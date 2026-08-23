@@ -28,7 +28,11 @@ APH.Colony = (function(){
     bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6,
       desc:'自动攻击来袭敌人。(Phase4 生效)' },
     bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1,
-      desc:'远征出发时携带 1 次急救(+40生命)。' },
+      desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
+    bl_farm:        { name:'水培农场', cost:35, size:52, max:4,
+      desc:'种植食物。有居民务农时每分钟产粮。' },
+    bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2,
+      desc:'饲养星绵羊。定期产肉皮。(U6)' },
   };
 
   function list(){ return BUILDINGS; }
@@ -117,6 +121,33 @@ APH.Colony = (function(){
     return { ok:true };
   }
 
+  /* ---------- U3 农田生长(纯函数) ----------
+     plot {stage:0~3, t:当前阶段累计}
+     每30s一跳; 有农民(skills.sk_farm)则加速。 */
+  function farmTick(plot, farmerSkill){
+    var need=[0,1,2,3][plot.stage];              // 各阶段所需跳数
+    var speed = 1 + (farmerSkill||0)*0.12;       // 种植技能加速
+    var p={stage:plot.stage, t:plot.t + speed};
+    if(p.t>=need && p.stage<3){ p.stage++; p.t=0; }
+    return p;
+  }
+  function harvestYield(plot){
+    return plot.stage===3 ? 3 : 0;               // 成熟收3粮
+  }
+
+  /* ---------- U5 岗位产出(纯函数) ----------
+     居民效率×主技能 → 每跳产出 */
+  function jobOutput(residentsAtJob, kind){
+    var total=0;
+    residentsAtJob.forEach(function(r){
+      var sk = kind==='farm'?'sk_farm':(kind==='ranch'?'sk_ranch':'sk_craft');
+      var eff=APH.Res.efficiency(r);
+      var lv=r.skills[sk]||0;
+      if(lv>0) total += Math.round(eff*(1+lv*0.25)*10)/10;
+    });
+    return total;
+  }
+
   /* ---------- 生产 tick (每30游戏秒一跳) ---------- */
   function productionTick(meta, buildings){
     var out = { mineral:0, research:0 };
@@ -165,6 +196,7 @@ APH.Colony = (function(){
   return {
     list:list, get:get,
     TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
+    farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, productionTick:productionTick,
     ensurePad:ensurePad,

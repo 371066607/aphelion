@@ -1,3 +1,31 @@
+/* P6-U1/U3/U4/U5/U7: 生成/需求/效率/社交/农田/岗位 */
+'use strict';
+const Colony = window.APH.Colony;
+
+test('farmTick: 阶段推进与技能加速', () => {
+  let p={stage:1,t:0};
+  p=Colony.farmTick(p,0);                       // 无农民: 播种需1跳
+  if(p.stage!==2) throw new Error('无农民1跳应到stage2: '+p.stage);
+  let q={stage:2,t:0};
+  q=Colony.farmTick(q,5);                       // 技能5: ×1.6/跳, 需求2 → 两跳累计3.2
+  if(Math.abs(q.t-1.6)>0.01) throw new Error('技能5一跳应累计1.6: '+q.t);
+  q=Colony.farmTick(q,5);
+  if(q.stage!==3) throw new Error('技能加速应两跳成熟: '+q.stage);
+});
+test('harvestYield: 只有成熟产出', () => {
+  if(Colony.harvestYield({stage:2})!==0) throw new Error('未熟应为0');
+  if(Colony.harvestYield({stage:3})!==3) throw new Error('成熟应产3');
+});
+test('jobOutput: 技能越高产出越多, 效率打折生效', () => {
+  const rookie=Res.generate('a',11); rookie.skills.sk_farm=1; rookie.mood=80; rookie.food=90;
+  const expert=Res.generate('b',22); expert.skills.sk_farm=8; expert.mood=85; expert.food=90;
+  const o1=Colony.jobOutput([rookie],'farm'), o2=Colony.jobOutput([expert],'farm');
+  if(!(o2>o1)) throw new Error('专家应更高: '+o1+' vs '+o2);
+  const starved=Res.generate('c',33); starved.skills.sk_farm=8; starved.mood=20; starved.food=5;
+  const o3=Colony.jobOutput([starved],'farm');
+  if(o3>=o2) throw new Error('饥饿低落应打折: '+o3+' vs '+o2);
+});
+
 /* P6-U1/U4/U7 居民系统纯函数: 生成/需求tick/效率/社交 */
 'use strict';
 const Res = window.APH.Res;

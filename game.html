@@ -878,7 +878,11 @@ APH.Colony = (function(){
     bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6,
       desc:'自动攻击来袭敌人。(Phase4 生效)' },
     bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1,
-      desc:'远征出发时携带 1 次急救(+40生命)。' },
+      desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
+    bl_farm:        { name:'水培农场', cost:35, size:52, max:4,
+      desc:'种植食物。有居民务农时每分钟产粮。' },
+    bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2,
+      desc:'饲养星绵羊。定期产肉皮。(U6)' },
   };
 
   function list(){ return BUILDINGS; }
@@ -967,6 +971,33 @@ APH.Colony = (function(){
     return { ok:true };
   }
 
+  /* ---------- U3 农田生长(纯函数) ----------
+     plot {stage:0~3, t:当前阶段累计}
+     每30s一跳; 有农民(skills.sk_farm)则加速。 */
+  function farmTick(plot, farmerSkill){
+    var need=[0,1,2,3][plot.stage];              // 各阶段所需跳数
+    var speed = 1 + (farmerSkill||0)*0.12;       // 种植技能加速
+    var p={stage:plot.stage, t:plot.t + speed};
+    if(p.t>=need && p.stage<3){ p.stage++; p.t=0; }
+    return p;
+  }
+  function harvestYield(plot){
+    return plot.stage===3 ? 3 : 0;               // 成熟收3粮
+  }
+
+  /* ---------- U5 岗位产出(纯函数) ----------
+     居民效率×主技能 → 每跳产出 */
+  function jobOutput(residentsAtJob, kind){
+    var total=0;
+    residentsAtJob.forEach(function(r){
+      var sk = kind==='farm'?'sk_farm':(kind==='ranch'?'sk_ranch':'sk_craft');
+      var eff=APH.Res.efficiency(r);
+      var lv=r.skills[sk]||0;
+      if(lv>0) total += Math.round(eff*(1+lv*0.25)*10)/10;
+    });
+    return total;
+  }
+
   /* ---------- 生产 tick (每30游戏秒一跳) ---------- */
   function productionTick(meta, buildings){
     var out = { mineral:0, research:0 };
@@ -1015,6 +1046,7 @@ APH.Colony = (function(){
   return {
     list:list, get:get,
     TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
+    farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, productionTick:productionTick,
     ensurePad:ensurePad,
@@ -3052,6 +3084,32 @@ window.APH = window.APH || {};
       APH.Res.needsTick(r, hasFood);
       if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
     });
+    /* U5 自动指派(简单版): 农场/牧场有空则派种植/畜牧最高的闲人 */
+    autoAssign('bl_farm','sk_farm',2);
+    autoAssign('bl_pasture','sk_ranch',2);
+
+    /* U3/U5 农场与岗位产出 */
+    var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
+    var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
+    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
+    farms.forEach(function(b){
+      if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
+      var bestFarmer=farmers.reduce(function(acc,r){
+        return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
+      },null);
+      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?bestFarmer.skills.sk_farm:0);
+      if(APH.Colony.harvestYield(b.plot)>0){
+        m.res.food=(m.res.food||0)+3;
+        APH.UI.floatText('🌾 农场收获 +3 食物','#c8e89a');
+        b.plot={stage:1,t:0};
+      }
+    });
+    /* 畜牧(U6简化): 有牧民时每跳概率+1肉 */
+    if(ranchers.length && Math.random()<0.35*ranchers.length){
+      m.res.food=(m.res.food||0)+2;
+      APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
+    }
+
     /* U7 社交 */
     var pairs=[];
     for(var i=0;i<m.residents.length;i++)
@@ -3081,6 +3139,19 @@ window.APH = window.APH || {};
     }
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  function autoAssign(buildingId, skillKey, perBuilding){
+    var s=APH.state, m=s.meta;
+    var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
+    var onJob = m.residents.filter(function(r){return r.job===buildingId;});
+    if(onJob.length>=slots) return;
+    var free=m.residents.filter(function(r){return !r.job;})
+      .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
+    while(onJob.length<slots && free.length){
+      var r=free.shift();
+      r.job=buildingId;
+      APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(buildingId).name+'工作','#8fd4ff');
+    }
+  }
   
   /* 战争系统: 袭击预警与进行中 */
     if(s.war.raidWarn>0){

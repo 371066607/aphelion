@@ -455,6 +455,32 @@ window.APH = window.APH || {};
       APH.Res.needsTick(r, hasFood);
       if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
     });
+    /* U5 自动指派(简单版): 农场/牧场有空则派种植/畜牧最高的闲人 */
+    autoAssign('bl_farm','sk_farm',2);
+    autoAssign('bl_pasture','sk_ranch',2);
+
+    /* U3/U5 农场与岗位产出 */
+    var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
+    var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
+    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
+    farms.forEach(function(b){
+      if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
+      var bestFarmer=farmers.reduce(function(acc,r){
+        return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
+      },null);
+      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?bestFarmer.skills.sk_farm:0);
+      if(APH.Colony.harvestYield(b.plot)>0){
+        m.res.food=(m.res.food||0)+3;
+        APH.UI.floatText('🌾 农场收获 +3 食物','#c8e89a');
+        b.plot={stage:1,t:0};
+      }
+    });
+    /* 畜牧(U6简化): 有牧民时每跳概率+1肉 */
+    if(ranchers.length && Math.random()<0.35*ranchers.length){
+      m.res.food=(m.res.food||0)+2;
+      APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
+    }
+
     /* U7 社交 */
     var pairs=[];
     for(var i=0;i<m.residents.length;i++)
@@ -484,6 +510,19 @@ window.APH = window.APH || {};
     }
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  function autoAssign(buildingId, skillKey, perBuilding){
+    var s=APH.state, m=s.meta;
+    var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
+    var onJob = m.residents.filter(function(r){return r.job===buildingId;});
+    if(onJob.length>=slots) return;
+    var free=m.residents.filter(function(r){return !r.job;})
+      .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
+    while(onJob.length<slots && free.length){
+      var r=free.shift();
+      r.job=buildingId;
+      APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(buildingId).name+'工作','#8fd4ff');
+    }
+  }
   
   /* 战争系统: 袭击预警与进行中 */
     if(s.war.raidWarn>0){
