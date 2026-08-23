@@ -64,6 +64,12 @@ window.APH = window.APH || {};
   function launchExpedition(){
     var s = APH.state;
     if(s.scene==='expedition') return;
+    /* T9: 超重出发提醒(不阻止, 只提示——玩家的选择权在他手里) */
+    var loadW=APH.Combat.carryWeight(s.carry);
+    if(loadW > CFG.player.carryMax*.7){
+      APH.UI.floatText('⚠ 负重 '+loadW+'/'+CFG.player.carryMax+
+        ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
+    }
     var seed=(Date.now()%100000)|0;
     var planet = APH.Planet.fallbackPlanet(seed);
     var cached = APH.Save.loadPlanet(planet.id);
@@ -611,6 +617,7 @@ window.APH = window.APH || {};
       updateHome(dt);
       /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
+      drawTutorialArrow(s.clock);
       APH.UI.updHUD();
       return;
     }
@@ -664,6 +671,30 @@ window.APH = window.APH || {};
       crystalGlow:function(){},
     };
   }
+  function drawTutorialArrow(time){
+    var s=APH.state;
+    if((s.meta.tut||0)>=4 || s.scene!=='home') return;
+    var pad=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
+    if(!pad) return;
+    var ctx2=document.getElementById('cv').getContext('2d');
+    var pulse=Math.sin(time*4)*.5+.5;
+    /* 玩家→发射台方向的浮动三角 */
+    var dx=pad.x-s.px, dy=(pad.y-40)-s.py, L=Math.sqrt(dx*dx+dy*dy)||1;
+    var ax=s.px+dx/L*46, ay=s.py+dy/L*46 - Math.sin(time*3)*4;
+    ctx2.save();
+    ctx2.translate(ax,ay);
+    ctx2.rotate(Math.atan2(dy,dx));
+    ctx2.fillStyle='rgba(255,200,87,'+(0.45+pulse*.5)+')';
+    ctx2.beginPath();
+    ctx2.moveTo(10,0); ctx2.lineTo(-6,-7); ctx2.lineTo(-6,7);
+    ctx2.closePath(); ctx2.fill();
+    ctx2.restore();
+    /* 距离标签 */
+    ctx2.fillStyle='rgba(255,200,87,.75)';
+    ctx2.font='10px monospace'; ctx2.textAlign='center';
+    ctx2.fillText('发射台 '+Math.round(L)+'m', ax, ay+20);
+  }
+
   function homeDrawers(){
     var d = {
       player:function(e,t){ APH.Ent.drawPlayer(e,t); },
