@@ -351,6 +351,16 @@ window.APH = window.APH || {};
     /* 殖民地内缓慢回血回氧(安全区) */
     s.o2=Math.min(CFG.player.o2Max, s.o2+dt*10);
     s.hp=Math.min(CFG.player.hpMax, s.hp+dt*6);
+
+    /* 生产 tick: 每30游戏秒结算一次采矿机/研究站 (ADR-6 固定tick) */
+    s.prodT=(s.prodT||0)+dt;
+    if(s.prodT>=30){
+      s.prodT-=30;
+      var out=APH.Colony.productionTick(s.meta, s.colony.buildings);
+      APH.Save.saveMeta(s.meta);
+      if(out.mineral||out.research)
+        APH.UI.floatText('生产: +'+out.mineral+' 矿材 +'+out.research+' 研究点','#9fe8c8');
+    }
   }
   function updateExpedition(dt){
     var s=APH.state;
@@ -468,6 +478,24 @@ window.APH = window.APH || {};
     return d;
   }
 
+  /* ================= 科技效果应用 ================= */
+  function applyTech(meta,techId){
+    var t=APH.Colony.TECHS[techId]; if(!t) return;
+    var lv=meta.tech[techId]||0;
+    var P=CFG.player;
+    /* 从基准值重算, 避免叠加误差 */
+    if(t.effect.o2Max){ P.o2Max = 100 + t.effect.o2Max*lv; S_o2Clamp(); }
+    if(t.effect.dmgMul){ CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*lv)); }
+    if(t.effect.spdMul){ P.walkSpeed=Math.round(150*(1+t.effect.spdMul*lv));
+                         P.runSpeed=Math.round(235*(1+t.effect.spdMul*lv)); }
+    if(t.effect.radar){ /* Phase3b: 罗盘全显 */ }
+  }
+  function applyAllTech(meta){
+    Object.keys(APH.Colony.TECHS).forEach(function(id){ applyTech(meta,id); });
+    if(S_o2Clamp) S_o2Clamp();
+  }
+  function S_o2Clamp(){ if(APH.state) APH.state.o2=Math.min(APH.state.o2,CFG.player.o2Max); }
+
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
     var s=APH.state;
@@ -531,6 +559,27 @@ window.APH = window.APH || {};
           : '建造模式关闭');
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
+      /* T=科技购买(仅殖民地): 循环选择并直接购买 */
+      if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
+        var tids=Object.keys(APH.Colony.TECHS);
+        var ti=tids.indexOf(s.techSel);
+        s.techSel=tids[(ti+1)%tids.length];
+        var tdef=APH.Colony.TECHS[s.techSel];
+        var lv=s.meta.tech[s.techSel]||0;
+        APH.UI.setHint('[回车购买] '+tdef.name+' Lv'+lv+'/'+tdef.max+
+          ' · '+tdef.desc+' · '+tdef.cost+'研究点 (再按T换, Enter买)');
+      }
+      if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'&&s.techSel){
+        var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech);
+        if(r2.ok){
+          s.meta.tech=r2.owned;
+          APH.Save.saveMeta(s.meta);
+          applyTech(s.meta,s.techSel);
+          APH.UI.floatText('✔ 研究完成: '+APH.Colony.TECHS[s.techSel].name,'#59d9ff');
+        }else{
+          APH.UI.floatText('✕ 无法研究','#ff9a9a');
+        }
+      }
       if(e.code==='KeyK'&&s.mode==='running'){
         var f=s.spec.enemies.factions[0];
         s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
@@ -648,7 +697,10 @@ window.APH = window.APH || {};
   function boot(){
     try{
       var meta=APH.Save.loadMeta();
+      if(!meta.tech) meta.tech={};
+      if(!meta.res) meta.res={mineral:0};
       APH.state.meta=meta;
+      applyAllTech(meta);
       APH.state.colony=loadColony();          // 殖民地布局持久化
       APH.World.initCanvas();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));

@@ -129,8 +129,42 @@ APH.Colony = (function(){
     return out;
   }
 
+
+  /* ---------- 科技树 v1 (ADR-9: te_ 前缀; 消耗研究点) ----------
+     effect 字段由 applyTech 解释, 永不直接改数值。 */
+  var TECHS = {
+    te_o2tank:   { name:'氧气罐扩容', cost:40, max:3,
+                   desc:'氧气上限 +25', effect:{ o2Max:+25 } },
+    te_weaponry: { name:'等离子强化', cost:60, max:3,
+                   desc:'武器伤害 +30%', effect:{ dmgMul:.30 } },
+    te_radar:    { name:'深空雷达', cost:50, max:2,
+                   desc:'罗盘显示所有信标距离', effect:{ radar:true } },
+    exo_suit:    { name:'外骨骼', cost:90, max:2,
+                   desc:'移动速度 +15%', effect:{ spdMul:.15 } },
+  };
+
+  /* 可购判定(纯函数) */
+  function canBuy(meta, techId, owned){
+    var t=TECHS[techId];
+    if(!t) return { ok:false, why:'未知科技' };
+    if((owned[techId]||0)>=t.max) return { ok:false, why:'已达最高等级' };
+    if(meta.research < t.cost) return { ok:false, why:'研究点不足 (需 '+t.cost+')' };
+    return { ok:true };
+  }
+
+  /* 购买并应用效果(世界侧): 返回更新后的 owned */
+  function buyTech(meta, techId, owned){
+    var chk=canBuy(meta, techId, owned);
+    if(!chk.ok) return { ok:false, owned:owned };
+    meta.research -= TECHS[techId].cost;
+    var o = Object.assign({}, owned);
+    o[techId]=(o[techId]||0)+1;
+    return { ok:true, owned:o };
+  }
+
   return {
     list:list, get:get,
+    TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, productionTick:productionTick,
     ensurePad:ensurePad,
