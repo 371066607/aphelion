@@ -268,6 +268,7 @@ APH.Combat = (function(){
     if(s.hp <= 0){
       s.hp = 0;
       s.mode = 'dead';
+      U.emit('gameOver',{});
       s.meta.stats.deaths++;
       APH.Save.saveMeta(s.meta);
       APH.UI.showDeath('你被 '+source+'终结了。', {

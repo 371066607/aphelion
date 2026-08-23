@@ -1351,6 +1351,7 @@ APH.Combat = (function(){
     if(s.hp <= 0){
       s.hp = 0;
       s.mode = 'dead';
+      U.emit('gameOver',{});
       s.meta.stats.deaths++;
       APH.Save.saveMeta(s.meta);
       APH.UI.showDeath('你被 '+source+'终结了。', {
@@ -2160,6 +2161,105 @@ APH.Ent = (function(){
 </script>
 <script>
 /* ============================================================
+   Aphelion · sfx.js — 合成音效 (Phase 5)
+   挂载: window.APH.SFX
+   零素材: 全部 WebAudio 振荡器合成。
+   通过事件总线(ADR-8)自动接线, 无 AudioContext 时静默降级。
+   M 键静音切换(main.js)。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.SFX = (function(){
+  'use strict';
+  var ctx=null, muted=false;
+
+  function ensure(){
+    if(ctx) return true;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return false;
+    try{ ctx = new AC(); }catch(e){ return false; }
+    return true;
+  }
+  /* 浏览器自动播放策略: 首次用户手势时 resume */
+  function unlock(){ if(ensure() && ctx.state==='suspended') ctx.resume(); }
+
+  function tone(opt){
+    if(muted || !ensure()) return;
+    try{
+      var t=ctx.currentTime+(opt.delay||0);
+      var o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=opt.type||'square';
+      o.frequency.setValueAtTime(opt.f0||440,t);
+      if(opt.f1) o.frequency.exponentialRampToValueAtTime(Math.max(1,opt.f1),t+(opt.dur||.1));
+      g.gain.setValueAtTime(opt.vol||.08,t);
+      g.gain.exponentialRampToValueAtTime(.0008,t+(opt.dur||.1));
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t+(opt.dur||.1)+.02);
+    }catch(e){}
+  }
+  function noise(dur,vol,f){
+    if(muted || !ensure()) return;
+    try{
+      var n=ctx.sampleRate*dur, buf=ctx.createBuffer(1,n,ctx.sampleRate);
+      var d=buf.getChannelData(0);
+      for(var i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+      var src=ctx.createBufferSource(); src.buffer=buf;
+      var flt=ctx.createBiquadFilter(); flt.type='lowpass'; flt.frequency.value=f||900;
+      var g=ctx.createGain(); g.gain.value=vol||.12;
+      src.connect(flt); flt.connect(g); g.connect(ctx.destination);
+      src.start();
+    }catch(e){}
+  }
+
+  /* ---------- 音效定义 ---------- */
+  var LIB={
+    playerFired:  function(){ tone({type:'square',f0:880,f1:220,dur:.09,vol:.05});
+                             noise(.04,.03,2400); },
+    enemyHit:     function(){ tone({type:'triangle',f0:300,f1:120,dur:.07,vol:.06}); },
+    enemyKilled:  function(){ noise(.18,.14,700);
+                              tone({type:'sawtooth',f0:160,f1:40,dur:.22,vol:.08}); },
+    lootPicked:   function(){ tone({type:'sine',f0:660,dur:.07,vol:.06});
+                              tone({type:'sine',f0:990,dur:.09,vol:.05,delay:.06}); },
+    beaconScan:   function(){ tone({type:'sine',f0:520,dur:.12,vol:.05});
+                              tone({type:'sine',f0:780,dur:.12,vol:.05,delay:.11});
+                              tone({type:'sine',f0:1040,dur:.2,vol:.06,delay:.22}); },
+    playerHurt:   function(){ tone({type:'sawtooth',f0:200,f1:70,dur:.16,vol:.1});
+                              noise(.1,.08,500); },
+    built:        function(){ tone({type:'square',f0:392,dur:.08,vol:.06});
+                              tone({type:'square',f0:523,dur:.1,vol:.06,delay:.08}); },
+    techDone:     function(){ [523,659,784].forEach(function(f,i){
+                                tone({type:'sine',f0:f,dur:.12,vol:.06,delay:i*.09}); }); },
+    raidWarn:     function(){ tone({type:'square',f0:440,dur:.15,vol:.09});
+                              tone({type:'square',f0:440,dur:.15,vol:.09,delay:.25}); },
+    raidStarted:  function(){ tone({type:'sawtooth',f0:110,f1:55,dur:.6,vol:.12}); },
+    raidDefended: function(){ [392,494,587,784].forEach(function(f,i){
+                                tone({type:'triangle',f0:f,dur:.16,vol:.07,delay:i*.11}); }); },
+    raidSuccess:  function(){ noise(.3,.16,600);
+                              [330,392,523,659].forEach(function(f,i){
+                                tone({type:'square',f0:f,dur:.14,vol:.07,delay:i*.1}); }); },
+    died:         function(){ tone({type:'sawtooth',f0:220,f1:30,dur:.9,vol:.12}); },
+    launched:     function(){ tone({type:'sawtooth',f0:80,f1:400,dur:.5,vol:.08}); },
+  };
+
+  /* 接线事件总线 */
+  function bindBus(){
+    var U=APH.U; if(!U||!U.on) return;
+    Object.keys(LIB).forEach(function(ev){
+      U.on(ev, function(){ LIB[ev](); });
+    });
+    /* 死亡走 playerHurt 之外单独事件 */
+    U.on('gameOver', function(){ LIB.died(); });
+  }
+  function toggleMute(){ muted=!muted; return muted; }
+  function isMuted(){ return muted; }
+
+  return { unlock:unlock, bindBus:bindBus, toggleMute:toggleMute,
+           isMuted:isMuted, play:function(n){ if(LIB[n]) LIB[n](); } };
+})();
+
+</script>
+<script>
+/* ============================================================
    Aphelion · ui.js — HUD/提示/卡片/全屏界面 (无游戏逻辑)
    挂载: window.APH.UI
    ============================================================ */
@@ -2344,7 +2444,19 @@ window.APH = window.APH || {};
     s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
     document.getElementById('planetTitle').textContent =
       '新曙光殖民地 · 家园';
-    APH.UI.setHint('殖民地 · 安全区。靠近发射台出发远征。');
+    /* 新手引导(meta.tut 阶段标记, 持久化) */
+    var tut=APH.state.meta.tut||0;
+    var hints=[
+      '殖民地是你的家。先按 [T] 选科技、[B] 建造, 或去发射台',
+      '[E] 从发射台出发远征 · 星球上搜刮战利品',
+      '返回舱按 [E] 回家结算 · 研究点用于科技与建造',
+      '小心: AI 殖民地会袭击你。炮塔与士兵是防御的关键',
+    ];
+    APH.UI.setHint(hints[Math.min(tut,hints.length-1)]);
+    if(tut<hints.length) {
+      APH.state.meta.tut=tut+1;
+      APH.Save.saveMeta(APH.state.meta);
+    }
   }
   function launchExpedition(){
     var s = APH.state;
@@ -2606,6 +2718,7 @@ window.APH = window.APH || {};
     }
     if(s.o2<=0){
       s.mode='dead';
+      U.emit('gameOver',{});
       APH.state.meta.stats.deaths++;
       APH.Save.saveMeta(APH.state.meta);
       APH.UI.showDeath('生命维持系统在荒原上停转了。', {
@@ -2938,6 +3051,7 @@ window.APH = window.APH || {};
     var s=APH.state;
     addEventListener('keydown',function(e){
       s.keys[e.code]=true;
+      APH.SFX.unlock();
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
       /* E=发射台交互: 不在发射台时自动走过去(再次按E触发) */
       if(e.code==='KeyE'&&s.mode==='running'){
@@ -2968,6 +3082,8 @@ window.APH = window.APH || {};
           : '建造模式关闭');
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
+      if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
+        APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -3089,6 +3205,7 @@ window.APH = window.APH || {};
   }
 
   function startGame(){
+    APH.SFX.unlock();
     var s=APH.state;
     if(s.mode!=='intro') return;
     s.mode='running';
@@ -3114,6 +3231,7 @@ window.APH = window.APH || {};
       APH.World.initCanvas();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
       var seed=(Date.now()%100000)|0;
+      APH.SFX.bindBus();
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
       bindInput();

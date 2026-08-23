@@ -23,6 +23,7 @@ MODULE_ORDER = [
     "combat.js",
     "world.js",
     "entities.js",
+    "sfx.js",
     "ui.js",
     "main.js",
 ]

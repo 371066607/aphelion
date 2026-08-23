@@ -47,7 +47,19 @@ window.APH = window.APH || {};
     s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
     document.getElementById('planetTitle').textContent =
       '新曙光殖民地 · 家园';
-    APH.UI.setHint('殖民地 · 安全区。靠近发射台出发远征。');
+    /* 新手引导(meta.tut 阶段标记, 持久化) */
+    var tut=APH.state.meta.tut||0;
+    var hints=[
+      '殖民地是你的家。先按 [T] 选科技、[B] 建造, 或去发射台',
+      '[E] 从发射台出发远征 · 星球上搜刮战利品',
+      '返回舱按 [E] 回家结算 · 研究点用于科技与建造',
+      '小心: AI 殖民地会袭击你。炮塔与士兵是防御的关键',
+    ];
+    APH.UI.setHint(hints[Math.min(tut,hints.length-1)]);
+    if(tut<hints.length) {
+      APH.state.meta.tut=tut+1;
+      APH.Save.saveMeta(APH.state.meta);
+    }
   }
   function launchExpedition(){
     var s = APH.state;
@@ -309,6 +321,7 @@ window.APH = window.APH || {};
     }
     if(s.o2<=0){
       s.mode='dead';
+      U.emit('gameOver',{});
       APH.state.meta.stats.deaths++;
       APH.Save.saveMeta(APH.state.meta);
       APH.UI.showDeath('生命维持系统在荒原上停转了。', {
@@ -641,6 +654,7 @@ window.APH = window.APH || {};
     var s=APH.state;
     addEventListener('keydown',function(e){
       s.keys[e.code]=true;
+      APH.SFX.unlock();
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
       /* E=发射台交互: 不在发射台时自动走过去(再次按E触发) */
       if(e.code==='KeyE'&&s.mode==='running'){
@@ -671,6 +685,8 @@ window.APH = window.APH || {};
           : '建造模式关闭');
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
+      if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
+        APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -792,6 +808,7 @@ window.APH = window.APH || {};
   }
 
   function startGame(){
+    APH.SFX.unlock();
     var s=APH.state;
     if(s.mode!=='intro') return;
     s.mode='running';
@@ -817,6 +834,7 @@ window.APH = window.APH || {};
       APH.World.initCanvas();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
       var seed=(Date.now()%100000)|0;
+      APH.SFX.bindBus();
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
       bindInput();
