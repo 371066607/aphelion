@@ -33,52 +33,65 @@ window.APH = window.APH || {};
   };
 
   /* ================= 世界搭建 ================= */
-  function buildWorld(seed){
+  function buildWorld(seed, onReady){
     var s = APH.state;
     var planet = APH.Planet.fallbackPlanet(seed);
-    /* 存档: 有缓存用缓存, 否则写入 */
     var cached = APH.Save.loadPlanet(planet.id);
-    if(cached){ planet = cached; }
-    else{ APH.Save.savePlanet(planet.id, planet); }
-    s.spec = planet;
-    s.seed = planet.seed;
-    s.totalBeacons = planet.beacons.length;
-
-    /* 统一实体列表 (ADR-3) */
-    s.entities = [];
-    s.entities.push({ id:'player', type:T.PLAYER, x:CFG.HAB.x, y:CFG.HAB.y+70 });
-    s.px = CFG.HAB.x; s.py = CFG.HAB.y+70;
-    s.camX = s.px; s.camY = s.py;
-
-    var rng = U.makeRng(seed ^ 0x9E3779B9);   // 地形装饰独立子流
-    var placedR=0, guard=0;
-    while(placedR < CFG.caps.rocks && guard++ < 500){
-      var rx = rng()*(CFG.WORLD-120)+60, ry = rng()*(CFG.WORLD-120)+60;
-      if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
-      if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<planet.terrain.lakeR+40) continue;
-      if(planet.beacons.some(function(b){ return U.dst(rx,ry,b.x,b.y)<90; })) continue;
-      s.entities.push(APH.Ent.makeRock(rx,ry,rng));
-      placedR++;
+    if(cached){ planet = cached; applySpec(planet); }
+    else{
+      applySpec(planet);                        // 先以降级版立即开跑
+      APH.LLM.enrichPlanet(planet).then(function(rich){
+        if(rich && s.mode==='intro' && !s.specSaved){   // intro 期完成才热替换
+          rich.id = planet.id;                    // 富化不改 id
+          APH.Save.savePlanet(rich.id, rich);
+          s.specSaved = true;
+          applySpec(rebuildEntities(rich));
+        }
+      });
     }
-    var placedC=0; guard=0;
-    while(placedC < Math.floor(CFG.caps.crystals*planet.terrain.crystalDensity) && guard++ < 500){
-      var cx = rng()*(CFG.WORLD-140)+70, cy = rng()*(CFG.WORLD-140)+70;
-      if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
-      if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<planet.terrain.lakeR+30) continue;
-      s.entities.push(APH.Ent.makeCrystal(cx,cy));
-      placedC++;
+    function rebuildEntities(p){ return p; }      // 占位: 实体在 applySpec 内重建
+
+    function applySpec(p){
+      s.spec = p;
+      s.specSaved = !!cached;
+      s.seed = p.seed;
+      s.totalBeacons = p.beacons.length;
+
+      /* 统一实体列表 (ADR-3) */
+      s.entities = [];
+      s.entities.push({ id:'player', type:T.PLAYER, x:CFG.HAB.x, y:CFG.HAB.y+70 });
+      s.px = CFG.HAB.x; s.py = CFG.HAB.y+70;
+      s.camX = s.px; s.camY = s.py;
+
+      var rng = U.makeRng(seed ^ 0x9E3779B9);
+      var placedR=0, guard=0;
+      while(placedR < CFG.caps.rocks && guard++ < 500){
+        var rx = rng()*(CFG.WORLD-120)+60, ry = rng()*(CFG.WORLD-120)+60;
+        if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
+        if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
+        if(p.beacons.some(function(b){ return U.dst(rx,ry,b.x,b.y)<90; })) continue;
+        s.entities.push(APH.Ent.makeRock(rx,ry,rng));
+        placedR++;
+      }
+      var placedC=0; guard=0;
+      while(placedC < Math.floor(CFG.caps.crystals*p.terrain.crystalDensity) && guard++ < 500){
+        var cx = rng()*(CFG.WORLD-140)+70, cy = rng()*(CFG.WORLD-140)+70;
+        if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
+        if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        s.entities.push(APH.Ent.makeCrystal(cx,cy));
+        placedC++;
+      }
+      p.beacons.forEach(function(d){ s.entities.push(APH.Ent.makeBeacon(d)); });
+
+      s.spores = [];
+      for(var i=0;i<CFG.caps.spores;i++)
+        s.spores.push({x:rng()*CFG.WORLD, y:rng()*CFG.WORLD, ph:rng()*U.TAU, s:.5+rng()});
+
+      document.getElementById('planetTitle').textContent =
+        p.name + ' · ' + p.paletteName;
+      APH.World.buildTerrain();
+      if(onReady) onReady();
     }
-    planet.beacons.forEach(function(d){
-      s.entities.push(APH.Ent.makeBeacon(d));
-    });
-
-    /* 孢子(表现层) */
-    s.spores = [];
-    for(var i=0;i<CFG.caps.spores;i++)
-      s.spores.push({x:rng()*CFG.WORLD, y:rng()*CFG.WORLD, ph:rng()*U.TAU, s:.5+rng()});
-
-    document.getElementById('planetTitle').textContent =
-      planet.name + ' · ' + planet.paletteName;
   }
 
   /* ================= 扫描交互 ================= */
@@ -378,9 +391,19 @@ window.APH = window.APH || {};
       APH.state.mode='running';
       document.getElementById('end').classList.remove('show');
     });
-    /* 开场画面整体可点(点击兜底协议) */
+    /* 通关结算页: 新星球按钮 */
+    var np=document.createElement('button');
+    np.className='bigBtn';
+    np.style.cssText+='margin-top:10px;border-color:#59d9ff;color:#59d9ff;letter-spacing:3px;font-size:13px';
+    np.textContent='跃迁 · 下一颗星球';
+    np.addEventListener('click',newPlanet);
+    document.getElementById('end').appendChild(np);
+    /* 开场画面点击开始(只限按钮/背景, 不吃设置面板的交互) */
     document.getElementById('intro').addEventListener('click',function(ev){
-      if(ev.target.id!=='startBtn') startGame();
+      var t=ev.target;
+      var inPanel = t.closest && t.closest('#llmForm');
+      if(inPanel) return;                    // 设置面板内不触发
+      if(t.id==='startBtn'||t===ev.currentTarget) startGame();
     });
   }
 
@@ -408,12 +431,82 @@ window.APH = window.APH || {};
       var seed=(Date.now()%100000)|0;
       buildWorld(seed);
       bindInput();
+      bindLLMPanel();
       APH.UI.updHUD();
-      document.title='✓就绪 '+APH.state.spec.name;
+      document.title='✓就绪 '+APH.state.spec.name+
+        (APH.LLM.enabled()?' ·AI':'');
     }catch(err){
       APH.UI.fatal('启动失败: '+err.message+'\n'+(err.stack||''));
       throw err;
     }
+  }
+
+  /* 「新星球」: 换 seed 重建世界(结算页入口) */
+  function newPlanet(){
+    var s=APH.state;
+    s.mode='intro';
+    document.getElementById('end').classList.remove('show');
+    var scr=document.getElementById('intro');
+    scr.classList.remove('hide');
+    scr.querySelector('h1').textContent='跃 迁 中';
+    scr.querySelector('.tag').textContent='WARP COMPLETE';
+    scr.querySelector('p').innerHTML='正在展开新的行星档案…<br><span style="color:#5d6f96">'+
+      (APH.LLM.enabled()?'AI 正在撰写这颗星球的故事':'(未配置 AI, 使用程序生成档案)')+'</span>';
+    var b=document.getElementById('startBtn');
+    b.textContent='踏 上 星 球';
+    b.onclick=function(){ location.reload(); };
+    var seed=((Date.now()>>>3)^(s.seed*2654435761))>>>0 % 100000;
+    buildWorld(seed);
+    setTimeout(function(){
+      scr.querySelector('h1').textContent='远 日 点';
+      scr.querySelector('p').innerHTML='档案就绪：<b style="color:#ffc857">'+
+        s.spec.name+'</b> · '+s.spec.paletteName+
+        '<br>6 座信标 · '+(s.spec.generatedBy==='llm'?'AI 撰写档案':'程序生成档案');
+      refreshLLMStatus();
+    }, 600);
+  }
+
+  /* ================= LLM 设置面板(开场画面内) ================= */
+  function bindLLMPanel(){
+    var intro=document.getElementById('intro');
+    var panel=document.createElement('div');
+    panel.style.cssText='margin-top:18px;font-size:11px;color:#5d6f96;line-height:2';
+    panel.innerHTML=
+      '<span id="llmStatus"></span> '+
+      '<a href="#" id="llmToggle" style="color:#59d9ff;text-decoration:none">AI 档案设置</a>'+
+      '<div id="llmForm" style="display:none;margin-top:8px">'+
+      '<input id="llmEp" placeholder="API endpoint (https://.../v1)" '+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px"><br>'+
+      '<input id="llmKey" type="password" placeholder="API Key"'+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
+      '<input id="llmModel" placeholder="模型名 (如 gemini-2.0-flash)"'+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
+      '<button id="llmSave" style="margin-top:6px;background:none;border:1px solid #59d9ff;color:#59d9ff;'+
+        'padding:5px 16px;border-radius:12px;font-size:11px;cursor:pointer">保存</button>'+
+      '</div>';
+    intro.appendChild(panel);
+    refreshLLMStatus();
+    document.getElementById('llmToggle').addEventListener('click',function(e){
+      e.preventDefault();
+      var f=document.getElementById('llmForm');
+      f.style.display = f.style.display==='none' ? 'block' : 'none';
+    });
+    document.getElementById('llmSave').addEventListener('click',function(){
+      APH.LLM.setConf(
+        document.getElementById('llmEp').value,
+        document.getElementById('llmKey').value,
+        document.getElementById('llmModel').value);
+      refreshLLMStatus();
+      document.getElementById('llmForm').style.display='none';
+    });
+  }
+  function refreshLLMStatus(){
+    var el=document.getElementById('llmStatus');
+    if(!el) return;
+    var q=APH.LLM.quotaInfo();
+    el.textContent = APH.LLM.enabled()
+      ? '● AI 档案开启 (今日余 '+q.left+')'
+      : '○ AI 未配置(程序降级)';
   }
   boot();
   requestAnimationFrame(frame);

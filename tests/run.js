@@ -22,9 +22,9 @@ const cases = [];
 function test(name, fn) { cases.push({ name, fn }); }
 global.test = test;
 
-/* ---- 加载被测模块(顺序同 build.py) ---- */
+/* ---- 加载被测模块(顺序同 build.py, 不含 DOM 依赖模块) ---- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'save.js', 'planet.js', 'combat.js']) {
+for (const f of ['config.js', 'utils.js', 'save.js', 'planet.js', 'combat.js', 'llm.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 

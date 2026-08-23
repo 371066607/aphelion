@@ -17,6 +17,7 @@ MODULE_ORDER = [
     "utils.js",
     "save.js",
     "planet.js",
+    "llm.js",
     "combat.js",
     "world.js",
     "entities.js",
