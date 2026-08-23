@@ -1,3 +1,17 @@
+/* V2 唯一性与小传 */
+test('generate: takenNames 查重', () => {
+  const r=Res.generate('u1',9,['青禾·一号']);
+  if(r.name==='青禾·一号') throw new Error('应避开已用名');
+  const r2=Res.generate('u2',9,[]);
+  if(!r2.name) throw new Error('无查重表也应正常命名');
+});
+test('fallbackBio: 确定性小传含名字与出身', () => {
+  const r=Res.generate('b1',42);
+  const bio1=Res.fallbackBio(r), bio2=Res.fallbackBio(r);
+  if(bio1!==bio2) throw new Error('小传应确定');
+  if(bio1.indexOf(r.name)<0 || bio1.indexOf(r.origin)<0) throw new Error('应含名字与出身: '+bio1);
+});
+
 /* V1 全局加成 */
 test('globalBonuses: 空居民无加成', () => {
   const gb=Res.globalBonuses([]);

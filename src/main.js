@@ -1119,6 +1119,7 @@ window.APH = window.APH || {};
         ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
          :' · '+jobTxt)+'</span><br>'+
         '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
+        (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
         '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
         '</div>';
     });
@@ -1222,9 +1223,11 @@ window.APH = window.APH || {};
     var cap=housingCap();
     if(m.residents.length < cap && Math.random()<0.25){
       m.residentSeq=(m.residentSeq||0)+1;
+      var taken=m.residents.map(function(x){return x.name;});
       var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
-                             ((s.seed||7)*31+m.residentSeq*917)>>>0);
+                             ((s.seed||7)*31+m.residentSeq*917)>>>0, taken);
       r.arrivedAt=s.clock;
+      APH.Res.enrichBio(r);
       m.residents.push(r);
       saveMetaQuiet();
       var skName=APH.Res.SKILL_NAMES[r.mainSkill];

@@ -1170,7 +1170,7 @@ APH.Res = (function(){
   /* ---------- U1: 居民生成(纯函数) ----------
      每人: 一个主技能(高) + 一个副技能(中) + 其余低;
      心情/饱食度初始健康。 */
-  function generate(id, seed){
+  function generate(id, seed, takenNames){
     var rng=U.makeRng(seed);
     function pick(a){ return a[Math.floor(rng()*a.length)]; }
     /* 主副技能不重复 */
@@ -1185,7 +1185,15 @@ APH.Res = (function(){
     });
     return {
       id:'rs_'+id,
-      name:pick(FIRST)+pick(LAST),
+      name:(function(){
+        /* V2 唯一性: 与已用名组合去重 */
+        var used=takenNames||[], nm;
+        for(var tries=0; tries<40; tries++){
+          nm=pick(FIRST)+pick(LAST);
+          if(used.indexOf(nm)<0) return nm;
+        }
+        return nm+'·'+id;                        // 兜底: 附id保证唯一
+      })(),
       origin:pick(ORIGINS),
       skills:skills, mainSkill:main, subSkill:sub,
       mood:70+Math.floor(rng()*25),                          // 70~94
@@ -1255,11 +1263,38 @@ APH.Res = (function(){
     };
   }
 
+  /* ---------- V2 程序化小传(降级用, 纯函数) ---------- */
+  var BIO_A=['沉默寡言','爱管闲事','手艺精湛','记性极差','运气出奇','胆小如鼠','天生乐观','固执己见'];
+  var BIO_B=['曾在废墟里救过人','会修任何漏水的管子','坚持每天写日记','养着一株不肯开花的植物',
+             '声称听过星球的声音','输掉过一整艘飞船','做的汤全殖民地公认第一','总在夜里看星星'];
+  function fallbackBio(r){
+    var rng=U.makeRng((r.id.length*131+r.name.length*17)>>>0);
+    function pick(a){ return a[Math.floor(rng()*a.length)]; }
+    var sk=SKILL_NAMES[r.mainSkill];
+    return r.name+'，来自'+r.origin+'，'+pick(BIO_A)+'。'+pick(BIO_B)+
+           '。'+sk+'是他/她在船上唯一安放得下的骄傲。';
+  }
+  /* LLM 富化(异步): 走 llm.generate 缓存与配额, 失败静默保留程序版 */
+  function enrichBio(r){
+    if(!APH.LLM || !APH.LLM.enabled()) { r.bio=fallbackBio(r); return Promise.resolve(r); }
+    var user='为殖民者写一条中文小传(40-70字)。姓名:'+r.name+'; 出身:'+r.origin+
+      '; 性格:'+r.trait+'; 主技能:'+SKILL_NAMES[r.mainSkill]+'('+((r.skills[r.mainSkill]||0))+'级)'+
+      '; 当前心情:'+r.mood+'。只输出JSON: {"bio":"..."}。冷静克制的科幻笔触。';
+    return APH.LLM.generate('colonist_v1', {id:r.id}, '你是科幻游戏的程序化叙事引擎, 只输出合法 JSON。', user)
+      .then(function(en){
+        r.bio = (en && typeof en.bio==='string' && en.bio.length>=10)
+          ? en.bio.slice(0,140) : fallbackBio(r);
+        return r;
+      })
+      .catch(function(){ r.bio=fallbackBio(r); return r; });
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, efficiency:efficiency,
     socialTick:socialTick, applyBond:applyBond,
     globalBonuses:globalBonuses,
+    fallbackBio:fallbackBio, enrichBio:enrichBio,
   };
 })();
 
@@ -3773,6 +3808,7 @@ window.APH = window.APH || {};
         ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
          :' · '+jobTxt)+'</span><br>'+
         '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
+        (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
         '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
         '</div>';
     });
@@ -3876,9 +3912,11 @@ window.APH = window.APH || {};
     var cap=housingCap();
     if(m.residents.length < cap && Math.random()<0.25){
       m.residentSeq=(m.residentSeq||0)+1;
+      var taken=m.residents.map(function(x){return x.name;});
       var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
-                             ((s.seed||7)*31+m.residentSeq*917)>>>0);
+                             ((s.seed||7)*31+m.residentSeq*917)>>>0, taken);
       r.arrivedAt=s.clock;
+      APH.Res.enrichBio(r);
       m.residents.push(r);
       saveMetaQuiet();
       var skName=APH.Res.SKILL_NAMES[r.mainSkill];
