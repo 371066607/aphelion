@@ -3034,10 +3034,55 @@ window.APH = window.APH || {};
       if(out.mineral||out.research)
         APH.UI.floatText('生产: +'+out.mineral+' 矿材 +'+out.research+' 研究点','#9fe8c8');
       /* AI殖民地同步成长(同拍) */
-      tickRivals(dt*0+30/60);
+      tickRivals(30/60);
+      residentsTick();                            // P6-U2/U4/U7
     }
 
-    /* 战争系统: 袭击预警与进行中 */
+    /* ================= P6 居民系统 ================= */
+  function housingCap(){
+    /* 住宅容量: 居住舱本体2席, 医疗舱每座+1(临时设计, 后续住宅建筑扩展) */
+    return 2 + APH.state.colony.buildings.filter(function(b){return b.id==='bl_clinic';}).length;
+  }
+  function residentsTick(){
+    var s=APH.state, m=s.meta;
+    /* U4 需求结算: 吃仓库食物 */
+    var hasFood=(m.res.food||0)>0;
+    m.residents.forEach(function(r){
+      var before=r.food;
+      APH.Res.needsTick(r, hasFood);
+      if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
+    });
+    /* U7 社交 */
+    var pairs=[];
+    for(var i=0;i<m.residents.length;i++)
+      for(var j=i+1;j<m.residents.length;j++){
+        var a=m.residents[i], b=m.residents[j];
+        pairs.push({a:a,b:b,sameJob:!!(a.job&&a.job===b.job)});
+      }
+    if(!m.bonds) m.bonds={};
+    APH.Res.socialTick(pairs).forEach(function(d){
+      m.bonds=APH.Res.applyBond(m.bonds,d.a,d.b,d.delta);
+    });
+    saveMetaQuiet();
+    /* U2 到访事件 */
+    var cap=housingCap();
+    if(m.residents.length < cap && Math.random()<0.25){
+      m.residentSeq=(m.residentSeq||0)+1;
+      var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
+                             ((s.seed||7)*31+m.residentSeq*917)>>>0);
+      r.arrivedAt=s.clock;
+      m.residents.push(r);
+      saveMetaQuiet();
+      var skName=APH.Res.SKILL_NAMES[r.mainSkill];
+      APH.UI.floatText('🧑‍🚀 '+r.name+' 加入了殖民地 ('+skName+'专精)', '#9fe8c8');
+      U.emit('residentJoined', r);
+    }else if(m.residents.length>=cap && Math.random()<0.06){
+      APH.UI.floatText('一名旅人远眺了殖民地，但没有停留…','#5d6f96');
+    }
+  }
+  function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  
+  /* 战争系统: 袭击预警与进行中 */
     if(s.war.raidWarn>0){
       s.war.raidWarn-=dt;
       APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
@@ -3534,7 +3579,9 @@ window.APH = window.APH || {};
     try{
       var meta=APH.Save.loadMeta();
       if(!meta.tech) meta.tech={};
-      if(!meta.res) meta.res={mineral:0};
+      if(!meta.res) meta.res={mineral:0, food:0};
+      if(!meta.residents) meta.residents=[];   // P6 居民名册
+      if(meta.residentSeq===undefined) meta.residentSeq=0;
       APH.state.meta=meta;
       applyAllTech(meta);
       APH.state.colony=loadColony();          // 殖民地布局持久化
