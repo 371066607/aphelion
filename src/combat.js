@@ -170,30 +170,43 @@ APH.Combat = (function(){
       if(p.type !== T.PROJECTILE || p.dead) return;
       p.life -= dt;
       if(p.life <= 0){ p.dead = true; return; }
+      var segX0=p.x, segY0=p.y;              // T3-fix: 隧穿修复——线段扫描
       p.x += p.vx*dt; p.y += p.vy*dt;
 
+      /* 点到本帧位移线段的最短距离 */
+      function segDist(x1,y1,x2,y2,px2,py2){
+        var dx=x2-x1, dy=y2-y1;
+        var L2=dx*dx+dy*dy;
+        var t2=L2? ((px2-x1)*dx+(py2-y1)*dy)/L2 : 0;
+        t2=Math.max(0,Math.min(1,t2));
+        var cx=x1+dx*t2, cy=y1+dy*t2;
+        return Math.sqrt((px2-cx)*(px2-cx)+(py2-cy)*(py2-cy));
+      }
+
       if(p.side === 'player'){
-        s.entities.forEach(function(en){
+        for(var ei=0; ei<s.entities.length; ei++){
+          var en=s.entities[ei];
           if(en.type === T.BUILDING && en.bid==='bl_rival_base' && !en.dead
-             && U.dst(p.x,p.y,en.x,en.y) < 44){
+             && segDist(segX0,segY0,p.x,p.y,en.x,en.y) < 44){
             p.dead=true; en.hp-=p.dmg;
             s.shake=Math.min(1,s.shake+.15);
             U.emit('rivalBaseHit',en);
             if(en.hp<=0){ raidBaseSuccess(en); }
-            return;
+            break;
           }
-          if(en.type !== T.ENEMY || en.dead) return;
-          var r = 14 * en.faction.gene.size;
-          if(U.dst(p.x,p.y,en.x,en.y) < r){
+          if(en.type !== T.ENEMY || en.dead) continue;
+          var r = 14 * en.faction.gene.size * (en.isBoss?1.9:1);
+          if(segDist(segX0,segY0,p.x,p.y,en.x,en.y) < r){
             p.dead = true;
             en.hp -= p.dmg;
             s.shake = Math.min(1, s.shake+.12);
             U.emit('enemyHit', en);
             if(en.hp <= 0) killEnemy(en);
+            break;
           }
-        });
+        }
       }else if(p.side === 'enemy'){
-        if(U.dst(p.x,p.y,s.px,s.py) < CFG.player.radius+5){
+        if(segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
           p.dead = true;
           hurtPlayer(p.dmg, '酸液');
         }
@@ -221,16 +234,23 @@ APH.Combat = (function(){
     s.meta.stats.kills++;
     s.shake = Math.min(1, s.shake+.25);
     var rng = U.makeRng((s.seed ^ Math.floor(en.x*7) ^ Math.floor(en.y*13)) >>> 0);
-    var loot = rollLoot(rng);
+    var lootCount = en.isBoss ? 4 : 1;
     var r = U.makeRng(Date.now() & 0xffff);          // 表现层散布用
-    for(var k=0;k<8;k++)
+    for(var k=0;k<(en.isBoss?20:8);k++)
       s.parts.push({t:'shard', x:en.x, y:en.y, vx:U.rr(-90,90), vy:U.rr(-110,-10),
                     life:U.rr(.4,.9), max:.9, hue:en.faction.gene.hue});
-    s.entities.push({
-      id:'dp_'+(++pid), type:T.DROPPED,
-      x:en.x+U.rr(-14,14), y:en.y+U.rr(-10,10),
-      itemId:loot.id, n:loot.n, bobA:U.rr(0,U.TAU),
-    });
+    for(var li=0;li<lootCount;li++){
+      var loot = rollLoot(rng);
+      s.entities.push({
+        id:'dp_'+(++pid), type:T.DROPPED,
+        x:en.x+U.rr(-26,26), y:en.y+U.rr(-18,18),
+        itemId:loot.id, n:(en.isBoss?loot.n+1:loot.n), bobA:U.rr(0,U.TAU),
+      });
+    }
+    if(en.isBoss){
+      s.entities.push({ id:'dp_'+(++pid), type:T.DROPPED,
+        x:en.x, y:en.y-10, itemId:'it_relic', n:1, bobA:0 });
+    }
     U.emit('enemyKilled', { en:en, loot:loot });
   }
 

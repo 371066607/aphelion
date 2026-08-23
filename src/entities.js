@@ -57,7 +57,7 @@ APH.Ent = (function(){
   /* ================= 敌人绘制（形态基因程序化） ================= */
   function drawEnemy(e, time){
     var g = e.faction.gene;
-    var s = 11 * g.size * (e.geneJit?e.geneJit.size:1);
+    var s = 11 * g.size * (e.geneJit?e.geneJit.size:1) * (e.isBoss?1.9:1);
     var step = Math.sin(e.walkPh);
     var col = 'hsl('+g.hue+',62%,52%)';
     var colD = 'hsl('+g.hue+',55%,36%)';
@@ -110,6 +110,21 @@ APH.Ent = (function(){
       ctx.strokeStyle='rgba(255,109,122,.85)'; ctx.lineWidth=1.6; ctx.stroke();
     }else if(e.state==='flee'){
       ctx.strokeStyle='rgba(125,255,171,.7)'; ctx.lineWidth=1.4; ctx.stroke();
+    }
+    /* Boss 血条+名牌(世界空间, 不随身体旋转) */
+    if(e.isBoss){
+      ctx.save();
+      ctx.rotate(-ang);
+      var pct=Math.max(0,e.hp/(e.faction.hp*8+40));
+      ctx.fillStyle='rgba(10,12,24,.8)';
+      ctx.fillRect(-30,-s-26,60,7);
+      ctx.fillStyle=pct>.35?'#ff9a4d':'#ff4d5e';
+      ctx.fillRect(-29,-s-25,58*pct,5);
+      ctx.fillStyle='#ffd97a';
+      ctx.font='bold 9px monospace';
+      ctx.textAlign='center';
+      ctx.fillText(e.bossName||'BOSS',0,-s-31);
+      ctx.restore();
     }
     /* 眼(朝向前方) */
     ctx.fillStyle='#0c1018';

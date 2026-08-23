@@ -254,15 +254,50 @@ window.APH = window.APH || {};
             vx:U.rr(-90,90),vy:U.rr(-110,-10),life:U.rr(.5,1),max:1,hue:45});
           APH.UI.setHint('已录入 '+s.found+'/'+s.totalBeacons);
           if(s.found>=s.totalBeacons){
-            s.mode='won';
-            setTimeout(function(){
-              APH.UI.showWin({clock:s.clock, cry:s.cry});
-            },1100);
+            /* T3 Boss: 全信标录入惊醒星球守护者 */
+            spawnGuardian(sb.x, sb.y);
           }
         }
       }
     }else{
       APH.UI.setActBtn(s.nearBeacon);
+    }
+  }
+
+  /* ================= T3 守护者Boss ================= */
+  function spawnGuardian(x,y){
+    var s=APH.state;
+    if(s.entities.some(function(e){return e.type===T.ENEMY&&e.isBoss&&!e.dead;})) return;
+    var base=s.spec.enemies.factions[0];
+    var b=APH.Ent.makeEnemy(base, x+60, y+40);
+    b.isBoss=true;
+    b.hp=Math.round(b.faction.hp*8)+40;
+    b.bossName='星球守护者';
+    s.entities.push(b);
+    s.mode='running';                        // 保持运行(不立即won)
+    s.shake=1;
+    APH.UI.floatText('⚠ '+b.bossName+'苏醒了!','#ff9a4d');
+    APH.UI.setHint('击败守护者才能带着完整档案离开');
+    U.emit('bossSpawned',{x:x,y:y});
+    s.bossEverSpawned=true;
+  }
+  function checkBossDown(){
+    var s=APH.state;
+    if(s.mode!=='running') return;
+    var bossAlive=false, hadBoss=(s.bossEverSpawned===true);
+    s.entities.forEach(function(e){
+      if(e.type===T.ENEMY&&e.isBoss&&!e.dead) bossAlive=true;
+    });
+    if(s.found>=s.totalBeacons && !bossAlive){
+      if(!hadBoss){ s.bossEverSpawned=true; }
+      /* 首次全录入后 boss 必然已刷过(spawnGuardian 在扫描回调里同步执行) */
+      if(s.bossEverSpawned || s.guardianCleared){
+        s.guardianCleared=true;
+        s.mode='won';
+        setTimeout(function(){
+          APH.UI.showWin({clock:s.clock, cry:s.cry});
+        },1100);
+      }
     }
   }
 
@@ -506,6 +541,7 @@ window.APH = window.APH || {};
       APH.UI.setHint('[E] 返航殖民地 (结算战利品)');
     }
     updateSurvival(dt);
+    checkBossDown();
     if(s.mode!=='running') return;
     updateCamera(dt);
     updateParticles(dt,s.clock);
