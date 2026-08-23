@@ -6,7 +6,7 @@
 ## P5 打磨清单
 
 - [x] T1 性能护栏：主循环 watchdog——连续 3 帧超过 250ms 自动重置实体粒子上限并 console.warn；entities 超过 400 时最远的 dropped/enemy 提前回收。验收：scenario 测试新增用例模拟 500 杂散实体后帧仍可推进。
-- [ ] T2 星球难度分级：以 seed 哈希算 tier(1~3)，tier 影响刷怪间隔(×0.8/0.65/0.5)与敌人 hp(×1/1.25/1.6)；标题探针显示 tier。验收：planet 纯函数测试 3 档边界。
+- [x] T2 星球难度分级：以 seed 哈希算 tier(1~3)，tier 影响刷怪间隔(×0.8/0.65/0.5)与敌人 hp(×1/1.25/1.6)；标题探针显示 tier。验收：planet 纯函数测试 3 档边界。
 - [ ] T3 Boss 信标：第 6 座信标扫描完成后生成守护者(大型敌人 hp×8, 掉落 4 件+保底遗件)。验收：combat 测试模拟击杀掉落 ≥4。
 - [ ] T4 战争态势 HUD：HUD 增加 warScore 条(复用 .track 样式)，防御胜利/掠夺成功后可见变化。验收：手动构建通过 + ui.js 无报错 + scenario 全绿。
 - [ ] T5 图鉴页：L 键切换图鉴浮层(已建档异常列表+阵营介绍)，再按 L 关闭。数据源 spec.laws/beacons/enemies。验收：纯渲染层，scenario 全绿即可。

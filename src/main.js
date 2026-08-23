@@ -272,6 +272,9 @@ window.APH = window.APH || {};
     s.spawnT -= dt;
     if(s.spawnT > 0) return;
     var interval = night ? CFG.spawn.intervalNight : CFG.spawn.intervalDay;
+    /* T2 难度分级: 高tier刷怪更快 */
+    var tierMul = [1, .85, .7][(s.spec.tier||1)-1];
+    interval *= tierMul;
     s.spawnT = interval * U.rr(.75, 1.3);
 
     var count = 0;

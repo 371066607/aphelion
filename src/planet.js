@@ -122,14 +122,16 @@ APH.Planet = (function(){
       });
     }
 
-    /* 敌人阵营: 全部3种 + 权重(近战为主) */
+    /* 敌人阵营: 全部3种 + 权重(近战为主); hp 按 tier 缩放(T2) */
+    var tier = tierOf(seed);
+    var tierHpMul = [1, 1.25, 1.6][tier-1];
     var factions = ENEMY_FACTIONS.map(function(f){
       return {
         id:f.id, name:f.name, behavior:f.behavior,
         gene:{ hue:(f.gene.hue + Math.floor(rng()*24-12) + 360) % 360,
                sides:f.gene.sides, limbs:f.gene.limbs,
                size:f.gene.size, spikes:f.gene.spikes, eyes:f.gene.eyes },
-        hp:f.hp, speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
+        hp:Math.round(f.hp*tierHpMul), speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
         lore:f.lore,
       };
     });
@@ -152,12 +154,24 @@ APH.Planet = (function(){
       beacons: beacons,
       enemies: { factions: factions, weights: weights },
       rivals: rivals,
+      tier: tier,
       generatedBy: 'fallback',
     };
   }
 
   /* ---------- Schema 校验 (Phase2 LLM 路径用) ----------
      返回 { ok:true, spec } 或 { ok:false, errors:[...] } */
+  /* ---------- 难度分级 (T2, 纯函数) ----------
+     seed 哈希 → tier 1/2/3: 影响敌人 hp 与刷怪间隔。约50%/30%/20%分布 */
+  function tierOf(seed){
+    /* mulberry32 首抽(ADR-5 已验证的均匀性) ×100 取整 */
+    var rng = U.makeRng((seed ^ 0x713C4A11) >>> 0);
+    var h = Math.floor(rng()*100);
+    if(h < 50) return 1;
+    if(h < 80) return 2;
+    return 3;
+  }
+
   function validate(spec){
     var errors = [];
     if(!spec || typeof spec !== 'object') return { ok:false, errors:['not an object'] };
@@ -174,5 +188,5 @@ APH.Planet = (function(){
     return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
   }
 
-  return { fallbackPlanet:fallbackPlanet, validate:validate };
+  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf };
 })();
