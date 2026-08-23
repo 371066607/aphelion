@@ -79,6 +79,12 @@
 <body>
 <canvas id="cv"></canvas>
 
+<div id="resPanel" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:41;padding:56px 48px;overflow:auto">
+  <h2 style="color:#9fe8c8;font-size:18px;letter-spacing:4px;margin:0 0 6px">殖 民 者 名 册</h2>
+  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">食物储备 <b id="resFood" style="color:#c8e89a">0</b> · 人口 <b id="resPop" style="color:#cdd9f5">0</b></p>
+  <div id="resBody" style="max-width:720px;font-size:12px;line-height:1.8;color:#cdd9f5"></div>
+  <p style="margin-top:26px;color:#39435c;font-size:11px">按 [R] 关闭</p>
+</div>
 <div id="codex" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:40;padding:56px 48px;overflow:auto">
   <h2 style="color:#ffc857;font-size:18px;letter-spacing:4px;margin:0 0 6px">星 球 图 鉴</h2>
   <p id="codexSub" style="color:#5d6f96;font-size:11px;margin:0 0 18px"></p>
@@ -3070,90 +3076,7 @@ window.APH = window.APH || {};
       residentsTick();                            // P6-U2/U4/U7
     }
 
-    /* ================= P6 居民系统 ================= */
-  function housingCap(){
-    /* 住宅容量: 居住舱本体2席, 医疗舱每座+1(临时设计, 后续住宅建筑扩展) */
-    return 2 + APH.state.colony.buildings.filter(function(b){return b.id==='bl_clinic';}).length;
-  }
-  function residentsTick(){
-    var s=APH.state, m=s.meta;
-    /* U4 需求结算: 吃仓库食物 */
-    var hasFood=(m.res.food||0)>0;
-    m.residents.forEach(function(r){
-      var before=r.food;
-      APH.Res.needsTick(r, hasFood);
-      if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
-    });
-    /* U5 自动指派(简单版): 农场/牧场有空则派种植/畜牧最高的闲人 */
-    autoAssign('bl_farm','sk_farm',2);
-    autoAssign('bl_pasture','sk_ranch',2);
-
-    /* U3/U5 农场与岗位产出 */
-    var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
-    var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
-    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
-    farms.forEach(function(b){
-      if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
-      var bestFarmer=farmers.reduce(function(acc,r){
-        return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
-      },null);
-      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?bestFarmer.skills.sk_farm:0);
-      if(APH.Colony.harvestYield(b.plot)>0){
-        m.res.food=(m.res.food||0)+3;
-        APH.UI.floatText('🌾 农场收获 +3 食物','#c8e89a');
-        b.plot={stage:1,t:0};
-      }
-    });
-    /* 畜牧(U6简化): 有牧民时每跳概率+1肉 */
-    if(ranchers.length && Math.random()<0.35*ranchers.length){
-      m.res.food=(m.res.food||0)+2;
-      APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
-    }
-
-    /* U7 社交 */
-    var pairs=[];
-    for(var i=0;i<m.residents.length;i++)
-      for(var j=i+1;j<m.residents.length;j++){
-        var a=m.residents[i], b=m.residents[j];
-        pairs.push({a:a,b:b,sameJob:!!(a.job&&a.job===b.job)});
-      }
-    if(!m.bonds) m.bonds={};
-    APH.Res.socialTick(pairs).forEach(function(d){
-      m.bonds=APH.Res.applyBond(m.bonds,d.a,d.b,d.delta);
-    });
-    saveMetaQuiet();
-    /* U2 到访事件 */
-    var cap=housingCap();
-    if(m.residents.length < cap && Math.random()<0.25){
-      m.residentSeq=(m.residentSeq||0)+1;
-      var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
-                             ((s.seed||7)*31+m.residentSeq*917)>>>0);
-      r.arrivedAt=s.clock;
-      m.residents.push(r);
-      saveMetaQuiet();
-      var skName=APH.Res.SKILL_NAMES[r.mainSkill];
-      APH.UI.floatText('🧑‍🚀 '+r.name+' 加入了殖民地 ('+skName+'专精)', '#9fe8c8');
-      U.emit('residentJoined', r);
-    }else if(m.residents.length>=cap && Math.random()<0.06){
-      APH.UI.floatText('一名旅人远眺了殖民地，但没有停留…','#5d6f96');
-    }
-  }
-  function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
-  function autoAssign(buildingId, skillKey, perBuilding){
-    var s=APH.state, m=s.meta;
-    var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
-    var onJob = m.residents.filter(function(r){return r.job===buildingId;});
-    if(onJob.length>=slots) return;
-    var free=m.residents.filter(function(r){return !r.job;})
-      .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
-    while(onJob.length<slots && free.length){
-      var r=free.shift();
-      r.job=buildingId;
-      APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(buildingId).name+'工作','#8fd4ff');
-    }
-  }
-  
-  /* 战争系统: 袭击预警与进行中 */
+    /* 战争系统: 袭击预警与进行中 */
     if(s.war.raidWarn>0){
       s.war.raidWarn-=dt;
       APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
@@ -3508,8 +3431,9 @@ window.APH = window.APH || {};
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
-      /* L=图鉴(仅远征场景有内容) */
+      /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
+      if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -3785,6 +3709,151 @@ window.APH = window.APH || {};
       '殖民地数据库 · 远征档案实时同步';
   }
 
+  /* ================= U8 居民名册 ================= */
+  function toggleResPanel(){
+    var el=document.getElementById('resPanel');
+    if(!el) return;
+    var show=el.style.display==='none';
+    el.style.display=show?'':'none';
+    if(show) renderResPanel();
+  }
+  function moodFace(m){
+    return m>=75?'😊':(m>=50?'😐':(m>=30?'😟':'😭'));
+  }
+  function foodBar(f){
+    var col=f>=60?'#7dffab':(f>=35?'#ffc857':'#ff6d7a');
+    return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;'+
+           'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
+           f+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f);
+  }
+  function renderResPanel(){
+    var s=APH.state, m=s.meta;
+    var body=document.getElementById('resBody'); if(!body) return;
+    document.getElementById('resFood').textContent=m.res.food||0;
+    document.getElementById('resPop').textContent=m.residents.length+'/'+housingCap();
+    if(!m.residents.length){
+      body.innerHTML='<div style="color:#39435c;margin-top:40px;text-align:center">'+
+        '殖民地还没有居民。<br>保持空住宅位，旅人会循着灯光而来。</div>';
+      return;
+    }
+    var html='';
+    m.residents.forEach(function(r){
+      var skHtml = Res.SKILLS.map(function(sk){
+        var v=r.skills[sk];
+        var col = sk===r.mainSkill?'#ffc857':(sk===r.subSkill?'#8fd4ff':'#39435c');
+        return '<span style="color:'+col+'">'+Res.SKILL_NAMES[sk]+v+'</span>';
+      }).join(' · ');
+      var jobTxt=r.job?APH.Colony.get(r.job).name:(r.mainSkill==='sk_farm'?'待岗(适合务农)':'闲居');
+      html+='<div style="border:1px solid #1a2334;border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#0c1220">'+
+        '<b style="font-size:13px">'+r.name+'</b>'+
+        ' <span style="color:#8fa3cc;font-size:11px">'+moodFace(r.mood)+' '+r.trait+
+        ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
+         :' · '+jobTxt)+'</span><br>'+
+        '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
+        '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
+        '</div>';
+    });
+    /* 关系摘要 */
+    if(m.bonds && Object.keys(m.bonds).length){
+      html+='<div style="margin-top:14px;color:#ffc857">人际关系</div>';
+      Object.keys(m.bonds).forEach(function(k){
+        var v=Math.round(m.bonds[k]);
+        var names=k.split('|').map(function(id){
+          var r=m.residents.find(function(x){return x.id===id;});
+          return r?r.name:'?';
+        });
+        var tag=v>=70?'挚友':(v>=55?'友好':(v>=40?'平淡':(v>=25?'疏远':'敌视')));
+        var col=v>=70?'#7dffab':(v>=40?'#8fa3cc':'#ff6d7a');
+        html+='<div style="color:'+col+'">'+names[0]+' ↔ '+names[1]+' : '+tag+' ('+v+')</div>';
+      });
+    }
+    body.innerHTML=html;
+  }
+
+  /* ================= P6 居民系统 ================= */
+  function housingCap(){
+    /* 住宅容量: 居住舱本体2席, 医疗舱每座+1(临时设计, 后续住宅建筑扩展) */
+    return 2 + APH.state.colony.buildings.filter(function(b){return b.id==='bl_clinic';}).length;
+  }
+  function residentsTick(){
+    var s=APH.state, m=s.meta;
+    /* U4 需求结算: 吃仓库食物 */
+    var hasFood=(m.res.food||0)>0;
+    m.residents.forEach(function(r){
+      var before=r.food;
+      APH.Res.needsTick(r, hasFood);
+      if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
+    });
+    /* U5 自动指派(简单版): 农场/牧场有空则派种植/畜牧最高的闲人 */
+    autoAssign('bl_farm','sk_farm',2);
+    autoAssign('bl_pasture','sk_ranch',2);
+
+    /* U3/U5 农场与岗位产出 */
+    var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
+    var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
+    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
+    farms.forEach(function(b){
+      if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
+      var bestFarmer=farmers.reduce(function(acc,r){
+        return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
+      },null);
+      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?bestFarmer.skills.sk_farm:0);
+      if(APH.Colony.harvestYield(b.plot)>0){
+        m.res.food=(m.res.food||0)+3;
+        APH.UI.floatText('🌾 农场收获 +3 食物','#c8e89a');
+        b.plot={stage:1,t:0};
+      }
+    });
+    /* 畜牧(U6简化): 有牧民时每跳概率+1肉 */
+    if(ranchers.length && Math.random()<0.35*ranchers.length){
+      m.res.food=(m.res.food||0)+2;
+      APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
+    }
+
+    /* U7 社交 */
+    var pairs=[];
+    for(var i=0;i<m.residents.length;i++)
+      for(var j=i+1;j<m.residents.length;j++){
+        var a=m.residents[i], b=m.residents[j];
+        pairs.push({a:a,b:b,sameJob:!!(a.job&&a.job===b.job)});
+      }
+    if(!m.bonds) m.bonds={};
+    APH.Res.socialTick(pairs).forEach(function(d){
+      m.bonds=APH.Res.applyBond(m.bonds,d.a,d.b,d.delta);
+    });
+    saveMetaQuiet();
+    /* U2 到访事件 */
+    var cap=housingCap();
+    if(m.residents.length < cap && Math.random()<0.25){
+      m.residentSeq=(m.residentSeq||0)+1;
+      var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
+                             ((s.seed||7)*31+m.residentSeq*917)>>>0);
+      r.arrivedAt=s.clock;
+      m.residents.push(r);
+      saveMetaQuiet();
+      var skName=APH.Res.SKILL_NAMES[r.mainSkill];
+      APH.UI.floatText('🧑‍🚀 '+r.name+' 加入了殖民地 ('+skName+'专精)', '#9fe8c8');
+      U.emit('residentJoined', r);
+    }else if(m.residents.length>=cap && Math.random()<0.06){
+      APH.UI.floatText('一名旅人远眺了殖民地，但没有停留…','#5d6f96');
+    }
+  }
+  function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  function autoAssign(buildingId, skillKey, perBuilding){
+    var s=APH.state, m=s.meta;
+    var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
+    var onJob = m.residents.filter(function(r){return r.job===buildingId;});
+    if(onJob.length>=slots) return;
+    var free=m.residents.filter(function(r){return !r.job;})
+      .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
+    while(onJob.length<slots && free.length){
+      var r=free.shift();
+      r.job=buildingId;
+      APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(buildingId).name+'工作','#8fd4ff');
+    }
+  }
+  
+  
   /* 调试接口(标题探针之外的程序化验证通道) */
   APH.Main={
     start:startGame,
@@ -3804,6 +3873,8 @@ window.APH = window.APH || {};
     guardTrim:guardTrim,
     toggleCodex:toggleCodex,
     renderCodex:renderCodex,
+    renderResPanel:renderResPanel,
+    residentsTick:residentsTick,
     perfGuard:perfGuard,
     debugState:function(){
       var s=APH.state;
