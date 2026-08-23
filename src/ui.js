@@ -102,10 +102,18 @@ APH.UI = (function(){
       var parts=[];
       for(var k in stats.carry)
         parts.push(CFG.items[k].name+'×'+stats.carry[k]);
-      carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+'</span>';
+      carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+
+               '（共'+(stats.runLoot||0)+'件战利品）</span>';
+    }else if(stats.runLoot>0){
+      carryTxt='<br><span style="color:#5d6f96">本次远征曾拾取 '+stats.runLoot+' 件(已随之前结算入库)</span>';
+    }
+    var surv='';
+    if(typeof stats.survived==='number' && stats.survived>0){
+      var mm=Math.floor(stats.survived/60), ss=Math.round(stats.survived%60);
+      surv=' · 着陆存活 '+mm+'分'+ss+'秒';
     }
     s.querySelector('p').innerHTML=reason+
-      '<br>已建档异常 '+stats.found+'/'+stats.total+
+      '<br>已建档异常 '+stats.found+'/'+stats.total+surv+
       ' · 研究点保留'+carryTxt+
       '<br><span style="color:#5d6f96">殖民地数据库永久保留。下一次着陆，你仍知道这一切。</span>';
     var b=$('startBtn'); b.textContent='重 新 着 陆';

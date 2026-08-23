@@ -293,7 +293,7 @@ APH.Combat = (function(){
       APH.Save.saveMeta(s.meta);
       APH.UI.showDeath('你被 '+source+'终结了。', {
         cry:s.cry, found:s.found, total:s.totalBeacons,
-        carry:s.carry,
+        carry:s.carry, runLoot:s.runLoot, survived:s.clock-(s.landedAt||0),
       });
     }
   }
@@ -324,6 +324,7 @@ APH.Combat = (function(){
         if(r.ok){
           e.dead = true;
           s.carry = r.carry;
+          s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
           U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
           var nm = CFG.items[e.itemId].name;
           APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
