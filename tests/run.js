@@ -30,7 +30,7 @@ for (const f of ['config.js', 'utils.js', 'save.js', 'planet.js', 'combat.js', '
 
 /* ---- 加载测试文件 ---- */
 const argFiles = process.argv.slice(2);
-const EXCLUDE = ['scenario.test.js'];   // 独立入口(自带DOM桩+全模块加载)
+const EXCLUDE = ['scenario.test.js', 'perf.test.js'];   // 独立入口(DOM桩/require)   // 独立入口(自带DOM桩+全模块加载)
 let files = argFiles.length ? argFiles
   : fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js') && !EXCLUDE.includes(f));
 

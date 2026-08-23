@@ -163,6 +163,7 @@ APH.CFG = {
 
   /* 实体数量预算 */
   caps: {
+    entitiesHard: 400,
     rocks: 64,
     crystals: 26,
     spores: 70,
@@ -2910,6 +2911,36 @@ window.APH = window.APH || {};
       );
   }
 
+  /* ================= 性能护栏 (T1) =================
+     watchdog: 连续慢帧→削减粒子; 实体超限→回收最远杂散实体。
+     纯逻辑部分 guardTrim 抽出可测。 */
+  var slowStreak=0, lastFrameT=0;
+  function perfGuard(frameMs){
+    if(frameMs>250){ slowStreak++; }
+    else slowStreak=0;
+    if(slowStreak>=3){
+      slowStreak=0;
+      APH.state.parts.length=Math.min(APH.state.parts.length,40);
+      console.warn('[perf] 慢帧×3 → 粒子削减至40');
+      return true;
+    }
+    return false;
+  }
+  /* 实体上限: 超限时按"离玩家最远优先"回收可牺牲类型。
+     纯函数: 返回应删除的 id 集合(node 可测)。 */
+  function guardTrim(entities, px, py, cap){
+    if(entities.length<=cap) return [];
+    var expendable=entities.filter(function(e){
+      return e.type===T.DROPPED||e.type===T.ENEMY;
+    });
+    expendable.sort(function(a,b){
+      return U.dst(b.x,b.y,px,py)-U.dst(a.x,a.y,px,py);
+    });
+    var need=entities.length-cap, out=[];
+    for(var i=0;i<need && i<expendable.length;i++) out.push(expendable[i].id);
+    return out;
+  }
+
   /* ================= 主循环 ================= */
   var lastT=performance.now(), tickN=0;
   function frame(now){
@@ -2920,10 +2951,18 @@ window.APH = window.APH || {};
       document.title='▶帧'+tickN+' Δ('+dx+','+dy+') vw'+innerWidth+
         ' · '+s.found+'/'+s.totalBeacons;
     }
+    perfGuard(now-lastT);
     var dt=Math.min(.05,(now-lastT)/1000); lastT=now;
 
     var s=APH.state;
     if(s.mode!=='running'){ return; }
+
+    /* 实体上限护栏 */
+    var over=guardTrim(s.entities,s.px,s.py,CFG.caps.entitiesHard);
+    if(over.length){
+      var kill=new Set(over);
+      s.entities=s.entities.filter(function(e){return !kill.has(e.id);});
+    }
 
     s.clock+=dt;
 
@@ -3330,6 +3369,8 @@ window.APH = window.APH || {};
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
+    guardTrim:guardTrim,
+    perfGuard:perfGuard,
     debugState:function(){
       var s=APH.state;
       var enemies=0; s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)enemies++;});

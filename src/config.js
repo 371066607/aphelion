@@ -36,6 +36,7 @@ APH.CFG = {
 
   /* 实体数量预算 */
   caps: {
+    entitiesHard: 400,
     rocks: 64,
     crystals: 26,
     spores: 70,
