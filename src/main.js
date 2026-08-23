@@ -551,6 +551,7 @@ window.APH = window.APH || {};
     checkBossDown();
     if(s.mode!=='running') return;
     updateCamera(dt);
+    selfCenter();
     updateParticles(dt,s.clock);
     document.getElementById('vig').style.opacity =
       Math.max(
@@ -616,9 +617,11 @@ window.APH = window.APH || {};
 
     if(s.scene==='home'){
       updateHome(dt);
+      selfCenter();
       /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
       drawTutorialArrow(s.clock);
+      drawDebugMark();
       APH.UI.updHUD();
       return;
     }
@@ -628,10 +631,13 @@ window.APH = window.APH || {};
     if(s.mode!=='running') return;       // 本帧死亡
 
     if(tickN%30===0){
-      var ddx=Math.round(s.px-s.camX), ddy=Math.round(s.py-s.camY);
-      document.title='▶帧'+tickN+' Δ('+ddx+','+ddy+') 敌'+
-        s.entities.filter(function(e){return e.type===T.ENEMY&&!e.dead;}).length+
-        ' · '+s.found+'/'+s.totalBeacons;
+      /* 屏幕坐标探针: 角色在视口内的实际像素位置(应≈vw/2,vh/2) */
+      var sx=Math.round(s.px-s.camX+innerWidth/2),
+          sy=Math.round(s.py-s.camY+innerHeight/2);
+      document.title='▶'+tickN+' 屏幕('+sx+','+sy+') 视口['+
+        innerWidth+'x'+innerHeight+'] DPR'+(window.devicePixelRatio||1)+
+        ' cv('+document.getElementById('cv').width+'x'+
+        document.getElementById('cv').height+')';
     }
 
     APH.World.render(dt, expeditionDrawers());
@@ -672,6 +678,31 @@ window.APH = window.APH || {};
       crystalGlow:function(){},
     };
   }
+  /* 屏幕空间调试: 视口中心绿圈 + 角色红点(应重合) */
+  function drawDebugMark(){
+    var s=APH.state;
+    if(!s.debugMark) return;
+    var cv=document.getElementById('cv'), ctx2=cv.getContext('2d');
+    ctx2.setTransform(1,0,0,1,0,0);
+    var cx=cv.width/2, cy=cv.height/2;
+    ctx2.strokeStyle='#00ff88'; ctx2.lineWidth=2;
+    ctx2.beginPath(); ctx2.arc(cx,cy,18,0,Math.PI*2); ctx2.stroke();
+    ctx2.beginPath(); ctx2.moveTo(cx-26,cy); ctx2.lineTo(cx+26,cy);
+    ctx2.moveTo(cx,cy-26); ctx2.lineTo(cx,cy+26); ctx2.stroke();
+  }
+
+  /* 自愈居中(T11): 无论何种环境因素(DPR/iframe缩放)导致画面偏移,
+     只要玩家偏离视口中心超过阈值, 相机立即硬对齐。 */
+  function selfCenter(){
+    var s=APH.state;
+    var dx=(s.px-s.camX), dy=(s.py-s.camY);
+    var maxOff=Math.min(innerWidth,innerHeight)*0.25;
+    if(Math.abs(dx)>maxOff || Math.abs(dy)>maxOff){
+      s.camX=s.px; s.camY=s.py;
+      s.vx=0; s.vy=0;
+    }
+  }
+
   function drawTutorialArrow(time){
     var s=APH.state;
     if((s.meta.tut||0)>=4 || s.scene!=='home') return;
@@ -960,6 +991,19 @@ window.APH = window.APH || {};
       bindLLMPanel();
       APH.UI.updHUD();
       document.title='✓就绪 殖民地'+(APH.LLM.enabled()?' ·AI':'');
+      /* 自动化验证通道: autostart=1 跳过开场; exp=1 直接着陆远征 */
+      var _q=(typeof location!=='undefined'&&location.search)||'';
+      if(_q.indexOf('autostart=1')>=0){
+        startGame();
+        var pad0=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
+        if(pad0){ s.px=pad0.x; s.py=pad0.y+30; }   // 出生即站在发射台上
+      }
+      if(_q.indexOf('exp=1')>=0){
+        startGame();
+        launchExpedition();
+      }
+      /* 调试标记(?debugmark=1): 视口中心参考圈, 验证居中 */
+      if(_q.indexOf('debugmark')>=0) s.debugMark=true;
     }catch(err){
       APH.UI.fatal('启动失败: '+err.message+'\n'+(err.stack||''));
       throw err;
