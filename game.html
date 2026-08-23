@@ -132,6 +132,9 @@
 window.APH = window.APH || {};
 
 APH.CFG = {
+  /* 场景 (设计支柱: 殖民地优先) */
+  scene: { COLONY:'colony', PLANET:'planet' },
+
   /* 世界 */
   WORLD: 2200,
   CHUNK: 550,
@@ -818,6 +821,147 @@ APH.LLM = (function(){
     cacheKey:cacheKey, quotaInfo:quotaInfo, quotaUse:quotaUse,
     extractJSON:extractJSON, mergeEnrichment:mergeEnrichment,
     enrichPlanet:enrichPlanet, generate:generate,
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · colony.js — 殖民地场景 (设计支柱: 殖民地优先)
+   挂载: window.APH.Colony
+   殖民地 = 家 = 安全区:
+     - 无敌人/无氧气消耗
+     - 发射台: 出发远征的入口
+     - 仓库: 战利品卸货 → 研究点/资源
+     - 建造: 研究点买建筑, 放在殖民地里(Phase4 部分建筑有战斗作用)
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Colony = (function(){
+  'use strict';
+  var U = APH.U, CFG = APH.CFG, T = CFG.entType;
+
+  /* ---------- 建筑目录 (ADR-9: bl_ 前缀; 成本单位=研究点) ---------- */
+  var BUILDINGS = {
+    bl_landing_pad: { name:'发射台', cost:0,  size:64,
+      desc:'远征出发口。永远只有一座。' },
+    bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3,
+      desc:'+20 负重上限(永久)。' },
+    bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4,
+      desc:'每分钟产出 2 矿材到仓库。' },
+    bl_lab:         { name:'研究站', cost:60, size:48, max:2,
+      desc:'每分钟 +1 研究点。' },
+    bl_barracks:    { name:'兵营', cost:80, size:56, max:2,
+      desc:'训练士兵驻守殖民地。(Phase4)' },
+    bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6,
+      desc:'自动攻击来袭敌人。(Phase4 生效)' },
+    bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1,
+      desc:'远征出发时携带 1 次急救(+40生命)。' },
+  };
+
+  function list(){ return BUILDINGS; }
+  function get(id){ return BUILDINGS[id]; }
+
+  /* ---------- 殖民地世界布局 ----------
+     殖民地也是一张 2200×2200 地图, 但内容完全不同:
+     居住核心在中心, 发射台在南侧, 其余空地用于建造。 */
+  function buildColonyWorld(seed){
+    var s = APH.state;
+    var rng = U.makeRng((seed ^ 0xC010) >>> 0 || 7);
+
+    /* 殖民地调色板(固定, 与星球区分) */
+    var spec = {
+      v:1, id:'COLONY_HOME', seed:seed, name:'新曙光殖民地', paletteName:'家园',
+      palette:{ ground1:'#1c2419', ground2:'#27331f', accent:'#ffc857',
+                water:'#14314a', spore:'#ffe9b0' },
+      terrain:{ lakeR:90, rockDensity:.35, crystalDensity:.15 },
+      laws:[], beacons:[],
+      enemies:{ factions:[], weights:{} },
+      rivals:[],
+      generatedBy:'colony',
+    };
+    s.spec = spec;
+    s.totalBeacons = 0;
+
+    /* 实体重建: 玩家出生在居住舱旁 */
+    s.entities = [];
+    var spawnX = CFG.HAB.x, spawnY = CFG.HAB.y + 110;
+    s.entities.push({ id:'player', type:T.PLAYER, x:spawnX, y:spawnY });
+    s.px = spawnX; s.py = spawnY;
+    s.camX = spawnX; s.camY = spawnY;
+
+    /* 少量岩石装饰(避开核心区) */
+    var placed=0, guard=0;
+    while(placed < 22 && guard++ < 300){
+      var x = rng()*(CFG.WORLD-160)+80, y = rng()*(CFG.WORLD-160)+80;
+      if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 260) continue;
+      if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y+240) < 140) continue;   // 发射台区
+      s.entities.push(APH.Ent.makeRock(x,y,rng));
+      placed++;
+    }
+
+    /* 已建建筑实体化 */
+    s.colony.buildings.forEach(function(b){ placeBuildingEntity(b.id, b.x, b.y); });
+    ensurePad();
+  }
+
+  /* ---------- 建筑实体 ---------- */
+  function placeBuildingEntity(bid, x, y){
+    var s = APH.state;
+    var def = BUILDINGS[bid];
+    s.entities.push({
+      id:'be_'+bid+'_'+s.colony.buildings.length,
+      type:T.BUILDING, bid:bid, x:x, y:y, def:def,
+    });
+  }
+
+  /* 发射台保证存在(固定南侧位置) */
+  function ensurePad(){
+    var s = APH.state;
+    if(s.entities.some(function(e){ return e.type===T.BUILDING && e.bid==='bl_landing_pad'; })) return;
+    var px = CFG.HAB.x, py = CFG.HAB.y + 240;
+    s.entities.push({
+      id:'be_pad', type:T.BUILDING, bid:'bl_landing_pad', x:px, y:py,
+      def:BUILDINGS.bl_landing_pad, pad:true,
+    });
+  }
+
+  /* ---------- 建造逻辑(纯函数部分) ---------- */
+  /* 可否建造: 资源够 + 数量未满 + 位置合法(离核心/其他建筑不太近) */
+  function canPlace(colonyBuildings, research, bid, x, y){
+    var def = BUILDINGS[bid];
+    if(!def) return { ok:false, why:'未知建筑' };
+    if(def.cost > research) return { ok:false, why:'研究点不足 (需 '+def.cost+')' };
+    if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
+      return { ok:false, why:'已达数量上限' };
+    if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
+    for(var i=0;i<colonyBuildings.length;i++){
+      var b = colonyBuildings[i];
+      var other = BUILDINGS[b.id];
+      var minD = (def.size + (other?other.size:40)) * .62;
+      if(U.dst(x,y,b.x,b.y) < minD) return { ok:false, why:'与其他建筑重叠' };
+    }
+    if(x<60||y<60||x>CFG.WORLD-60||y>CFG.WORLD-60) return { ok:false, why:'超出殖民地边界' };
+    return { ok:true };
+  }
+
+  /* ---------- 生产 tick (每30游戏秒一跳) ---------- */
+  function productionTick(meta, buildings){
+    var out = { mineral:0, research:0 };
+    buildings.forEach(function(b){
+      if(b.id==='bl_mine') out.mineral += 2;
+      if(b.id==='bl_lab') out.research += 1;
+    });
+    meta.res.mineral = (meta.res.mineral||0) + out.mineral;
+    meta.research += out.research;
+    return out;
+  }
+
+  return {
+    list:list, get:get,
+    buildColonyWorld:buildColonyWorld,
+    canPlace:canPlace, productionTick:productionTick,
+    ensurePad:ensurePad,
   };
 })();
 
@@ -1661,6 +1805,59 @@ APH.Ent = (function(){
     ctx.restore();
   }
 
+  /* ================= 建筑绘制 ================= */
+  var BLD_COLORS={
+    bl_warehouse:'#b8874a', bl_mine:'#7a8aa0', bl_lab:'#59d9ff',
+    bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
+  };
+  function drawBuilding(e,time){
+    if(e.bid==='bl_landing_pad'){
+      /* 发射台: 圆台+光环+四角灯 */
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(4,6,46,22,0,0,U.TAU); ctx.fill();
+      var g=ctx.createRadialGradient(0,-4,6,0,0,38);
+      g.addColorStop(0,'#39435c'); g.addColorStop(1,'#242c40');
+      ctx.fillStyle=g;
+      ctx.beginPath(); ctx.ellipse(0,0,38,30,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='rgba(255,200,87,'+(.5+.25*Math.sin(time*2))+')';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(0,0,32,25,0,0,U.TAU); ctx.stroke();
+      for(var i=0;i<4;i++){
+        var a=i*U.TAU/4+.78;
+        var lx=Math.cos(a)*34, ly=Math.sin(a)*26;
+        ctx.fillStyle=(Math.floor(time*2+i)%2)?'#ffc857':'#5a4a28';
+        ctx.beginPath(); ctx.arc(lx,ly,2.6,0,U.TAU); ctx.fill();
+      }
+      /* 中心 H 标记 */
+      ctx.strokeStyle='rgba(255,200,87,.75)'; ctx.lineWidth=2.4;
+      ctx.beginPath();
+      ctx.moveTo(-7,-7); ctx.lineTo(-7,7); ctx.moveTo(7,-7); ctx.lineTo(7,7);
+      ctx.moveTo(-7,0); ctx.lineTo(7,0);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    /* 通用建筑: 影子+主体+屋顶灯 */
+    var col=BLD_COLORS[e.bid]||'#8fa3cc';
+    var sz=(e.def&&e.def.size)||40;
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(3,5,sz*.52,sz*.26,0,0,U.TAU); ctx.fill();
+    var bg=ctx.createLinearGradient(0,-sz*.45,0,sz*.3);
+    bg.addColorStop(0,col); bg.addColorStop(1,'#20283a');
+    ctx.fillStyle=bg;
+    ctx.beginPath();
+    ctx.rect(-sz*.42,-sz*.34,sz*.84,sz*.66);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.14)';
+    ctx.fillRect(-sz*.42,-sz*.34,sz*.84,4);
+    /* 屋顶警示灯 */
+    ctx.fillStyle=(Math.sin(time*3)>0)?'#ffd97a':'#5a4a28';
+    ctx.beginPath(); ctx.arc(0,-sz*.42,2.6,0,U.TAU); ctx.fill();
+    ctx.restore();
+  }
+
   /* ================= 玩家逻辑 ================= */
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
@@ -1713,12 +1910,73 @@ APH.Ent = (function(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
   }
 
+  /* 建筑绘制(殖民地/远征通用) */
+  function drawBuilding(b, time){
+    var def = b.def || {name:'?',size:44};
+    var s2 = def.size;
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    /* 影子 */
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(3,s2*.28,s2*.62,s2*.3,0,0,U.TAU); ctx.fill();
+
+    if(b.bid==='bl_landing_pad'){
+      /* 发射台: 大平台 + 指引灯 */
+      var pul=.5+.5*Math.sin(time*2.4);
+      ctx.fillStyle='#232c42';
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.85,s2*.5,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='rgba(255,200,87,'+(.45+pul*.4)+')';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.7,s2*.38,0,0,U.TAU); ctx.stroke();
+      for(var i=0;i<4;i++){
+        var a=i/4*U.TAU+.6;
+        ctx.fillStyle='rgba(255,200,87,'+(.5+pul*.5)+')';
+        ctx.beginPath();
+        ctx.arc(Math.cos(a)*s2*.68,Math.sin(a)*s2*.36,2.6,0,U.TAU); ctx.fill();
+      }
+      ctx.fillStyle='#39435c'; ctx.fillRect(-3,-s2*1.1,6,s2*1.1);
+      ctx.fillStyle=(Math.sin(time*3)>0)?'#7dffab':'#2a4a35';
+      ctx.beginPath(); ctx.arc(0,-s2*1.15,3.4,0,U.TAU); ctx.fill();
+    }else{
+      /* 通用小屋: 基座+穹顶+类别色带 */
+      var hue={ bl_warehouse:35, bl_mine:200, bl_lab:280, bl_barracks:0,
+                bl_turret:120, bl_clinic:160 }[b.bid]||50;
+      var bg=ctx.createRadialGradient(-s2*.2,-s2*.25,3,0,0,s2*.65);
+      bg.addColorStop(0,'#e8ecf5'); bg.addColorStop(1,'#a8b2c8');
+      ctx.fillStyle=bg;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='hsl('+hue+',70%,60%)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.stroke();
+      /* 类别标记 */
+      ctx.fillStyle='hsl('+hue+',75%,65%)';
+      if(b.bid==='bl_turret'){
+        ctx.fillRect(-2.5,-s2*.75,5,s2*.5);
+        ctx.beginPath(); ctx.arc(0,-s2*.72,4.5,0,U.TAU); ctx.fill();
+      }else{
+        ctx.beginPath(); ctx.arc(0,-s2*.1,4.5,0,U.TAU); ctx.fill();
+      }
+      /* 窗灯 */
+      ctx.fillStyle='rgba(255,233,196,'+(.7+.3*Math.sin(time*2+b.x))+')';
+      ctx.beginPath(); ctx.arc(s2*.22,-s2*.05,2.4,0,U.TAU); ctx.fill();
+    }
+    ctx.restore();
+    /* 建造模式提示名 */
+    if(APH.state.buildMode){
+      ctx.save();
+      ctx.fillStyle='rgba(160,180,220,.75)';
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(def.name,b.x,b.y-s2*.8);
+      ctx.restore();
+    }
+  }
+
   return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
+    drawBuilding:drawBuilding,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();
@@ -1876,26 +2134,125 @@ window.APH = window.APH || {};
   /* ================= 全局状态（唯一实例） ================= */
   APH.state = {
     mode:'intro',                // intro | running | dead | won
+    scene:'home',                // home=殖民地(安全) | expedition=星球远征
     clock:0,
     spec:null,                   // 当前 PlanetSpec (ADR-1)
     px:0, py:0, vx:0, vy:0,
     face:-Math.PI/2, walkPh:0, moving:false, run:false,
     o2:100, hp:100, cry:0, found:0, totalBeacons:6,
-    carry:{},                    // ADR: 背包 {itemId: n}
+    carry:{},                    // 远征背包 {itemId: n}
     fireCd:0, iFrameT:0, hurtFlash:0, noiseT:0,
     camX:0, camY:0, shake:0,
     target:null,
     keys:{}, joy:{active:false,id:null,x:0,y:0},
     entities:[],                 // 统一实体列表 (ADR-3)
-    parts:[],                    // 粒子(表现层，不入实体列表)
+    parts:[],                    // 粒子(表现层)
     spores:[],
     nearBeacon:null,
+    nearPad:false,               // 距离发射台(场景切换交互)
     scanning:null, scanT:0,
-    spawnT:6,                    // 刷怪倒计时
+    spawnT:6,
+    buildMode:null,              // 建造模式: 当前选择的建筑id | null
     seed:0,
   };
 
-  /* ================= 世界搭建 ================= */
+  /* ================= 场景切换 (设计支柱: 殖民地优先) ================= */
+  function enterHome(){
+    var s = APH.state;
+    s.scene='home';
+    APH.Colony.buildColonyWorld(s.seed);
+    APH.World.buildTerrain();
+    /* 远征战利品在出发前就已结算; 回家只做补给 */
+    s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
+    document.getElementById('planetTitle').textContent =
+      '新曙光殖民地 · 家园';
+    APH.UI.setHint('殖民地 · 安全区。靠近发射台出发远征。');
+  }
+  function launchExpedition(){
+    var s = APH.state;
+    if(s.scene==='expedition') return;
+    var seed=(Date.now()%100000)|0;
+    var planet = APH.Planet.fallbackPlanet(seed);
+    var cached = APH.Save.loadPlanet(planet.id);
+    if(cached){ applySpec(planet=cached); }
+    else{
+      applySpec(planet);
+      APH.LLM.enrichPlanet(planet).then(function(rich){
+        if(rich && s.scene==='expedition' && !s.specSaved && s.spec.seed===planet.seed){
+          rich.id=planet.id;
+          APH.Save.savePlanet(rich.id, rich);
+          s.specSaved=true;
+          applySpec(rich);
+        }
+      });
+    }
+    function applySpec(p){
+      s.spec=p; s.specSaved=!!cached; s.seed=p.seed;
+      s.totalBeacons=p.beacons.length;
+      s.entities=[{ id:'player', type:T.PLAYER, x:CFG.HAB.x, y:CFG.HAB.y+70 }];
+      s.px=CFG.HAB.x; s.py=CFG.HAB.y+70; s.camX=s.px; s.camY=s.py;
+      var rng=U.makeRng(p.seed ^ 0x9E3779B9);
+      var pr=0,gd=0;
+      while(pr<CFG.caps.rocks && gd++<500){
+        var rx=rng()*(CFG.WORLD-120)+60, ry=rng()*(CFG.WORLD-120)+60;
+        if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
+        if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
+        if(p.beacons.some(function(b){return U.dst(rx,ry,b.x,b.y)<90;})) continue;
+        s.entities.push(APH.Ent.makeRock(rx,ry,rng)); pr++;
+      }
+      var pc=0; gd=0;
+      while(pc < Math.floor(CFG.caps.crystals*p.terrain.crystalDensity) && gd++<500){
+        var cx=rng()*(CFG.WORLD-140)+70, cy=rng()*(CFG.WORLD-140)+70;
+        if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
+        if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        s.entities.push(APH.Ent.makeCrystal(cx,cy)); pc++;
+      }
+      p.beacons.forEach(function(d){ s.entities.push(APH.Ent.makeBeacon(d)); });
+      s.spores=[];
+      for(var i=0;i<CFG.caps.spores;i++)
+        s.spores.push({x:rng()*CFG.WORLD,y:rng()*CFG.WORLD,ph:rng()*U.TAU,s:.5+rng()});
+      s.o2=CFG.player.o2Max;                       // 出发时满氧
+      s.found=0; s.cry=0; s.carry={};              // 远征状态清零
+      s.spawnT=8;
+      /* 着陆点的返回舱(发射台): 靠近按 E 返航 */
+      s.entities.push({
+        id:'be_pad', type:T.BUILDING, bid:'bl_landing_pad',
+        x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
+      });
+      document.getElementById('planetTitle').textContent =
+        p.name+' · '+p.paletteName+' (远征)';
+    }
+    s.scene='expedition';
+    APH.UI.setHint('已着陆 '+s.spec.name+'。目标: 6 座信标 + 战利品。');
+    U.emit('launched',{});
+  }
+
+  /* 返回殖民地(发射台交互) */
+  function returnHome(){
+    var s=APH.state;
+    if(s.scene!=='expedition') return;
+    /* 结算远征收益: 背包→研究点 */
+    var gained=0;
+    for(var k in s.carry) gained += CFG.items[k].v * s.carry[k];
+    s.meta.research += gained;
+    s.meta.res = s.meta.res || {};
+    s.meta.stats.scans = s.meta.stats.scans||0;
+    if(gained>0){
+      APH.Save.saveMeta(s.meta);
+      APH.UI.floatText('远征结算 +'+gained+' 研究点','#ffe28a');
+    }else{
+      APH.UI.floatText('空手而归','#8fa3cc');
+    }
+    var foundN=s.found, cryN=s.carry[CFG.items.it_crystal_ore]||0;
+    s.carry={};
+    enterHome();
+    U.emit('returnedHome',{ research:gained, beacons:foundN });
+    log('远征归来: 异常 '+foundN+'/'+s.totalBeacons+
+        (gained>0?' · 研究点 +'+gained:''));
+  }
+  function log(t){ console.log('[aphelion]',t); }
+
+  /* ================= 世界搭建(旧函数保留给远征用) ================= */
   function buildWorld(seed, onReady){
     var s = APH.state;
     var planet = APH.Planet.fallbackPlanet(seed);
@@ -2101,39 +2458,109 @@ window.APH = window.APH || {};
     }
   }
 
+  /* ================= 场景条件化更新 ================= */
+  function updateHome(dt){
+    var s=APH.state;
+    APH.Ent.updatePlayer(dt);
+    updateCamera(dt);
+
+    /* 发射台接近检测 */
+    var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
+    s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
+    if(s.nearPad) APH.UI.setHint('[E] 登船出发远征');
+
+    /* 殖民地内缓慢回血回氧(安全区) */
+    s.o2=Math.min(CFG.player.o2Max, s.o2+dt*10);
+    s.hp=Math.min(CFG.player.hpMax, s.hp+dt*6);
+  }
+  function updateExpedition(dt){
+    var s=APH.state;
+    var night=APH.World.daylight()<.5;
+    APH.Ent.updatePlayer(dt);
+    updatePickups(dt);
+    updateInteraction(dt);
+    updateSpawner(dt, night);
+    APH.Combat.updateCombat(dt, night);
+    APH.Combat.updateDropped(dt);
+    /* 返回舱接近检测(玩家出生点旁) */
+    var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
+    s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
+    if(s.nearPad && !s.nearBeacon){
+      APH.UI.setHint('[E] 返航殖民地 (结算战利品)');
+    }
+    updateSurvival(dt);
+    if(s.mode!=='running') return;
+    updateCamera(dt);
+    updateParticles(dt,s.clock);
+    document.getElementById('vig').style.opacity =
+      Math.max(
+        s.o2<25?(1-s.o2/25)*.85:0,
+        s.hurtFlash>0? s.hurtFlash*2 : 0
+      );
+  }
+
   /* ================= 主循环 ================= */
   var lastT=performance.now(), tickN=0;
   function frame(now){
     requestAnimationFrame(frame);
     tickN++;
-    if(tickN%30===0)
-      document.title='▶帧'+tickN+' '+APH.state.spec.name+' · '+APH.state.found+'/'+APH.state.totalBeacons;
+    if(tickN%30===0){
+      var dx=Math.round(s.px-s.camX), dy=Math.round(s.py-s.camY);
+      document.title='▶帧'+tickN+' Δ('+dx+','+dy+') vw'+innerWidth+
+        ' · '+s.found+'/'+s.totalBeacons;
+    }
     var dt=Math.min(.05,(now-lastT)/1000); lastT=now;
 
     var s=APH.state;
     if(s.mode!=='running'){ return; }
 
     s.clock+=dt;
+
+    if(s.scene==='home'){
+      updateHome(dt);
+      /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
+      APH.World.render(dt, homeDrawers());
+      APH.UI.updHUD();
+      return;
+    }
+
     var night = APH.World.daylight() < .5;
-    APH.Ent.updatePlayer(dt);
-    updatePickups(dt);
-    updateInteraction(dt);
-    updateSpawner(dt, night);            // Phase1: 刷怪导演
-    APH.Combat.updateCombat(dt, night);  // Phase1: FSM/弹道/近战
-    APH.Combat.updateDropped(dt);        // Phase1: 掉落拾取
-    updateSurvival(dt);
+    updateExpedition(dt);
     if(s.mode!=='running') return;       // 本帧死亡
-    updateCamera(dt);
-    updateParticles(dt,s.clock);
 
-    /* 受击红闪(叠加低氧红晕) */
-    document.getElementById('vig').style.opacity =
-      Math.max(
-        s.o2<25?(1-s.o2/25)*.85:0,
-        s.hurtFlash>0? s.hurtFlash*2 : 0
-      );
+    if(tickN%30===0){
+      var ddx=Math.round(s.px-s.camX), ddy=Math.round(s.py-s.camY);
+      document.title='▶帧'+tickN+' Δ('+ddx+','+ddy+') 敌'+
+        s.entities.filter(function(e){return e.type===T.ENEMY&&!e.dead;}).length+
+        ' · '+s.found+'/'+s.totalBeacons;
+    }
 
-    APH.World.render(dt, {
+    APH.World.render(dt, expeditionDrawers());
+
+    APH.UI.updHUD();
+  }
+
+  /* ---- 渲染抽屉组: 场景各自注册 ---- */
+  function particlesDrawer(dt2,t){
+    var ctx2=document.getElementById('cv').getContext('2d');
+    var s=APH.state;
+    for(var i=0;i<s.parts.length;i++){
+      var p=s.parts[i], k=p.life/p.max;
+      if(p.t==='dust'){
+        ctx2.fillStyle='rgba(180,190,170,'+(k*.4)+')';
+        ctx2.beginPath(); ctx2.arc(p.x,p.y-k*6,2.5+k*2,0,U.TAU); ctx2.fill();
+      }else if(p.t==='ping'){
+        ctx2.strokeStyle='rgba(89,217,255,'+(k*.8)+')'; ctx2.lineWidth=1.5;
+        ctx2.beginPath();
+        ctx2.ellipse(p.x,p.y,(1-k)*26+4,((1-k)*26+4)*.5,0,0,U.TAU); ctx2.stroke();
+      }else if(p.t==='shard'){
+        ctx2.fillStyle='hsla('+p.hue+',90%,72%,'+k+')';
+        ctx2.fillRect(p.x-1.5,p.y-1.5,3,3);
+      }
+    }
+  }
+  function expeditionDrawers(){
+    return {
       player:function(e,t){ APH.Ent.drawPlayer(e,t); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
@@ -2141,29 +2568,53 @@ window.APH = window.APH || {};
       enemy:function(e,t){ APH.Ent.drawEnemy(e,t); },
       projectile:function(e,t){ APH.Ent.drawProj(e,t); },
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
-      particles:function(dt2,t){
-        var ctx2=document.getElementById('cv').getContext('2d');
-        for(var i=0;i<s.parts.length;i++){
-          var p=s.parts[i], k=p.life/p.max;
-          if(p.t==='dust'){
-            ctx2.fillStyle='rgba(180,190,170,'+(k*.4)+')';
-            ctx2.beginPath(); ctx2.arc(p.x,p.y-k*6,2.5+k*2,0,U.TAU); ctx2.fill();
-          }else if(p.t==='ping'){
-            ctx2.strokeStyle='rgba(89,217,255,'+(k*.8)+')'; ctx2.lineWidth=1.5;
-            ctx2.beginPath();
-            ctx2.ellipse(p.x,p.y,(1-k)*26+4,((1-k)*26+4)*.5,0,0,U.TAU); ctx2.stroke();
-          }else if(p.t==='shard'){
-            ctx2.fillStyle='hsla('+p.hue+',90%,72%,'+k+')';
-            ctx2.fillRect(p.x-1.5,p.y-1.5,3,3);
-          }
-        }
-      },
-      /* 晶体微光挂到暗幕之后：借 render 内部顺序，见 world.js drawDarkness 后回调 */
+      building:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      particles:particlesDrawer,
       crystalGlow:function(){},
-    });
-    /* 暗幕后的晶体辉光与居住舱暖光由 world.render 内部绘制 */
+    };
+  }
+  function homeDrawers(){
+    var d = {
+      player:function(e,t){ APH.Ent.drawPlayer(e,t); },
+      rock:function(e,t){ APH.Ent.drawRock(e); },
+      crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
+      beacon:function(e,t){},
+      enemy:function(e,t){},
+      projectile:function(e,t){},
+      dropped:function(e,t){},
+      building:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      particles:particlesDrawer,
+      crystalGlow:function(){},
+    };
+    return d;
+  }
 
-    APH.UI.updHUD();
+  /* ================= 建造放置 ================= */
+  function tryPlace(bid,wx,wy){
+    var s=APH.state;
+    var check=APH.Colony.canPlace(s.colony.buildings, s.meta.research, bid, wx, wy);
+    if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
+    var def=APH.Colony.get(bid);
+    s.meta.research-=def.cost;
+    s.colony.buildings.push({id:bid,x:Math.round(wx),y:Math.round(wy)});
+    APH.Save.saveMeta(s.meta);
+    saveColony();
+    APH.Colony.placeBuildingEntity(bid,wx,wy);
+    U.emit('built',{id:bid});
+    APH.UI.floatText('✔ '+def.name+' 建造完成','#9fe8c8');
+    if(def.id==='bl_warehouse') CFG.player.carryMax+=20;   // 仓库永久扩容
+    s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
+  }
+  function saveColony(){
+    try{ localStorage.setItem('aphelion_colony_v1',
+      JSON.stringify(APH.state.colony)); }catch(e){}
+  }
+  function loadColony(){
+    try{
+      var v=JSON.parse(localStorage.getItem('aphelion_colony_v1')||'null');
+      if(v && Array.isArray(v.buildings)) return v;
+    }catch(e){}
+    return { buildings:[], builtAt:Date.now() };
   }
 
   /* ================= 输入 ================= */
@@ -2172,11 +2623,35 @@ window.APH = window.APH || {};
     addEventListener('keydown',function(e){
       s.keys[e.code]=true;
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
+      /* E=发射台交互: 不在发射台时自动走过去(再次按E触发) */
+      if(e.code==='KeyE'&&s.mode==='running'){
+        if(s.nearPad){
+          if(s.scene==='home') launchExpedition();
+          else if(s.scene==='expedition') returnHome();
+        }else{
+          var padE=s.entities.find(function(en){return en.type===T.BUILDING&&en.pad;});
+          if(padE){
+            s.target={x:padE.x,y:padE.y+40};
+            s.parts.push({t:'ping',x:padE.x,y:padE.y,life:.9,max:.9});
+            APH.UI.setHint('前往发射台…到达后按 [E]');
+          }
+        }
+      }
       /* 调试热键(自动化验证协议):
          T=传送到最近未扫描信标并启动真实扫描管线
          G=向东传送600px, 触发舱外耗氧路径
          K=在视野边缘生成一只敌人(战斗管线验证) */
       if(e.code==='KeyJ' && s.mode==='running'){ APH.Combat.firePlasma(); }
+      /* B=建造模式(仅殖民地): 循环选择建筑, 点地放置, 右键/Esc取消 */
+      if(e.code==='KeyB'&&s.mode==='running'&&s.scene==='home'){
+        var ids=Object.keys(APH.Colony.list()).filter(function(id){return id!=='bl_landing_pad';});
+        var cur=ids.indexOf(s.buildMode);
+        s.buildMode = ids[(cur+1) % (ids.length+1)] || null;
+        APH.UI.setHint(s.buildMode
+          ? '建造: '+APH.Colony.get(s.buildMode).name+' · 点击空地放置 ('+APH.Colony.get(s.buildMode).cost+'研究点)'
+          : '建造模式关闭');
+      }
+      if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='KeyK'&&s.mode==='running'){
         var f=s.spec.enemies.factions[0];
         s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
@@ -2236,6 +2711,12 @@ window.APH = window.APH || {};
     });
     cv.addEventListener('pointerup',function(e){
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
+        /* 建造模式: 点地放置 */
+        if(s.scene==='home'&&s.buildMode){
+          var wx=e.clientX-innerWidth/2+s.camX, wy=e.clientY-innerHeight/2+s.camY;
+          tryPlace(s.buildMode,wx,wy);
+          return;
+        }
         var t={x:e.clientX-innerWidth/2+APH.state.camX, y:e.clientY-innerHeight/2+APH.state.camY};
         APH.state.target=t;
         APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
@@ -2289,15 +2770,16 @@ window.APH = window.APH || {};
     try{
       var meta=APH.Save.loadMeta();
       APH.state.meta=meta;
+      APH.state.colony=loadColony();          // 殖民地布局持久化
       APH.World.initCanvas();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
       var seed=(Date.now()%100000)|0;
-      buildWorld(seed);
+      /* 设计支柱: 永远出生在殖民地 */
+      enterHome();
       bindInput();
       bindLLMPanel();
       APH.UI.updHUD();
-      document.title='✓就绪 '+APH.state.spec.name+
-        (APH.LLM.enabled()?' ·AI':'');
+      document.title='✓就绪 殖民地'+(APH.LLM.enabled()?' ·AI':'');
     }catch(err){
       APH.UI.fatal('启动失败: '+err.message+'\n'+(err.stack||''));
       throw err;
@@ -2377,6 +2859,19 @@ window.APH = window.APH || {};
   /* 调试接口(标题探针之外的程序化验证通道) */
   APH.Main={
     start:startGame,
+    /* 自动化验证通道: 场景链路直调 */
+    debugTeleportPad:function(){
+      var s=APH.state;
+      var pad=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
+      if(pad){ s.px=pad.x; s.py=pad.y+30; s.camX=pad.x; s.camY=pad.y;
+        document.title='DBG 已到发射台'; }
+    },
+    debugPressE:function(){
+      var s=APH.state;
+      if(s.scene==='home'&&s.nearPad) launchExpedition();
+      else if(s.scene==='expedition'&&s.nearPad) returnHome();
+      document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
+    },
     debugState:function(){
       var s=APH.state;
       var enemies=0; s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)enemies++;});

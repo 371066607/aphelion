@@ -251,6 +251,59 @@ APH.Ent = (function(){
     ctx.restore();
   }
 
+  /* ================= 建筑绘制 ================= */
+  var BLD_COLORS={
+    bl_warehouse:'#b8874a', bl_mine:'#7a8aa0', bl_lab:'#59d9ff',
+    bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
+  };
+  function drawBuilding(e,time){
+    if(e.bid==='bl_landing_pad'){
+      /* 发射台: 圆台+光环+四角灯 */
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(4,6,46,22,0,0,U.TAU); ctx.fill();
+      var g=ctx.createRadialGradient(0,-4,6,0,0,38);
+      g.addColorStop(0,'#39435c'); g.addColorStop(1,'#242c40');
+      ctx.fillStyle=g;
+      ctx.beginPath(); ctx.ellipse(0,0,38,30,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='rgba(255,200,87,'+(.5+.25*Math.sin(time*2))+')';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(0,0,32,25,0,0,U.TAU); ctx.stroke();
+      for(var i=0;i<4;i++){
+        var a=i*U.TAU/4+.78;
+        var lx=Math.cos(a)*34, ly=Math.sin(a)*26;
+        ctx.fillStyle=(Math.floor(time*2+i)%2)?'#ffc857':'#5a4a28';
+        ctx.beginPath(); ctx.arc(lx,ly,2.6,0,U.TAU); ctx.fill();
+      }
+      /* 中心 H 标记 */
+      ctx.strokeStyle='rgba(255,200,87,.75)'; ctx.lineWidth=2.4;
+      ctx.beginPath();
+      ctx.moveTo(-7,-7); ctx.lineTo(-7,7); ctx.moveTo(7,-7); ctx.lineTo(7,7);
+      ctx.moveTo(-7,0); ctx.lineTo(7,0);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    /* 通用建筑: 影子+主体+屋顶灯 */
+    var col=BLD_COLORS[e.bid]||'#8fa3cc';
+    var sz=(e.def&&e.def.size)||40;
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(3,5,sz*.52,sz*.26,0,0,U.TAU); ctx.fill();
+    var bg=ctx.createLinearGradient(0,-sz*.45,0,sz*.3);
+    bg.addColorStop(0,col); bg.addColorStop(1,'#20283a');
+    ctx.fillStyle=bg;
+    ctx.beginPath();
+    ctx.rect(-sz*.42,-sz*.34,sz*.84,sz*.66);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.14)';
+    ctx.fillRect(-sz*.42,-sz*.34,sz*.84,4);
+    /* 屋顶警示灯 */
+    ctx.fillStyle=(Math.sin(time*3)>0)?'#ffd97a':'#5a4a28';
+    ctx.beginPath(); ctx.arc(0,-sz*.42,2.6,0,U.TAU); ctx.fill();
+    ctx.restore();
+  }
+
   /* ================= 玩家逻辑 ================= */
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
@@ -303,12 +356,73 @@ APH.Ent = (function(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
   }
 
+  /* 建筑绘制(殖民地/远征通用) */
+  function drawBuilding(b, time){
+    var def = b.def || {name:'?',size:44};
+    var s2 = def.size;
+    ctx.save();
+    ctx.translate(b.x,b.y);
+    /* 影子 */
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(3,s2*.28,s2*.62,s2*.3,0,0,U.TAU); ctx.fill();
+
+    if(b.bid==='bl_landing_pad'){
+      /* 发射台: 大平台 + 指引灯 */
+      var pul=.5+.5*Math.sin(time*2.4);
+      ctx.fillStyle='#232c42';
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.85,s2*.5,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='rgba(255,200,87,'+(.45+pul*.4)+')';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.7,s2*.38,0,0,U.TAU); ctx.stroke();
+      for(var i=0;i<4;i++){
+        var a=i/4*U.TAU+.6;
+        ctx.fillStyle='rgba(255,200,87,'+(.5+pul*.5)+')';
+        ctx.beginPath();
+        ctx.arc(Math.cos(a)*s2*.68,Math.sin(a)*s2*.36,2.6,0,U.TAU); ctx.fill();
+      }
+      ctx.fillStyle='#39435c'; ctx.fillRect(-3,-s2*1.1,6,s2*1.1);
+      ctx.fillStyle=(Math.sin(time*3)>0)?'#7dffab':'#2a4a35';
+      ctx.beginPath(); ctx.arc(0,-s2*1.15,3.4,0,U.TAU); ctx.fill();
+    }else{
+      /* 通用小屋: 基座+穹顶+类别色带 */
+      var hue={ bl_warehouse:35, bl_mine:200, bl_lab:280, bl_barracks:0,
+                bl_turret:120, bl_clinic:160 }[b.bid]||50;
+      var bg=ctx.createRadialGradient(-s2*.2,-s2*.25,3,0,0,s2*.65);
+      bg.addColorStop(0,'#e8ecf5'); bg.addColorStop(1,'#a8b2c8');
+      ctx.fillStyle=bg;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='hsl('+hue+',70%,60%)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.stroke();
+      /* 类别标记 */
+      ctx.fillStyle='hsl('+hue+',75%,65%)';
+      if(b.bid==='bl_turret'){
+        ctx.fillRect(-2.5,-s2*.75,5,s2*.5);
+        ctx.beginPath(); ctx.arc(0,-s2*.72,4.5,0,U.TAU); ctx.fill();
+      }else{
+        ctx.beginPath(); ctx.arc(0,-s2*.1,4.5,0,U.TAU); ctx.fill();
+      }
+      /* 窗灯 */
+      ctx.fillStyle='rgba(255,233,196,'+(.7+.3*Math.sin(time*2+b.x))+')';
+      ctx.beginPath(); ctx.arc(s2*.22,-s2*.05,2.4,0,U.TAU); ctx.fill();
+    }
+    ctx.restore();
+    /* 建造模式提示名 */
+    if(APH.state.buildMode){
+      ctx.save();
+      ctx.fillStyle='rgba(160,180,220,.75)';
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(def.name,b.x,b.y-s2*.8);
+      ctx.restore();
+    }
+  }
+
   return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
+    drawBuilding:drawBuilding,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();

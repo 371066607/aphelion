@@ -5,6 +5,9 @@
 window.APH = window.APH || {};
 
 APH.CFG = {
+  /* 场景 (设计支柱: 殖民地优先) */
+  scene: { COLONY:'colony', PLANET:'planet' },
+
   /* 世界 */
   WORLD: 2200,
   CHUNK: 550,

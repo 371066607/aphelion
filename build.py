@@ -18,6 +18,7 @@ MODULE_ORDER = [
     "save.js",
     "planet.js",
     "llm.js",
+    "colony.js",
     "combat.js",
     "world.js",
     "entities.js",
