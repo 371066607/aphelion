@@ -257,6 +257,32 @@ APH.Ent = (function(){
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
   };
   function drawBuilding(e,time){
+    if(e.bid==='bl_rival_base'){
+      /* 敌对基地: 暗红堡垒+血条 */
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.4)';
+      ctx.beginPath(); ctx.ellipse(5,8,52,26,0,0,U.TAU); ctx.fill();
+      var g=ctx.createLinearGradient(0,-30,0,22);
+      g.addColorStop(0,'#7a3040'); g.addColorStop(1,'#2a1420');
+      ctx.fillStyle=g;
+      ctx.fillRect(-40,-28,80,52);
+      ctx.strokeStyle='rgba(255,109,122,.6)'; ctx.lineWidth=2;
+      ctx.strokeRect(-40,-28,80,52);
+      /* 塔尖 */
+      ctx.fillStyle='#ff6d7a';
+      ctx.beginPath(); ctx.moveTo(-14,-28); ctx.lineTo(0,-46); ctx.lineTo(14,-28);
+      ctx.closePath(); ctx.fill();
+      if((Math.sin(time*3)>0)){ ctx.fillStyle='#ffd97a';
+        ctx.beginPath(); ctx.arc(0,-48,2.8,0,U.TAU); ctx.fill(); }
+      /* 血条 */
+      var pct=Math.max(0,e.hp/e.maxHp);
+      ctx.fillStyle='rgba(10,12,24,.75)';
+      ctx.fillRect(-32,-58,64,6);
+      ctx.fillStyle=pct>.4?'#ff9aa4':'#ff4d5e';
+      ctx.fillRect(-31,-57,62*pct,4);
+      ctx.restore();
+      return;
+    }
     if(e.bid==='bl_landing_pad'){
       /* 发射台: 圆台+光环+四角灯 */
       ctx.save(); ctx.translate(e.x,e.y);

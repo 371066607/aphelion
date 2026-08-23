@@ -32,6 +32,8 @@ window.APH = window.APH || {};
     scanning:null, scanT:0,
     spawnT:6,
     buildMode:null,              // 建造模式: 当前选择的建筑id | null
+    techSel:null,                // 科技选择游标
+    war:{ angerMin:0, raidWarn:0, raidActive:false, wins:0, raids:0 },
     seed:0,
   };
 
@@ -98,6 +100,24 @@ window.APH = window.APH || {};
         id:'be_pad', type:T.BUILDING, bid:'bl_landing_pad',
         x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
       });
+      /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
+      if(p.rivals && p.rivals.length){
+        var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
+        var ba=Math.random()*U.TAU;
+        var bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
+        var by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
+        s.entities.push({
+          id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
+          x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
+          hp:60, maxHp:60, def:{ name:rv.name+' 基地', size:70 },
+        });
+        /* 基地守军×3 */
+        for(var gi=0; gi<3; gi++){
+          var gf=p.enemies.factions[gi % p.enemies.factions.length];
+          s.entities.push(APH.Ent.makeEnemy(gf,
+            bx+(Math.random()*120-60), by+(Math.random()*90-45)));
+        }
+      }
       document.getElementById('planetTitle').textContent =
         p.name+' · '+p.paletteName+' (远征)';
     }
@@ -357,10 +377,102 @@ window.APH = window.APH || {};
     if(s.prodT>=30){
       s.prodT-=30;
       var out=APH.Colony.productionTick(s.meta, s.colony.buildings);
-      APH.Save.saveMeta(s.meta);
       if(out.mineral||out.research)
         APH.UI.floatText('生产: +'+out.mineral+' 矿材 +'+out.research+' 研究点','#9fe8c8');
+      /* AI殖民地同步成长(同拍) */
+      tickRivals(dt*0+30/60);
     }
+
+    /* 战争系统: 袭击预警与进行中 */
+    if(s.war.raidWarn>0){
+      s.war.raidWarn-=dt;
+      APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
+      if(s.war.raidWarn<=0) startRaid();
+    }else if(s.war.raidActive){
+      /* 波次刷怪(袭击敌人从地图边缘冲基地) */
+      s.war.raidSpawnT=(s.war.raidSpawnT||0)-dt;
+      var aliveEnemies=0;
+      s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)aliveEnemies++;});
+      if(aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
+        s.war.raidSpawnT=.7;
+        var f=s.spec.enemies.factions[Math.floor(Math.random()*s.spec.enemies.factions.length)];
+        var ang=Math.random()*U.TAU, d=Math.max(innerWidth,innerHeight)*.62;
+        var ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40),
+            ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
+        var en=APH.Ent.makeEnemy(f,ex,ey);
+        en.state='chase';                       // 直接冲基地
+        s.entities.push(en);
+        s.war.spawned++;
+      }
+      if(s.war.spawned>=s.war.wave.count){
+        var left=0;
+        s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)left++;});
+        if(left===0){
+          s.war.raidActive=false; s.war.wins++;
+          saveWar();
+          APH.UI.floatText('✔ 袭击被击退! 战争态势提升','#7dffab');
+          U.emit('raidDefended',{});
+        }
+      }
+    }
+  }
+
+  /* ---- AI殖民地成长 + 袭击决策 ---- */
+  function tickRivals(minutes){
+    var s=APH.state;
+    if(!s.rivalStates){ loadRivals(); }
+    s.rivalStates.forEach(function(r){
+      var g=APH.Rivals.growthTick(r.rival, minutes);
+      r.rival.military=g.military; r.rival.economy=g.economy;
+      r.anger += minutes;
+      /* 袭击决策(只在玩家在家时可发动; 远征时暂停积累愤怒) */
+      var def=playerDefPower();
+      var decision=APH.Rivals.shouldRaid(r.rival, def, r.anger);
+      if(decision.should && !s.war.raidActive && s.war.raidWarn<=0){
+        r.anger=0;
+        s.war.raidFrom=r.rival.name;
+        s.war.raidWarn=12;                      // 预警12s(原型缩短, 正式版60s)
+        s.war.pendingWave=APH.Rivals.raidWave(r.rival);
+        saveRivals();
+      }
+    });
+  }
+  function playerDefPower(){
+    var s=APH.state;
+    var turrets=s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length;
+    return 10 + turrets*12 + (s.meta.tech.te_weaponry||0)*5;
+  }
+  function startRaid(){
+    var s=APH.state;
+    s.war.raidActive=true;
+    s.war.wave=s.war.pendingWave||{count:4};
+    s.war.spawned=0; s.war.raidSpawnT=0;
+    APH.UI.setHint('');
+    document.getElementById('vig').style.opacity=.5;
+    setTimeout(function(){document.getElementById('vig').style.opacity=0;},900);
+    U.emit('raidStarted',s.war.wave);
+  }
+  function loadRivals(){
+    var s=APH.state;
+    try{
+      var v=JSON.parse(localStorage.getItem('aphelion_rivals_v1')||'null');
+      if(v&&Array.isArray(v)) { s.rivalStates=v; return; }
+    }catch(e){}
+    /* 从当前星球spec初始化(首次) */
+    var specRivals = window.APH.Planet.fallbackPlanet(s.seed||12345).rivals;
+    s.rivalStates = specRivals.map(function(r){
+      return { rival:r, anger:0 };
+    });
+    saveRivals();
+  }
+  function saveRivals(){
+    try{ localStorage.setItem('aphelion_rivals_v1',
+      JSON.stringify(APH.state.rivalStates)); }catch(e){}
+  }
+  function saveWar(){
+    var s=APH.state;
+    try{ localStorage.setItem('aphelion_war_v1',
+      JSON.stringify({wins:s.war.wins,raids:s.war.raids})); }catch(e){}
   }
   function updateExpedition(dt){
     var s=APH.state;

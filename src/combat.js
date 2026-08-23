@@ -174,6 +174,14 @@ APH.Combat = (function(){
 
       if(p.side === 'player'){
         s.entities.forEach(function(en){
+          if(en.type === T.BUILDING && en.bid==='bl_rival_base' && !en.dead
+             && U.dst(p.x,p.y,en.x,en.y) < 44){
+            p.dead=true; en.hp-=p.dmg;
+            s.shake=Math.min(1,s.shake+.15);
+            U.emit('rivalBaseHit',en);
+            if(en.hp<=0){ raidBaseSuccess(en); }
+            return;
+          }
           if(en.type !== T.ENEMY || en.dead) return;
           var r = 14 * en.faction.gene.size;
           if(U.dst(p.x,p.y,en.x,en.y) < r){
@@ -224,6 +232,28 @@ APH.Combat = (function(){
       itemId:loot.id, n:loot.n, bobA:U.rr(0,U.TAU),
     });
     U.emit('enemyKilled', { en:en, loot:loot });
+  }
+
+  /* ---- 掠夺敌基地成功 ---- */
+  function raidBaseSuccess(base){
+    base.dead=true;
+    var s=APH.state;
+    s.war.raids++;
+    try{ localStorage.setItem('aphelion_war_v1',
+      JSON.stringify({wins:s.war.wins||0,raids:s.war.raids})); }catch(e){}
+    /* 大量战利品撒落 */
+    for(var i=0;i<6;i++){
+      var loot=rollLoot(U.makeRng((Date.now()+i*77)&0xffff));
+      s.entities.push({ id:'dp_rb'+i, type:T.DROPPED,
+        x:base.x+(R()*120-60), y:base.y+(R()*90-45),
+        itemId:loot.id, n:loot.n, bobA:R()*U.TAU });
+    }
+    /* 高价值保底 */
+    s.entities.push({ id:'dp_relic', type:T.DROPPED,
+      x:base.x, y:base.y, itemId:'it_relic', n:2, bobA:0 });
+    s.shake=1;
+    APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
+    U.emit('raidSuccess',{ rivalId:base.rivalId });
   }
 
   /* ---- 玩家受伤(含无敌帧) ---- */

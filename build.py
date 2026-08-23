@@ -19,6 +19,7 @@ MODULE_ORDER = [
     "planet.js",
     "llm.js",
     "colony.js",
+    "rivals.js",
     "combat.js",
     "world.js",
     "entities.js",
