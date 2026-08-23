@@ -1405,12 +1405,19 @@ APH.World = (function(){
      ents: 统一实体列表 (ADR-3)。渲染只认 type。 */
   function render(dt, drawEntityFns){
     var s = APH.state, dL = daylight();
-    ctx.save();
+    var VW2=VW, VH2=VH;
+    /* 无状态变换: 每帧绝对重算(任何一帧异常都不会累积成画面漂移) */
+    function applyWorld(){ ctx.setTransform(DPR,0,0,DPR,
+      DPR*(VW2/2 - s.camX), DPR*(VH2/2 - s.camY)); }
+    function applyScreen(){ ctx.setTransform(DPR,0,0,DPR,0,0); }
+
+    applyScreen();
     ctx.fillStyle = dL>.5 ? '#141a20' : '#070a16';
     ctx.fillRect(0,0,VW,VH);
     var shX = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0,
         shY = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0;
-    ctx.translate(VW/2 - s.camX + shX, VH/2 - s.camY + shY);
+    applyWorld();
+    ctx.translate(shX,shY);
 
     /* 地形块 */
     var c0x=U.clamp(Math.floor((s.camX-VW/2)/CFG.CHUNK),0,NCH-1),
@@ -1459,9 +1466,8 @@ APH.World = (function(){
     });
     drawEmissive(time);
 
-    ctx.restore();
-
-    /* 屏幕空间 */
+    /* 屏幕空间(绝对重置, 无 restore 依赖) */
+    applyScreen();
     ctx.drawImage(vigCv,0,0,VW,VH);
     drawCompass();
   }
