@@ -1187,6 +1187,25 @@ window.APH = window.APH || {};
     if(gb.moodBoost>0){
       m.residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
     }
+    /* V3 随机社交事件(有≥2居民时) */
+    if(m.residents.length>=2 && Math.random()<0.4){
+      var ia=Math.floor(Math.random()*m.residents.length);
+      var ib=(ia+1+Math.floor(Math.random()*(m.residents.length-1)))%m.residents.length;
+      var ra=m.residents[ia], rb=m.residents[ib];
+      var positive = Math.random()<0.6;
+      if(!positive && (ra.trait==='暴脾气'||rb.trait==='暴脾气')) positive=false;
+      else if(ra.mood<35||rb.mood<35) positive=Math.random()<0.3;   // 低心情易冲突
+      if(positive){
+        m.bonds=APH.Res.applyBond(m.bonds||{},ra.id,rb.id,+4);
+        ra.mood=Math.min(100,ra.mood+2); rb.mood=Math.min(100,rb.mood+2);
+        APH.UI.floatText('💬 '+ra.name+' 和 '+rb.name+' 在食堂聊得很开心','#8fd4ff');
+      }else{
+        m.bonds=APH.Res.applyBond(m.bonds||{},ra.id,rb.id,-5);
+        ra.mood=Math.max(0,ra.mood-2); rb.mood=Math.max(0,rb.mood-2);
+        APH.UI.floatText('⚡ '+ra.name+' 和 '+rb.name+' 吵了一架','#ff9a9a');
+      }
+    }
+
     /* U7 社交 */
     var pairs=[];
     for(var i=0;i<m.residents.length;i++)
