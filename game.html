@@ -79,6 +79,12 @@
 <body>
 <canvas id="cv"></canvas>
 
+<div id="codex" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:40;padding:56px 48px;overflow:auto">
+  <h2 style="color:#ffc857;font-size:18px;letter-spacing:4px;margin:0 0 6px">星 球 图 鉴</h2>
+  <p id="codexSub" style="color:#5d6f96;font-size:11px;margin:0 0 18px"></p>
+  <div id="codexBody" style="max-width:640px;font-size:12px;line-height:1.9;color:#cdd9f5"></div>
+  <p style="margin-top:26px;color:#39435c;font-size:11px">按 [L] 关闭</p>
+</div>
 <div id="hud">
   <h1 id="planetTitle">APH-P1 · 前哨站</h1>
   <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
@@ -3230,6 +3236,8 @@ window.APH = window.APH || {};
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
+      /* L=图鉴(仅远征场景有内容) */
+      if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -3460,6 +3468,48 @@ window.APH = window.APH || {};
   boot();
   requestAnimationFrame(frame);
 
+  /* ================= T5 图鉴 ================= */
+  function toggleCodex(){
+    var el=document.getElementById('codex');
+    if(!el) return;
+    var show = el.style.display==='none';
+    el.style.display = show ? '' : 'none';
+    if(show) renderCodex();
+  }
+  function esc(t){ return String(t).replace(/</g,'&lt;'); }
+  function renderCodex(){
+    var s=APH.state, body=document.getElementById('codexBody');
+    if(!body) return;
+    var html='';
+    html+='<div style="color:#59d9ff;margin-bottom:4px">'+esc(s.spec.name)+' · '+
+          esc(s.spec.paletteName)+' · 难度 '+'★'.repeat(s.spec.tier||1)+'</div>';
+    /* 已录入异常 */
+    html+='<div style="margin-top:14px;color:#ffc857">已录入异常 ('+s.found+'/'+s.totalBeacons+')</div>';
+    s.entities.forEach(function(e){
+      if(e.type!==T.BEACON) return;
+      if(e.done) html+='<div style="color:#9fe8c8">◈ '+esc(e.name)+' — '+esc((e.lore||'').slice(0,60))+'…</div>';
+      else       html+='<div style="color:#39435c">◇ 未扫描</div>';
+    });
+    /* 已知生物 */
+    html+='<div style="margin-top:14px;color:#ffc857">已知生物</div>';
+    (s.spec.enemies.factions||[]).forEach(function(f){
+      html+='<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;'+
+            'background:hsl('+f.gene.hue+',62%,52%);margin-right:6px"></span>'+
+            '<b>'+esc(f.name)+'</b> <span style="color:#8fa3cc">'+esc(f.behavior)+
+            ' · HP '+f.hp+'</span><br><span style="color:#5d6f96">'+esc(f.lore||'')+'</span></div>';
+    });
+    /* 环境法则 */
+    if(s.spec.laws && s.spec.laws.length){
+      html+='<div style="margin-top:14px;color:#ffc857">环境法则</div>';
+      s.spec.laws.forEach(function(l){
+        html+='<div style="color:#8fa3cc">· <b style="color:#cdd9f5">'+esc(l.name||l.id)+'</b> '+esc(l.fact||'')+'</div>';
+      });
+    }
+    body.innerHTML=html;
+    document.getElementById('codexSub').textContent=
+      '殖民地数据库 · 远征档案实时同步';
+  }
+
   /* 调试接口(标题探针之外的程序化验证通道) */
   APH.Main={
     start:startGame,
@@ -3477,6 +3527,8 @@ window.APH = window.APH || {};
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
     guardTrim:guardTrim,
+    toggleCodex:toggleCodex,
+    renderCodex:renderCodex,
     perfGuard:perfGuard,
     debugState:function(){
       var s=APH.state;

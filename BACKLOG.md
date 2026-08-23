@@ -9,7 +9,7 @@
 - [x] T2 星球难度分级：以 seed 哈希算 tier(1~3)，tier 影响刷怪间隔(×0.8/0.65/0.5)与敌人 hp(×1/1.25/1.6)；标题探针显示 tier。验收：planet 纯函数测试 3 档边界。
 - [x] T3 Boss 信标：第 6 座信标扫描完成后生成守护者(大型敌人 hp×8, 掉落 4 件+保底遗件)。验收：combat 测试模拟击杀掉落 ≥4。
 - [x] T4 战争态势 HUD：HUD 增加 warScore 条(复用 .track 样式)，防御胜利/掠夺成功后可见变化。验收：手动构建通过 + ui.js 无报错 + scenario 全绿。
-- [ ] T5 图鉴页：L 键切换图鉴浮层(已建档异常列表+阵营介绍)，再按 L 关闭。数据源 spec.laws/beacons/enemies。验收：纯渲染层，scenario 全绿即可。
+- [x] T5 图鉴页：L 键切换图鉴浮层(已建档异常列表+阵营介绍)，再按 L 关闭。数据源 spec.laws/beacons/enemies。验收：纯渲染层，scenario 全绿即可。
 - [ ] T6 平衡：夜晚刷怪间隔 ×0.75 改为 ×0.85；酸吐者弹速 +12%。验收：config 数值变更 + 全测试绿。
 - [ ] T7 音量与静音持久化：meta.sfxMuted 存档，boot 时恢复；M 切换后 saveMeta。验收：save 默认结构测试更新。
 - [ ] T8 死亡结算改进：结算页显示本次远征拾取清单(从 carry 快照)与存活时长。验收：ui.js 变更 + scenario 全绿。
