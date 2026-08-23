@@ -41,6 +41,24 @@ APH.Planet = (function(){
     { id:'lw_echo', name:'声追者', fact:'某些猎手循声而来, 目不能视', zone:'wild' },
   ];
 
+  /* ---------- 敌人阵营池（形态基因, ADR-9: fx_ 前缀） ----------
+     behavior: melee_swarm(近战群冲) | spitter(远程酸吐) | tank(重装缓慢)
+     gene 字段驱动 drawEnemy 程序化绘制。Phase2 由 LLM 扩充。 */
+  var ENEMY_FACTIONS = [
+    { id:'fx_maw', name:'噬光群囊', behavior:'melee_swarm',
+      gene:{hue:285,sides:5,limbs:6,size:1.0,spikes:3,eyes:2},
+      hp:26, speed:96, dmg:8, nightBoost:1.35,
+      lore:'它们在黑暗中繁殖，光会让它们迟疑。' },
+    { id:'fx_spit', name:'酸吐者', behavior:'spitter',
+      gene:{hue:95,sides:6,limbs:4,size:1.15,spikes:1,eyes:4},
+      hp:20, speed:64, dmg:7, nightBoost:1.15,
+      lore:'它从不靠近，只是隔着三十米把胃液吐过来。' },
+    { id:'fx_bulwark', name:'硅壳壁垒', behavior:'tank',
+      gene:{hue:210,sides:7,limbs:8,size:1.45,spikes:5,eyes:2},
+      hp:70, speed:44, dmg:14, nightBoost:1.05,
+      lore:'矿物的甲壳、生物的心跳。子弹会在它身上弹开一半。' },
+  ];
+
   /* ---------- 希腊字母信标命名 ---------- */
   var GREEK = ['α','β','γ','δ','ε','ζ','η','θ'];
 
@@ -104,6 +122,19 @@ APH.Planet = (function(){
       });
     }
 
+    /* 敌人阵营: 全部3种 + 权重(近战为主) */
+    var factions = ENEMY_FACTIONS.map(function(f){
+      return {
+        id:f.id, name:f.name, behavior:f.behavior,
+        gene:{ hue:(f.gene.hue + Math.floor(rng()*24-12) + 360) % 360,
+               sides:f.gene.sides, limbs:f.gene.limbs,
+               size:f.gene.size, spikes:f.gene.spikes, eyes:f.gene.eyes },
+        hp:f.hp, speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
+        lore:f.lore,
+      };
+    });
+    var weights = { fx_maw:.55, fx_spit:.28, fx_bulwark:.17 };
+
     return {
       v: 1,
       id: id,
@@ -119,6 +150,7 @@ APH.Planet = (function(){
       },
       laws: laws,
       beacons: beacons,
+      enemies: { factions: factions, weights: weights },
       rivals: rivals,
       generatedBy: 'fallback',
     };

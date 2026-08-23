@@ -24,7 +24,7 @@ global.test = test;
 
 /* ---- 加载被测模块(顺序同 build.py) ---- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'save.js', 'planet.js']) {
+for (const f of ['config.js', 'utils.js', 'save.js', 'planet.js', 'combat.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 

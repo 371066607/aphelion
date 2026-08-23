@@ -15,8 +15,13 @@ APH.UI = (function(){
     var s = APH.state;
     $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
+    $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
+    $('vHP').textContent = Math.round(Math.max(0,s.hp));
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
+    var cw = APH.Combat.carryWeight(s.carry);
+    $('bCW').style.width = U.clamp(cw/APH.CFG.player.carryMax*100,0,100)+'%';
+    $('vCW').textContent = cw;
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
     var vig = $('vig');
@@ -72,11 +77,19 @@ APH.UI = (function(){
   function showDeath(reason,stats){
     var s=$('intro');
     s.querySelector('.tag').textContent='SIGNAL LOST';
-    s.querySelector('h1').textContent='氧 气 耗 尽';
+    s.querySelector('h1').textContent='信 号 中 断';
     s.querySelector('h2').textContent='';
+    var carryTxt='';
+    if(stats.carry && Object.keys(stats.carry).length){
+      var parts=[];
+      for(var k in stats.carry)
+        parts.push(CFG.items[k].name+'×'+stats.carry[k]);
+      carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+'</span>';
+    }
     s.querySelector('p').innerHTML=reason+
-      '<br>本次带回晶体 '+stats.cry+' 枚 · 已建档异常 '+stats.found+'/'+stats.total+
-      '<br><span style="color:#5d6f96">数据库永久保留。下一次着陆，你仍知道这一切。</span>';
+      '<br>已建档异常 '+stats.found+'/'+stats.total+
+      ' · 研究点保留'+carryTxt+
+      '<br><span style="color:#5d6f96">殖民地数据库永久保留。下一次着陆，你仍知道这一切。</span>';
     var b=$('startBtn'); b.textContent='重 新 着 陆';
     b.onclick=function(){ location.reload(); };
     s.classList.remove('hide');

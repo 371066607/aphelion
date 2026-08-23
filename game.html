@@ -82,7 +82,9 @@
 <div id="hud">
   <h1 id="planetTitle">APH-P1 · 前哨站</h1>
   <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
+  <div class="row"><span class="lab">生命</span><div class="track"><div class="fill" id="bHP" style="width:100%;background:#7dffab"></div></div><span class="val" id="vHP">100</span></div>
   <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
+  <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
 </div>
 
@@ -142,34 +144,66 @@ APH.CFG = {
   player: {
     walkSpeed: 150,
     runSpeed: 235,
-    accel: 9,                  // lerp 系数/秒
+    accel: 9,
     radius: 11,
     hpMax: 100,
+    healInHab: 7,              // 舱内回血 /s
     o2Max: 100,
-    o2Drain: 0.72,             // /s 舱外
-    o2Refill: 16,              // /s 舱内
-    carryMax: 40,              // 负重上限 (ADR 预留 Phase1)
+    o2Drain: 0.72,
+    o2Refill: 16,
+    carryMax: 40,              // 负重上限
   },
 
   /* 相机 */
   camLerp: 0.002,
   lookAhead: 40,
 
-  /* 实体数量预算 (ADR-3 统一列表的性能上限) */
+  /* 实体数量预算 */
   caps: {
     rocks: 64,
     crystals: 26,
     spores: 70,
     particles: 240,
-    enemies: 18,               // Phase1
+    enemies: 18,
   },
 
-  /* 掉落/资源 id 常量 (ADR-9) */
+  /* 战斗 */
+  combat: {
+    plasmaDmg: 13,
+    plasmaSpeed: 430,
+    fireCd: 0.32,              // 射击间隔 s
+    plasmaLife: 0.85,
+    noiseRadius: 300,          // 枪声惊动半径
+    hitStop: 0.035,            // 击杀顿帧
+  },
+
+  /* 敌人通用 */
+  enemy: {
+    aggroR: 195,
+    nightAggroMul: 1.6,
+    deaggroR: 430,
+    attackR: 27,
+    attackCd: 1.15,
+    fleeHpPct: 0.22,
+    projSpeed: 185,
+    projLife: 2.4,
+    despawnR: 900,             // 远离玩家后回收
+  },
+
+  /* 刷怪导演 */
+  spawn: {
+    intervalDay: 11,           // 白天平均间隔 s
+    intervalNight: 4.2,        // 夜晚密度×2.2+
+    minDistFromPlayer: 380,
+    maxDistFromPlayer: 680,
+  },
+
+  /* 物品表 (ADR-9: it_ 前缀; w=负重 v=研究点价值) */
   items: {
-    CRYSTAL_ORE: 'it_crystal_ore',   // 氧气原料
-    MINERAL: 'it_mineral',           // 通用矿材
-    ALLOY: 'it_alloy',               // 合金(冶炼产物)
-    RELIC: 'it_relic',               // 信标稀有件
+    it_crystal_ore: { name: '晶体矿', w: 2, v: 2 },
+    it_mineral:     { name: '矿材',   w: 3, v: 4 },
+    it_alloy:       { name: '合金碎片', w: 5, v: 10 },
+    it_relic:       { name: '信标遗件', w: 1, v: 40 },
   },
 
   /* 实体 type 枚举 (ADR-3) */
@@ -178,14 +212,14 @@ APH.CFG = {
     CRYSTAL: 'crystal',
     BEACON: 'beacon',
     PLAYER: 'player',
-    ENEMY: 'enemy',            // Phase1
-    BUILDING: 'building',      // Phase3
-    SOLDIER: 'soldier',        // Phase3
-    PROJECTILE: 'projectile',  // Phase1
-    DROPPED: 'dropped',        // Phase1 地面掉落物
+    ENEMY: 'enemy',
+    BUILDING: 'building',
+    SOLDIER: 'soldier',
+    PROJECTILE: 'projectile',
+    DROPPED: 'dropped',
   },
 
-  /* 存档 (ADR-2/9) */
+  /* 存档 */
   save: {
     PREFIX: 'aphelion_',
     KEY_META: 'aphelion_meta',
@@ -194,7 +228,7 @@ APH.CFG = {
     VERSION: 1,
   },
 
-  /* LLM (Phase2 启用，接口先定) */
+  /* LLM (Phase2 启用) */
   llm: {
     dailyLimit: 30,
     timeoutMs: 12000,
@@ -432,6 +466,24 @@ APH.Planet = (function(){
     { id:'lw_echo', name:'声追者', fact:'某些猎手循声而来, 目不能视', zone:'wild' },
   ];
 
+  /* ---------- 敌人阵营池（形态基因, ADR-9: fx_ 前缀） ----------
+     behavior: melee_swarm(近战群冲) | spitter(远程酸吐) | tank(重装缓慢)
+     gene 字段驱动 drawEnemy 程序化绘制。Phase2 由 LLM 扩充。 */
+  var ENEMY_FACTIONS = [
+    { id:'fx_maw', name:'噬光群囊', behavior:'melee_swarm',
+      gene:{hue:285,sides:5,limbs:6,size:1.0,spikes:3,eyes:2},
+      hp:26, speed:96, dmg:8, nightBoost:1.35,
+      lore:'它们在黑暗中繁殖，光会让它们迟疑。' },
+    { id:'fx_spit', name:'酸吐者', behavior:'spitter',
+      gene:{hue:95,sides:6,limbs:4,size:1.15,spikes:1,eyes:4},
+      hp:20, speed:64, dmg:7, nightBoost:1.15,
+      lore:'它从不靠近，只是隔着三十米把胃液吐过来。' },
+    { id:'fx_bulwark', name:'硅壳壁垒', behavior:'tank',
+      gene:{hue:210,sides:7,limbs:8,size:1.45,spikes:5,eyes:2},
+      hp:70, speed:44, dmg:14, nightBoost:1.05,
+      lore:'矿物的甲壳、生物的心跳。子弹会在它身上弹开一半。' },
+  ];
+
   /* ---------- 希腊字母信标命名 ---------- */
   var GREEK = ['α','β','γ','δ','ε','ζ','η','θ'];
 
@@ -495,6 +547,19 @@ APH.Planet = (function(){
       });
     }
 
+    /* 敌人阵营: 全部3种 + 权重(近战为主) */
+    var factions = ENEMY_FACTIONS.map(function(f){
+      return {
+        id:f.id, name:f.name, behavior:f.behavior,
+        gene:{ hue:(f.gene.hue + Math.floor(rng()*24-12) + 360) % 360,
+               sides:f.gene.sides, limbs:f.gene.limbs,
+               size:f.gene.size, spikes:f.gene.spikes, eyes:f.gene.eyes },
+        hp:f.hp, speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
+        lore:f.lore,
+      };
+    });
+    var weights = { fx_maw:.55, fx_spit:.28, fx_bulwark:.17 };
+
     return {
       v: 1,
       id: id,
@@ -510,6 +575,7 @@ APH.Planet = (function(){
       },
       laws: laws,
       beacons: beacons,
+      enemies: { factions: factions, weights: weights },
       rivals: rivals,
       generatedBy: 'fallback',
     };
@@ -534,6 +600,301 @@ APH.Planet = (function(){
   }
 
   return { fallbackPlanet:fallbackPlanet, validate:validate };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · combat.js — 敌人FSM(纯函数) / 弹道 / 掉落表
+   挂载: window.APH.Combat
+   设计: fsmStep/rollLoot 是纯函数(node 可测);
+         updateCombat 是世界侧包装(读写 APH.state, 发事件)。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Combat = (function(){
+  'use strict';
+  var U = APH.U, CFG = APH.CFG, T = CFG.entType;
+
+  /* ============================================================
+     1. 敌人 FSM —— 纯函数
+     状态: idle → alert → chase → attack → (低血) flee
+     ctx: { dist, night, hpPct, dt, heardShot }
+     ============================================================ */
+  function fsmStep(en, ctx){
+    var C = CFG.enemy;
+    var aggroR = C.aggroR * (ctx.night ? C.nightAggroMul : 1);
+    var s = en.state;
+
+    if (ctx.hpPct < C.fleeHpPct) return 'flee';
+
+    switch(s){
+      case 'idle':
+        if (ctx.dist < aggroR || ctx.heardShot && ctx.dist < C.noiseAggroR) return 'alert';
+        return s;
+      case 'alert':
+        if (ctx.dist > aggroR * 1.4 && !ctx.heardShot) return 'idle';
+        return 'chase';
+      case 'chase':
+        if (ctx.dist > C.deaggroR) return 'idle';
+        if (ctx.dist < C.attackR && s !== 'flee') return 'attack';
+        return s;
+      case 'attack':
+        if (ctx.dist > C.attackR * 1.35) return 'chase';
+        return s;
+      case 'flee':
+        if (ctx.dist > C.deaggroR * 1.2) return 'idle';
+        return s;
+      default: return 'idle';
+    }
+  }
+
+  /* 移动意图: FSM 状态 → 速度向量(纯函数) */
+  function moveIntent(en, ctx){
+    var spd = en.faction.speed * (ctx.night ? en.faction.nightBoost : 1);
+    var dx = ctx.px - en.x, dy = ctx.py - en.y;
+    var d = Math.sqrt(dx*dx + dy*dy) || 1;
+    var nx = dx/d, ny = dy/d;
+    switch(en.state){
+      case 'idle':    return { vx: Math.cos(en.wanderA)*spd*.25, vy: Math.sin(en.wanderA)*spd*.25 };
+      case 'alert':   return { vx: nx*spd*.5, vy: ny*spd*.5 };
+      case 'chase':   return { vx: nx*spd, vy: ny*spd };
+      case 'attack':  return { vx: 0, vy: 0 };
+      case 'flee':    return { vx: -nx*spd*1.1, vy: -ny*spd*1.1 };
+      default:        return { vx:0, vy:0 };
+    }
+  }
+
+  /* spitter 是否该吐酸(纯函数) */
+  function shouldSpit(en, ctx){
+    return en.faction.behavior === 'spitter'
+        && (en.state === 'chase' || en.state === 'alert')
+        && ctx.dist < 340 && ctx.dist > 90
+        && en.atkCd <= 0;
+  }
+
+  /* ============================================================
+     2. 掉落表 —— 纯函数 (seeded rng 由调用方传入)
+     ============================================================ */
+  var LOOT_TABLE = [
+    { id: 'it_crystal_ore', w: 40, n: [1,2] },
+    { id: 'it_mineral',     w: 34, n: [1,3] },
+    { id: 'it_alloy',       w: 20, n: [1,1] },
+    { id: 'it_relic',       w: 6,  n: [1,1] },
+  ];
+  function rollLoot(rng){
+    var total = LOOT_TABLE.reduce(function(a,e){ return a+e.w; }, 0);
+    var roll = rng() * total;
+    for(var i=0;i<LOOT_TABLE.length;i++){
+      roll -= LOOT_TABLE[i].w;
+      if(roll <= 0){
+        var e = LOOT_TABLE[i];
+        var n = e.n[0] + Math.floor(rng() * (e.n[1]-e.n[0]+1));
+        return { id: e.id, n: n };
+      }
+    }
+    return { id: LOOT_TABLE[0].id, n: 1 };
+  }
+
+  /* 背包操作(纯函数): 返回 {ok, carry, overflow}
+     ADR: 负重超限的部分留在原地(死亡循环的经济核心) */
+  function addToCarry(carry, itemId, n, carryMax){
+    var w = CFG.items[itemId].w * n;
+    var cur = carryWeight(carry);
+    var space = carryMax - cur;
+    if(space <= 0) return { ok:false, carry:carry, overflow:n };
+    var take = Math.min(n, Math.floor(space / CFG.items[itemId].w));
+    if(take <= 0) return { ok:false, carry:carry, overflow:n };
+    var c = Object.assign({}, carry);
+    c[itemId] = (c[itemId]||0) + take;
+    return { ok:true, carry:c, overflow:n-take };
+  }
+  function carryWeight(carry){
+    var w = 0;
+    for(var k in carry) w += (CFG.items[k]?CFG.items[k].w:0) * carry[k];
+    return w;
+  }
+
+  /* ============================================================
+     3. 世界侧更新(非纯, 每帧调用)
+     ============================================================ */
+  function updateCombat(dt, night){
+    var s = APH.state;
+    var ctx2 = { night:night, px:s.px, py:s.py };
+
+    var alive = 0;
+    s.entities.forEach(function(en){
+      if(en.type !== T.ENEMY || en.dead) return;
+      alive++;
+
+      /* 感知 */
+      var dist = U.dst(en.x, en.y, s.px, s.py);
+      var c = {
+        dist: dist, night: night,
+        hpPct: en.hp / en.faction.hp,
+        heardShot: s.noiseT > 0 && dist < CFG.combat.noiseRadius,
+        px: s.px, py: s.py,
+      };
+
+      /* FSM */
+      var prev = en.state;
+      en.state = fsmStep(en, c);
+      if(en.state !== prev) U.emit('enemyState', { en:en, from:prev, to:en.state });
+
+      /* 攻击冷却 */
+      en.atkCd -= dt;
+      en.wanderA += (U.rr(-1,1)) * dt * 2;
+
+      /* spitter 远程 */
+      if(shouldSpit(en, c)){
+        en.atkCd = 2.2;
+        var ddx = s.px-en.x, ddy = s.py-en.y, dd = Math.sqrt(ddx*ddx+ddy*ddy)||1;
+        s.entities.push(makeProj(en.x, en.y, ddx/dd*CFG.enemy.projSpeed, ddy/dd*CFG.enemy.projSpeed, 'enemy', en.faction.dmg));
+        U.emit('enemySpit', en);
+      }
+
+      /* 近战接触 */
+      if(en.state === 'attack' && en.atkCd <= 0){
+        en.atkCd = CFG.enemy.attackCd;
+        hurtPlayer(en.faction.dmg, en.faction.name);
+        U.emit('enemyMelee', en);
+      }
+
+      /* 移动 */
+      var mi = moveIntent(en, c);
+      en.x += mi.vx * dt; en.y += mi.vy * dt;
+      en.x = U.clamp(en.x, 30, CFG.WORLD-30);
+      en.y = U.clamp(en.y, 30, CFG.WORLD-30);
+      en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
+
+      /* 太远回收 */
+      if(dist > CFG.enemy.despawnR){ en.dead = true; }
+    });
+
+    /* ---- 玩家弹丸 ---- */
+    s.entities.forEach(function(p){
+      if(p.type !== T.PROJECTILE || p.dead) return;
+      p.life -= dt;
+      if(p.life <= 0){ p.dead = true; return; }
+      p.x += p.vx*dt; p.y += p.vy*dt;
+
+      if(p.side === 'player'){
+        s.entities.forEach(function(en){
+          if(en.type !== T.ENEMY || en.dead) return;
+          var r = 14 * en.faction.gene.size;
+          if(U.dst(p.x,p.y,en.x,en.y) < r){
+            p.dead = true;
+            en.hp -= p.dmg;
+            s.shake = Math.min(1, s.shake+.12);
+            U.emit('enemyHit', en);
+            if(en.hp <= 0) killEnemy(en);
+          }
+        });
+      }else if(p.side === 'enemy'){
+        if(U.dst(p.x,p.y,s.px,s.py) < CFG.player.radius+5){
+          p.dead = true;
+          hurtPlayer(p.dmg, '酸液');
+        }
+      }
+    });
+
+    /* 枪声衰减 */
+    if(s.noiseT > 0) s.noiseT -= dt;
+
+    /* 清尸 */
+    s.entities = s.entities.filter(function(e){ return !e.dead || e.type===T.PLAYER; });
+  }
+
+  function makeProj(x,y,vx,vy,side,dmg){
+    return { id:'pj_'+(++pid), type:T.PROJECTILE,
+             x:x, y:y, vx:vx, vy:vy, side:side, dmg:dmg,
+             life: side==='player' ? CFG.combat.plasmaLife : CFG.enemy.projLife };
+  }
+  var pid = 0;
+
+  /* ---- 击杀: 掉落生成 ---- */
+  function killEnemy(en){
+    en.dead = true;
+    var s = APH.state;
+    s.meta.stats.kills++;
+    s.shake = Math.min(1, s.shake+.25);
+    var rng = U.makeRng((s.seed ^ Math.floor(en.x*7) ^ Math.floor(en.y*13)) >>> 0);
+    var loot = rollLoot(rng);
+    var r = U.makeRng(Date.now() & 0xffff);          // 表现层散布用
+    for(var k=0;k<8;k++)
+      s.parts.push({t:'shard', x:en.x, y:en.y, vx:U.rr(-90,90), vy:U.rr(-110,-10),
+                    life:U.rr(.4,.9), max:.9, hue:en.faction.gene.hue});
+    s.entities.push({
+      id:'dp_'+(++pid), type:T.DROPPED,
+      x:en.x+U.rr(-14,14), y:en.y+U.rr(-10,10),
+      itemId:loot.id, n:loot.n, bobA:U.rr(0,U.TAU),
+    });
+    U.emit('enemyKilled', { en:en, loot:loot });
+  }
+
+  /* ---- 玩家受伤(含无敌帧) ---- */
+  function hurtPlayer(dmg, source){
+    var s = APH.state;
+    if(s.iFrameT > 0) return;
+    s.iFrameT = 0.5;
+    s.hp -= dmg;
+    s.shake = Math.min(1, s.shake+.35);
+    s.hurtFlash = 0.35;
+    U.emit('playerHurt', { dmg:dmg, source:source });
+    if(s.hp <= 0){
+      s.hp = 0;
+      s.mode = 'dead';
+      s.meta.stats.deaths++;
+      APH.Save.saveMeta(s.meta);
+      APH.UI.showDeath('你被 '+source+'终结了。', {
+        cry:s.cry, found:s.found, total:s.totalBeacons,
+        carry:s.carry,
+      });
+    }
+  }
+
+  /* ---- 玩家射击(由输入层调用) ---- */
+  function firePlasma(){
+    var s = APH.state;
+    if(s.fireCd > 0 || s.mode !== 'running') return false;
+    s.fireCd = CFG.combat.fireCd;
+    var a = s.face;
+    s.entities.push(makeProj(
+      s.px + Math.cos(a)*16, s.py + Math.sin(a)*16 - 11,
+      Math.cos(a)*CFG.combat.plasmaSpeed, Math.sin(a)*CFG.combat.plasmaSpeed,
+      'player', CFG.combat.plasmaDmg));
+    s.noiseT = 0.8;                                    // 惊动附近敌人
+    U.emit('playerFired');
+    return true;
+  }
+
+  /* ---- 掉落物拾取 ---- */
+  function updateDropped(dt){
+    var s = APH.state;
+    s.entities.forEach(function(e){
+      if(e.type !== T.DROPPED || e.dead) return;
+      e.bobA += dt*3;
+      if(U.dst(e.x,e.y,s.px,s.py) < 26){
+        var r = addToCarry(s.carry, e.itemId, e.n, CFG.player.carryMax);
+        if(r.ok){
+          e.dead = true;
+          s.carry = r.carry;
+          U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
+          var nm = CFG.items[e.itemId].name;
+          APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
+        }else{
+          APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
+        }
+      }
+    });
+  }
+
+  return {
+    fsmStep:fsmStep, moveIntent:moveIntent, shouldSpit:shouldSpit,
+    rollLoot:rollLoot, addToCarry:addToCarry, carryWeight:carryWeight,
+    updateCombat:updateCombat, updateDropped:updateDropped,
+    firePlasma:firePlasma, makeProj:makeProj,
+  };
 })();
 
 </script>
@@ -832,7 +1193,6 @@ APH.World = (function(){
    Aphelion · entities.js — 实体工厂 + 绘制 + 玩家 (ADR-3)
    挂载: window.APH.Ent
    统一实体: {id,type,x,y,...} 全部进 APH.state.entities。
-   Phase1 的 enemy/projectile/dropped 也从这里扩展。
    ============================================================ */
 window.APH = window.APH || {};
 
@@ -841,7 +1201,7 @@ APH.Ent = (function(){
   var U = APH.U, CFG = APH.CFG, T = CFG.entType;
   var idSeq = 0;
   function nid(prefix){ return prefix + '_' + (++idSeq); }
-  /* 渲染上下文延迟绑定(main.boot 时注入, 避免 world↔entities 循环依赖) */
+  /* 渲染上下文延迟绑定(main.boot 时注入) */
   var ctx = null;
   function bindCtx(c){ ctx = c; }
 
@@ -869,8 +1229,126 @@ APH.Ent = (function(){
     return { id:d.id, type:T.BEACON, x:d.x, y:d.y,
              name:d.name, lore:d.lore, done:false, ph:Math.random()*U.TAU };
   }
+  /* 敌人个体: 阵营基因 ±5% 抖动 */
+  function makeEnemy(faction, x, y){
+    var jit = function(){ return 1 + (Math.random()*.1 - .05); };
+    return {
+      id:nid('en'), type:T.ENEMY,
+      faction:faction,
+      x:x, y:y,
+      hp:faction.hp * (0.9+Math.random()*.2),
+      state:'idle',
+      wanderA:Math.random()*U.TAU,
+      atkCd:Math.random(),
+      walkPh:Math.random()*6,
+      geneJit:{ size:jit(), limbs:jit() },
+    };
+  }
 
-  /* ================= 绘制 ================= */
+  /* ================= 敌人绘制（形态基因程序化） ================= */
+  function drawEnemy(e, time){
+    var g = e.faction.gene;
+    var s = 11 * g.size * (e.geneJit?e.geneJit.size:1);
+    var step = Math.sin(e.walkPh);
+    var col = 'hsl('+g.hue+',62%,52%)';
+    var colD = 'hsl('+g.hue+',55%,36%)';
+    var colL = 'hsl('+g.hue+',70%,66%)';
+    var ang = Math.atan2(APH.state.py-e.y, APH.state.px-e.x);
+
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    /* 影子 */
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(1,4,s*1.15,s*.55,0,0,U.TAU); ctx.fill();
+
+    /* 肢(步态摆动) */
+    ctx.strokeStyle=colD; ctx.lineWidth=2.2; ctx.lineCap='round';
+    for(var l=0;l<g.limbs;l++){
+      var la=(l/g.limbs)*U.TAU + time*0 + ang*.15;
+      var sw=Math.sin(e.walkPh + l*1.7)*3.5;
+      var lx=Math.cos(la)*(s+4)+sw*Math.cos(la+Math.PI/2),
+          ly=Math.sin(la)*(s+3)+sw*Math.sin(la+Math.PI/2);
+      ctx.beginPath(); ctx.moveTo(Math.cos(la)*s*.5, Math.sin(la)*s*.5);
+      ctx.lineTo(lx, ly); ctx.stroke();
+    }
+    ctx.rotate(ang);                       // 身体朝向玩家
+    /* 尖刺 */
+    ctx.fillStyle=colD;
+    for(var sp=0; sp<g.spikes; sp++){
+      var sa=(sp/g.spikes)*U.TAU;
+      ctx.save(); ctx.rotate(sa);
+      ctx.beginPath();
+      ctx.moveTo(s*.75,-2.4); ctx.lineTo(s*1.42,0); ctx.lineTo(s*.75,2.4);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    /* 身体多边形 */
+    var breathe = 1 + Math.sin(time*3+e.walkPh*.3)*.05;
+    ctx.beginPath();
+    for(var i2=0;i2<=g.sides;i2++){
+      var a2=(i2/g.sides)*U.TAU;
+      var rr=s*breathe*(i2%2?.82:1.06);
+      var px=Math.cos(a2)*rr, py=Math.sin(a2)*rr*.86;
+      i2===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    var bg=ctx.createRadialGradient(-s*.25,-s*.2,s*.15,0,0,s*1.2);
+    bg.addColorStop(0,colL); bg.addColorStop(1,col);
+    if(e.state==='flee') bg.addColorStop(1,'hsl('+g.hue+',45%,58%)');
+    ctx.fillStyle=bg; ctx.fill();
+    /* 状态描边 */
+    if(e.state==='alert'||e.state==='chase'){
+      ctx.strokeStyle='rgba(255,109,122,.85)'; ctx.lineWidth=1.6; ctx.stroke();
+    }else if(e.state==='flee'){
+      ctx.strokeStyle='rgba(125,255,171,.7)'; ctx.lineWidth=1.4; ctx.stroke();
+    }
+    /* 眼(朝向前方) */
+    ctx.fillStyle='#0c1018';
+    for(var ey=0;ey<g.eyes;ey++){
+      var ea=((ey-(g.eyes-1)/2)/(g.eyes||1))*.8;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ea)*s*.45, Math.sin(ea)*s*.4, s*.13, 0, U.TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* 弹丸绘制 */
+  function drawProj(p, time){
+    if(p.side === 'player'){
+      ctx.save();
+      ctx.shadowColor='#59d9ff'; ctx.shadowBlur=9;
+      ctx.strokeStyle='#bdeaff'; ctx.lineWidth=2.6; ctx.lineCap='round';
+      var vl=Math.sqrt(p.vx*p.vx+p.vy*p.vy)||1;
+      ctx.beginPath();
+      ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x-p.vx/vl*10, p.y-p.vy/vl*10);
+      ctx.stroke();
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.shadowColor='#7dff5e'; ctx.shadowBlur=8;
+      ctx.fillStyle='#b6ff8f';
+      ctx.beginPath(); ctx.arc(p.x,p.y,4.2,0,U.TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* 掉落物绘制 */
+  function drawDropped(e, time){
+    var bob=Math.sin(e.bobA)*2.5;
+    ctx.save();
+    ctx.translate(e.x, e.y+bob);
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(0,6-bob,8,3.4,0,0,U.TAU); ctx.fill();
+    ctx.shadowColor='#ffe28a'; ctx.shadowBlur=7;
+    ctx.fillStyle='#ffdf8f';
+    ctx.rotate(time*1.4);
+    ctx.fillRect(-3.4,-3.4,6.8,6.8);
+    ctx.restore();
+  }
+
+  /* ================= 原有绘制 ================= */
   function drawRock(e){
     ctx.save(); ctx.translate(e.x,e.y);
     ctx.fillStyle='rgba(0,0,0,.3)';
@@ -906,7 +1384,6 @@ APH.Ent = (function(){
     });
     ctx.restore();
   }
-  /* 晶体微光（暗幕之上） */
   function drawCrystalGlow(e,time){
     e.m.forEach(function(m,i){
       var sway=Math.sin(time*1.8+e.ph+i)*1.5;
@@ -932,10 +1409,13 @@ APH.Ent = (function(){
   }
   function drawPlayer(e,time){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
+    var s = APH.state;
     ctx.save(); ctx.translate(e.x,e.y);
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
     ctx.translate(0,-bobbing);
+    /* 受击无敌帧闪烁 */
+    if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
     ctx.fillStyle='#8f99ad';
     if(e.moving){
       ctx.fillRect(-5.5+step*2.4,-6,4.5,7);
@@ -952,13 +1432,17 @@ APH.Ent = (function(){
     ctx.beginPath(); ctx.arc(vx,-22+vy,4.6,-.6,3.7); ctx.fill();
     ctx.fillStyle='rgba(120,200,255,.65)';
     ctx.beginPath(); ctx.arc(vx-1.2,-23.4+vy,1.5,0,U.TAU); ctx.fill();
-    var chest=(Math.sin(time*4)>.2)?'#ffd97a':'#8a7648';
-    ctx.fillStyle=chest;
-    ctx.beginPath(); ctx.arc(Math.cos(e.face)*6,-11+Math.sin(e.face)*4,1.8,0,U.TAU); ctx.fill();
+    /* 武器(朝向短线) */
+    ctx.strokeStyle='#39435c'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
+    ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
+    ctx.stroke();
+    ctx.globalAlpha=1;
     ctx.restore();
   }
 
-  /* ================= 玩家逻辑（从原型 main 迁移） ================= */
+  /* ================= 玩家逻辑 ================= */
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
     var ix=0, iy=0;
@@ -998,9 +1482,13 @@ APH.Ent = (function(){
       if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
       if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
     }
-    /* 同步到玩家实体 */
     var pe = findPlayer();
     pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh;
+
+    /* 计时器 */
+    if(s.fireCd>0) s.fireCd-=dt;
+    if(s.iFrameT>0) s.iFrameT-=dt;
+    if(s.hurtFlash>0) s.hurtFlash-=dt;
   }
   function findPlayer(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
@@ -1008,9 +1496,10 @@ APH.Ent = (function(){
 
   return {
     bindCtx:bindCtx,
-    makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon,
+    makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer,
+    drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();
@@ -1034,8 +1523,13 @@ APH.UI = (function(){
     var s = APH.state;
     $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
+    $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
+    $('vHP').textContent = Math.round(Math.max(0,s.hp));
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
+    var cw = APH.Combat.carryWeight(s.carry);
+    $('bCW').style.width = U.clamp(cw/APH.CFG.player.carryMax*100,0,100)+'%';
+    $('vCW').textContent = cw;
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
     var vig = $('vig');
@@ -1091,11 +1585,19 @@ APH.UI = (function(){
   function showDeath(reason,stats){
     var s=$('intro');
     s.querySelector('.tag').textContent='SIGNAL LOST';
-    s.querySelector('h1').textContent='氧 气 耗 尽';
+    s.querySelector('h1').textContent='信 号 中 断';
     s.querySelector('h2').textContent='';
+    var carryTxt='';
+    if(stats.carry && Object.keys(stats.carry).length){
+      var parts=[];
+      for(var k in stats.carry)
+        parts.push(CFG.items[k].name+'×'+stats.carry[k]);
+      carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+'</span>';
+    }
     s.querySelector('p').innerHTML=reason+
-      '<br>本次带回晶体 '+stats.cry+' 枚 · 已建档异常 '+stats.found+'/'+stats.total+
-      '<br><span style="color:#5d6f96">数据库永久保留。下一次着陆，你仍知道这一切。</span>';
+      '<br>已建档异常 '+stats.found+'/'+stats.total+
+      ' · 研究点保留'+carryTxt+
+      '<br><span style="color:#5d6f96">殖民地数据库永久保留。下一次着陆，你仍知道这一切。</span>';
     var b=$('startBtn'); b.textContent='重 新 着 陆';
     b.onclick=function(){ location.reload(); };
     s.classList.remove('hide');
@@ -1159,7 +1661,9 @@ window.APH = window.APH || {};
     spec:null,                   // 当前 PlanetSpec (ADR-1)
     px:0, py:0, vx:0, vy:0,
     face:-Math.PI/2, walkPh:0, moving:false, run:false,
-    o2:100, cry:0, found:0, totalBeacons:6,
+    o2:100, hp:100, cry:0, found:0, totalBeacons:6,
+    carry:{},                    // ADR: 背包 {itemId: n}
+    fireCd:0, iFrameT:0, hurtFlash:0, noiseT:0,
     camX:0, camY:0, shake:0,
     target:null,
     keys:{}, joy:{active:false,id:null,x:0,y:0},
@@ -1168,6 +1672,7 @@ window.APH = window.APH || {};
     spores:[],
     nearBeacon:null,
     scanning:null, scanT:0,
+    spawnT:6,                    // 刷怪倒计时
     seed:0,
   };
 
@@ -1261,13 +1766,55 @@ window.APH = window.APH || {};
     }
   }
 
-  /* ================= 氧气 / 死亡 ================= */
+  /* ================= 刷怪导演 ================= */
+  function updateSpawner(dt, night){
+    var s = APH.state;
+    s.spawnT -= dt;
+    if(s.spawnT > 0) return;
+    var interval = night ? CFG.spawn.intervalNight : CFG.spawn.intervalDay;
+    s.spawnT = interval * U.rr(.75, 1.3);
+
+    var count = 0;
+    s.entities.forEach(function(e){
+      if(e.type===T.ENEMY && !e.dead) count++;
+    });
+    if(count >= CFG.caps.enemies) return;
+
+    /* 按权重抽阵营(seeded rng, ADR-5) */
+    var E = s.spec.enemies;
+    var roll = Math.random();
+    var faction = E.factions[E.factions.length-1];
+    for(var i=0;i<E.factions.length;i++){
+      roll -= (E.weights[E.factions[i].id] || 0);
+      if(roll <= 0){ faction = E.factions[i]; break; }
+    }
+    /* 环形随机位置: 距玩家 min~max */
+    var a = U.rr(0,U.TAU), d = U.rr(CFG.spawn.minDistFromPlayer, CFG.spawn.maxDistFromPlayer);
+    var x = U.clamp(s.px + Math.cos(a)*d, 40, CFG.WORLD-40);
+    var y = U.clamp(s.py + Math.sin(a)*d, 40, CFG.WORLD-40);
+    if(U.dst(x,y,CFG.LAKE.x,CFG.LAKE.y) < s.spec.terrain.lakeR+20) return;
+    s.entities.push(APH.Ent.makeEnemy(faction, x, y));
+    U.emit('enemySpawned', faction);
+  }
+
+  /* ================= 氧气 / HP / 死亡 ================= */
   function updateSurvival(dt){
     var s = APH.state;
     var dHab = U.dst(s.px,s.py,CFG.HAB.x,CFG.HAB.y);
     if(dHab < CFG.HAB.r){
       s.o2 = Math.min(CFG.player.o2Max, s.o2 + dt*CFG.player.o2Refill);
-      APH.UI.setHint(s.o2<CFG.player.o2Max-2 ? '居住舱 · 氧气补充中' : '出舱探索 · 寻找金色光柱');
+      s.hp = Math.min(CFG.player.hpMax, s.hp + dt*CFG.player.healInHab);
+      /* 回舱自动卸货 → 研究点 */
+      var loadW = APH.Combat.carryWeight(s.carry);
+      if(loadW > 0){
+        for(var k in s.carry){
+          s.meta.research += CFG.items[k].v * s.carry[k];
+        }
+        APH.Save.saveMeta(s.meta);
+        s.carry = {};
+        U.emit('cargoSold', {});
+      }
+      APH.UI.setHint('居住舱 · 补给中 (氧气/生命/卸货)');
     }else{
       s.o2 -= dt*CFG.player.o2Drain;
       if(s.o2<25) APH.UI.setHint('⚠ 氧气 '+Math.max(0,Math.round(s.o2))+'% —— 回舱或采集粉色晶体！');
@@ -1276,8 +1823,8 @@ window.APH = window.APH || {};
       s.mode='dead';
       APH.state.meta.stats.deaths++;
       APH.Save.saveMeta(APH.state.meta);
-      APH.UI.showDeath('生命维持系统在荒原上停转了。',
-        {cry:s.cry, found:s.found, total:s.totalBeacons});
+      APH.UI.showDeath('生命维持系统在荒原上停转了。', {
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry});
     }
   }
 
@@ -1335,19 +1882,33 @@ window.APH = window.APH || {};
     if(s.mode!=='running'){ return; }
 
     s.clock+=dt;
+    var night = APH.World.daylight() < .5;
     APH.Ent.updatePlayer(dt);
     updatePickups(dt);
     updateInteraction(dt);
+    updateSpawner(dt, night);            // Phase1: 刷怪导演
+    APH.Combat.updateCombat(dt, night);  // Phase1: FSM/弹道/近战
+    APH.Combat.updateDropped(dt);        // Phase1: 掉落拾取
     updateSurvival(dt);
     if(s.mode!=='running') return;       // 本帧死亡
     updateCamera(dt);
     updateParticles(dt,s.clock);
+
+    /* 受击红闪(叠加低氧红晕) */
+    document.getElementById('vig').style.opacity =
+      Math.max(
+        s.o2<25?(1-s.o2/25)*.85:0,
+        s.hurtFlash>0? s.hurtFlash*2 : 0
+      );
 
     APH.World.render(dt, {
       player:function(e,t){ APH.Ent.drawPlayer(e,t); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
+      enemy:function(e,t){ APH.Ent.drawEnemy(e,t); },
+      projectile:function(e,t){ APH.Ent.drawProj(e,t); },
+      dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       particles:function(dt2,t){
         var ctx2=document.getElementById('cv').getContext('2d');
         for(var i=0;i<s.parts.length;i++){
@@ -1381,7 +1942,14 @@ window.APH = window.APH || {};
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
       /* 调试热键(自动化验证协议):
          T=传送到最近未扫描信标并启动真实扫描管线
-         G=向东传送600px, 触发舱外耗氧路径 */
+         G=向东传送600px, 触发舱外耗氧路径
+         K=在视野边缘生成一只敌人(战斗管线验证) */
+      if(e.code==='KeyJ' && s.mode==='running'){ APH.Combat.firePlasma(); }
+      if(e.code==='KeyK'&&s.mode==='running'){
+        var f=s.spec.enemies.factions[0];
+        s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
+        document.title='DBG 已生成 '+f.name;
+      }
       if(e.code==='KeyT'&&s.mode==='running'){
         var nb=null,bd=1e9;
         s.entities.forEach(function(en){
@@ -1499,8 +2067,11 @@ window.APH = window.APH || {};
     start:startGame,
     debugState:function(){
       var s=APH.state;
+      var enemies=0; s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)enemies++;});
       return {mode:s.mode,frameN:tickN,clock:+s.clock.toFixed(1),o2:+s.o2.toFixed(0),
-              found:s.found,total:s.totalBeacons,ents:s.entities.length};
+              hp:Math.round(s.hp),found:s.found,total:s.totalBeacons,
+              enemies:enemies,carryW:APH.Combat.carryWeight(s.carry),
+              research:s.meta?s.meta.research:0};
     },
   };
 })();

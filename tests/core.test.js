@@ -66,7 +66,7 @@ test('fallbackPlanet 同 seed 完全一致(星球可复现)', () => {
 });
 test('PlanetSpec 满足 ADR-1 契约字段', () => {
   const p = Planet.fallbackPlanet(42);
-  for (const k of ['id', 'seed', 'name', 'palette', 'terrain', 'laws', 'beacons', 'rivals']) {
+  for (const k of ['id', 'seed', 'name', 'palette', 'terrain', 'laws', 'beacons', 'enemies', 'rivals']) {
     if (!(k in p)) throw new Error('缺字段: ' + k);
   }
   if (!Array.isArray(p.beacons) || p.beacons.length !== 6) throw new Error('信标应为6座');
@@ -76,6 +76,24 @@ test('PlanetSpec 满足 ADR-1 契约字段', () => {
   });
   if (!p.laws.every(l => l.id.startsWith('lw_'))) throw new Error('法则 id 前缀违规');
   if (!p.rivals.every(r => r.id.startsWith('rv_'))) throw new Error('敌殖民 id 前缀违规');
+});
+test('enemies 契约: 3阵营/基因字段/权重归一', () => {
+  const p = Planet.fallbackPlanet(555);
+  const E = p.enemies;
+  if (!Array.isArray(E.factions) || E.factions.length !== 3) throw new Error('应为3阵营');
+  const ids = new Set(E.factions.map(f => f.id));
+  if (ids.size !== 3) throw new Error('阵营 id 重复');
+  for (const f of E.factions) {
+    if (!f.id.startsWith('fx_')) throw new Error('fx_ 前缀违规: ' + f.id);
+    const g = f.gene;
+    for (const k of ['hue','sides','limbs','size','spikes','eyes'])
+      if (typeof g[k] !== 'number') throw new Error(f.id+' 缺基因.'+k);
+    if (!(f.hp > 0 && f.speed > 0 && f.dmg > 0)) throw new Error(f.id+' 数值非法');
+    if (!['melee_swarm','spitter','tank'].includes(f.behavior))
+      throw new Error(f.id+' 未知 behavior: '+f.behavior);
+  }
+  const wsum = Object.values(E.weights).reduce((a, b) => a+b, 0);
+  if (Math.abs(wsum - 1) > .01) throw new Error('权重和≠1: '+wsum);
 });
 test('validate 拒绝残缺 spec、接受合法 spec', () => {
   if (Planet.validate({}).ok) throw new Error('空对象应被拒');

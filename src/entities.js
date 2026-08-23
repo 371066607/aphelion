@@ -2,7 +2,6 @@
    Aphelion · entities.js — 实体工厂 + 绘制 + 玩家 (ADR-3)
    挂载: window.APH.Ent
    统一实体: {id,type,x,y,...} 全部进 APH.state.entities。
-   Phase1 的 enemy/projectile/dropped 也从这里扩展。
    ============================================================ */
 window.APH = window.APH || {};
 
@@ -11,7 +10,7 @@ APH.Ent = (function(){
   var U = APH.U, CFG = APH.CFG, T = CFG.entType;
   var idSeq = 0;
   function nid(prefix){ return prefix + '_' + (++idSeq); }
-  /* 渲染上下文延迟绑定(main.boot 时注入, 避免 world↔entities 循环依赖) */
+  /* 渲染上下文延迟绑定(main.boot 时注入) */
   var ctx = null;
   function bindCtx(c){ ctx = c; }
 
@@ -39,8 +38,126 @@ APH.Ent = (function(){
     return { id:d.id, type:T.BEACON, x:d.x, y:d.y,
              name:d.name, lore:d.lore, done:false, ph:Math.random()*U.TAU };
   }
+  /* 敌人个体: 阵营基因 ±5% 抖动 */
+  function makeEnemy(faction, x, y){
+    var jit = function(){ return 1 + (Math.random()*.1 - .05); };
+    return {
+      id:nid('en'), type:T.ENEMY,
+      faction:faction,
+      x:x, y:y,
+      hp:faction.hp * (0.9+Math.random()*.2),
+      state:'idle',
+      wanderA:Math.random()*U.TAU,
+      atkCd:Math.random(),
+      walkPh:Math.random()*6,
+      geneJit:{ size:jit(), limbs:jit() },
+    };
+  }
 
-  /* ================= 绘制 ================= */
+  /* ================= 敌人绘制（形态基因程序化） ================= */
+  function drawEnemy(e, time){
+    var g = e.faction.gene;
+    var s = 11 * g.size * (e.geneJit?e.geneJit.size:1);
+    var step = Math.sin(e.walkPh);
+    var col = 'hsl('+g.hue+',62%,52%)';
+    var colD = 'hsl('+g.hue+',55%,36%)';
+    var colL = 'hsl('+g.hue+',70%,66%)';
+    var ang = Math.atan2(APH.state.py-e.y, APH.state.px-e.x);
+
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    /* 影子 */
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(1,4,s*1.15,s*.55,0,0,U.TAU); ctx.fill();
+
+    /* 肢(步态摆动) */
+    ctx.strokeStyle=colD; ctx.lineWidth=2.2; ctx.lineCap='round';
+    for(var l=0;l<g.limbs;l++){
+      var la=(l/g.limbs)*U.TAU + time*0 + ang*.15;
+      var sw=Math.sin(e.walkPh + l*1.7)*3.5;
+      var lx=Math.cos(la)*(s+4)+sw*Math.cos(la+Math.PI/2),
+          ly=Math.sin(la)*(s+3)+sw*Math.sin(la+Math.PI/2);
+      ctx.beginPath(); ctx.moveTo(Math.cos(la)*s*.5, Math.sin(la)*s*.5);
+      ctx.lineTo(lx, ly); ctx.stroke();
+    }
+    ctx.rotate(ang);                       // 身体朝向玩家
+    /* 尖刺 */
+    ctx.fillStyle=colD;
+    for(var sp=0; sp<g.spikes; sp++){
+      var sa=(sp/g.spikes)*U.TAU;
+      ctx.save(); ctx.rotate(sa);
+      ctx.beginPath();
+      ctx.moveTo(s*.75,-2.4); ctx.lineTo(s*1.42,0); ctx.lineTo(s*.75,2.4);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    /* 身体多边形 */
+    var breathe = 1 + Math.sin(time*3+e.walkPh*.3)*.05;
+    ctx.beginPath();
+    for(var i2=0;i2<=g.sides;i2++){
+      var a2=(i2/g.sides)*U.TAU;
+      var rr=s*breathe*(i2%2?.82:1.06);
+      var px=Math.cos(a2)*rr, py=Math.sin(a2)*rr*.86;
+      i2===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+    var bg=ctx.createRadialGradient(-s*.25,-s*.2,s*.15,0,0,s*1.2);
+    bg.addColorStop(0,colL); bg.addColorStop(1,col);
+    if(e.state==='flee') bg.addColorStop(1,'hsl('+g.hue+',45%,58%)');
+    ctx.fillStyle=bg; ctx.fill();
+    /* 状态描边 */
+    if(e.state==='alert'||e.state==='chase'){
+      ctx.strokeStyle='rgba(255,109,122,.85)'; ctx.lineWidth=1.6; ctx.stroke();
+    }else if(e.state==='flee'){
+      ctx.strokeStyle='rgba(125,255,171,.7)'; ctx.lineWidth=1.4; ctx.stroke();
+    }
+    /* 眼(朝向前方) */
+    ctx.fillStyle='#0c1018';
+    for(var ey=0;ey<g.eyes;ey++){
+      var ea=((ey-(g.eyes-1)/2)/(g.eyes||1))*.8;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ea)*s*.45, Math.sin(ea)*s*.4, s*.13, 0, U.TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /* 弹丸绘制 */
+  function drawProj(p, time){
+    if(p.side === 'player'){
+      ctx.save();
+      ctx.shadowColor='#59d9ff'; ctx.shadowBlur=9;
+      ctx.strokeStyle='#bdeaff'; ctx.lineWidth=2.6; ctx.lineCap='round';
+      var vl=Math.sqrt(p.vx*p.vx+p.vy*p.vy)||1;
+      ctx.beginPath();
+      ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x-p.vx/vl*10, p.y-p.vy/vl*10);
+      ctx.stroke();
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.shadowColor='#7dff5e'; ctx.shadowBlur=8;
+      ctx.fillStyle='#b6ff8f';
+      ctx.beginPath(); ctx.arc(p.x,p.y,4.2,0,U.TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* 掉落物绘制 */
+  function drawDropped(e, time){
+    var bob=Math.sin(e.bobA)*2.5;
+    ctx.save();
+    ctx.translate(e.x, e.y+bob);
+    ctx.fillStyle='rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.ellipse(0,6-bob,8,3.4,0,0,U.TAU); ctx.fill();
+    ctx.shadowColor='#ffe28a'; ctx.shadowBlur=7;
+    ctx.fillStyle='#ffdf8f';
+    ctx.rotate(time*1.4);
+    ctx.fillRect(-3.4,-3.4,6.8,6.8);
+    ctx.restore();
+  }
+
+  /* ================= 原有绘制 ================= */
   function drawRock(e){
     ctx.save(); ctx.translate(e.x,e.y);
     ctx.fillStyle='rgba(0,0,0,.3)';
@@ -76,7 +193,6 @@ APH.Ent = (function(){
     });
     ctx.restore();
   }
-  /* 晶体微光（暗幕之上） */
   function drawCrystalGlow(e,time){
     e.m.forEach(function(m,i){
       var sway=Math.sin(time*1.8+e.ph+i)*1.5;
@@ -102,10 +218,13 @@ APH.Ent = (function(){
   }
   function drawPlayer(e,time){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
+    var s = APH.state;
     ctx.save(); ctx.translate(e.x,e.y);
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
     ctx.translate(0,-bobbing);
+    /* 受击无敌帧闪烁 */
+    if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
     ctx.fillStyle='#8f99ad';
     if(e.moving){
       ctx.fillRect(-5.5+step*2.4,-6,4.5,7);
@@ -122,13 +241,17 @@ APH.Ent = (function(){
     ctx.beginPath(); ctx.arc(vx,-22+vy,4.6,-.6,3.7); ctx.fill();
     ctx.fillStyle='rgba(120,200,255,.65)';
     ctx.beginPath(); ctx.arc(vx-1.2,-23.4+vy,1.5,0,U.TAU); ctx.fill();
-    var chest=(Math.sin(time*4)>.2)?'#ffd97a':'#8a7648';
-    ctx.fillStyle=chest;
-    ctx.beginPath(); ctx.arc(Math.cos(e.face)*6,-11+Math.sin(e.face)*4,1.8,0,U.TAU); ctx.fill();
+    /* 武器(朝向短线) */
+    ctx.strokeStyle='#39435c'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
+    ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
+    ctx.stroke();
+    ctx.globalAlpha=1;
     ctx.restore();
   }
 
-  /* ================= 玩家逻辑（从原型 main 迁移） ================= */
+  /* ================= 玩家逻辑 ================= */
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
     var ix=0, iy=0;
@@ -168,9 +291,13 @@ APH.Ent = (function(){
       if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
       if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
     }
-    /* 同步到玩家实体 */
     var pe = findPlayer();
     pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh;
+
+    /* 计时器 */
+    if(s.fireCd>0) s.fireCd-=dt;
+    if(s.iFrameT>0) s.iFrameT-=dt;
+    if(s.hurtFlash>0) s.hurtFlash-=dt;
   }
   function findPlayer(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
@@ -178,9 +305,10 @@ APH.Ent = (function(){
 
   return {
     bindCtx:bindCtx,
-    makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon,
+    makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer,
+    drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();
