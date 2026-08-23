@@ -62,7 +62,7 @@ APH.CFG = {
     attackR: 27,
     attackCd: 1.15,
     fleeHpPct: 0.22,
-    projSpeed: 185,
+    projSpeed: 207,   // T6: +12%
     projLife: 2.4,
     despawnR: 900,             // 远离玩家后回收
   },
@@ -70,7 +70,7 @@ APH.CFG = {
   /* 刷怪导演 */
   spawn: {
     intervalDay: 11,           // 白天平均间隔 s
-    intervalNight: 4.2,        // 夜晚密度×2.2+
+    intervalNight: 4.94,        // 夜晚密度×2.2+
     minDistFromPlayer: 380,
     maxDistFromPlayer: 680,
   },
