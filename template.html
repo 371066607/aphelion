@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Aphelion · 远日点</title>
+<style>
+  /* ===== 基础 ===== */
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b0f14;color:#dfe8ff;
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;user-select:none}
+  #cv{position:fixed;inset:0;display:block;touch-action:none}
+
+  /* ===== HUD ===== */
+  #hud{position:fixed;top:12px;left:14px;z-index:5;pointer-events:none;
+    background:rgba(8,12,20,.6);border:1px solid rgba(140,170,255,.16);
+    border-radius:12px;padding:10px 14px;backdrop-filter:blur(6px);min-width:216px}
+  #hud h1{font-size:11px;letter-spacing:2px;color:#ffc857;font-weight:600;margin-bottom:7px}
+  .row{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11px}
+  .lab{width:32px;color:#8fa3cc;letter-spacing:1px}
+  .track{flex:1;height:4px;background:rgba(140,170,255,.14);border-radius:2px;overflow:hidden}
+  .fill{height:100%;border-radius:2px;transition:width .25s}
+  .val{width:38px;text-align:right;color:#cdd9f5}
+
+  #hint{position:fixed;bottom:104px;left:50%;transform:translateX(-50%);z-index:5;
+    font-size:12px;color:#9db1dc;background:rgba(8,12,20,.6);padding:6px 16px;
+    border-radius:14px;border:1px solid rgba(140,170,255,.14);pointer-events:none;
+    letter-spacing:1px;white-space:nowrap;transition:opacity .4s}
+
+  #actBtn{position:fixed;bottom:146px;left:50%;transform:translateX(-50%);z-index:6;display:none;
+    background:rgba(255,200,87,.12);border:1px solid rgba(255,200,87,.65);color:#ffc857;
+    padding:12px 28px;border-radius:26px;font-size:14px;letter-spacing:2px;cursor:pointer;
+    backdrop-filter:blur(6px)}
+  #actBtn.show{display:block;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,200,87,.35)}50%{box-shadow:0 0 0 13px rgba(255,200,87,0)}}
+  #scanRing{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;display:none}
+  #scanRing svg{transform:rotate(-90deg)}
+
+  #discCard{position:fixed;top:74px;right:-360px;width:min(300px,82vw);z-index:8;
+    background:rgba(10,14,24,.94);border:1px solid rgba(255,200,87,.4);
+    border-radius:14px;padding:15px;transition:right .45s cubic-bezier(.2,.9,.25,1);backdrop-filter:blur(8px)}
+  #discCard.show{right:14px}
+  #discCard .k{font-size:10px;letter-spacing:3px;color:#ffc857;margin-bottom:6px}
+  #discCard h3{font-size:15px;letter-spacing:1px;margin-bottom:7px;color:#ffe2a3}
+  #discCard p{font-size:12.5px;line-height:1.75;color:#aab8dd}
+
+  #stick{position:fixed;left:24px;bottom:24px;width:116px;height:116px;z-index:6;
+    border-radius:50%;border:1.5px solid rgba(140,170,255,.28);background:rgba(16,24,40,.4);
+    backdrop-filter:blur(4px);display:none;touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:48px;height:48px;border-radius:50%;
+    transform:translate(-50%,-50%);background:rgba(160,190,255,.32);border:1px solid rgba(200,220,255,.45)}
+  @media(pointer:coarse){#stick{display:block}}
+
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .8s;
+    background:radial-gradient(ellipse at center,transparent 52%,rgba(255,40,60,.36) 100%)}
+
+  /* ===== 全屏界面 ===== */
+  .screen{position:fixed;inset:0;z-index:20;background:linear-gradient(#070a12f5,#0a0e1afa);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    text-align:center;padding:24px;transition:opacity .9s}
+  .screen.hide{opacity:0;pointer-events:none}
+  .tag{font-size:11px;letter-spacing:6px;color:#59d9ff;margin-bottom:14px}
+  #intro h1{font-size:min(42px,11vw);letter-spacing:.3em;font-weight:700;margin-bottom:6px;
+    text-shadow:0 0 40px rgba(89,217,255,.3)}
+  #intro h2{font-size:13px;letter-spacing:4px;color:#8fa3cc;font-weight:400;margin-bottom:24px}
+  #intro p{font-size:12.5px;color:#7688ad;line-height:2.1;max-width:430px;margin-bottom:28px}
+  .bigBtn{background:transparent;border:1px solid #ffc857;color:#ffc857;font-size:15px;
+    letter-spacing:6px;padding:14px 44px;border-radius:30px;cursor:pointer;transition:.2s}
+  .bigBtn:hover{background:rgba(255,200,87,.12)}
+  #ctrlHint{margin-top:20px;font-size:11px;color:#5d6f96;letter-spacing:1px;line-height:2}
+  #end{display:none}
+  #end.show{display:flex}
+  #end h1{font-size:28px;letter-spacing:.25em;margin-bottom:16px;color:#ffc857}
+  #endStats{font-size:13px;color:#9db1dc;line-height:2.2;margin-bottom:28px}
+  #fatal{position:fixed;left:12px;right:12px;bottom:12px;z-index:99;color:#ff8095;font-size:12px;
+    white-space:pre-wrap;display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <h1 id="planetTitle">APH-P1 · 前哨站</h1>
+  <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
+  <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
+  <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
+</div>
+
+<div id="hint">跟随金色光柱</div>
+<button id="actBtn">◈ 扫描异常</button>
+<div id="scanRing">
+  <svg width="92" height="92">
+    <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,200,87,.2)" stroke-width="4"/>
+    <circle id="ringArc" cx="46" cy="46" r="38" fill="none" stroke="#ffc857" stroke-width="4"
+      stroke-linecap="round" stroke-dasharray="238.7" stroke-dashoffset="238.7"/>
+  </svg>
+</div>
+
+<div id="discCard"><div class="k">◈ 异常已录入数据库</div><h3 id="dcName"></h3><p id="dcLore"></p></div>
+
+<div id="stick"><div id="knob"></div></div>
+<div id="vig"></div>
+
+<div class="screen" id="intro">
+  <div class="tag">COLONY FRONTIER · 07</div>
+  <h1>远 日 点</h1>
+  <h2>APH-P1 · 未建档行星</h2>
+  <p>你是这颗星球的第一个殖民者。<br>
+     荒原上散布着 <b style="color:#ffc857">6 座先导信标</b>，找到并扫描它们。<br>
+     白天赶路；夜晚的世界只属于带光的人。<br>
+     粉色晶体可以提炼氧气——氧气归零前，回到居住舱。</p>
+  <button class="bigBtn" id="startBtn">踏 上 星 球</button>
+  <div id="ctrlHint">WASD / 方向键 移动 · Shift 疾跑 · 点击地面自动行走<br>触屏设备左下角虚拟摇杆 · 靠近信标出现扫描按钮 · 回车开始</div>
+</div>
+
+<div class="screen" id="end">
+  <div class="tag">MISSION COMPLETE</div>
+  <h1>勘 测 完 成</h1>
+  <div id="endStats"></div>
+  <button class="bigBtn" id="freeBtn">继续自由探索</button>
+</div>
+
+<div id="fatal"></div>
+
+<!--SCRIPTS-->
+</body>
+</html>

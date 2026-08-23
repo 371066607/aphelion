@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>远日点 KX-7 · 俯视勘测</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b0f14;color:#dfe8ff;
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;user-select:none}
+  #cv{position:fixed;inset:0;display:block;touch-action:none}
+
+  /* ── HUD ── */
+  #hud{position:fixed;top:12px;left:14px;z-index:5;pointer-events:none;
+    background:rgba(8,12,20,.6);border:1px solid rgba(140,170,255,.16);
+    border-radius:12px;padding:10px 14px;backdrop-filter:blur(6px);min-width:216px}
+  #hud h1{font-size:11px;letter-spacing:2px;color:#ffc857;font-weight:600;margin-bottom:7px}
+  .row{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11px}
+  .lab{width:32px;color:#8fa3cc;letter-spacing:1px}
+  .track{flex:1;height:4px;background:rgba(140,170,255,.14);border-radius:2px;overflow:hidden}
+  .fill{height:100%;border-radius:2px;transition:width .25s}
+  .val{width:38px;text-align:right;color:#cdd9f5}
+
+  #hint{position:fixed;bottom:104px;left:50%;transform:translateX(-50%);z-index:5;
+    font-size:12px;color:#9db1dc;background:rgba(8,12,20,.6);padding:6px 16px;
+    border-radius:14px;border:1px solid rgba(140,170,255,.14);pointer-events:none;
+    letter-spacing:1px;white-space:nowrap;transition:opacity .4s}
+
+  #actBtn{position:fixed;bottom:146px;left:50%;transform:translateX(-50%);z-index:6;display:none;
+    background:rgba(255,200,87,.12);border:1px solid rgba(255,200,87,.65);color:#ffc857;
+    padding:12px 28px;border-radius:26px;font-size:14px;letter-spacing:2px;cursor:pointer;
+    backdrop-filter:blur(6px)}
+  #actBtn.show{display:block;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,200,87,.35)}50%{box-shadow:0 0 0 13px rgba(255,200,87,0)}}
+  #scanRing{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;display:none}
+  #scanRing svg{transform:rotate(-90deg)}
+
+  #discCard{position:fixed;top:74px;right:-360px;width:min(300px,82vw);z-index:8;
+    background:rgba(10,14,24,.94);border:1px solid rgba(255,200,87,.4);
+    border-radius:14px;padding:15px;transition:right .45s cubic-bezier(.2,.9,.25,1);backdrop-filter:blur(8px)}
+  #discCard.show{right:14px}
+  #discCard .k{font-size:10px;letter-spacing:3px;color:#ffc857;margin-bottom:6px}
+  #discCard h3{font-size:15px;letter-spacing:1px;margin-bottom:7px;color:#ffe2a3}
+  #discCard p{font-size:12.5px;line-height:1.75;color:#aab8dd}
+
+  #stick{position:fixed;left:24px;bottom:24px;width:116px;height:116px;z-index:6;
+    border-radius:50%;border:1.5px solid rgba(140,170,255,.28);background:rgba(16,24,40,.4);
+    backdrop-filter:blur(4px);display:none;touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:48px;height:48px;border-radius:50%;
+    transform:translate(-50%,-50%);background:rgba(160,190,255,.32);border:1px solid rgba(200,220,255,.45)}
+  @media(pointer:coarse){#stick{display:block}}
+
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .8s;
+    background:radial-gradient(ellipse at center,transparent 52%,rgba(255,40,60,.36) 100%)}
+
+  .screen{position:fixed;inset:0;z-index:20;background:linear-gradient(#070a12f5,#0a0e1afa);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    text-align:center;padding:24px;transition:opacity .9s}
+  .screen.hide{opacity:0;pointer-events:none}
+  .tag{font-size:11px;letter-spacing:6px;color:#59d9ff;margin-bottom:14px}
+  #intro h1{font-size:min(42px,11vw);letter-spacing:.3em;font-weight:700;margin-bottom:6px;
+    text-shadow:0 0 40px rgba(89,217,255,.3)}
+  #intro h2{font-size:13px;letter-spacing:4px;color:#8fa3cc;font-weight:400;margin-bottom:24px}
+  #intro p{font-size:12.5px;color:#7688ad;line-height:2.1;max-width:430px;margin-bottom:28px}
+  .bigBtn{background:transparent;border:1px solid #ffc857;color:#ffc857;font-size:15px;
+    letter-spacing:6px;padding:14px 44px;border-radius:30px;cursor:pointer;transition:.2s}
+  .bigBtn:hover{background:rgba(255,200,87,.12)}
+  #ctrlHint{margin-top:20px;font-size:11px;color:#5d6f96;letter-spacing:1px;line-height:2}
+  #end{display:none}
+  #end.show{display:flex}
+  #end h1{font-size:28px;letter-spacing:.25em;margin-bottom:16px;color:#ffc857}
+  #endStats{font-size:13px;color:#9db1dc;line-height:2.2;margin-bottom:28px}
+  #fatal{position:fixed;left:12px;right:12px;bottom:12px;z-index:99;color:#ff8095;font-size:12px;
+    white-space:pre-wrap;display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <h1>KX-7 · 前哨站</h1>
+  <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
+  <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
+  <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
+</div>
+
+<div id="hint">跟随金色光柱</div>
+<button id="actBtn">◈ 扫描异常</button>
+<div id="scanRing">
+  <svg width="92" height="92">
+    <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,200,87,.2)" stroke-width="4"/>
+    <circle id="ringArc" cx="46" cy="46" r="38" fill="none" stroke="#ffc857" stroke-width="4"
+      stroke-linecap="round" stroke-dasharray="238.7" stroke-dashoffset="238.7"/>
+  </svg>
+</div>
+
+<div id="discCard"><div class="k">◈ 异常已录入数据库</div><h3 id="dcName"></h3><p id="dcLore"></p></div>
+
+<div id="stick"><div id="knob"></div></div>
+<div id="vig"></div>
+
+<div class="screen" id="intro">
+  <div class="tag">COLONY FRONTIER · 07</div>
+  <h1>远 日 点</h1>
+  <h2>KX-7 · 俯视勘测原型 v2</h2>
+  <p>你是这颗星球的第一个殖民者。<br>
+     荒原上散布着 <b style="color:#ffc857">6 座先导信标</b>，找到并扫描它们。<br>
+     白天赶路；夜晚的世界只属于带光的人。<br>
+     粉色晶体可以提炼氧气——氧气归零前，回到居住舱。</p>
+  <button class="bigBtn" id="startBtn">踏 上 星 球</button>
+  <div id="ctrlHint">WASD / 方向键 移动 · Shift 疾跑 · 点击地面自动行走<br>触屏设备左下角虚拟摇杆 · 靠近信标出现扫描按钮</div>
+</div>
+
+<div class="screen" id="end">
+  <div class="tag">MISSION COMPLETE</div>
+  <h1>勘 测 完 成</h1>
+  <div id="endStats"></div>
+  <button class="bigBtn" id="freeBtn">继续自由探索</button>
+</div>
+
+<div id="fatal"></div>
+
+<script>
+'use strict';
+window.addEventListener('error',function(e){
+  var f=document.getElementById('fatal');if(f){f.style.display='block';
+  f.textContent='⚠ '+(e.message||e.type)+' @line '+(e.lineno||'?');}
+});
+
+/* ═══════════ 基础 ═══════════ */
+var TAU=Math.PI*2;
+function clamp(v,a,b){return v<a?a:(v>b?b:v)}
+function lerp(a,b,t){return a+(b-a)*t}
+function rr(a,b){return a+Math.random()*(b-a)}
+function ri(a,b){return Math.floor(rr(a,b+1))}
+function dst(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return Math.sqrt(dx*dx+dy*dy)}
+function smooth(a,b,x){x=clamp((x-a)/(b-a),0,1);return x*x*(3-2*x)}
+function hash2(x,y){var h=Math.sin(x*127.1+y*311.7)*43758.5453;return h-Math.floor(h)}
+function vnoise(x,y){var xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,
+  u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  return lerp(lerp(hash2(xi,yi),hash2(xi+1,yi),u),lerp(hash2(xi,yi+1),hash2(xi+1,yi+1),u),v)}
+
+/* ═══════════ 世界配置 ═══════════ */
+var WORLD=2200, CHUNK=550, NCH=WORLD/CHUNK;
+var LAKE={x:1660,y:1560,r:148};
+var HAB={x:1100,y:1100,r:92};
+var DAY_LEN=210;
+
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var VW=0,VH=0,DPR=1;
+function resize(){DPR=Math.min(window.devicePixelRatio||1,2);
+  VW=innerWidth;VH=innerHeight;cv.width=VW*DPR;cv.height=VH*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);}
+addEventListener('resize',resize);resize();
+
+/* ═══════════ 游戏状态 ═══════════ */
+var G={
+  started:false,ended:false,clock:0,
+  px:HAB.x,py:HAB.y+70,vx:0,vy:0,face:-Math.PI/2,moving:false,run:false,
+  walkPh:0,o2:100,o2max:100,cry:0,found:0,
+  target:null,scanning:null,scanT:0,
+  camX:HAB.x,camY:HAB.y,shake:0,
+};
+
+/* ═══════════ 实体 ═══════════ */
+var rocks=[],crystals=[],beacons=[],parts=[],spores=[];
+var POI=[
+ {x:420, y:380, name:'信标 α · 「回声」', lore:'它仍在重复七年前的登陆广播——用的是你的声音。而你还没有录过任何广播。'},
+ {x:1760,y:520, name:'信标 β · 「倒悬之林」', lore:'周边植物根系朝上生长，像被某种温和的力托着。土壤样本显示：这里曾有不同的重力。'},
+ {x:520, y:1700,name:'信标 γ · 「玻璃之海」', lore:'沙地在正午熔成过液体。信标背光面 −40°C，向光面足以点燃纸张。'},
+ {x:1880,y:1140,name:'信标 δ · 「低语环」', lore:'靠近时耳机里出现规律的低频脉冲。破译后只有一句话：别在夜里走向湖。'},
+ {x:330, y:1080,name:'信标 ε · 「山之眼」', lore:'岩层中有一个完美的圆形洞穴，直径与深井档案里的「井」完全一致。它们是同一年龄的。'},
+ {x:1120,y:1870,name:'信标 ζ · 「第七个脚印」', lore:'信标周围有一串脚印通向荒原深处，一共七个——你是第六个。'}];
+
+function buildWorld(){
+  var i,j,x,y,h,vn;
+  rocks.length=crystals.length=0;
+  /* 岩石群 */
+  for(i=0;i<64;i++){
+    x=rr(60,WORLD-60);y=rr(60,WORLD-60);
+    if(dst(x,y,HAB.x,HAB.y)<140||dst(x,y,LAKE.x,LAKE.y)<LAKE.r+40)continue;
+    var grp=[];var n=ri(1,3);
+    for(j=0;j<n;j++)grp.push({ox:rr(-16,16),oy:rr(-10,10),r:rr(7,17),rot:rr(0,TAU),sq:rr(.72,.95)});
+    rocks.push({x:x,y:y,g:grp});
+  }
+  /* 晶体簇 */
+  var placed=0,guard=0;
+  while(placed<26&&guard++<400){
+    x=rr(70,WORLD-70);y=rr(70,WORLD-70);
+    if(dst(x,y,HAB.x,HAB.y)<150||dst(x,y,LAKE.x,LAKE.y)<LAKE.r+30)continue;
+    var mem=[];
+    var cn=ri(2,4);
+    for(j=0;j<cn;j++)mem.push({ox:rr(-14,14),oy:rr(-9,9),h:rr(14,30),w:rr(6,10),lean:rr(-.25,.25)});
+    crystals.push({x:x,y:y,m:mem,taken:false,ph:rr(0,TAU)});placed++;
+  }
+  /* 信标 */
+  beacons.length=0;
+  POI.forEach(function(d,i){
+    beacons.push({x:d.x,y:d.y,data:d,done:false,ph:rr(0,TAU)});
+  });
+  /* 孢子(环境粒子) */
+  spores.length=0;
+  for(i=0;i<70;i++)spores.push({x:rr(0,WORLD),y:rr(0,WORLD),ph:rr(0,TAU),s:rr(.5,1.4)});
+}
+
+/* ═══════════ 地形预渲染（分块离屏画布） ═══════════ */
+var chunks=[];
+function paintChunk(ci,cj){
+  var c=document.createElement('canvas');c.width=CHUNK;c.height=CHUNK;
+  var g=c.getContext('2d');
+  var ox=ci*CHUNK,oy=cj*CHUNK,i,k;
+  g.fillStyle='#232e29';g.fillRect(0,0,CHUNK,CHUNK);
+  /* 大块色斑 */
+  for(i=0;i<340;i++){
+    var bx=hash2(ci*77+i,cj*31+i*3),by=hash2(ci*13+i*7,cj*91+i);
+    var wx=bx*CHUNK,wy=by*CHUNK;
+    var vn=vnoise((ox+wx)*.006,(oy+wy)*.006);
+    var col=vn>.62?'#343a44':(vn>.47?'#2a3730':'#1f2824');
+    if(vn<.3)col='#26332e';
+    g.globalAlpha=.16+hash2(i,ci+cj)*.14;
+    g.fillStyle=col;
+    g.beginPath();
+    g.ellipse(wx,wy,10+hash2(i,1)*34,8+hash2(i,2)*26,hash2(i,3)*TAU,0,TAU);
+    g.fill();
+  }
+  /* 苔藓亮斑 */
+  for(i=0;i<90;i++){
+    var mx2=hash2(i*9+ci,ci*5+cj)*CHUNK,my2=hash2(cj*7+i,ci*3+i)*CHUNK;
+    if(vnoise((ox+mx2)*.008,(oy+my2)*.008)>.52){
+      g.globalAlpha=.13;g.fillStyle='#3d5548';
+      g.beginPath();g.ellipse(mx2,my2,14+hash2(i,4)*22,10+hash2(i,5)*16,0,0,TAU);g.fill();}
+  }
+  /* 湖岸沙环 */
+  var lx=LAKE.x-ox,ly=LAKE.y-oy;
+  if(lx>-260&&lx<CHUNK+260&&ly>-260&&ly<CHUNK+260){
+    for(i=0;i<160;i++){
+      var a=rr(0,TAU),rd=LAKE.r+rr(6,86);
+      var sx=LAKE.x+Math.cos(a)*rd-ox,sy=LAKE.y+Math.sin(a)*rd-oy;
+      if(sx<-20||sx>CHUNK+20||sy<-20||sy>CHUNK+20)continue;
+      g.globalAlpha=rr(.05,.16);g.fillStyle=rd<LAKE.r+34?'#6b6248':'#4a4636';
+      g.beginPath();g.ellipse(sx,sy,rr(6,20),rr(4,12),a,0,TAU);g.fill();
+    }
+  }
+  /* 细碎砾石与草茎 */
+  for(i=0;i<120;i++){
+    var px2=hash2(i*3+ci*11,cj*17)*CHUNK,py2=hash2(i*5,cj*13+i)*CHUNK;
+    var wx2=ox+px2,wy2=oy+py2;
+    if(dst(wx2,wy2,LAKE.x,LAKE.y)<LAKE.r)continue;
+    if(hash2(i,99)>.82){
+      g.globalAlpha=.5;g.strokeStyle='#3a4a3e';g.lineWidth=1.4;
+      g.beginPath();g.moveTo(px2,py2);g.lineTo(px2+rr(-3,3),py2-rr(4,8));g.stroke();
+    }else{
+      g.globalAlpha=.35;g.fillStyle=hash2(i,7)>.5?'#1a221f':'#39404d';
+      g.beginPath();g.arc(px2,py2,rr(1,2.4),0,TAU);g.fill();
+    }
+  }
+  g.globalAlpha=1;
+  return c;
+}
+function buildTerrain(){
+  chunks=[];var ci,cj;
+  for(ci=0;ci<NCH;ci++){chunks.push([]);
+    for(cj=0;cj<NCH;cj++)chunks[ci].push(paintChunk(ci,cj));}
+}
+
+/* ═══════════ 输入 ═══════════ */
+var keys={};
+addEventListener('keydown',function(e){keys[e.code]=true});
+addEventListener('keyup',function(e){keys[e.code]=false});
+
+var joy={active:false,id:null,x:0,y:0};
+var stickEl=document.getElementById('stick'),knob=document.getElementById('knob');
+stickEl.addEventListener('pointerdown',function(e){
+  joy.active=true;joy.id=e.pointerId;joyMove(e);e.stopPropagation();});
+addEventListener('pointermove',function(e){if(joy.active&&e.pointerId===joy.id)joyMove(e)});
+addEventListener('pointerup',function(e){
+  if(joy.active&&e.pointerId===joy.id){joy.active=false;joy.x=joy.y=0;
+    knob.style.transform='translate(-50%,-50%)';}});
+function joyMove(e){
+  var r=stickEl.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  var dx=e.clientX-cx,dy=e.clientY-cy,len=Math.sqrt(dx*dx+dy*dy)||1,max=r.width/2;
+  var cl=Math.min(len,max);
+  joy.x=dx/len*(cl/max);joy.y=dy/len*(cl/max);
+  knob.style.transform='translate(calc(-50% + '+(dx/len*cl)+'px), calc(-50% + '+(dy/len*cl)+'px))';
+}
+/* 点击地面行走 */
+var downX=0,downY=0,downT=0,downMoved=0;
+cv.addEventListener('pointerdown',function(e){downX=e.clientX;downY=e.clientY;downT=performance.now();downMoved=0;});
+cv.addEventListener('pointermove',function(e){
+  downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);downX=e.clientX;downY=e.clientY;});
+cv.addEventListener('pointerup',function(e){
+  if(performance.now()-downT<450&&downMoved<12)setTarget(e.clientX,e.clientY);});
+function setTarget(sx,sy){
+  G.target={x:sx+G.camX-VW/2,y:sy+G.camY-VH/2};
+  parts.push({t:'ping',x:G.target.x,y:G.target.y,life:.8,max:.8});
+}
+
+/* 扫描 */
+var actBtn=document.getElementById('actBtn');
+actBtn.addEventListener('click',function(){
+  if(!nearBeacon||G.scanning)return;
+  G.scanning=nearBeacon;G.scanT=0;
+  document.getElementById('scanRing').style.display='block';
+  actBtn.classList.remove('show');
+});
+
+/* ═══════════ UI ═══════════ */
+function $(id){return document.getElementById(id)}
+var hintEl=$('hint'),cardTimer=null;
+function setHint(t){hintEl.textContent=t;hintEl.style.opacity=t?1:0}
+function updHUD(){
+  $('bO2').style.width=clamp(G.o2/G.o2max*100,0,100)+'%';
+  $('vO2').textContent=Math.round(Math.max(0,G.o2));
+  $('bCR').style.width=clamp(G.cry*4,0,100)+'%';
+  $('vCR').textContent=G.cry;
+  $('bDS').style.width=G.found/POI.length*100+'%';
+  $('vDS').textContent=G.found+'/'+POI.length;
+}
+function showCard(name,lore){
+  $('dcName').textContent=name;$('dcLore').textContent=lore;
+  var c=$('discCard');c.classList.add('show');
+  clearTimeout(cardTimer);cardTimer=setTimeout(function(){c.classList.remove('show')},6500);
+}
+function tryStart(){
+  if(G.started)return;
+  $('intro').classList.add('hide');G.started=true;
+  document.title='▶启动 KX-7';
+  /* 探针：游戏启动证明 */
+  var pb=document.createElement('button');pb.id='probeRun';
+  pb.style.cssText='position:fixed;bottom:8px;right:10px;z-index:50;background:#0c1220;'+
+    'border:1px solid #223252;color:#6f84ab;font-size:11px;padding:4px 9px;border-radius:7px;';
+  pb.textContent='● 0s';
+  document.body.appendChild(pb);
+  setInterval(function(){pb.textContent='● '+Math.round(G.clock)+'s · O2 '+Math.max(0,Math.round(G.o2))+'%';},1000);
+}
+$('startBtn').addEventListener('click',tryStart);
+/* 整个开场画面可点 + 回车开始（双保险） */
+$('intro').addEventListener('click',tryStart);
+addEventListener('keydown',function(e){
+  if((e.code==='Enter'||e.code==='Space')&&!G.started)tryStart();
+});
+$('freeBtn').addEventListener('click',function(){$('end').classList.remove('show');G.ended=false;});
+function die(){
+  if(G.ended)return;G.ended=true;
+  var s=$('intro');
+  s.querySelector('.tag').textContent='SIGNAL LOST';
+  s.querySelector('h1').textContent='氧 气 耗 尽';
+  s.querySelector('h2').textContent='';
+  s.querySelector('p').innerHTML=
+    '生命维持系统在荒原上停转了。<br>本次带回晶体 '+G.cry+' 枚 · 已建档异常 '+G.found+'/6<br>'+
+    '<span style="color:#5d6f96">数据库永久保留。下一次着陆，你仍知道这一切。</span>';
+  var b=$('startBtn');b.textContent='重 新 着 陆';b.onclick=function(){location.reload()};
+  s.classList.remove('hide');
+}
+function winGame(){
+  if(G.ended)return;G.ended=true;
+  $('endStats').innerHTML='用时 '+Math.round(G.clock/60)+' 分 · 采集晶体 '+G.cry+' 枚 · 历经 '+(G.clock/DAY_LEN>=1?'昼夜交替':'白昼')+
+    '<br><br><span style="color:#5d6f96">正式版中，六份异常档案由 AI 依据你本局的行动轨迹即时撰写——每个人的星球故事都不同。</span>';
+  $('end').classList.add('show');
+}
+
+/* ═══════════ 更新逻辑 ═══════════ */
+var nearBeacon=null;
+function update(dt){
+  G.clock+=dt;
+  /* 输入合成 */
+  var ix=0,iy=0;
+  if(keys.KeyW||keys.ArrowUp)iy-=1;
+  if(keys.KeyS||keys.ArrowDown)iy+=1;
+  if(keys.KeyA||keys.ArrowLeft)ix-=1;
+  if(keys.KeyD||keys.ArrowRight)ix+=1;
+  if(joy.active){ix+=joy.x;iy+=joy.y;}
+  G.run=!!(keys.ShiftLeft||keys.ShiftRight);
+  var hasKey=(ix!==0||iy!==0);
+  if(hasKey)G.target=null;
+  var mx=0,my=0;
+  if(hasKey){var il=Math.sqrt(ix*ix+iy*iy)||1;mx=ix/il;my=iy/il;}
+  else if(G.target){
+    var tx=G.target.x-G.px,ty=G.target.y-G.py,td=Math.sqrt(tx*tx+ty*ty);
+    if(td<7){G.target=null;}
+    else{mx=tx/td;my=ty/td;}
+  }
+  var ml=Math.sqrt(mx*mx+my*my);
+  if(ml>1){mx/=ml;my/=ml;}
+  G.moving=ml>.01;
+  var spd=(G.run?235:150)*(ml>0?ml:0);
+  if(G.moving){
+    G.face=Math.atan2(my,mx);
+    G.vx=lerp(G.vx,mx*spd,dt*9);G.vy=lerp(G.vy,my*spd,dt*9);
+    G.walkPh+=dt*(G.run?13:8.5);
+  }else{G.vx*=Math.pow(.0005,dt);G.vy*=Math.pow(.0005,dt);}
+  var nx=clamp(G.px+G.vx*dt,40,WORLD-40),ny=clamp(G.py+G.vy*dt,40,WORLD-40);
+  if(dst(nx,ny,LAKE.x,LAKE.y)>LAKE.r-14){G.px=nx;G.py=ny;}
+  else{/* 湖边滑动 */ if(dst(nx,G.py,LAKE.x,LAKE.y)>LAKE.r-14)G.px=nx; if(dst(G.px,ny,LAKE.x,LAKE.y)>LAKE.r-14)G.py=ny;}
+
+  /* 脚步尘埃 */
+  if(G.moving&&Math.random()<dt*7){
+    parts.push({t:'dust',x:G.px+rr(-4,4),y:G.py+rr(2,7),life:rr(.4,.7),max:.7});}
+
+  /* 相机跟随 */
+  var lookX=G.px+(G.moving?Math.cos(G.face)*40:0),
+      lookY=G.py+(G.moving?Math.sin(G.face)*40:0);
+  G.camX=lerp(G.camX,lookX,1-Math.pow(.002,dt));
+  G.camY=lerp(G.camY,lookY,1-Math.pow(.002,dt));
+  G.camX=clamp(G.camX,VW/2-80,WORLD-VW/2+80);
+  G.camY=clamp(G.camY,VH/2-80,WORLD-VH/2+80);
+  if(G.shake>0)G.shake-=dt*2.2;
+
+  /* 氧气 */
+  var dHab=dst(G.px,G.py,HAB.x,HAB.y);
+  if(dHab<HAB.r){
+    G.o2=Math.min(G.o2max,G.o2+dt*16);
+    setHint(G.o2<G.o2max-2?'居住舱 · 氧气补充中':'出舱探索 · 寻找金色光柱');
+  }else{
+    G.o2-=dt*.72;
+    if(G.o2<25)setHint('⚠ 氧气 '+Math.max(0,Math.round(G.o2))+'% —— 回舱或采集粉色晶体！');
+  }
+  document.getElementById('vig').style.opacity=G.o2<25?(1-G.o2/25)*.85:0;
+  if(G.o2<=0){die();return;}
+
+  /* 晶体拾取 */
+  crystals.forEach(function(c){
+    if(c.taken)return;
+    if(dst(c.x,c.y,G.px,G.py)<30){
+      c.taken=true;G.cry++;G.o2=Math.min(G.o2max,G.o2+8);
+      updHUD();floatText('+1 晶体 · 氧气 +8','#ff9ad0');
+      for(var k=0;k<10;k++)parts.push({t:'shard',x:c.x,y:c.y,
+        vx:rr(-70,70),vy:rr(-90,-20),life:rr(.4,.8),max:.8,hue:310});
+      G.shake=Math.min(1,G.shake+.15);
+    }
+  });
+
+  /* 信标接近检测 */
+  nearBeacon=null;var bd=1e9;
+  beacons.forEach(function(b){
+    b.ph+=dt;
+    if(!b.done){var d=dst(b.x,b.y,G.px,G.py);if(d<86&&d<bd){bd=d;nearBeacon=b;}}
+  });
+  if(G.scanning){
+    var sb=G.scanning;
+    if(dst(sb.x,sb.y,G.px,G.py)>105){cancelScan(true);}
+    else{
+      G.scanT+=dt/2.2;
+      $('ringArc').style.strokeDashoffset=238.7*(1-Math.min(1,G.scanT));
+      if(G.scanT>=1){
+        sb.done=true;G.found++;updHUD();cancelScan(false);
+        showCard(sb.data.name,sb.data.lore);
+        for(var k2=0;k2<16;k2++)parts.push({t:'shard',x:sb.x,y:sb.y-52,
+          vx:rr(-90,90),vy:rr(-110,-10),life:rr(.5,1),max:1,hue:45});
+        G.shake=.5;
+        setHint('已录入 '+G.found+'/'+POI.length+
+          (G.found>=POI.length?' · 全部建档完成':''));
+        if(G.found>=POI.length)setTimeout(winGame,1100);
+      }
+    }
+  }else actBtn.classList.toggle('show',!!nearBeacon);
+
+  updHUD();
+}
+function cancelScan(showHintAgain){
+  G.scanning=null;$('scanRing').style.display='none';
+  $('ringArc').style.strokeDashoffset=238.7;
+  if(showHintAgain)setHint('');
+}
+var ftEl=null,ftT=null;
+function floatText(txt,col){
+  if(!ftEl){ftEl=document.createElement('div');
+    ftEl.style.cssText='position:fixed;left:50%;bottom:186px;transform:translateX(-50%);z-index:9;'+
+    'font-size:14px;letter-spacing:2px;pointer-events:none;transition:all .6s;text-shadow:0 0 10px currentColor';
+    document.body.appendChild(ftEl);}
+  ftEl.textContent=txt;ftEl.style.color=col;ftEl.style.opacity=1;ftEl.style.bottom='186px';
+  clearTimeout(ftT);ftT=setTimeout(function(){ftEl.style.opacity=0;ftEl.style.bottom='204px'},850);
+}
+
+/* ═══════════ 绘制 ═══════════ */
+var vigCv=document.createElement('canvas');
+function buildVignette(){
+  vigCv.width=VW;vigCv.height=VH;
+  var g=vigCv.getContext('2d');
+  var gr=g.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.42,VW/2,VH/2,Math.max(VW,VH)*.72);
+  gr.addColorStop(0,'rgba(4,6,14,0)');gr.addColorStop(1,'rgba(4,6,14,.55)');
+  g.fillStyle=gr;g.fillRect(0,0,VW,VH);
+}
+addEventListener('resize',buildVignette);
+
+function daylight(){
+  var ph=(G.clock/DAY_LEN)%1;
+  return clamp(Math.sin(ph*TAU)*1.7+.38,0,1);
+}
+
+function drawRock(r){
+  ctx.save();ctx.translate(r.x,r.y);
+  ctx.fillStyle='rgba(0,0,0,.3)';
+  ctx.beginPath();ctx.ellipse(2,5,20,9,0,0,TAU);ctx.fill();
+  r.g.forEach(function(m){
+    ctx.save();ctx.translate(m.ox,m.oy-m.r*.4);ctx.rotate(m.rot);
+    ctx.fillStyle='#39404d';
+    ctx.beginPath();ctx.ellipse(0,0,m.r,m.r*m.sq,0,0,TAU);ctx.fill();
+    ctx.fillStyle='#4a5262';
+    ctx.beginPath();ctx.ellipse(-m.r*.22,-m.r*.3,m.r*.55,m.r*.4,0,0,TAU);ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+function drawCrystalBody(c,time){
+  ctx.save();ctx.translate(c.x,c.y);
+  ctx.fillStyle='rgba(0,0,0,.28)';
+  ctx.beginPath();ctx.ellipse(3,6,18,8,0,0,TAU);ctx.fill();
+  c.m.forEach(function(m,i){
+    var sway=Math.sin(time*1.8+c.ph+i)*1.5;
+    ctx.save();ctx.translate(m.ox,m.oy);ctx.rotate(m.lean+sway*.02);
+    ctx.fillStyle='#b3238f';
+    ctx.beginPath();
+    ctx.moveTo(-m.w/2,0);ctx.lineTo(-m.w*.22,-m.h);ctx.lineTo(m.w*.22,-m.h);ctx.lineTo(m.w/2,0);
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ff4fd8';
+    ctx.beginPath();
+    ctx.moveTo(-m.w*.28,0);ctx.lineTo(-m.w*.1,-m.h*.92);ctx.lineTo(m.w*.05,-m.h*.92);ctx.lineTo(m.w*.16,0);
+    ctx.closePath();ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+function drawBeacon(b,time){
+  var pul=b.done?0:Math.sin(b.ph*2.4)*.5+.5;
+  ctx.save();ctx.translate(b.x,b.y);
+  /* 地面环 */
+  ctx.strokeStyle=b.done?'rgba(125,255,171,.4)':'rgba(255,200,87,'+(.35+pul*.3)+')';
+  ctx.lineWidth=2;
+  ctx.beginPath();ctx.ellipse(0,4,30,14,0,0,TAU);ctx.stroke();
+  /* 底座+杆(伪立体向上) */
+  ctx.fillStyle='rgba(0,0,0,.32)';
+  ctx.beginPath();ctx.ellipse(2,5,16,8,0,0,TAU);ctx.fill();
+  ctx.fillStyle='#39435c';ctx.fillRect(-2.5,-46,5,50);
+  ctx.fillStyle='#4c5878';ctx.fillRect(-2.5,-46,2,50);
+  ctx.restore();
+}
+function drawBeaconGem(b,time){
+  var gy=b.y-50;
+  var pul=b.done?.55:Math.sin(b.ph*2.4)*.5+.5;
+  /* 光柱 */
+  if(!b.done){
+    var lg=ctx.createLinearGradient(0,gy-150,0,gy+8);
+    lg.addColorStop(0,'rgba(255,200,87,0)');
+    lg.addColorStop(1,'rgba(255,200,87,'+(0.13+pul*.09)+')');
+    ctx.fillStyle=lg;ctx.fillRect(b.x-13,gy-150,26,158);
+  }
+  var col=b.done?'#7dffab':'#ffc857';
+  ctx.save();
+  ctx.translate(b.x,gy);
+  ctx.rotate(time*.9);
+  ctx.shadowColor=col;ctx.shadowBlur=16;
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(7,0);ctx.lineTo(0,9);ctx.lineTo(-7,0);
+  ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;ctx.restore();
+}
+function drawHabitat(time){
+  ctx.save();ctx.translate(HAB.x,HAB.y);
+  ctx.fillStyle='rgba(0,0,0,.3)';
+  ctx.beginPath();ctx.ellipse(4,8,66,34,0,0,TAU);ctx.fill();
+  /* 舱体 */
+  var bg=ctx.createRadialGradient(-14,-16,8,0,0,62);
+  bg.addColorStop(0,'#dfe6f2');bg.addColorStop(1,'#98a4bd');
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.ellipse(0,0,58,44,0,0,TAU);ctx.fill();
+  /* 穹顶高光 */
+  ctx.fillStyle='rgba(255,255,255,.22)';
+  ctx.beginPath();ctx.ellipse(-14,-16,26,14,-.4,0,TAU);ctx.fill();
+  /* 门 */
+  ctx.fillStyle='#2c3652';
+  ctx.beginPath();ctx.ellipse(44,10,11,14,0,0,TAU);ctx.fill();
+  ctx.restore();
+}
+function drawHabitatEmissive(time){
+  /* 地面暖光池 */
+  var g=ctx.createRadialGradient(HAB.x,HAB.y,10,HAB.x,HAB.y,120);
+  g.addColorStop(0,'rgba(255,233,196,'+(0.16+Math.sin(time*1.2)*.03)+')');
+  g.addColorStop(1,'rgba(255,233,196,0)');
+  ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(HAB.x,HAB.y+6,120,84,0,0,TAU);ctx.fill();
+  /* 舷窗 */
+  for(var i=0;i<5;i++){
+    var a=i/5*TAU+.5;
+    var wx=HAB.x+Math.cos(a)*40,wy=HAB.y+Math.sin(a)*30-6;
+    ctx.fillStyle='#ffe9c4';
+    ctx.beginPath();ctx.arc(wx,wy,3.2,0,TAU);ctx.fill();
+  }
+  /* 信标灯闪烁 */
+  var bl=(Math.sin(time*3)>.4)?'#7dffab':'#2a4a35';
+  ctx.fillStyle=bl;
+  ctx.beginPath();ctx.arc(HAB.x-30,HAB.y-34,3.4,0,TAU);ctx.fill();
+}
+function drawPlayer(time){
+  var x=G.px,y=G.py;
+  var step=Math.sin(G.walkPh),bobbing=G.moving?Math.abs(step)*1.6:.6;
+  ctx.save();ctx.translate(x,y);
+  /* 影子 */
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.beginPath();ctx.ellipse(1,4,11,5.5,0,0,TAU);ctx.fill();
+  ctx.translate(0,-bobbing);
+  /* 腿 */
+  ctx.fillStyle='#8f99ad';
+  if(G.moving){
+    ctx.fillRect(-5.5+step*2.4,-6,4.5,7);
+    ctx.fillRect(1-step*2.4,-6,4.5,7);
+  }else{ctx.fillRect(-5.5,-6,4.5,7);ctx.fillRect(1,-6,4.5,7);}
+  /* 背包 */
+  var bx=-Math.cos(G.face)*5,by=-Math.sin(G.face)*3;
+  ctx.fillStyle='#ff8c42';
+  ctx.beginPath();ctx.roundRect?ctx.roundRect(bx-5+ -Math.cos(G.face)*3,by-19+ -Math.sin(G.face)*2,10,13,3):ctx.rect(bx-5-Math.cos(G.face)*3,by-19-Math.sin(G.face)*2,10,13);
+  ctx.fill();
+  /* 身体 */
+  var bg=ctx.createRadialGradient(-3,-14,2,0,-11,13);
+  bg.addColorStop(0,'#ffffff');bg.addColorStop(1,'#cdd6e6');
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.arc(0,-11,9.5,0,TAU);ctx.fill();
+  /* 头盔 */
+  ctx.fillStyle='#eef3fb';
+  ctx.beginPath();ctx.arc(0,-22,7.5,0,TAU);ctx.fill();
+  /* 面罩(朝向) */
+  var vx=Math.cos(G.face)*3.2,vy=Math.sin(G.face)*2.4;
+  ctx.fillStyle='#152238';
+  ctx.beginPath();ctx.arc(vx,-22+vy,4.6,-.6,3.7);ctx.fill();
+  ctx.fillStyle='rgba(120,200,255,.65)';
+  ctx.beginPath();ctx.arc(vx-1.2,-23.4+vy,1.5,0,TAU);ctx.fill();
+  /* 胸灯 */
+  var chest=(Math.sin(time*4)>.2)?'#ffd97a':'#8a7648';
+  ctx.fillStyle=chest;
+  ctx.beginPath();ctx.arc(Math.cos(G.face)*6,-11+Math.sin(G.face)*4,1.8,0,TAU);ctx.fill();
+  ctx.restore();
+}
+function drawParticles(dt,time){
+  for(var i=parts.length-1;i>=0;i--){
+    var p=parts[i];p.life-=dt;
+    if(p.life<=0){parts.splice(i,1);continue;}
+    var k=p.life/p.max;
+    if(p.t==='dust'){
+      ctx.fillStyle='rgba(180,190,170,'+(k*.4)+')';
+      ctx.beginPath();ctx.arc(p.x,p.y-k*6,2.5+k*2,0,TAU);ctx.fill();
+    }else if(p.t==='ping'){
+      ctx.strokeStyle='rgba(89,217,255,'+(k*.8)+')';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.ellipse(p.x,p.y,(1-k)*26+4,((1-k)*26+4)*.5,0,0,TAU);ctx.stroke();
+    }else if(p.t==='shard'){
+      p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=160*dt;
+      ctx.fillStyle='hsla('+p.hue+',90%,72%,'+k+')';
+      ctx.fillRect(p.x-1.5,p.y-1.5,3,3);
+    }
+  }
+}
+function drawSpores(time,dL){
+  ctx.save();
+  spores.forEach(function(s){
+    var sx=s.x+Math.sin(time*.4+s.ph)*14,
+        sy=s.y+Math.cos(time*.3+s.ph*1.3)*10;
+    if(sx<G.camX-VW/2-20||sx>G.camX+VW/2+20||sy<G.camY-VH/2-20||sy>G.camY+VH/2+20)return;
+    var tw=.5+.5*Math.sin(time*1.5+s.ph*3);
+    ctx.fillStyle='rgba(159,232,200,'+((0.10+ (1-dL)*0.30)*tw)+')';
+    ctx.beginPath();ctx.arc(sx,sy,1.6*s.s,0,TAU);ctx.fill();
+  });
+  ctx.restore();
+}
+
+/* 夜景照明：暗幕 + 挖洞 */
+var darkCv=document.createElement('canvas'),darkCtx=darkCv.getContext('2d');
+function drawDarkness(dL,time){
+  var na=1-dL;
+  if(na<.02)return;
+  darkCv.width=VW;darkCv.height=VH;
+  var g=darkCtx;
+  g.clearRect(0,0,VW,VH);
+  g.fillStyle='rgba(5,8,26,'+(na*.82)+')';
+  g.fillRect(0,0,VW,VH);
+  g.globalCompositeOperation='destination-out';
+  function hole(wx,wy,r,str){
+    var sx=wx-G.camX+VW/2,sy=wy-G.camY+VH/2;
+    if(sx<-r||sx>VW+r||sy<-r||sy>VH+r)return;
+    var gr=g.createRadialGradient(sx,sy,0,sx,sy,r);
+    gr.addColorStop(0,'rgba(0,0,0,'+str+')');gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.fillStyle=gr;g.beginPath();g.arc(sx,sy,r,0,TAU);g.fill();
+  }
+  hole(HAB.x,HAB.y,250,1);
+  hole(G.px,G.py,95,.95);
+  /* 头灯前向 */
+  hole(G.px+Math.cos(G.face)*70,G.py+Math.sin(G.face)*70-10,75,.8);
+  beacons.forEach(function(b){hole(b.x,b.y-40,b.done?90:135,b.done?.6:1);});
+  crystals.forEach(function(c){if(!c.taken)hole(c.x,c.y-8,42,.5);});
+  g.globalCompositeOperation='source-over';
+  ctx.drawImage(darkCv,0,0,VW,VH);
+}
+
+/* 边缘罗盘：最近的未扫描信标 */
+function drawCompass(){
+  var best=null,bd=1e9;
+  beacons.forEach(function(b){
+    if(b.done)return;
+    var d=dst(b.x,b.y,G.px,G.py);if(d<bd){bd=d;best=b;}});
+  if(!best)return;
+  var sx=best.x-G.camX+VW/2,sy=best.y-G.camY+VH/2;
+  if(sx>60&&sx<VW-60&&sy>70&&sy<VH-70)return;   // 在视野内不画
+  var cx=clamp(sx,46,VW-46),cy=clamp(sy,84,VH-96);
+  var ang=Math.atan2(best.y-G.py,best.x-G.px);
+  ctx.save();ctx.translate(cx,cy);
+  ctx.rotate(ang);
+  ctx.fillStyle='rgba(255,200,87,.9)';
+  ctx.shadowColor='#ffc857';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
+  ctx.closePath();ctx.fill();
+  ctx.shadowBlur=0;ctx.rotate(-ang);
+  ctx.fillStyle='#ffc857';ctx.font='10px sans-serif';ctx.textAlign='center';
+  ctx.fillText(Math.round(bd/10)+'m',0,22);
+  ctx.restore();
+}
+
+/* ═══════════ 主循环 ═══════════ */
+var lastT=performance.now(),tickN=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  tickN++;
+  if(tickN%30===0)document.title=(G.started?'▶':'●')+'帧'+tickN+' KX-7 · '+Math.round(G.found)+'/'+POI.length;
+  var dt=Math.min(.05,(now-lastT)/1000);lastT=now;
+  if(!G.started){return;}
+  if(!G.ended)update(dt);
+  render(dt);
+}
+requestAnimationFrame(frame);
+
+function render(dt){
+  var time=G.clock,dL=daylight();
+  ctx.save();
+  /* 背景(世界外) */
+  ctx.fillStyle=dL>.5?'#141a20':'#070a16';
+  ctx.fillRect(0,0,VW,VH);
+  /* 相机变换(含震动) */
+  var shX=G.shake>0?rr(-1,1)*G.shake*4:0,
+      shY=G.shake>0?rr(-1,1)*G.shake*4:0;
+  ctx.translate(VW/2-G.camX+shX,VH/2-G.camY+shY);
+
+  /* 可见地形块 */
+  var c0x=clamp(Math.floor((G.camX-VW/2)/CHUNK),0,NCH-1),
+      c1x=clamp(Math.floor((G.camX+VW/2)/CHUNK),0,NCH-1),
+      c0y=clamp(Math.floor((G.camY-VH/2)/CHUNK),0,NCH-1),
+      c1y=clamp(Math.floor((G.camY+VH/2)/CHUNK),0,NCH-1);
+  for(var ci=c0x;ci<=c1x;ci++)for(var cj=c0y;cj<=c1y;cj++)
+    ctx.drawImage(chunks[ci][cj],ci*CHUNK,cj*CHUNK);
+
+  /* 湖面动画 */
+  var lg=ctx.createRadialGradient(LAKE.x,LAKE.y,10,LAKE.x,LAKE.y,LAKE.r);
+  lg.addColorStop(0,'#0f2233');lg.addColorStop(1,'#1c3d54');
+  ctx.fillStyle=lg;
+  ctx.beginPath();ctx.arc(LAKE.x,LAKE.y,LAKE.r,0,TAU);ctx.fill();
+  ctx.save();
+  ctx.beginPath();ctx.arc(LAKE.x,LAKE.y,LAKE.r,0,TAU);ctx.clip();
+  for(var wv=0;wv<5;wv++){
+    var wy=LAKE.y-LAKE.r+((time*12+wv*67)%(LAKE.r*2));
+    ctx.strokeStyle='rgba(120,200,240,'+(0.05+wv*.012)+')';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(LAKE.x-LAKE.r+20,wy);
+    ctx.quadraticCurveTo(LAKE.x,wy+Math.sin(time+wv)*7,LAKE.x+LAKE.r-20,wy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  /* 地面粒子 */
+  drawParticles(dt,time);
+
+  /* 实体按 y 排序绘制(伪立体) */
+  var ents=[];
+  rocks.forEach(function(r){ents.push({y:r.y,f:function(){drawRock(r)}})});
+  crystals.forEach(function(c){if(!c.taken)ents.push({y:c.y,f:function(){drawCrystalBody(c,time)}})});
+  beacons.forEach(function(b){ents.push({y:b.y,f:function(){drawBeacon(b,time)}})});
+  ents.push({y:HAB.y,f:function(){drawHabitat(time)}});
+  ents.push({y:G.py,f:function(){drawPlayer(time)}});
+  ents.sort(function(a,b){return a.y-b.y});
+  ents.forEach(function(e){e.f()});
+
+  /* 孢子(受昼夜影响) */
+  drawSpores(time,dL);
+
+  /* 发光体(在暗幕之后再画一遍核心) —— 先画暗幕 */
+  drawDarkness(dL,time);
+  beacons.forEach(function(b){drawBeaconGem(b,time)});
+  crystals.forEach(function(c){
+    if(c.taken)return;
+    c.m.forEach(function(m,i){
+      var sway=Math.sin(time*1.8+c.ph+i)*1.5;
+      var gx=c.x+m.ox+sway*.3,gy=c.y+m.oy-m.h*.55;
+      var gr=ctx.createRadialGradient(gx,gy,0,gx,gy,10);
+      gr.addColorStop(0,'rgba(255,215,244,.85)');
+      gr.addColorStop(.4,'rgba(255,79,216,.4)');
+      gr.addColorStop(1,'rgba(255,79,216,0)');
+      ctx.fillStyle=gr;ctx.beginPath();ctx.arc(gx,gy,10,0,TAU);ctx.fill();
+    });
+  });
+  drawHabitatEmissive(time);
+
+  ctx.restore();
+
+  /* 屏幕空间 */
+  ctx.drawImage(vigCv,0,0,VW,VH);
+  drawCompass();
+}
+
+/* ═══════════ 启动 ═══════════ */
+buildWorld();
+buildTerrain();
+buildVignette();
+updHUD();
+document.title='✓就绪 KX-7';
+</script>
+</body>
+</html>

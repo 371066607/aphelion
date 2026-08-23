@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Aphelion · 远日点</title>
+<style>
+  /* ===== 基础 ===== */
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#0b0f14;color:#dfe8ff;
+    font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;user-select:none}
+  #cv{position:fixed;inset:0;display:block;touch-action:none}
+
+  /* ===== HUD ===== */
+  #hud{position:fixed;top:12px;left:14px;z-index:5;pointer-events:none;
+    background:rgba(8,12,20,.6);border:1px solid rgba(140,170,255,.16);
+    border-radius:12px;padding:10px 14px;backdrop-filter:blur(6px);min-width:216px}
+  #hud h1{font-size:11px;letter-spacing:2px;color:#ffc857;font-weight:600;margin-bottom:7px}
+  .row{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:11px}
+  .lab{width:32px;color:#8fa3cc;letter-spacing:1px}
+  .track{flex:1;height:4px;background:rgba(140,170,255,.14);border-radius:2px;overflow:hidden}
+  .fill{height:100%;border-radius:2px;transition:width .25s}
+  .val{width:38px;text-align:right;color:#cdd9f5}
+
+  #hint{position:fixed;bottom:104px;left:50%;transform:translateX(-50%);z-index:5;
+    font-size:12px;color:#9db1dc;background:rgba(8,12,20,.6);padding:6px 16px;
+    border-radius:14px;border:1px solid rgba(140,170,255,.14);pointer-events:none;
+    letter-spacing:1px;white-space:nowrap;transition:opacity .4s}
+
+  #actBtn{position:fixed;bottom:146px;left:50%;transform:translateX(-50%);z-index:6;display:none;
+    background:rgba(255,200,87,.12);border:1px solid rgba(255,200,87,.65);color:#ffc857;
+    padding:12px 28px;border-radius:26px;font-size:14px;letter-spacing:2px;cursor:pointer;
+    backdrop-filter:blur(6px)}
+  #actBtn.show{display:block;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,200,87,.35)}50%{box-shadow:0 0 0 13px rgba(255,200,87,0)}}
+  #scanRing{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);z-index:7;display:none}
+  #scanRing svg{transform:rotate(-90deg)}
+
+  #discCard{position:fixed;top:74px;right:-360px;width:min(300px,82vw);z-index:8;
+    background:rgba(10,14,24,.94);border:1px solid rgba(255,200,87,.4);
+    border-radius:14px;padding:15px;transition:right .45s cubic-bezier(.2,.9,.25,1);backdrop-filter:blur(8px)}
+  #discCard.show{right:14px}
+  #discCard .k{font-size:10px;letter-spacing:3px;color:#ffc857;margin-bottom:6px}
+  #discCard h3{font-size:15px;letter-spacing:1px;margin-bottom:7px;color:#ffe2a3}
+  #discCard p{font-size:12.5px;line-height:1.75;color:#aab8dd}
+
+  #stick{position:fixed;left:24px;bottom:24px;width:116px;height:116px;z-index:6;
+    border-radius:50%;border:1.5px solid rgba(140,170,255,.28);background:rgba(16,24,40,.4);
+    backdrop-filter:blur(4px);display:none;touch-action:none}
+  #knob{position:absolute;left:50%;top:50%;width:48px;height:48px;border-radius:50%;
+    transform:translate(-50%,-50%);background:rgba(160,190,255,.32);border:1px solid rgba(200,220,255,.45)}
+  @media(pointer:coarse){#stick{display:block}}
+
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:4;opacity:0;transition:opacity .8s;
+    background:radial-gradient(ellipse at center,transparent 52%,rgba(255,40,60,.36) 100%)}
+
+  /* ===== 全屏界面 ===== */
+  .screen{position:fixed;inset:0;z-index:20;background:linear-gradient(#070a12f5,#0a0e1afa);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    text-align:center;padding:24px;transition:opacity .9s}
+  .screen.hide{opacity:0;pointer-events:none}
+  .tag{font-size:11px;letter-spacing:6px;color:#59d9ff;margin-bottom:14px}
+  #intro h1{font-size:min(42px,11vw);letter-spacing:.3em;font-weight:700;margin-bottom:6px;
+    text-shadow:0 0 40px rgba(89,217,255,.3)}
+  #intro h2{font-size:13px;letter-spacing:4px;color:#8fa3cc;font-weight:400;margin-bottom:24px}
+  #intro p{font-size:12.5px;color:#7688ad;line-height:2.1;max-width:430px;margin-bottom:28px}
+  .bigBtn{background:transparent;border:1px solid #ffc857;color:#ffc857;font-size:15px;
+    letter-spacing:6px;padding:14px 44px;border-radius:30px;cursor:pointer;transition:.2s}
+  .bigBtn:hover{background:rgba(255,200,87,.12)}
+  #ctrlHint{margin-top:20px;font-size:11px;color:#5d6f96;letter-spacing:1px;line-height:2}
+  #end{display:none}
+  #end.show{display:flex}
+  #end h1{font-size:28px;letter-spacing:.25em;margin-bottom:16px;color:#ffc857}
+  #endStats{font-size:13px;color:#9db1dc;line-height:2.2;margin-bottom:28px}
+  #fatal{position:fixed;left:12px;right:12px;bottom:12px;z-index:99;color:#ff8095;font-size:12px;
+    white-space:pre-wrap;display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <h1 id="planetTitle">APH-P1 · 前哨站</h1>
+  <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
+  <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
+  <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
+</div>
+
+<div id="hint">跟随金色光柱</div>
+<button id="actBtn">◈ 扫描异常</button>
+<div id="scanRing">
+  <svg width="92" height="92">
+    <circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,200,87,.2)" stroke-width="4"/>
+    <circle id="ringArc" cx="46" cy="46" r="38" fill="none" stroke="#ffc857" stroke-width="4"
+      stroke-linecap="round" stroke-dasharray="238.7" stroke-dashoffset="238.7"/>
+  </svg>
+</div>
+
+<div id="discCard"><div class="k">◈ 异常已录入数据库</div><h3 id="dcName"></h3><p id="dcLore"></p></div>
+
+<div id="stick"><div id="knob"></div></div>
+<div id="vig"></div>
+
+<div class="screen" id="intro">
+  <div class="tag">COLONY FRONTIER · 07</div>
+  <h1>远 日 点</h1>
+  <h2>APH-P1 · 未建档行星</h2>
+  <p>你是这颗星球的第一个殖民者。<br>
+     荒原上散布着 <b style="color:#ffc857">6 座先导信标</b>，找到并扫描它们。<br>
+     白天赶路；夜晚的世界只属于带光的人。<br>
+     粉色晶体可以提炼氧气——氧气归零前，回到居住舱。</p>
+  <button class="bigBtn" id="startBtn">踏 上 星 球</button>
+  <div id="ctrlHint">WASD / 方向键 移动 · Shift 疾跑 · 点击地面自动行走<br>触屏设备左下角虚拟摇杆 · 靠近信标出现扫描按钮 · 回车开始</div>
+</div>
+
+<div class="screen" id="end">
+  <div class="tag">MISSION COMPLETE</div>
+  <h1>勘 测 完 成</h1>
+  <div id="endStats"></div>
+  <button class="bigBtn" id="freeBtn">继续自由探索</button>
+</div>
+
+<div id="fatal"></div>
+
+<script>
+/* ============================================================
+   Aphelion · config.js — 全局数值表 (ADR-10: 逻辑代码零魔数)
+   挂载: window.APH.CFG
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.CFG = {
+  /* 世界 */
+  WORLD: 2200,
+  CHUNK: 550,
+  GRID: 48,                    // ADR-4 逻辑格网
+  LAKE: { x: 1660, y: 1560, r: 148 },
+  HAB: { x: 1100, y: 1100, r: 92 },
+  DAY_LEN: 210,                // 一天的秒数
+
+  /* 玩家 */
+  player: {
+    walkSpeed: 150,
+    runSpeed: 235,
+    accel: 9,                  // lerp 系数/秒
+    radius: 11,
+    hpMax: 100,
+    o2Max: 100,
+    o2Drain: 0.72,             // /s 舱外
+    o2Refill: 16,              // /s 舱内
+    carryMax: 40,              // 负重上限 (ADR 预留 Phase1)
+  },
+
+  /* 相机 */
+  camLerp: 0.002,
+  lookAhead: 40,
+
+  /* 实体数量预算 (ADR-3 统一列表的性能上限) */
+  caps: {
+    rocks: 64,
+    crystals: 26,
+    spores: 70,
+    particles: 240,
+    enemies: 18,               // Phase1
+  },
+
+  /* 掉落/资源 id 常量 (ADR-9) */
+  items: {
+    CRYSTAL_ORE: 'it_crystal_ore',   // 氧气原料
+    MINERAL: 'it_mineral',           // 通用矿材
+    ALLOY: 'it_alloy',               // 合金(冶炼产物)
+    RELIC: 'it_relic',               // 信标稀有件
+  },
+
+  /* 实体 type 枚举 (ADR-3) */
+  entType: {
+    ROCK: 'rock',
+    CRYSTAL: 'crystal',
+    BEACON: 'beacon',
+    PLAYER: 'player',
+    ENEMY: 'enemy',            // Phase1
+    BUILDING: 'building',      // Phase3
+    SOLDIER: 'soldier',        // Phase3
+    PROJECTILE: 'projectile',  // Phase1
+    DROPPED: 'dropped',        // Phase1 地面掉落物
+  },
+
+  /* 存档 (ADR-2/9) */
+  save: {
+    PREFIX: 'aphelion_',
+    KEY_META: 'aphelion_meta',
+    KEY_PLANET: 'aphelion_planet_',
+    KEY_RIVALS: 'aphelion_rivals_',
+    VERSION: 1,
+  },
+
+  /* LLM (Phase2 启用，接口先定) */
+  llm: {
+    dailyLimit: 30,
+    timeoutMs: 12000,
+    retry: 1,
+  },
+};
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · utils.js — 工具 / 事件总线(ADR-8) / 双RNG(ADR-5)
+   挂载: window.APH.U
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.U = (function(){
+  'use strict';
+  var TAU = Math.PI * 2;
+
+  /* ---------- 基础数学 ---------- */
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function rr(a,b){ return a+Math.random()*(b-a); }        // 表现层随机
+  function ri(a,b){ return Math.floor(rr(a,b+1)); }
+  function dst(ax,ay,bx,by){ var dx=ax-bx, dy=ay-by; return Math.sqrt(dx*dx+dy*dy); }
+  function smooth(a,b,x){ x=clamp((x-a)/(b-a),0,1); return x*x*(3-2*x); }
+
+  /* ---------- Seeded RNG (ADR-5: 世界生成/掉落判定专用) ----------
+     mulberry32：确定性、快、统计够用。同 seed 同序列。 */
+  function makeRng(seed){
+    var a = seed >>> 0;
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function hash2(x,y){ var h=Math.sin(x*127.1+y*311.7)*43758.5453; return h-Math.floor(h); }
+  function vnoise(x,y){
+    var xi=Math.floor(x), yi=Math.floor(y), xf=x-xi, yf=y-yi;
+    var u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+    return lerp(lerp(hash2(xi,yi),hash2(xi+1,yi),u),
+                lerp(hash2(xi,yi+1),hash2(xi+1,yi+1),u), v);
+  }
+
+  /* ---------- 事件总线 (ADR-8) ----------
+     on(evt,fn) 订阅 · off 反订阅 · emit 发布。
+     系统解耦的唯一通道：combat→loot/UI/音效/存档 不互相 import。 */
+  var listeners = {};
+  function on(evt, fn){
+    (listeners[evt] = listeners[evt] || []).push(fn);
+    return fn;                       // 返回 fn 方便 off
+  }
+  function off(evt, fn){
+    var arr = listeners[evt];
+    if(!arr) return;
+    var i = arr.indexOf(fn);
+    if(i >= 0) arr.splice(i,1);
+  }
+  function emit(evt, payload){
+    var arr = listeners[evt];
+    if(!arr) return;
+    for(var i=0;i<arr.length;i++){
+      try{ arr[i](payload); }
+      catch(e){ console.error('[bus]', evt, e); }   // 单个监听者出错不拖垮其他
+    }
+  }
+
+  /* ---------- 极简断言（测试与运行时共用） ---------- */
+  function assert(cond, msg){
+    if(!cond) throw new Error('ASSERT: ' + msg);
+  }
+
+  return {
+    TAU:TAU, clamp:clamp, lerp:lerp, rr:rr, ri:ri,
+    dst:dst, smooth:smooth,
+    makeRng:makeRng, hash2:hash2, vnoise:vnoise,
+    on:on, off:off, emit:emit,
+    assert:assert,
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · save.js — 三层存档 (ADR-2) + 版本迁移入口
+   挂载: window.APH.Save
+   层级:
+     meta            跨星球永久进度(研究点/科技/统计)
+     planet_<id>     PlanetSpec + 殖民地布局 + 已发现法则
+     rivals_<id>     AI 殖民地实时状态
+   环境容错: localStorage 不可用时降级为内存 Map(单次会话可玩)。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Save = (function(){
+  'use strict';
+  var U = APH.U;
+  var CFG = APH.CFG;
+
+  /* ---------- 存储后端（带降级） ---------- */
+  var mem = {};                       // localStorage 不可用时的兜底
+  var persistent = true;
+  function rawGet(k){
+    try{ return localStorage.getItem(k); }catch(e){ persistent=false; return mem[k]||null; }
+  }
+  function rawSet(k,v){
+    try{ localStorage.setItem(k,v); }catch(e){ persistent=false; mem[k]=v; }
+  }
+  function rawDel(k){
+    try{ localStorage.removeItem(k); }catch(e){}
+    delete mem[k];
+  }
+
+  /* ---------- 版本迁移 (ADR-2: 唯一收口点) ----------
+     迁移链: v0(无版本) → v1 → v2 → ...
+     每级一步, 逐步推进; 未知版本抛错(宁可失败不可静默丢数据)。 */
+  var migrations = {
+    // 1: function(s){ s.newField = 0; return s; },
+  };
+  function migrate(save){
+    var v = save.v || 0;
+    while(v < CFG.save.VERSION){
+      v++;
+      if(migrations[v]) save = migrations[v](save);
+      else save.v = v;                 // 无显式迁移 = 仅推进版本号
+    }
+    save.v = CFG.save.VERSION;
+    return save;
+  }
+
+  /* ---------- 通用读写 ---------- */
+  function read(key){
+    var txt = rawGet(key);
+    if(!txt) return null;
+    var obj;
+    try{ obj = JSON.parse(txt); }
+    catch(e){ return null; }           // 损坏存档视为不存在, 不抛错
+    return migrate(obj);
+  }
+  function write(key, obj){
+    obj.v = CFG.save.VERSION;
+    rawSet(key, JSON.stringify(obj));
+  }
+  function remove(key){ rawDel(key); }
+
+  /* ---------- 三层接口 ---------- */
+  function loadMeta(){
+    var m = read(CFG.save.KEY_META);
+    if(!m){
+      m = {
+        v: CFG.save.VERSION,
+        research: 0,
+        tech: [],                      // 已购科技 id
+        stats: { landings:0, deaths:0, kills:0, scans:0, playSec:0 },
+        currentPlanet: null,
+      };
+    }
+    return m;
+  }
+  function saveMeta(m){ write(CFG.save.KEY_META, m); }
+
+  function loadPlanet(id){ return read(CFG.save.KEY_PLANET + id); }
+  function savePlanet(id, spec){ write(CFG.save.KEY_PLANET + id, spec); }
+
+  function loadRivals(id){ return read(CFG.save.KEY_RIVALS + id); }
+  function saveRivals(id, state){ write(CFG.save.KEY_RIVALS + id, state); }
+
+  /* ---------- 调试/重置 ---------- */
+  function wipeAll(){
+    // 只清本游戏前缀的 key
+    try{
+      var del = [];
+      for(var i=0;i<localStorage.length;i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf(CFG.save.PREFIX)===0) del.push(k);
+      }
+      del.forEach(rawDel);
+    }catch(e){}
+    mem = {};
+  }
+
+  return {
+    loadMeta:loadMeta, saveMeta:saveMeta,
+    loadPlanet:loadPlanet, savePlanet:savePlanet,
+    loadRivals:loadRivals, saveRivals:saveRivals,
+    migrate:migrate, wipeAll:wipeAll,
+    isPersistent:function(){ return persistent; },
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · planet.js — PlanetSpec 生成 (ADR-1 数据契约 v1)
+   挂载: window.APH.Planet
+   fallbackPlanet(seed): 纯程序生成完整 PlanetSpec(不调 LLM)。
+   Phase2 的 llm.js 生成后经 schema 校验、逐字段回退到本生成器。
+   游戏运行时永远只消费 PlanetSpec, 不知道它来自哪条路径。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Planet = (function(){
+  'use strict';
+  var U = APH.U;
+
+  /* ---------- 调色板池（Phase2 由 LLM 扩充） ---------- */
+  var PALETTES = [
+    { name:'苔原类地', ground1:'#1f2824', ground2:'#2a3730', accent:'#ffc857', water:'#1c3d54', spore:'#9fe8c8' },
+    { name:'铁锈荒漠', ground1:'#2b2018', ground2:'#3d2c1e', accent:'#ffb45f', water:'#4a3a28', spore:'#e8c89f' },
+    { name:'蓝藻冻土', ground1:'#18202b', ground2:'#22303f', accent:'#59d9ff', water:'#123044', spore:'#a8d8ff' },
+    { name:'硫磺峡谷', ground1:'#2b2416', ground2:'#403318', accent:'#ffd166', water:'#3d4a1e', spore:'#e8e39f' },
+  ];
+
+  /* ---------- 敌对殖民地名字池（Phase4 用, 先占位） ---------- */
+  var RIVAL_NAMES = ['铁砧前哨','灰烬商会','静默方舟','赤砂军团','深空开拓团'];
+  var RIVAL_TRAITS = ['aggressive','expansionist','trader'];
+
+  /* ---------- 信标档案池（降级文案, Phase2 由 LLM 替换） ---------- */
+  var LORE_POOL = [
+    { name:'「回声」', lore:'它仍在重复七年前的登陆广播——用的是你的声音。而你还没有录过任何广播。' },
+    { name:'「倒悬之林」', lore:'周边植物根系朝上生长，像被某种温和的力托着。土壤样本显示：这里曾有不同的重力。' },
+    { name:'「玻璃之海」', lore:'沙地在正午熔成过液体。信标背光面 −40°C，向光面足以点燃纸张。' },
+    { name:'「低语环」', lore:'靠近时耳机里出现规律的低频脉冲。破译后只有一句话：别在夜里走向湖。' },
+    { name:'「山之眼」', lore:'岩层中有一个完美的圆形洞穴，直径与深井档案里的「井」完全一致。它们是同一年龄的。' },
+    { name:'「第七个脚印」', lore:'信标周围有一串脚印通向荒原深处，一共七个——你是第六个。' },
+    { name:'「空摇篮」', lore:'信标底座围着一圈整齐的卵形石，每一枚都被精确剖成两半。切口是新的。' },
+    { name:'「静默塔」', lore:'它不广播任何信号，但所有罗盘在它周围都指向它自己。' },
+  ];
+  var LAW_POOL = [
+    { id:'lw_night_acid', name:'夜间水体酸化', fact:'夜间接触湖水造成腐蚀伤害', zone:'lake' },
+    { id:'lw_spore_light', name:'孢子趋光性', fact:'携带光源可吸引孢子开路', zone:'forest' },
+    { id:'lw_storm', name:'磁暴周期', fact:'固定周期内磁暴必然造访高地', zone:'ridge' },
+    { id:'lw_echo', name:'声追者', fact:'某些猎手循声而来, 目不能视', zone:'wild' },
+  ];
+
+  /* ---------- 希腊字母信标命名 ---------- */
+  var GREEK = ['α','β','γ','δ','ε','ζ','η','θ'];
+
+  /* ---------- 生成 PlanetSpec ----------
+     确定性: 同 seed 永远同一颗星球 (ADR-5) */
+  function fallbackPlanet(seed){
+    var rng = U.makeRng(seed);
+    function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
+    function rr(a,b){ return a+rng()*(b-a); }
+
+    var pal = pick(PALETTES);
+    var id = 'P' + (seed % 4096).toString(16).toUpperCase();
+
+    /* 信标: 6 座, 撒在世界内并避开湖/基地 */
+    var beacons = [];
+    var guard = 0;
+    while(beacons.length < 6 && guard++ < 400){
+      var bx = Math.floor(120 + rng() * (APH.CFG.WORLD - 240));
+      var by = Math.floor(120 + rng() * (APH.CFG.WORLD - 240));
+      var dHab = U.dst(bx,by,APH.CFG.HAB.x,APH.CFG.HAB.y);
+      var dLake = U.dst(bx,by,APH.CFG.LAKE.x,APH.CFG.LAKE.y);
+      var tooClose = beacons.some(function(b){ return U.dst(bx,by,b.x,b.y) < 420; });
+      if(dHab < 220 || dLake < 200 || tooClose) continue;
+      var lore = LORE_POOL[(beacons.length + Math.floor(rng()*2)) % LORE_POOL.length];
+      beacons.push({
+        id: 'bk_' + id + '_' + beacons.length,
+        x: bx, y: by,
+        name: '信标 ' + GREEK[beacons.length] + ' · ' + lore.name,
+        lore: lore.lore,
+      });
+    }
+
+    /* 法则: 抽 2~3 条 */
+    var laws = [];
+    var lawCount = 2 + Math.floor(rng() * 2);
+    var shuffled = LAW_POOL.slice().sort(function(){ return rng() - .5; });
+    for(var i = 0; i < lawCount; i++){
+      laws.push({
+        id: shuffled[i].id, name: shuffled[i].name,
+        fact: shuffled[i].fact, zone: shuffled[i].zone,
+        discovered: false,
+      });
+    }
+
+    /* 敌对殖民地: 1~2 个 (Phase4 激活, 数据先行) */
+    var rivals = [];
+    var rivalCount = 1 + Math.floor(rng() * 2);
+    for(var r = 0; r < rivalCount; r++){
+      var ang = rng() * U.TAU;
+      var rad = 700 + rng() * 250;
+      rivals.push({
+        id: 'rv_' + id + '_' + r,
+        name: pick(RIVAL_NAMES),
+        trait: pick(RIVAL_TRAITS),
+        color: ['#ff6d4a','#c39bff','#7dffab','#ffb45f'][Math.floor(rng()*4)],
+        base: {
+          x: Math.floor(APH.CFG.HAB.x + Math.cos(ang) * rad),
+          y: Math.floor(APH.CFG.HAB.y + Math.sin(ang) * rad),
+        },
+        military: 10, economy: 10, warScore: 0,
+      });
+    }
+
+    return {
+      v: 1,
+      id: id,
+      seed: seed,
+      name: 'APH-' + id,
+      paletteName: pal.name,
+      palette: { ground1:pal.ground1, ground2:pal.ground2, accent:pal.accent,
+                 water:pal.water, spore:pal.spore },
+      terrain: {
+        lakeR: Math.floor(rr(120, 170)),
+        rockDensity: +rr(0.5, 0.9).toFixed(2),
+        crystalDensity: +rr(0.4, 0.8).toFixed(2),
+      },
+      laws: laws,
+      beacons: beacons,
+      rivals: rivals,
+      generatedBy: 'fallback',
+    };
+  }
+
+  /* ---------- Schema 校验 (Phase2 LLM 路径用) ----------
+     返回 { ok:true, spec } 或 { ok:false, errors:[...] } */
+  function validate(spec){
+    var errors = [];
+    if(!spec || typeof spec !== 'object') return { ok:false, errors:['not an object'] };
+    if(!spec.id) errors.push('missing id');
+    if(!Array.isArray(spec.beacons) || spec.beacons.length < 4)
+      errors.push('beacons must be array of >=4');
+    else spec.beacons.forEach(function(b,i){
+      if(typeof b.x !== 'number' || typeof b.y !== 'number') errors.push('beacon['+i+'] pos');
+      if(!b.name) errors.push('beacon['+i+'] name');
+    });
+    if(!Array.isArray(spec.laws)) errors.push('laws must be array');
+    if(!Array.isArray(spec.rivals)) errors.push('rivals must be array');
+    if(!spec.palette) errors.push('missing palette');
+    return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
+  }
+
+  return { fallbackPlanet:fallbackPlanet, validate:validate };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · world.js — 世界生成/地形渲染/昼夜 (ADR-3/4/5)
+   挂载: window.APH.World
+   从已认可原型 v2_topdown 迁移, 实体改走统一列表 entities[]。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.World = (function(){
+  'use strict';
+  var U = APH.U, CFG = APH.CFG;
+
+  var cv, ctx, VW=0, VH=0, DPR=1;
+  var chunks = [], NCH = 0;
+  var vigCv = document.createElement('canvas');
+  var darkCv = document.createElement('canvas'), darkCtx = darkCv.getContext('2d');
+
+  /* ---------- 初始化画布 ---------- */
+  function initCanvas(){
+    cv = document.getElementById('cv');
+    ctx = cv.getContext('2d');
+    resize();
+    addEventListener('resize', resize);
+  }
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    VW = innerWidth; VH = innerHeight;
+    cv.width = VW*DPR; cv.height = VH*DPR;
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    buildVignette();
+  }
+  function buildVignette(){
+    vigCv.width = VW; vigCv.height = VH;
+    var g = vigCv.getContext('2d');
+    var gr = g.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.42, VW/2,VH/2,Math.max(VW,VH)*.72);
+    gr.addColorStop(0,'rgba(4,6,14,0)');
+    gr.addColorStop(1,'rgba(4,6,14,.55)');
+    g.fillStyle = gr; g.fillRect(0,0,VW,VH);
+  }
+
+  /* ---------- 地形分块预渲染（调色板来自 PlanetSpec） ---------- */
+  function paintChunk(ci, cj, pal){
+    var c = document.createElement('canvas');
+    c.width = CFG.CHUNK; c.height = CFG.CHUNK;
+    var g = c.getContext('2d');
+    var ox = ci*CFG.CHUNK, oy = cj*CFG.CHUNK;
+    var lakeR = APH.state.spec.terrain.lakeR;
+    g.fillStyle = pal.ground1;
+    g.fillRect(0,0,CFG.CHUNK,CFG.CHUNK);
+
+    for(var i=0;i<340;i++){
+      var wx = U.hash2(ci*77+i, cj*31+i*3)*CFG.CHUNK,
+          wy = U.hash2(ci*13+i*7, cj*91+i)*CFG.CHUNK;
+      var vn = U.vnoise((ox+wx)*.006, (oy+wy)*.006);
+      g.globalAlpha = .16 + U.hash2(i,ci+cj)*.14;
+      g.fillStyle = vn>.62 ? pal.ground2 : (vn>.47 ? shade(pal.ground1, 8) : pal.ground1);
+      if(vn < .3) g.fillStyle = shade(pal.ground1, -6);
+      g.beginPath();
+      g.ellipse(wx,wy,10+U.hash2(i,1)*34,8+U.hash2(i,2)*26,U.hash2(i,3)*U.TAU,0,U.TAU);
+      g.fill();
+    }
+    /* 湖岸沙环 */
+    var lx = APH.CFG.LAKE.x-ox, ly = APH.CFG.LAKE.y-oy;
+    if(lx>-260 && lx<CFG.CHUNK+260 && ly>-260 && ly<CFG.CHUNK+260){
+      for(var k=0;k<160;k++){
+        var a = Math.random()*U.TAU, rd = lakeR + 6 + Math.random()*80;
+        var sx = APH.CFG.LAKE.x+Math.cos(a)*rd-ox, sy = APH.CFG.LAKE.y+Math.sin(a)*rd-oy;
+        if(sx<-20||sx>CFG.CHUNK+20||sy<-20||sy>CFG.CHUNK+20) continue;
+        g.globalAlpha = .05+Math.random()*.11;
+        g.fillStyle = rd < lakeR+34 ? '#6b6248' : '#4a4636';
+        g.beginPath(); g.ellipse(sx,sy,6+Math.random()*14,4+Math.random()*8,a,0,U.TAU); g.fill();
+      }
+    }
+    /* 砾石草茎 */
+    for(var j=0;j<120;j++){
+      var px = U.hash2(j*3+ci*11, cj*17)*CFG.CHUNK,
+          py = U.hash2(j*5, cj*13+j)*CFG.CHUNK;
+      if(U.dst(ox+px,oy+py,APH.CFG.LAKE.x,APH.CFG.LAKE.y) < lakeR) continue;
+      if(U.hash2(j,99) > .82){
+        g.globalAlpha=.5; g.strokeStyle='#3a4a3e'; g.lineWidth=1.4;
+        g.beginPath(); g.moveTo(px,py); g.lineTo(px+(Math.random()*6-3),py-(4+Math.random()*4)); g.stroke();
+      }else{
+        g.globalAlpha=.35; g.fillStyle = U.hash2(j,7)>.5?'#1a221f':'#39404d';
+        g.beginPath(); g.arc(px,py,1+Math.random()*1.4,0,U.TAU); g.fill();
+      }
+    }
+    g.globalAlpha = 1;
+    return c;
+  }
+  /* 颜色微调工具: hex → 明暗 ±n */
+  function shade(hex, n){
+    var r = parseInt(hex.slice(1,3),16)+n, g2 = parseInt(hex.slice(3,5),16)+n,
+        b = parseInt(hex.slice(5,7),16)+n;
+    return 'rgb('+U.clamp(r,0,255)+','+U.clamp(g2,0,255)+','+U.clamp(b,0,255)+')';
+  }
+
+  function buildTerrain(){
+    NCH = CFG.WORLD / CFG.CHUNK;
+    chunks = [];
+    var pal = APH.state.spec.palette;
+    for(var ci=0;ci<NCH;ci++){
+      chunks.push([]);
+      for(var cj=0;cj<NCH;cj++) chunks[ci].push(paintChunk(ci,cj,pal));
+    }
+  }
+
+  /* ---------- 昼夜 ---------- */
+  function daylight(){
+    return U.clamp(Math.sin((APH.state.clock / CFG.DAY_LEN % 1) * U.TAU) * 1.7 + .38, 0, 1);
+  }
+
+  /* ---------- 夜景暗幕 + 光源挖洞 ---------- */
+  function drawDarkness(dL){
+    var na = 1 - dL;
+    if(na < .02) return;
+    darkCv.width = VW; darkCv.height = VH;
+    var g = darkCtx;
+    g.clearRect(0,0,VW,VH);
+    g.fillStyle = 'rgba(5,8,26,' + (na*.82) + ')';
+    g.fillRect(0,0,VW,VH);
+    g.globalCompositeOperation = 'destination-out';
+    function hole(wx,wy,r,str){
+      var sx = wx - APH.state.camX + VW/2, sy = wy - APH.state.camY + VH/2;
+      if(sx<-r||sx>VW+r||sy<-r||sy>VH+r) return;
+      var gr = g.createRadialGradient(sx,sy,0,sx,sy,r);
+      gr.addColorStop(0,'rgba(0,0,0,'+str+')'); gr.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(sx,sy,r,0,U.TAU); g.fill();
+    }
+    hole(CFG.HAB.x, CFG.HAB.y, 250, 1);
+    hole(APH.state.px, APH.state.py, 95, .95);
+    hole(APH.state.px + Math.cos(APH.state.face)*70,
+         APH.state.py + Math.sin(APH.state.face)*70 - 10, 75, .8);
+    APH.state.entities.forEach(function(e){
+      if(e.type === 'beacon') hole(e.x, e.y-40, e.done?90:135, e.done?.6:1);
+      else if(e.type === 'crystal' && !e.taken) hole(e.x, e.y-8, 42, .5);
+    });
+    g.globalCompositeOperation = 'source-over';
+    ctx.drawImage(darkCv, 0, 0, VW, VH);
+  }
+
+  /* ---------- 主渲染入口（main.js 每帧调用） ----------
+     ents: 统一实体列表 (ADR-3)。渲染只认 type。 */
+  function render(dt, drawEntityFns){
+    var s = APH.state, dL = daylight();
+    ctx.save();
+    ctx.fillStyle = dL>.5 ? '#141a20' : '#070a16';
+    ctx.fillRect(0,0,VW,VH);
+    var shX = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0,
+        shY = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0;
+    ctx.translate(VW/2 - s.camX + shX, VH/2 - s.camY + shY);
+
+    /* 地形块 */
+    var c0x=U.clamp(Math.floor((s.camX-VW/2)/CFG.CHUNK),0,NCH-1),
+        c1x=U.clamp(Math.floor((s.camX+VW/2)/CFG.CHUNK),0,NCH-1),
+        c0y=U.clamp(Math.floor((s.camY-VH/2)/CFG.CHUNK),0,NCH-1),
+        c1y=U.clamp(Math.floor((s.camY+VH/2)/CFG.CHUNK),0,NCH-1);
+    for(var ci=c0x;ci<=c1x;ci++)
+      for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(chunks[ci][cj], ci*CFG.CHUNK, cj*CFG.CHUNK);
+
+    /* 湖面 */
+    var lakeR = s.spec.terrain.lakeR, time = s.clock;
+    var lg = ctx.createRadialGradient(CFG.LAKE.x,CFG.LAKE.y,10, CFG.LAKE.x,CFG.LAKE.y,lakeR);
+    lg.addColorStop(0,'#0f2233'); lg.addColorStop(1,s.spec.palette.water);
+    ctx.fillStyle = lg;
+    ctx.beginPath(); ctx.arc(CFG.LAKE.x,CFG.LAKE.y,lakeR,0,U.TAU); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(CFG.LAKE.x,CFG.LAKE.y,lakeR,0,U.TAU); ctx.clip();
+    for(var wv=0;wv<5;wv++){
+      var wy = CFG.LAKE.y-lakeR+((time*12+wv*67)%(lakeR*2));
+      ctx.strokeStyle='rgba(120,200,240,'+(0.05+wv*.012)+')'; ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(CFG.LAKE.x-lakeR+20, wy);
+      ctx.quadraticCurveTo(CFG.LAKE.x, wy+Math.sin(time+wv)*7, CFG.LAKE.x+lakeR-20, wy);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* 粒子层(地面) */
+    drawEntityFns.particles(dt, time);
+
+    /* 统一实体 Y 排序 (ADR-3) */
+    var sorted = s.entities.filter(function(e){ return !e.dead && e.type!=='player'; })
+                  .concat([s.entities.find(function(e){return e.type==='player'})])
+                  .filter(Boolean)
+                  .sort(function(a,b){ return a.y-b.y; });
+    sorted.forEach(function(e){ drawEntityFns[e.type] && drawEntityFns[e.type](e, time); });
+
+    /* 孢子 */
+    drawSpores(time, dL);
+
+    /* 暗幕 + 发光体重绘 */
+    drawDarkness(dL);
+    s.entities.forEach(function(e){
+      if(e.type==='beacon') drawBeaconGem(e,time);
+      else if(e.type==='crystal' && !e.taken) APH.Ent.drawCrystalGlow(e,time);
+    });
+    drawEmissive(time);
+
+    ctx.restore();
+
+    /* 屏幕空间 */
+    ctx.drawImage(vigCv,0,0,VW,VH);
+    drawCompass();
+  }
+
+  function drawSpores(time,dL){
+    var spores = APH.state.spores;
+    var sporeCol = APH.state.spec.palette.spore;      // '#9fe8c8' → '159,232,200'
+    var sr=parseInt(sporeCol.slice(1,3),16),
+        sg=parseInt(sporeCol.slice(3,5),16),
+        sb=parseInt(sporeCol.slice(5,7),16);
+    for(var i=0;i<spores.length;i++){
+      var sp = spores[i];
+      var sx = sp.x+Math.sin(time*.4+sp.ph)*14, sy = sp.y+Math.cos(time*.3+sp.ph*1.3)*10;
+      if(Math.abs(sx-APH.state.camX)>innerWidth/2+20||Math.abs(sy-APH.state.camY)>innerHeight/2+20) continue;
+      var tw = .5+.5*Math.sin(time*1.5+sp.ph*3);
+      ctx.fillStyle='rgba('+sr+','+sg+','+sb+','+((0.10+(1-dL)*0.30)*tw)+')';
+      ctx.beginPath(); ctx.arc(sx,sy,1.6*sp.s,0,U.TAU); ctx.fill();
+    }
+  }
+
+  /* 信标顶部宝石 + 光柱（暗幕之上） */
+  function drawBeaconGem(b,time){
+    var gy = b.y-50;
+    var pul = b.done ? .55 : Math.sin(b.ph*2.4)*.5+.5;
+    if(!b.done){
+      var lg = ctx.createLinearGradient(0,gy-150,0,gy+8);
+      lg.addColorStop(0,'rgba(255,200,87,0)');
+      lg.addColorStop(1,'rgba(255,200,87,'+(0.13+pul*.09)+')');
+      ctx.fillStyle=lg; ctx.fillRect(b.x-13,gy-150,26,158);
+    }
+    var col = b.done?'#7dffab':'#ffc857';
+    ctx.save(); ctx.translate(b.x,gy); ctx.rotate(time*.9);
+    ctx.shadowColor=col; ctx.shadowBlur=16; ctx.fillStyle=col;
+    ctx.beginPath(); ctx.moveTo(0,-9);ctx.lineTo(7,0);ctx.lineTo(0,9);ctx.lineTo(-7,0);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0; ctx.restore();
+  }
+
+  /* 居住舱暖光池 + 舷窗（暗幕之上） */
+  function drawEmissive(time){
+    var H = CFG.HAB;
+    var g = ctx.createRadialGradient(H.x,H.y,10,H.x,H.y,120);
+    g.addColorStop(0,'rgba(255,233,196,'+(0.16+Math.sin(time*1.2)*.03)+')');
+    g.addColorStop(1,'rgba(255,233,196,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.ellipse(H.x,H.y+6,120,84,0,0,U.TAU); ctx.fill();
+    for(var i=0;i<5;i++){
+      var a=i/U.TAU*5+.5;
+      var wx=H.x+Math.cos(a)*40, wy=H.y+Math.sin(a)*30-6;
+      ctx.fillStyle='#ffe9c4';
+      ctx.beginPath(); ctx.arc(wx,wy,3.2,0,U.TAU); ctx.fill();
+    }
+    ctx.fillStyle=(Math.sin(time*3)>.4)?'#7dffab':'#2a4a35';
+    ctx.beginPath(); ctx.arc(H.x-30,H.y-34,3.4,0,U.TAU); ctx.fill();
+  }
+
+  /* 边缘罗盘：最近未扫描信标 */
+  function drawCompass(){
+    var s = APH.state, best=null, bd=1e9;
+    s.entities.forEach(function(e){
+      if(e.type!=='beacon'||e.done) return;
+      var d=U.dst(e.x,e.y,s.px,s.py);
+      if(d<bd){bd=d;best=e;}
+    });
+    if(!best) return;
+    var VW2=innerWidth, VH2=innerHeight;
+    var sx=best.x-s.camX+VW2/2, sy=best.y-s.camY+VH2/2;
+    if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
+    var cx=U.clamp(sx,46,VW2-46), cy=U.clamp(sy,84,VH2-96);
+    var ang=Math.atan2(best.y-s.py,best.x-s.px);
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+    ctx.fillStyle='rgba(255,200,87,.9)';
+    ctx.shadowColor='#ffc857'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
+    ctx.closePath(); ctx.fill();
+    ctx.shadowBlur=0; ctx.rotate(-ang);
+    ctx.fillStyle='#ffc857'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(Math.round(bd/10)+'m',0,22);
+    ctx.restore();
+  }
+
+  return {
+    initCanvas:initCanvas, buildTerrain:buildTerrain,
+    daylight:daylight, render:render,
+    getViewport:function(){ return {w:VW,h:VH}; },
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · entities.js — 实体工厂 + 绘制 + 玩家 (ADR-3)
+   挂载: window.APH.Ent
+   统一实体: {id,type,x,y,...} 全部进 APH.state.entities。
+   Phase1 的 enemy/projectile/dropped 也从这里扩展。
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Ent = (function(){
+  'use strict';
+  var U = APH.U, CFG = APH.CFG, T = CFG.entType;
+  var idSeq = 0;
+  function nid(prefix){ return prefix + '_' + (++idSeq); }
+  /* 渲染上下文延迟绑定(main.boot 时注入, 避免 world↔entities 循环依赖) */
+  var ctx = null;
+  function bindCtx(c){ ctx = c; }
+
+  /* ================= 工厂 ================= */
+  function makeRock(x,y,rng){
+    var grp = [];
+    var n = 1 + Math.floor(rng()*3);
+    for(var j=0;j<n;j++) grp.push({
+      ox:(rng()*32-16), oy:(rng()*20-10),
+      r:7+rng()*10, rot:rng()*U.TAU, sq:.72+rng()*.23,
+    });
+    return { id:nid('rk'), type:T.ROCK, x:x, y:y, g:grp };
+  }
+  function makeCrystal(x,y){
+    var m = [];
+    var n = 2 + Math.floor(Math.random()*3);
+    for(var j=0;j<n;j++) m.push({
+      ox:Math.random()*28-14, oy:Math.random()*18-9,
+      h:14+Math.random()*16, w:6+Math.random()*4,
+      lean:Math.random()*.5-.25,
+    });
+    return { id:nid('cr'), type:T.CRYSTAL, x:x, y:y, m:m, taken:false, ph:Math.random()*U.TAU };
+  }
+  function makeBeacon(d){
+    return { id:d.id, type:T.BEACON, x:d.x, y:d.y,
+             name:d.name, lore:d.lore, done:false, ph:Math.random()*U.TAU };
+  }
+
+  /* ================= 绘制 ================= */
+  function drawRock(e){
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.beginPath(); ctx.ellipse(2,5,20,9,0,0,U.TAU); ctx.fill();
+    e.g.forEach(function(m){
+      ctx.save(); ctx.translate(m.ox,m.oy-m.r*.4); ctx.rotate(m.rot);
+      ctx.fillStyle='#39404d';
+      ctx.beginPath(); ctx.ellipse(0,0,m.r,m.r*m.sq,0,0,U.TAU); ctx.fill();
+      ctx.fillStyle='#4a5262';
+      ctx.beginPath(); ctx.ellipse(-m.r*.22,-m.r*.3,m.r*.55,m.r*.4,0,0,U.TAU); ctx.fill();
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+  function drawCrystal(e,time){
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(3,6,18,8,0,0,U.TAU); ctx.fill();
+    e.m.forEach(function(m,i){
+      var sway=Math.sin(time*1.8+e.ph+i)*1.5;
+      ctx.save(); ctx.translate(m.ox,m.oy); ctx.rotate(m.lean+sway*.02);
+      ctx.fillStyle='#b3238f';
+      ctx.beginPath();
+      ctx.moveTo(-m.w/2,0); ctx.lineTo(-m.w*.22,-m.h);
+      ctx.lineTo(m.w*.22,-m.h); ctx.lineTo(m.w/2,0);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#ff4fd8';
+      ctx.beginPath();
+      ctx.moveTo(-m.w*.28,0); ctx.lineTo(-m.w*.1,-m.h*.92);
+      ctx.lineTo(m.w*.05,-m.h*.92); ctx.lineTo(m.w*.16,0);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+  /* 晶体微光（暗幕之上） */
+  function drawCrystalGlow(e,time){
+    e.m.forEach(function(m,i){
+      var sway=Math.sin(time*1.8+e.ph+i)*1.5;
+      var gx=e.x+m.ox+sway*.3, gy=e.y+m.oy-m.h*.55;
+      var gr=ctx.createRadialGradient(gx,gy,0,gx,gy,10);
+      gr.addColorStop(0,'rgba(255,215,244,.85)');
+      gr.addColorStop(.4,'rgba(255,79,216,.4)');
+      gr.addColorStop(1,'rgba(255,79,216,0)');
+      ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(gx,gy,10,0,U.TAU); ctx.fill();
+    });
+  }
+  function drawBeacon(e,time){
+    var pul = e.done?0:Math.sin(e.ph*2.4)*.5+.5;
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.strokeStyle = e.done?'rgba(125,255,171,.4)':'rgba(255,200,87,'+(.35+pul*.3)+')';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(0,4,30,14,0,0,U.TAU); ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.32)';
+    ctx.beginPath(); ctx.ellipse(2,5,16,8,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#39435c'; ctx.fillRect(-2.5,-46,5,50);
+    ctx.fillStyle='#4c5878'; ctx.fillRect(-2.5,-46,2,50);
+    ctx.restore();
+  }
+  function drawPlayer(e,time){
+    var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
+    ctx.save(); ctx.translate(e.x,e.y);
+    ctx.fillStyle='rgba(0,0,0,.35)';
+    ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
+    ctx.translate(0,-bobbing);
+    ctx.fillStyle='#8f99ad';
+    if(e.moving){
+      ctx.fillRect(-5.5+step*2.4,-6,4.5,7);
+      ctx.fillRect(1-step*2.4,-6,4.5,7);
+    }else{ ctx.fillRect(-5.5,-6,4.5,7); ctx.fillRect(1,-6,4.5,7); }
+    var bg=ctx.createRadialGradient(-3,-14,2,0,-11,13);
+    bg.addColorStop(0,'#ffffff'); bg.addColorStop(1,'#cdd6e6');
+    ctx.fillStyle=bg;
+    ctx.beginPath(); ctx.arc(0,-11,9.5,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#eef3fb';
+    ctx.beginPath(); ctx.arc(0,-22,7.5,0,U.TAU); ctx.fill();
+    var vx=Math.cos(e.face)*3.2, vy=Math.sin(e.face)*2.4;
+    ctx.fillStyle='#152238';
+    ctx.beginPath(); ctx.arc(vx,-22+vy,4.6,-.6,3.7); ctx.fill();
+    ctx.fillStyle='rgba(120,200,255,.65)';
+    ctx.beginPath(); ctx.arc(vx-1.2,-23.4+vy,1.5,0,U.TAU); ctx.fill();
+    var chest=(Math.sin(time*4)>.2)?'#ffd97a':'#8a7648';
+    ctx.fillStyle=chest;
+    ctx.beginPath(); ctx.arc(Math.cos(e.face)*6,-11+Math.sin(e.face)*4,1.8,0,U.TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  /* ================= 玩家逻辑（从原型 main 迁移） ================= */
+  function updatePlayer(dt){
+    var s = APH.state, P = CFG.player;
+    var ix=0, iy=0;
+    if(s.keys.KeyW||s.keys.ArrowUp) iy-=1;
+    if(s.keys.KeyS||s.keys.ArrowDown) iy+=1;
+    if(s.keys.KeyA||s.keys.ArrowLeft) ix-=1;
+    if(s.keys.KeyD||s.keys.ArrowRight) ix+=1;
+    if(s.joy.active){ ix+=s.joy.x; iy+=s.joy.y; }
+    s.run = !!(s.keys.ShiftLeft||s.keys.ShiftRight);
+    var hasKey=(ix!==0||iy!==0);
+    if(hasKey) s.target=null;
+    var mx=0,my=0;
+    if(hasKey){
+      var il=Math.sqrt(ix*ix+iy*iy)||1; mx=ix/il; my=iy/il;
+    }else if(s.target){
+      var tx=s.target.x-s.px, ty=s.target.y-s.py, td=Math.sqrt(tx*tx+ty*ty);
+      if(td<7) s.target=null; else { mx=tx/td; my=ty/td; }
+    }
+    var ml=Math.sqrt(mx*mx+my*my);
+    if(ml>1){ mx/=ml; my/=ml; }
+    var moving = ml>.01;
+    var spd=(s.run?P.runSpeed:P.walkSpeed)*(ml>0?ml:0);
+    if(moving){
+      s.face=Math.atan2(my,mx);
+      s.vx=U.lerp(s.vx,mx*spd,dt*P.accel);
+      s.vy=U.lerp(s.vy,my*spd,dt*P.accel);
+      s.walkPh+=dt*(s.run?13:8.5);
+      if(Math.random()<dt*7) s.parts.push({t:'dust',x:s.px+U.rr(-4,4),y:s.py+U.rr(2,7),life:.55,max:.55});
+    }else{
+      s.vx*=Math.pow(.0005,dt); s.vy*=Math.pow(.0005,dt);
+    }
+    var nx=U.clamp(s.px+s.vx*dt,40,CFG.WORLD-40),
+        ny=U.clamp(s.py+s.vy*dt,40,CFG.WORLD-40);
+    var lakeR=s.spec.terrain.lakeR;
+    if(U.dst(nx,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ s.px=nx; s.py=ny; }
+    else{
+      if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
+      if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
+    }
+    /* 同步到玩家实体 */
+    var pe = findPlayer();
+    pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh;
+  }
+  function findPlayer(){
+    return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
+  }
+
+  return {
+    bindCtx:bindCtx,
+    makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon,
+    drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
+    drawBeacon:drawBeacon, drawPlayer:drawPlayer,
+    updatePlayer:updatePlayer, findPlayer:findPlayer,
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · ui.js — HUD/提示/卡片/全屏界面 (无游戏逻辑)
+   挂载: window.APH.UI
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.UI = (function(){
+  'use strict';
+  var U = APH.U;
+
+  function $(id){ return document.getElementById(id); }
+
+  /* ---------- HUD ---------- */
+  function updHUD(){
+    var s = APH.state;
+    $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
+    $('vO2').textContent = Math.round(Math.max(0,s.o2));
+    $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
+    $('vCR').textContent = s.cry;
+    $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
+    $('vDS').textContent = s.found+'/'+s.totalBeacons;
+    var vig = $('vig');
+    vig.style.opacity = s.o2<25 ? (1-s.o2/25)*.85 : 0;
+  }
+
+  /* ---------- 提示条 ---------- */
+  var hintEl=null;
+  function setHint(t){
+    if(!hintEl) hintEl=$('hint');
+    hintEl.textContent=t; hintEl.style.opacity=t?1:0;
+  }
+
+  /* ---------- 拾取飘字 ---------- */
+  var ftEl=null, ftT=null;
+  function floatText(txt,col){
+    if(!ftEl){
+      ftEl=document.createElement('div');
+      ftEl.style.cssText='position:fixed;left:50%;bottom:186px;transform:translateX(-50%);z-index:9;'+
+        'font-size:14px;letter-spacing:2px;pointer-events:none;transition:all .6s;text-shadow:0 0 10px currentColor';
+      document.body.appendChild(ftEl);
+    }
+    ftEl.textContent=txt; ftEl.style.color=col;
+    ftEl.style.opacity=1; ftEl.style.bottom='186px';
+    clearTimeout(ftT);
+    ftT=setTimeout(function(){ ftEl.style.opacity=0; ftEl.style.bottom='204px'; },850);
+  }
+
+  /* ---------- 发现卡片 ---------- */
+  var cardT=null;
+  function showCard(name,lore){
+    $('dcName').textContent=name; $('dcLore').textContent=lore;
+    var c=$('discCard'); c.classList.add('show');
+    clearTimeout(cardT);
+    cardT=setTimeout(function(){ c.classList.remove('show'); },6500);
+  }
+
+  /* ---------- 扫描环 ---------- */
+  function showScanRing(){ $('scanRing').style.display='block'; }
+  function hideScanRing(){
+    $('scanRing').style.display='none';
+    $('ringArc').style.strokeDashoffset=238.7;
+  }
+  function setScanProgress(k){
+    $('ringArc').style.strokeDashoffset=238.7*(1-U.clamp(k,0,1));
+  }
+  function setActBtn(visible){
+    $('actBtn').classList.toggle('show',!!visible);
+  }
+
+  /* ---------- 全屏界面 ---------- */
+  function hideIntro(){ $('intro').classList.add('hide'); }
+  function showDeath(reason,stats){
+    var s=$('intro');
+    s.querySelector('.tag').textContent='SIGNAL LOST';
+    s.querySelector('h1').textContent='氧 气 耗 尽';
+    s.querySelector('h2').textContent='';
+    s.querySelector('p').innerHTML=reason+
+      '<br>本次带回晶体 '+stats.cry+' 枚 · 已建档异常 '+stats.found+'/'+stats.total+
+      '<br><span style="color:#5d6f96">数据库永久保留。下一次着陆，你仍知道这一切。</span>';
+    var b=$('startBtn'); b.textContent='重 新 着 陆';
+    b.onclick=function(){ location.reload(); };
+    s.classList.remove('hide');
+  }
+  function showWin(stats){
+    $('endStats').innerHTML=
+      '用时 '+Math.round(stats.clock/60)+' 分 · 采集晶体 '+stats.cry+' 枚'+
+      ' · 历经 '+(stats.clock/APH.CFG.DAY_LEN>=1?'昼夜交替':'白昼')+
+      '<br><br><span style="color:#5d6f96">正式版中，异常档案由 AI 依据你的行动轨迹即时撰写。</span>';
+    $('end').classList.add('show');
+  }
+
+  /* ---------- 致命错误 ---------- */
+  function fatal(msg){
+    var f=$('fatal');
+    if(f){ f.style.display='block'; f.textContent=msg; }
+  }
+
+  /* ---------- 启动探针（调试协议，验证用） ---------- */
+  var probeT=null;
+  function armProbe(){
+    if(document.getElementById('probeRun')) return;
+    var pb=document.createElement('button');
+    pb.id='probeRun';
+    pb.style.cssText='position:fixed;bottom:8px;right:10px;z-index:50;background:#0c1220;'+
+      'border:1px solid #223252;color:#6f84ab;font-size:11px;padding:4px 9px;border-radius:7px;';
+    pb.textContent='● 0s';
+    document.body.appendChild(pb);
+    probeT=setInterval(function(){
+      var s=APH.state;
+      pb.textContent='● '+Math.round(s.clock)+'s · O2 '+Math.max(0,Math.round(s.o2))+'%';
+    },1000);
+  }
+
+  return {
+    updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
+    showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
+    setActBtn:setActBtn, hideIntro:hideIntro, showDeath:showDeath, showWin:showWin,
+    fatal:fatal, armProbe:armProbe,
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   Aphelion · main.js — 全局状态 / 输入 / 游戏循环 / 启动
+   挂载: window.APH.state · APH.Main
+   加载顺序(ADR-7, build.py 声明): config→utils→save→planet→world
+                                  →entities→ui→main
+   ============================================================ */
+window.APH = window.APH || {};
+
+(function(){
+  'use strict';
+  var U=APH.U, CFG=APH.CFG, T=CFG.entType;
+
+  /* ================= 全局状态（唯一实例） ================= */
+  APH.state = {
+    mode:'intro',                // intro | running | dead | won
+    clock:0,
+    spec:null,                   // 当前 PlanetSpec (ADR-1)
+    px:0, py:0, vx:0, vy:0,
+    face:-Math.PI/2, walkPh:0, moving:false, run:false,
+    o2:100, cry:0, found:0, totalBeacons:6,
+    camX:0, camY:0, shake:0,
+    target:null,
+    keys:{}, joy:{active:false,id:null,x:0,y:0},
+    entities:[],                 // 统一实体列表 (ADR-3)
+    parts:[],                    // 粒子(表现层，不入实体列表)
+    spores:[],
+    nearBeacon:null,
+    scanning:null, scanT:0,
+    seed:0,
+  };
+
+  /* ================= 世界搭建 ================= */
+  function buildWorld(seed){
+    var s = APH.state;
+    var planet = APH.Planet.fallbackPlanet(seed);
+    /* 存档: 有缓存用缓存, 否则写入 */
+    var cached = APH.Save.loadPlanet(planet.id);
+    if(cached){ planet = cached; }
+    else{ APH.Save.savePlanet(planet.id, planet); }
+    s.spec = planet;
+    s.seed = planet.seed;
+    s.totalBeacons = planet.beacons.length;
+
+    /* 统一实体列表 (ADR-3) */
+    s.entities = [];
+    s.entities.push({ id:'player', type:T.PLAYER, x:CFG.HAB.x, y:CFG.HAB.y+70 });
+    s.px = CFG.HAB.x; s.py = CFG.HAB.y+70;
+    s.camX = s.px; s.camY = s.py;
+
+    var rng = U.makeRng(seed ^ 0x9E3779B9);   // 地形装饰独立子流
+    var placedR=0, guard=0;
+    while(placedR < CFG.caps.rocks && guard++ < 500){
+      var rx = rng()*(CFG.WORLD-120)+60, ry = rng()*(CFG.WORLD-120)+60;
+      if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
+      if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<planet.terrain.lakeR+40) continue;
+      if(planet.beacons.some(function(b){ return U.dst(rx,ry,b.x,b.y)<90; })) continue;
+      s.entities.push(APH.Ent.makeRock(rx,ry,rng));
+      placedR++;
+    }
+    var placedC=0; guard=0;
+    while(placedC < Math.floor(CFG.caps.crystals*planet.terrain.crystalDensity) && guard++ < 500){
+      var cx = rng()*(CFG.WORLD-140)+70, cy = rng()*(CFG.WORLD-140)+70;
+      if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
+      if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<planet.terrain.lakeR+30) continue;
+      s.entities.push(APH.Ent.makeCrystal(cx,cy));
+      placedC++;
+    }
+    planet.beacons.forEach(function(d){
+      s.entities.push(APH.Ent.makeBeacon(d));
+    });
+
+    /* 孢子(表现层) */
+    s.spores = [];
+    for(var i=0;i<CFG.caps.spores;i++)
+      s.spores.push({x:rng()*CFG.WORLD, y:rng()*CFG.WORLD, ph:rng()*U.TAU, s:.5+rng()});
+
+    document.getElementById('planetTitle').textContent =
+      planet.name + ' · ' + planet.paletteName;
+  }
+
+  /* ================= 扫描交互 ================= */
+  function updateInteraction(dt){
+    var s = APH.state;
+    s.nearBeacon = null;
+    var bd = 1e9;
+    s.entities.forEach(function(e){
+      if(e.type!==T.BEACON || e.done) return;
+      e.ph += dt;
+      var d = U.dst(e.x,e.y,s.px,s.py);
+      if(d<86 && d<bd){ bd=d; s.nearBeacon=e; }
+    });
+    if(s.scanning){
+      var sb=s.scanning;
+      if(U.dst(sb.x,sb.y,s.px,s.py)>105){
+        s.scanning=null; APH.UI.hideScanRing(); APH.UI.setHint('');
+      }else{
+        s.scanT += dt/2.2;
+        APH.UI.setScanProgress(s.scanT);
+        if(s.scanT>=1){
+          sb.done=true; s.found++;
+          APH.state.meta.stats.scans++; APH.Save.saveMeta(APH.state.meta);
+          U.emit('beaconScanned', sb);           // ADR-8 解耦示例
+          APH.UI.hideScanRing();
+          APH.UI.showCard(sb.name, sb.lore);
+          s.scanning=null; s.shake=.5;
+          for(var k=0;k<16;k++) s.parts.push({t:'shard',x:sb.x,y:sb.y-52,
+            vx:U.rr(-90,90),vy:U.rr(-110,-10),life:U.rr(.5,1),max:1,hue:45});
+          APH.UI.setHint('已录入 '+s.found+'/'+s.totalBeacons);
+          if(s.found>=s.totalBeacons){
+            s.mode='won';
+            setTimeout(function(){
+              APH.UI.showWin({clock:s.clock, cry:s.cry});
+            },1100);
+          }
+        }
+      }
+    }else{
+      APH.UI.setActBtn(s.nearBeacon);
+    }
+  }
+
+  /* ================= 氧气 / 死亡 ================= */
+  function updateSurvival(dt){
+    var s = APH.state;
+    var dHab = U.dst(s.px,s.py,CFG.HAB.x,CFG.HAB.y);
+    if(dHab < CFG.HAB.r){
+      s.o2 = Math.min(CFG.player.o2Max, s.o2 + dt*CFG.player.o2Refill);
+      APH.UI.setHint(s.o2<CFG.player.o2Max-2 ? '居住舱 · 氧气补充中' : '出舱探索 · 寻找金色光柱');
+    }else{
+      s.o2 -= dt*CFG.player.o2Drain;
+      if(s.o2<25) APH.UI.setHint('⚠ 氧气 '+Math.max(0,Math.round(s.o2))+'% —— 回舱或采集粉色晶体！');
+    }
+    if(s.o2<=0){
+      s.mode='dead';
+      APH.state.meta.stats.deaths++;
+      APH.Save.saveMeta(APH.state.meta);
+      APH.UI.showDeath('生命维持系统在荒原上停转了。',
+        {cry:s.cry, found:s.found, total:s.totalBeacons});
+    }
+  }
+
+  /* ================= 晶体拾取 ================= */
+  function updatePickups(dt){
+    var s = APH.state;
+    s.entities.forEach(function(e){
+      if(e.type!==T.CRYSTAL || e.taken) return;
+      e.ph += dt*.3;
+      if(U.dst(e.x,e.y,s.px,s.py)<30){
+        e.taken=true; e.dead=true;         // ADR-3: dead 标记, 渲染层统一过滤
+        s.cry++;
+        s.o2=Math.min(CFG.player.o2Max, s.o2+8);
+        U.emit('crystalPicked', e);
+        APH.UI.floatText('+1 晶体 · 氧气 +8','#ff9ad0');
+        for(var k=0;k<10;k++) s.parts.push({t:'shard',x:e.x,y:e.y,
+          vx:U.rr(-70,70),vy:U.rr(-90,-20),life:U.rr(.4,.8),max:.8,hue:310});
+        s.shake=Math.min(1,s.shake+.15);
+      }
+    });
+  }
+
+  /* ================= 相机 ================= */
+  function updateCamera(dt){
+    var s = APH.state;
+    var lx = s.px+(s.moving?Math.cos(s.face)*CFG.lookAhead:0),
+        ly = s.py+(s.moving?Math.sin(s.face)*CFG.lookAhead:0);
+    s.camX=U.lerp(s.camX,lx,1-Math.pow(CFG.camLerp,dt));
+    s.camY=U.lerp(s.camY,ly,1-Math.pow(CFG.camLerp,dt));
+    s.camX=U.clamp(s.camX,innerWidth/2-80,CFG.WORLD-innerWidth/2+80);
+    s.camY=U.clamp(s.camY,innerHeight/2-80,CFG.WORLD-innerHeight/2+80);
+    if(s.shake>0) s.shake-=dt*2.2;
+  }
+
+  /* ================= 粒子 ================= */
+  function updateParticles(dt,time){
+    var s=APH.state;
+    for(var i=s.parts.length-1;i>=0;i--){
+      var p=s.parts[i]; p.life-=dt;
+      if(p.life<=0){ s.parts.splice(i,1); continue; }
+      if(p.t==='shard'){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=160*dt; }
+    }
+  }
+
+  /* ================= 主循环 ================= */
+  var lastT=performance.now(), tickN=0;
+  function frame(now){
+    requestAnimationFrame(frame);
+    tickN++;
+    if(tickN%30===0)
+      document.title='▶帧'+tickN+' '+APH.state.spec.name+' · '+APH.state.found+'/'+APH.state.totalBeacons;
+    var dt=Math.min(.05,(now-lastT)/1000); lastT=now;
+
+    var s=APH.state;
+    if(s.mode!=='running'){ return; }
+
+    s.clock+=dt;
+    APH.Ent.updatePlayer(dt);
+    updatePickups(dt);
+    updateInteraction(dt);
+    updateSurvival(dt);
+    if(s.mode!=='running') return;       // 本帧死亡
+    updateCamera(dt);
+    updateParticles(dt,s.clock);
+
+    APH.World.render(dt, {
+      player:function(e,t){ APH.Ent.drawPlayer(e,t); },
+      rock:function(e,t){ APH.Ent.drawRock(e); },
+      crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
+      beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
+      particles:function(dt2,t){
+        var ctx2=document.getElementById('cv').getContext('2d');
+        for(var i=0;i<s.parts.length;i++){
+          var p=s.parts[i], k=p.life/p.max;
+          if(p.t==='dust'){
+            ctx2.fillStyle='rgba(180,190,170,'+(k*.4)+')';
+            ctx2.beginPath(); ctx2.arc(p.x,p.y-k*6,2.5+k*2,0,U.TAU); ctx2.fill();
+          }else if(p.t==='ping'){
+            ctx2.strokeStyle='rgba(89,217,255,'+(k*.8)+')'; ctx2.lineWidth=1.5;
+            ctx2.beginPath();
+            ctx2.ellipse(p.x,p.y,(1-k)*26+4,((1-k)*26+4)*.5,0,0,U.TAU); ctx2.stroke();
+          }else if(p.t==='shard'){
+            ctx2.fillStyle='hsla('+p.hue+',90%,72%,'+k+')';
+            ctx2.fillRect(p.x-1.5,p.y-1.5,3,3);
+          }
+        }
+      },
+      /* 晶体微光挂到暗幕之后：借 render 内部顺序，见 world.js drawDarkness 后回调 */
+      crystalGlow:function(){},
+    });
+    /* 暗幕后的晶体辉光与居住舱暖光由 world.render 内部绘制 */
+
+    APH.UI.updHUD();
+  }
+
+  /* ================= 输入 ================= */
+  function bindInput(){
+    var s=APH.state;
+    addEventListener('keydown',function(e){
+      s.keys[e.code]=true;
+      if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
+      /* 调试热键(自动化验证协议):
+         T=传送到最近未扫描信标并启动真实扫描管线
+         G=向东传送600px, 触发舱外耗氧路径 */
+      if(e.code==='KeyT'&&s.mode==='running'){
+        var nb=null,bd=1e9;
+        s.entities.forEach(function(en){
+          if(en.type!==T.BEACON||en.done) return;
+          var d=U.dst(en.x,en.y,s.px,s.py);
+          if(d<bd){bd=d;nb=en;}
+        });
+        if(nb){
+          s.px=nb.x-50; s.py=nb.y; s.target=null;
+          s.camX=s.px; s.camY=s.py;
+          s.scanning=nb; s.scanT=0;
+          APH.UI.showScanRing();
+          document.title='DBG 已传送到 '+nb.name.slice(0,10);
+        }else document.title='DBG 无未扫描信标';
+      }
+      if(e.code==='KeyG'&&s.mode==='running'){
+        s.px=U.clamp(s.px+600,40,CFG.WORLD-40);
+        s.camX=s.px; s.target=null;
+        document.title='DBG 已东移600px';
+      }
+    });
+    addEventListener('keyup',function(e){ s.keys[e.code]=false; });
+
+    var stickEl=document.getElementById('stick'), knob=document.getElementById('knob');
+    stickEl.addEventListener('pointerdown',function(e){
+      s.joy.active=true; s.joy.id=e.pointerId; joyMove(e); e.stopPropagation();
+    });
+    addEventListener('pointermove',function(e){
+      if(s.joy.active&&e.pointerId===s.joy.id) joyMove(e);
+    });
+    addEventListener('pointerup',function(e){
+      if(s.joy.active&&e.pointerId===s.joy.id){
+        s.joy.active=false; s.joy.x=0; s.joy.y=0;
+        knob.style.transform='translate(-50%,-50%)';
+      }
+    });
+    function joyMove(e){
+      var r=stickEl.getBoundingClientRect(), cxx=r.left+r.width/2, cyy=r.top+r.height/2;
+      var dx=e.clientX-cxx, dy=e.clientY-cyy, len=Math.sqrt(dx*dx+dy*dy)||1, max=r.width/2;
+      var cl=Math.min(len,max);
+      s.joy.x=dx/len*(cl/max); s.joy.y=dy/len*(cl/max);
+      knob.style.transform='translate(calc(-50% + '+(dx/len*cl)+'px), calc(-50% + '+(dy/len*cl)+'px))';
+    }
+
+    var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0;
+    cv.addEventListener('pointerdown',function(e){
+      downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
+    });
+    cv.addEventListener('pointermove',function(e){
+      downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
+      downX=e.clientX; downY=e.clientY;
+    });
+    cv.addEventListener('pointerup',function(e){
+      if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
+        var t={x:e.clientX-innerWidth/2+APH.state.camX, y:e.clientY-innerHeight/2+APH.state.camY};
+        APH.state.target=t;
+        APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
+      }
+    });
+
+    document.getElementById('actBtn').addEventListener('click',function(){
+      var s2=APH.state;
+      if(!s2.nearBeacon||s2.scanning) return;
+      s2.scanning=s2.nearBeacon; s2.scanT=0;
+      APH.UI.showScanRing(); APH.UI.setActBtn(false);
+    });
+
+    document.getElementById('startBtn').addEventListener('click',startGame);
+    document.getElementById('freeBtn').addEventListener('click',function(){
+      APH.state.mode='running';
+      document.getElementById('end').classList.remove('show');
+    });
+    /* 开场画面整体可点(点击兜底协议) */
+    document.getElementById('intro').addEventListener('click',function(ev){
+      if(ev.target.id!=='startBtn') startGame();
+    });
+  }
+
+  function startGame(){
+    var s=APH.state;
+    if(s.mode!=='intro') return;
+    s.mode='running';
+    APH.UI.hideIntro();
+    APH.UI.armProbe();
+    APH.state.meta.stats.landings++;
+    APH.Save.saveMeta(APH.state.meta);
+  }
+
+  /* ================= 事件订阅 (ADR-8 示范) ================= */
+  U.on('crystalPicked', function(){ /* Phase1: 音效挂这里 */ });
+  U.on('beaconScanned', function(b){ /* Phase2: 动态档案生成挂这里 */ });
+
+  /* ================= 启动 ================= */
+  function boot(){
+    try{
+      var meta=APH.Save.loadMeta();
+      APH.state.meta=meta;
+      APH.World.initCanvas();
+      APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
+      var seed=(Date.now()%100000)|0;
+      buildWorld(seed);
+      bindInput();
+      APH.UI.updHUD();
+      document.title='✓就绪 '+APH.state.spec.name;
+    }catch(err){
+      APH.UI.fatal('启动失败: '+err.message+'\n'+(err.stack||''));
+      throw err;
+    }
+  }
+  boot();
+  requestAnimationFrame(frame);
+
+  /* 调试接口(标题探针之外的程序化验证通道) */
+  APH.Main={
+    start:startGame,
+    debugState:function(){
+      var s=APH.state;
+      return {mode:s.mode,frameN:tickN,clock:+s.clock.toFixed(1),o2:+s.o2.toFixed(0),
+              found:s.found,total:s.totalBeacons,ents:s.entities.length};
+    },
+  };
+})();
+
+</script>
+</body>
+</html>
