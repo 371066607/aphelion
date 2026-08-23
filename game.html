@@ -86,6 +86,7 @@
   <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
   <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
+  <div class="row" id="rowWar" style="display:none"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span></div>
 </div>
 
 <div id="hint">跟随金色光柱</div>
@@ -2333,6 +2334,24 @@ APH.UI = (function(){
     var cw = APH.Combat.carryWeight(s.carry);
     $('bCW').style.width = U.clamp(cw/APH.CFG.player.carryMax*100,0,100)+'%';
     $('vCW').textContent = cw;
+    /* T4 战争态势: 有战斗记录或袭击过才显示 */
+    var war=s.war||{}, rowWar=$('rowWar');
+    if(rowWar){
+      var showWar=(war.wins||0)+(war.raids||0)>0 || war.raidActive;
+      rowWar.style.display = showWar?'':'none';
+      if(showWar){
+        var topMil=1, def=10;
+        try{
+          (s.rivalStates||[]).forEach(function(r){ if(r.rival.military>topMil) topMil=r.rival.military; });
+          def = 10 + (s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length)*12
+                    + ((s.meta.tech&&s.meta.tech.te_weaponry)||0)*5;
+        }catch(e){}
+        var ws = APH.Rivals.warScore(topMil, def, war.wins, war.raids);
+        $('bWAR').style.width = U.clamp(ws,2,100)+'%';
+        $('vWAR').textContent = ws;
+        $('bWAR').style.background = ws>=60?'#7dffab':(ws>=35?'#ffc857':'#ff6d7a');
+      }
+    }
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
     var vig = $('vig');

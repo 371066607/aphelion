@@ -22,6 +22,24 @@ APH.UI = (function(){
     var cw = APH.Combat.carryWeight(s.carry);
     $('bCW').style.width = U.clamp(cw/APH.CFG.player.carryMax*100,0,100)+'%';
     $('vCW').textContent = cw;
+    /* T4 战争态势: 有战斗记录或袭击过才显示 */
+    var war=s.war||{}, rowWar=$('rowWar');
+    if(rowWar){
+      var showWar=(war.wins||0)+(war.raids||0)>0 || war.raidActive;
+      rowWar.style.display = showWar?'':'none';
+      if(showWar){
+        var topMil=1, def=10;
+        try{
+          (s.rivalStates||[]).forEach(function(r){ if(r.rival.military>topMil) topMil=r.rival.military; });
+          def = 10 + (s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length)*12
+                    + ((s.meta.tech&&s.meta.tech.te_weaponry)||0)*5;
+        }catch(e){}
+        var ws = APH.Rivals.warScore(topMil, def, war.wins, war.raids);
+        $('bWAR').style.width = U.clamp(ws,2,100)+'%';
+        $('vWAR').textContent = ws;
+        $('bWAR').style.background = ws>=60?'#7dffab':(ws>=35?'#ffc857':'#ff6d7a');
+      }
+    }
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
     var vig = $('vig');
