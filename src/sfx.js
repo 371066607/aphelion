@@ -88,9 +88,20 @@ APH.SFX = (function(){
     /* 死亡走 playerHurt 之外单独事件 */
     U.on('gameOver', function(){ LIB.died(); });
   }
-  function toggleMute(){ muted=!muted; return muted; }
+  function toggleMute(){
+    muted=!muted;
+    /* T7: 持久化到 meta(经 Save), 失败静默 */
+    try{
+      var m=APH.state&&APH.state.meta;
+      if(m){ m.sfxMuted=muted; APH.Save.saveMeta(m); }
+    }catch(e){}
+    return muted;
+  }
+  function restore(meta){
+    if(meta && meta.sfxMuted===true) muted=true;
+  }
   function isMuted(){ return muted; }
 
-  return { unlock:unlock, bindBus:bindBus, toggleMute:toggleMute,
+  return { unlock:unlock, bindBus:bindBus, toggleMute:toggleMute, restore:restore,
            isMuted:isMuted, play:function(n){ if(LIB[n]) LIB[n](); } };
 })();

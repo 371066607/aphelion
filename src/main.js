@@ -914,6 +914,7 @@ window.APH = window.APH || {};
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
       var seed=(Date.now()%100000)|0;
       APH.SFX.bindBus();
+      APH.SFX.restore(meta);
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
       bindInput();
