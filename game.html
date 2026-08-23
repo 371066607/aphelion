@@ -1237,10 +1237,29 @@ APH.Res = (function(){
     return bonds;
   }
 
+  /* ---------- V1 全局加成(纯函数) ----------
+     建造: 建筑费用 -12%/级 (取最高建造技能者)
+     学识: 每生产跳额外研究点 = 0.5×最高学识
+     社交: 每跳全殖民者心情 +0.3×最高社交(上限+2) */
+  function globalBonuses(residents){
+    var best={};
+    SKILLS.forEach(function(sk){
+      best[sk]=residents.reduce(function(acc,r){
+        return Math.max(acc, r.skills[sk]||0);
+      },0);
+    });
+    return {
+      buildCostMul: Math.max(.4, 1 - best.sk_build*0.12),
+      lorePerTick : best.sk_lore*0.5,
+      moodBoost   : Math.min(2, best.sk_social*0.3),
+    };
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, efficiency:efficiency,
     socialTick:socialTick, applyBond:applyBond,
+    globalBonuses:globalBonuses,
   };
 })();
 
@@ -3368,10 +3387,14 @@ window.APH = window.APH || {};
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
     var s=APH.state;
+    /* V1: 建造专长折扣 */
+    var mul=APH.Res.globalBonuses(s.meta.residents||[]).buildCostMul;
+    var effCost=Math.max(1,Math.round(APH.Colony.get(bid).cost*mul));
     var check=APH.Colony.canPlace(s.colony.buildings, s.meta.research, bid, wx, wy);
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
-    s.meta.research-=def.cost;
+    if(s.meta.research<def.cost*mul){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
+    s.meta.research-=effCost;
     s.colony.buildings.push({id:bid,x:Math.round(wx),y:Math.round(wy)});
     APH.Save.saveMeta(s.meta);
     saveColony();
@@ -3810,6 +3833,14 @@ window.APH = window.APH || {};
       APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
     }
 
+    /* V1 全局专长加成 */
+    var gb=APH.Res.globalBonuses(m.residents);
+    if(gb.lorePerTick>0){
+      m.research+=Math.round(gb.lorePerTick);
+    }
+    if(gb.moodBoost>0){
+      m.residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
+    }
     /* U7 社交 */
     var pairs=[];
     for(var i=0;i<m.residents.length;i++)

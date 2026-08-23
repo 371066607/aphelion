@@ -733,10 +733,14 @@ window.APH = window.APH || {};
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
     var s=APH.state;
+    /* V1: 建造专长折扣 */
+    var mul=APH.Res.globalBonuses(s.meta.residents||[]).buildCostMul;
+    var effCost=Math.max(1,Math.round(APH.Colony.get(bid).cost*mul));
     var check=APH.Colony.canPlace(s.colony.buildings, s.meta.research, bid, wx, wy);
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
-    s.meta.research-=def.cost;
+    if(s.meta.research<def.cost*mul){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
+    s.meta.research-=effCost;
     s.colony.buildings.push({id:bid,x:Math.round(wx),y:Math.round(wy)});
     APH.Save.saveMeta(s.meta);
     saveColony();
@@ -1175,6 +1179,14 @@ window.APH = window.APH || {};
       APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
     }
 
+    /* V1 全局专长加成 */
+    var gb=APH.Res.globalBonuses(m.residents);
+    if(gb.lorePerTick>0){
+      m.research+=Math.round(gb.lorePerTick);
+    }
+    if(gb.moodBoost>0){
+      m.residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
+    }
     /* U7 社交 */
     var pairs=[];
     for(var i=0;i<m.residents.length;i++)

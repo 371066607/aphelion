@@ -94,9 +94,28 @@ APH.Res = (function(){
     return bonds;
   }
 
+  /* ---------- V1 全局加成(纯函数) ----------
+     建造: 建筑费用 -12%/级 (取最高建造技能者)
+     学识: 每生产跳额外研究点 = 0.5×最高学识
+     社交: 每跳全殖民者心情 +0.3×最高社交(上限+2) */
+  function globalBonuses(residents){
+    var best={};
+    SKILLS.forEach(function(sk){
+      best[sk]=residents.reduce(function(acc,r){
+        return Math.max(acc, r.skills[sk]||0);
+      },0);
+    });
+    return {
+      buildCostMul: Math.max(.4, 1 - best.sk_build*0.12),
+      lorePerTick : best.sk_lore*0.5,
+      moodBoost   : Math.min(2, best.sk_social*0.3),
+    };
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, efficiency:efficiency,
     socialTick:socialTick, applyBond:applyBond,
+    globalBonuses:globalBonuses,
   };
 })();

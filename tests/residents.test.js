@@ -1,3 +1,25 @@
+/* V1 全局加成 */
+test('globalBonuses: 空居民无加成', () => {
+  const gb=Res.globalBonuses([]);
+  if(gb.buildCostMul!==1||gb.lorePerTick!==0||gb.moodBoost!==0)
+    throw new Error('空名单应无加成: '+JSON.stringify(gb));
+});
+test('globalBonuses: 建造折扣与下限40%', () => {
+  const r1=Res.generate('a',5); r1.skills.sk_build=3;
+  let gb=Res.globalBonuses([r1]);
+  if(Math.abs(gb.buildCostMul-(1-0.36))>0.01) throw new Error('3级应×0.64: '+gb.buildCostMul);
+  r1.skills.sk_build=9;
+  gb=Res.globalBonuses([r1]);
+  if(gb.buildCostMul<0.4) throw new Error('下限0.4');
+});
+test('globalBonuses: 学识产出与社交心情上限', () => {
+  const a=Res.generate('a',6); a.skills.sk_lore=4;
+  const b=Res.generate('b',7); b.skills.sk_social=9;
+  const gb=Res.globalBonuses([a,b]);
+  if(gb.lorePerTick!==2) throw new Error('学识4应+2/跳: '+gb.lorePerTick);
+  if(gb.moodBoost!==2) throw new Error('社交9应封顶+2: '+gb.moodBoost);
+});
+
 /* P6-U1/U3/U4/U5/U7: 生成/需求/效率/社交/农田/岗位 */
 'use strict';
 const Colony = window.APH.Colony;
