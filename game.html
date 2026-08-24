@@ -2492,7 +2492,9 @@ APH.Ent = (function(){
         ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
       }
       var defS = APH.Sprites.sheetDef(e.bid);
-      var frame = APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time);
+      /* 动作幅度收敛: 只循环低幅度帧(0-3), 高潮帧(跳跃/爆发)不再日常播放 */
+      var total = Math.min((defS&&defS.count)||8, 4);
+      var frame = APH.Sprites.frameAt({fps:2.5, count:total, loop:true}, time);
       /* 环境融合: 白天原版; 越暗越用降饱和tint版(消"贴纸感") */
       var dL = APH.World.daylight ? APH.World.daylight() : 1;
       var tinted = APH.Sprites.getTinted(e.bid);
@@ -4218,10 +4220,10 @@ window.APH = window.APH || {};
         }else if (name.indexOf('enemy_')===0){
           /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death) */
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
-                                     count:8, fps:7, loop:true });
+                                     count:8, fps:4.5, loop:true });
         }else{
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
-                                     count:8, fps:6, loop:true });
+                                     count:8, fps:3, loop:true });
         }
       });
       APH.Sprites.loadAll();

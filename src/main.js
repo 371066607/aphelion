@@ -1147,10 +1147,10 @@ window.APH = window.APH || {};
         }else if (name.indexOf('enemy_')===0){
           /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death) */
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
-                                     count:8, fps:7, loop:true });
+                                     count:8, fps:4.5, loop:true });
         }else{
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
-                                     count:8, fps:6, loop:true });
+                                     count:8, fps:3, loop:true });
         }
       });
       APH.Sprites.loadAll();

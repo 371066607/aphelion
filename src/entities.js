@@ -402,7 +402,9 @@ APH.Ent = (function(){
         ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
       }
       var defS = APH.Sprites.sheetDef(e.bid);
-      var frame = APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time);
+      /* 动作幅度收敛: 只循环低幅度帧(0-3), 高潮帧(跳跃/爆发)不再日常播放 */
+      var total = Math.min((defS&&defS.count)||8, 4);
+      var frame = APH.Sprites.frameAt({fps:2.5, count:total, loop:true}, time);
       /* 环境融合: 白天原版; 越暗越用降饱和tint版(消"贴纸感") */
       var dL = APH.World.daylight ? APH.World.daylight() : 1;
       var tinted = APH.Sprites.getTinted(e.bid);
