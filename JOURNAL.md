@@ -114,3 +114,5 @@
   下一步: 批量生成其余9种建筑序列帧 + G键建造面板(动森风UI)。
 
 - **2026-08-24 15:05 · 班次**: ✅Task2 建造队列完成。BUILDINGS加buildTime(12~30s); queueTick纯函数(并行上限3/顺序推进); tryPlace改入队+开工飘字; 完工时放实体+仓库扩容。旧档兼容buildQueue默认[]。79单元全绿。
+
+- **2026-08-24 15:08 · 班次**: ✅Task3 建筑等级完成。upgradeCost 1.6倍指数; canUpgrade校验; mineOutput/labOutput线性随级; U键升级最近建筑(扣费+飘字+持久化); 旧档补lv默认1。83单元全绿。

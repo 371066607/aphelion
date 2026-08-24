@@ -79,3 +79,24 @@ test('buildQueue: 并行上限3(第4项不推进)', () => {
   ], 1);
   if (r.queue[3].remain !== 9) throw new Error('第4项不应推进: '+r.queue[3].remain);
 });
+
+test('canUpgrade: 费用与上限校验', () => {
+  const def = Colony.get('bl_mine');
+  const r = Colony.canUpgrade({id:'bl_mine',lv:1}, def, 1000);
+  if (!r.ok) throw new Error('Lv1应可升: '+r.why);
+  const r2 = Colony.canUpgrade({id:'bl_mine',lv:4}, def, 99999);
+  if (r2.ok) throw new Error('超上限应拒绝');
+});
+test('upgradeCost: 1.6倍指数曲线', () => {
+  if (Colony.upgradeCost({cost:45},0) !== 45) throw new Error('lv0=基础价');
+  if (Colony.upgradeCost({cost:45},1) !== 72) throw new Error('lv1=72');
+});
+test('mineOutput/labOutput: 随等级线性', () => {
+  if (Colony.mineOutput(1)!==2||Colony.mineOutput(3)!==6) throw new Error('矿产出错误');
+  if (Colony.labOutput(undefined)!==1) throw new Error('默认lv=1');
+});
+test('productionTick: 消费建筑等级', () => {
+  const meta={research:0,res:{mineral:0}};
+  Colony.productionTick(meta,[{id:'bl_mine',lv:3},{id:'bl_lab'}]);
+  if(meta.res.mineral!==6||meta.research!==1) throw new Error('等级产出未生效');
+});

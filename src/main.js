@@ -827,7 +827,11 @@ window.APH = window.APH || {};
   function loadColony(){
     try{
       var v=JSON.parse(localStorage.getItem('aphelion_colony_v1')||'null');
-      if(v && Array.isArray(v.buildings)){ v.buildQueue=v.buildQueue||[]; return v; }
+      if(v && Array.isArray(v.buildings)){
+        v.buildQueue=v.buildQueue||[];
+        v.buildings.forEach(function(b){ b.lv=b.lv||1; });
+        return v;
+      }
     }catch(e){}
     return { buildings:[], builtAt:Date.now() };
   }
@@ -872,6 +876,29 @@ window.APH = window.APH || {};
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
       if(e.code==='KeyH'){ s.showMarker=!s.showMarker;
         APH.UI.floatText(s.showMarker?'角色标记: 开':'角色标记: 关','#8fa3cc'); }
+      /* U=升级最近的已建成建筑 */
+      if(e.code==='KeyU'&&s.mode==='running'&&s.scene==='home'){
+        var best=null,bd=1e9;
+        s.colony.buildings.forEach(function(b){
+          if(b.id==='bl_landing_pad') return;
+          var d=U.dst(s.px,s.py,b.x,b.y);
+          if(d<bd){bd=d;best=b;}
+        });
+        if(!best){ APH.UI.floatText('附近没有可升级的建筑','#8fa3cc'); }
+        else{
+          var def2=APH.Colony.get(best.id);
+          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research);
+          if(r3.ok){
+            s.meta.research-=r3.cost;
+            best.lv=(best.lv||1)+1;
+            APH.Save.saveMeta(s.meta); saveColony();
+            APH.UI.floatText('⬆ '+def2.name+' → Lv'+best.lv,'#59d9ff');
+            U.emit('upgraded',{id:best.id,lv:best.lv});
+          }else{
+            APH.UI.floatText('✕ '+r3.why,'#ff9a9a');
+          }
+        }
+      }
       /* C=相机锁定: 角色永远钉在屏幕正中(关闭lookAhead平滑) */
       if(e.code==='KeyC'){ s.strictCam=!s.strictCam;
         APH.UI.floatText(s.strictCam?'📷 相机锁定(角色恒居中)':'📷 相机平滑跟随','#59d9ff'); }

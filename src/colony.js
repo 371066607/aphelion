@@ -20,13 +20,16 @@ APH.Colony = (function(){
     bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3, buildTime:12,
       desc:'+20 负重上限(永久)。' },
     bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4, buildTime:20,
-      desc:'每分钟产出 2 矿材到仓库。' },
+      desc:'每30秒产出 2×等级 矿材。',
+      upg:{ effectPerLv:2, maxLv:3 } },
     bl_lab:         { name:'研究站', cost:60, size:48, max:2, buildTime:25,
-      desc:'每分钟 +1 研究点。' },
+      desc:'+1×等级 研究点/分钟。',
+      upg:{ effectPerLv:1, maxLv:2 } },
     bl_barracks:    { name:'兵营', cost:80, size:56, max:2, buildTime:30,
       desc:'训练士兵驻守殖民地。(Phase4)' },
     bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6, buildTime:25,
-      desc:'自动攻击来袭敌人。(Phase4 生效)' },
+      desc:'自动攻击来袭敌人, 伤害随等级。',
+      upg:{ effectPerLv:8, maxLv:3 } },
     bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1, buildTime:22,
       desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
     bl_farm:        { name:'水培农场', cost:35, size:52, max:4, buildTime:15,
@@ -34,6 +37,21 @@ APH.Colony = (function(){
     bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2, buildTime:18,
       desc:'饲养星绵羊。定期产肉皮。(U6)' },
   };
+
+  /* ---------- Task3: 建筑等级 ---------- */
+  function upgradeCost(def, curLv){
+    return Math.round(def.cost * Math.pow(1.6, curLv));
+  }
+  function canUpgrade(b, def, research){
+    if (!def.upg) return {ok:false, why:'不可升级'};
+    var lv = b.lv||1;
+    if (lv > def.upg.maxLv) return {ok:false, why:'已达最高等级'};
+    var cost = upgradeCost(def, lv);
+    if (research < cost) return {ok:false, why:'研究点不足(需'+cost+')'};
+    return {ok:true, cost:cost};
+  }
+  function mineOutput(lv){ return 2*(lv||1); }
+  function labOutput(lv){ return (lv||1); }
 
   function list(){ return BUILDINGS; }
   function get(id){ return BUILDINGS[id]; }
@@ -152,8 +170,8 @@ APH.Colony = (function(){
   function productionTick(meta, buildings){
     var out = { mineral:0, research:0 };
     buildings.forEach(function(b){
-      if(b.id==='bl_mine') out.mineral += 2;
-      if(b.id==='bl_lab') out.research += 1;
+      if(b.id==='bl_mine') out.mineral += mineOutput(b.lv);
+      if(b.id==='bl_lab') out.research += labOutput(b.lv);
     });
     meta.res.mineral = (meta.res.mineral||0) + out.mineral;
     meta.research += out.research;
@@ -217,6 +235,8 @@ APH.Colony = (function(){
     canPlace:canPlace, productionTick:productionTick,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
+    upgradeCost:upgradeCost, canUpgrade:canUpgrade,
+    mineOutput:mineOutput, labOutput:labOutput,
     ensurePad:ensurePad,
   };
 })();
