@@ -29,7 +29,7 @@ const A=(c,m)=>{ if(!c) throw new Error(m||'断言失败'); };
 
 const SRC=path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','save.js','planet.js','llm.js','combat.js',
-                'colony.js','rivals.js','world.js','entities.js','sfx.js','ui.js','main.js']){
+                'colony.js','rivals.js','world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 

@@ -1011,6 +1011,13 @@ window.APH = window.APH || {};
       var seed=(Date.now()%100000)|0;
       APH.SFX.bindBus();
       APH.SFX.restore(meta);
+      /* M1 序列帧注册与异步加载 */
+      var SD = window.APH.SPRITE_DATA || {};
+      Object.keys(SD).forEach(function(name){
+        APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:4, rows:1,
+                                   count:4, fps:5, loop:true });
+      });
+      APH.Sprites.loadAll();
       /* 常驻诊断角标(左上小字): 相机与玩家屏幕坐标实时可见 */
       var diag=document.createElement('div');
       diag.id='camDiag';
@@ -1021,11 +1028,12 @@ window.APH = window.APH || {};
         var st=APH.state;
         var sx=Math.round(st.px-st.camX+vpW()/2),
             sy=Math.round(st.py-st.camY+vpH()/2);
+        var mineN=0; st.entities.forEach(function(e2){if(e2.bid==='bl_mine')mineN++;});
         diag.innerHTML='scr '+sx+','+sy+' / 视口 '+vpW()+'x'+vpH()+
           ' / win '+innerWidth+'x'+innerHeight+
           '<br>cam '+Math.round(st.camX)+','+Math.round(st.camY)+
           ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征')+
-          (st.strictCam?' [锁定]':'');
+          ' 矿'+mineN+(APH.Sprites.isReady('bl_mine')?' spr✓':' spr✗');
       },250);
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
@@ -1037,7 +1045,15 @@ window.APH = window.APH || {};
       var s = APH.state;
       var _q=(typeof location!=='undefined'&&location.search)||'';
       if(_q.indexOf('autostart=1')>=0){
+        document.title='AUTO: q命中';
         startGame();
+        /* 仅诊断(?debugmark): 自动放一座采矿机验证sprite渲染 */
+        if(_q.indexOf('debugmark')>=0){
+          var px2=s.px+60, py2=s.py-40;
+          s.colony.buildings.push({id:'bl_mine',x:px2,y:py2,lv:1});
+          APH.Colony.placeBuildingEntity('bl_mine',px2,py2);
+          document.title='AUTO: started +mine';
+        }
         var pad0=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
         if(pad0){ s.px=pad0.x; s.py=pad0.y+30; }   // 出生即站在发射台上
       }

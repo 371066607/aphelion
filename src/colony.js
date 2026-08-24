@@ -199,6 +199,7 @@ APH.Colony = (function(){
     farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, productionTick:productionTick,
+    placeBuildingEntity:placeBuildingEntity,
     ensurePad:ensurePad,
   };
 })();

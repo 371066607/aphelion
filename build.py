@@ -25,6 +25,7 @@ MODULE_ORDER = [
     "world.js",
     "entities.js",
     "sfx.js",
+    "sprite_data.js",
     "sprites.js",
     "ui.js",
     "main.js",

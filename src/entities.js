@@ -345,6 +345,18 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* M1: 有序列帧的建筑优先 sprite 渲染 */
+    if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
+      var szS=(e.def&&e.def.size)||44;
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.32)';
+      ctx.beginPath(); ctx.ellipse(3,5,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
+      ctx.restore();
+      APH.Sprites.draw(ctx, e.bid, e.x, e.y+4,
+        APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
+        szS*2.4/128);
+      return;
+    }
     /* 通用建筑: 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;
