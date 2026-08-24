@@ -3729,7 +3729,7 @@ window.APH = window.APH || {};
       /* 调试标记(?debugmark=1): 视口中心参考圈, 验证居中 */
       if(_q.indexOf('debugmark')>=0) s.debugMark=true;
       /* strict=1: 每帧强制相机=玩家(排除相机逻辑, 二分定位偏移源) */
-      s.strictCam = _q.indexOf('strict')>=0;
+      APH.state.strictCam = _q.indexOf('strict')>=0;
     }catch(err){
       APH.UI.fatal('启动失败: '+err.message+'\n'+(err.stack||''));
       throw err;
