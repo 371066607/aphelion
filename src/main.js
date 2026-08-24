@@ -432,6 +432,22 @@ window.APH = window.APH || {};
     s.o2=Math.min(CFG.player.o2Max, s.o2+dt*10);
     s.hp=Math.min(CFG.player.hpMax, s.hp+dt*6);
 
+    /* Task2: 建造队列推进 */
+    if(s.colony.buildQueue && s.colony.buildQueue.length){
+      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt);
+      s.colony.buildQueue=qr.queue;
+      qr.done.forEach(function(d){
+        var b={id:d.bid,x:d.x,y:d.y};
+        s.colony.buildings.push(b);
+        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y);
+        saveColony();
+        U.emit('built',{id:d.bid});
+        APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
+        if(d.bid==='bl_warehouse') CFG.player.carryMax+=20;
+        s.parts.push({t:'ping',x:d.x,y:d.y,life:.9,max:.9});
+      });
+    }
+
     /* 生产 tick: 每30游戏秒结算一次采矿机/研究站 (ADR-6 固定tick) */
     s.prodT=(s.prodT||0)+dt;
     if(s.prodT>=30){
@@ -793,12 +809,14 @@ window.APH = window.APH || {};
     var def=APH.Colony.get(bid);
     if(s.meta.research<def.cost*mul){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
     s.meta.research-=effCost;
-    s.colony.buildings.push({id:bid,x:Math.round(wx),y:Math.round(wy)});
+    /* Task2: 进入建造队列(工期), 完工后由 updateHome 放置实体 */
+    s.colony.buildQueue = s.colony.buildQueue||[];
+    s.colony.buildQueue.push({bid:bid,x:Math.round(wx),y:Math.round(wy),
+                              remain:def.buildTime||0});
     APH.Save.saveMeta(s.meta);
     saveColony();
-    APH.Colony.placeBuildingEntity(bid,wx,wy);
-    U.emit('built',{id:bid});
-    APH.UI.floatText('✔ '+def.name+' 建造完成','#9fe8c8');
+    U.emit('queued',{id:bid});
+    APH.UI.floatText('🔨 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
     if(def.id==='bl_warehouse') CFG.player.carryMax+=20;   // 仓库永久扩容
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
   }
@@ -809,7 +827,7 @@ window.APH = window.APH || {};
   function loadColony(){
     try{
       var v=JSON.parse(localStorage.getItem('aphelion_colony_v1')||'null');
-      if(v && Array.isArray(v.buildings)) return v;
+      if(v && Array.isArray(v.buildings)){ v.buildQueue=v.buildQueue||[]; return v; }
     }catch(e){}
     return { buildings:[], builtAt:Date.now() };
   }

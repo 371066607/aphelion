@@ -15,23 +15,23 @@ APH.Colony = (function(){
 
   /* ---------- 建筑目录 (ADR-9: bl_ 前缀; 成本单位=研究点) ---------- */
   var BUILDINGS = {
-    bl_landing_pad: { name:'发射台', cost:0,  size:64,
+    bl_landing_pad: { name:'发射台', cost:0,  size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
-    bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3,
+    bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3, buildTime:12,
       desc:'+20 负重上限(永久)。' },
-    bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4,
+    bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4, buildTime:20,
       desc:'每分钟产出 2 矿材到仓库。' },
-    bl_lab:         { name:'研究站', cost:60, size:48, max:2,
+    bl_lab:         { name:'研究站', cost:60, size:48, max:2, buildTime:25,
       desc:'每分钟 +1 研究点。' },
-    bl_barracks:    { name:'兵营', cost:80, size:56, max:2,
+    bl_barracks:    { name:'兵营', cost:80, size:56, max:2, buildTime:30,
       desc:'训练士兵驻守殖民地。(Phase4)' },
-    bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6,
+    bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6, buildTime:25,
       desc:'自动攻击来袭敌人。(Phase4 生效)' },
-    bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1,
+    bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1, buildTime:22,
       desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
-    bl_farm:        { name:'水培农场', cost:35, size:52, max:4,
+    bl_farm:        { name:'水培农场', cost:35, size:52, max:4, buildTime:15,
       desc:'种植食物。有居民务农时每分钟产粮。' },
-    bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2,
+    bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2, buildTime:18,
       desc:'饲养星绵羊。定期产肉皮。(U6)' },
   };
 
@@ -161,6 +161,22 @@ APH.Colony = (function(){
   }
 
 
+  /* ---------- Task2: 建造队列(纯函数) ----------
+     并行上限3; 顺序完工。q项 {bid,x,y,remain}。
+     返回 {queue:剩余, done:[{bid,x,y}]} */
+  function queueTick(queue, dt){
+    var done = [];
+    var active = 0;
+    var out = queue.map(function(item){
+      if (active >= 3) return item;
+      active++;
+      var r = item.remain - dt;
+      if (r <= 0){ done.push({bid:item.bid,x:item.x,y:item.y}); return null; }
+      return Object.assign({}, item, {remain:r});
+    }).filter(Boolean);
+    return { queue: out, done: done };
+  }
+
   /* ---------- 科技树 v1 (ADR-9: te_ 前缀; 消耗研究点) ----------
      effect 字段由 applyTech 解释, 永不直接改数值。 */
   var TECHS = {
@@ -200,6 +216,7 @@ APH.Colony = (function(){
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, productionTick:productionTick,
     placeBuildingEntity:placeBuildingEntity,
+    queueTick:queueTick,
     ensurePad:ensurePad,
   };
 })();

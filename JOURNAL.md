@@ -112,3 +112,5 @@
   修复: Colony.placeBuildingEntity漏导出; 测试桩补sprites.js加载。
   全量回归: 76单元+8场景+3perf+2boss全绿。构建255KB(+89KB sprite)。
   下一步: 批量生成其余9种建筑序列帧 + G键建造面板(动森风UI)。
+
+- **2026-08-24 15:05 · 班次**: ✅Task2 建造队列完成。BUILDINGS加buildTime(12~30s); queueTick纯函数(并行上限3/顺序推进); tryPlace改入队+开工飘字; 完工时放实体+仓库扩容。旧档兼容buildQueue默认[]。79单元全绿。

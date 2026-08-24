@@ -56,3 +56,26 @@ test('buyTech: 扣费+升级+效果由applyTech解释(数据分离)', () => {
   if(!r2.ok) throw new Error('第二个科技应可购');
   if(!r2.owned.te_weaponry) throw new Error('独立计数失效');
 });
+
+test('buildQueue: 工期推进与完工出队', () => {
+  let q = [{bid:'bl_mine',x:600,y:600,remain:20}];
+  q = Colony.queueTick(q, 10).queue;
+  if (q[0].remain !== 10) throw new Error('应剩10: '+q[0].remain);
+  const r = Colony.queueTick(q, 12);
+  if (r.queue.length !== 0) throw new Error('应完工出队');
+  if (r.done.length!==1 || r.done[0].bid!=='bl_mine') throw new Error('done应含采矿机');
+});
+test('buildQueue: 并行内同时推进', () => {
+  const r = Colony.queueTick([
+    {bid:'bl_lab', x:500,y:500, remain:5},
+    {bid:'bl_mine',x:700,y:700, remain:5},
+  ], 5);
+  if (r.done.length!==2) throw new Error('并行3内应同时完工2项: '+r.done.length);
+});
+test('buildQueue: 并行上限3(第4项不推进)', () => {
+  const r = Colony.queueTick([
+    {bid:'bl_mine',remain:9},{bid:'bl_mine',remain:9},
+    {bid:'bl_mine',remain:9},{bid:'bl_mine',remain:9},
+  ], 1);
+  if (r.queue[3].remain !== 9) throw new Error('第4项不应推进: '+r.queue[3].remain);
+});
