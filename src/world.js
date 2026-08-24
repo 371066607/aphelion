@@ -244,8 +244,8 @@ APH.World = (function(){
     if(!b.done){
       var lg = ctx.createLinearGradient(0,gy-150,0,gy+8);
       lg.addColorStop(0,'rgba(255,200,87,0)');
-      lg.addColorStop(1,'rgba(255,200,87,'+(0.13+pul*.09)+')');
-      ctx.fillStyle=lg; ctx.fillRect(b.x-13,gy-150,26,158);
+      lg.addColorStop(1,'rgba(255,200,87,'+(0.08+pul*.06)+')');
+      ctx.fillStyle=lg; ctx.fillRect(b.x-9,gy-130,18,138);
     }
     var col = b.done?'#7dffab':'#ffc857';
     ctx.save(); ctx.translate(b.x,gy); ctx.rotate(time*.9);

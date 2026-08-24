@@ -42,9 +42,19 @@ APH.Sprites = (function(){
       var d = SHEETS[name];
       var img = new Image();
       img.onload = function(){
-        IMAGES[name] = img;
-        readyCount++;
-        if (--pending <= 0 && onReady) onReady();
+        /* 强制完整解码后再标记ready, 避免首帧drawImage画出半解码白条 */
+        if (img.decode) {
+          img.decode().then(function(){
+            IMAGES[name] = img;
+            if (--pending <= 0 && onReady) onReady();
+          }).catch(function(){
+            IMAGES[name] = null;
+            if (--pending <= 0 && onReady) onReady();
+          });
+        } else {
+          IMAGES[name] = img;
+          if (--pending <= 0 && onReady) onReady();
+        }
       };
       img.onerror = function(){
         IMAGES[name] = null;               // 标记失败, isReady 返回 false

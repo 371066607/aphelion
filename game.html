@@ -2025,8 +2025,8 @@ APH.World = (function(){
     if(!b.done){
       var lg = ctx.createLinearGradient(0,gy-150,0,gy+8);
       lg.addColorStop(0,'rgba(255,200,87,0)');
-      lg.addColorStop(1,'rgba(255,200,87,'+(0.13+pul*.09)+')');
-      ctx.fillStyle=lg; ctx.fillRect(b.x-13,gy-150,26,158);
+      lg.addColorStop(1,'rgba(255,200,87,'+(0.08+pul*.06)+')');
+      ctx.fillStyle=lg; ctx.fillRect(b.x-9,gy-130,18,138);
     }
     var col = b.done?'#7dffab':'#ffc857';
     ctx.save(); ctx.translate(b.x,gy); ctx.rotate(time*.9);
@@ -2475,9 +2475,6 @@ APH.Ent = (function(){
     }
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
-      if(APH.state.debugMark){ ctx.save(); ctx.strokeStyle='#ff2222'; ctx.lineWidth=3;
-        ctx.beginPath(); ctx.moveTo(e.x-30,e.y-30); ctx.lineTo(e.x+30,e.y+30);
-        ctx.moveTo(e.x+30,e.y-30); ctx.lineTo(e.x-30,e.y+30); ctx.stroke(); ctx.restore(); }
       var szS=(e.def&&e.def.size)||44;
       /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -2527,9 +2524,7 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
-    if(APH.state.debugMark){ ctx.save(); ctx.fillStyle='#22ff22';
-      ctx.beginPath(); ctx.arc(e.x,e.y-40,10,0,U.TAU); ctx.fill(); ctx.restore(); }
-    /* 通用建筑: 影子+主体+屋顶灯 */
+    /* 通用建筑(回退): 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;
     ctx.save(); ctx.translate(e.x,e.y);
@@ -2788,9 +2783,19 @@ APH.Sprites = (function(){
       var d = SHEETS[name];
       var img = new Image();
       img.onload = function(){
-        IMAGES[name] = img;
-        readyCount++;
-        if (--pending <= 0 && onReady) onReady();
+        /* 强制完整解码后再标记ready, 避免首帧drawImage画出半解码白条 */
+        if (img.decode) {
+          img.decode().then(function(){
+            IMAGES[name] = img;
+            if (--pending <= 0 && onReady) onReady();
+          }).catch(function(){
+            IMAGES[name] = null;
+            if (--pending <= 0 && onReady) onReady();
+          });
+        } else {
+          IMAGES[name] = img;
+          if (--pending <= 0 && onReady) onReady();
+        }
       };
       img.onerror = function(){
         IMAGES[name] = null;               // 标记失败, isReady 返回 false

@@ -385,9 +385,6 @@ APH.Ent = (function(){
     }
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
-      if(APH.state.debugMark){ ctx.save(); ctx.strokeStyle='#ff2222'; ctx.lineWidth=3;
-        ctx.beginPath(); ctx.moveTo(e.x-30,e.y-30); ctx.lineTo(e.x+30,e.y+30);
-        ctx.moveTo(e.x+30,e.y-30); ctx.lineTo(e.x-30,e.y+30); ctx.stroke(); ctx.restore(); }
       var szS=(e.def&&e.def.size)||44;
       /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -437,9 +434,7 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
-    if(APH.state.debugMark){ ctx.save(); ctx.fillStyle='#22ff22';
-      ctx.beginPath(); ctx.arc(e.x,e.y-40,10,0,U.TAU); ctx.fill(); ctx.restore(); }
-    /* 通用建筑: 影子+主体+屋顶灯 */
+    /* 通用建筑(回退): 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;
     ctx.save(); ctx.translate(e.x,e.y);
