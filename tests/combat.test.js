@@ -101,3 +101,28 @@ test('carryWeight: 权重计算正确', () => {
   const c = {}; c[KEY_MIN] = 3;   // w=3 ×3 = 9
   if (C.carryWeight(c) !== 9) throw new Error('应为9, got ' + C.carryWeight(c));
 });
+
+/* ---------- Task4: 炮塔/士兵 ---------- */
+const T_ENEMY2 = 'enemy';
+test('turretStep: 射程内敌人受击+进冷却', () => {
+  const tw = {x:0,y:0,lv:1,cd:0};
+  const foe = {type:T_ENEMY2, x:200,y:0, hp:100, dead:false};
+  C.turretStep(tw,[foe],0.1);
+  if (foe.hp >= 100) throw new Error('应受击: '+foe.hp);
+});
+test('turretStep: 射程外不攻击', () => {
+  const tw = {x:0,y:0,lv:1,cd:0};
+  const far = {type:T_ENEMY2, x:400,y:0, hp:50, dead:false};
+  C.turretStep(tw,[far],0.1);
+  if (far.hp !== 50) throw new Error('射程外不应受击');
+});
+test('turretStep: 冷却期不开火', () => {
+  const tw = {x:0,y:0,lv:1,cd:5};
+  const foe = {type:T_ENEMY2, x:100,y:0, hp:50, dead:false};
+  if (C.turretStep(tw,[foe],0.1) !== false) throw new Error('冷却中应返回false');
+});
+test('soldierCount: 兵营等级×2', () => {
+  if (C.soldierCount([])!==0) throw new Error('无兵营=0');
+  if (C.soldierCount([{bid:'bl_barracks',lv:1}])!==2) throw new Error('1级=2');
+  if (C.soldierCount([{bid:'bl_barracks',lv:2}])!==4) throw new Error('2级=4');
+});

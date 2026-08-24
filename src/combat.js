@@ -227,6 +227,30 @@ APH.Combat = (function(){
   }
   var pid = 0;
 
+  /* ---------- Task4: 炮塔/士兵(纯函数部分) ---------- */
+  function turretDamage(lv){ return CFG.turret.dmgBase + CFG.turret.dmgPerLv*((lv||1)-1); }
+  function soldierCount(barracks){
+    return barracks.reduce(function(a,b){ return a + CFG.soldier.perBarracks*(b.lv||1); },0);
+  }
+  /* 炮塔单步: 冷却递减; 射程内最近敌人受击。返回是否开火 */
+  function turretStep(turret, enemies, dt){
+    turret.cd=(turret.cd||0)-dt;
+    if(turret.cd>0) return false;
+    var best=null,bd=CFG.turret.range;
+    enemies.forEach(function(en){
+      if(en.dead) return;
+      var d=U.dst(turret.x,turret.y,en.x,en.y);
+      if(d<bd){bd=d;best=en;}
+    });
+    if(!best) return false;
+    best.hp-=turretDamage(turret.lv);
+    best.hitFlash=0.1;
+    turret.cd=CFG.turret.cd;
+    U.emit('enemyHit',best);
+    if(best.hp<=0) killEnemy(best);
+    return true;
+  }
+
   /* ---- 击杀: 掉落生成 ---- */
   function killEnemy(en){
     en.dead = true;
@@ -340,5 +364,6 @@ APH.Combat = (function(){
     rollLoot:rollLoot, addToCarry:addToCarry, carryWeight:carryWeight,
     updateCombat:updateCombat, updateDropped:updateDropped,
     firePlasma:firePlasma, makeProj:makeProj,
+    turretStep:turretStep, soldierCount:soldierCount, turretDamage:turretDamage,
   };
 })();

@@ -466,6 +466,20 @@ window.APH = window.APH || {};
       APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
       if(s.war.raidWarn<=0) startRaid();
     }else if(s.war.raidActive){
+      /* Task4: 炮塔开火(对射程内最近敌人) */
+      var raidFoes=[];
+      s.entities.forEach(function(e2){if(e2.type===T.ENEMY&&!e2.dead)raidFoes.push(e2);});
+      s.colony.buildings.forEach(function(b){
+        if(b.id!=='bl_turret') return;
+        var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
+        var fired=APH.Combat.turretStep(tw,raidFoes,dt);
+        b.cd=tw.cd;
+        if(fired){
+          s.parts.push({t:'ping',x:b.x,y:b.y-20,life:.3,max:.3});
+          U.emit('turretFired',{});
+        }
+      });
+
       /* 波次刷怪(袭击敌人从地图边缘冲基地) */
       s.war.raidSpawnT=(s.war.raidSpawnT||0)-dt;
       var aliveEnemies=0;
@@ -522,6 +536,17 @@ window.APH = window.APH || {};
   function startRaid(){
     var s=APH.state;
     s.war.raidActive=true;
+    /* Task4: 兵营召唤驻守士兵 */
+    var n=APH.Combat.soldierCount(s.colony.buildings.filter(function(b){return b.id==='bl_barracks';}));
+    for(var i=0;i<n;i++){
+      var sf=s.spec.enemies.factions[0];
+      var sol=APH.Ent.makeEnemy(sf, CFG.HAB.x+U.rr(-80,80), CFG.HAB.y+U.rr(-60,60));
+      sol.isSoldier=true;
+      sol.hp=CFG.soldier.hp; sol.maxHp=CFG.soldier.hp;
+      sol.state='idle';
+      s.entities.push(sol);
+    }
+    if(n>0) APH.UI.floatText('🛡 '+n+' 名士兵出动','#ffc857');
     s.war.wave=s.war.pendingWave||{count:4};
     s.war.spawned=0; s.war.raidSpawnT=0;
     APH.UI.setHint('');

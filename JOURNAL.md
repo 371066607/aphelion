@@ -116,3 +116,5 @@
 - **2026-08-24 15:05 · 班次**: ✅Task2 建造队列完成。BUILDINGS加buildTime(12~30s); queueTick纯函数(并行上限3/顺序推进); tryPlace改入队+开工飘字; 完工时放实体+仓库扩容。旧档兼容buildQueue默认[]。79单元全绿。
 
 - **2026-08-24 15:08 · 班次**: ✅Task3 建筑等级完成。upgradeCost 1.6倍指数; canUpgrade校验; mineOutput/labOutput线性随级; U键升级最近建筑(扣费+飘字+持久化); 旧档补lv默认1。83单元全绿。
+
+- **2026-08-24 15:11 · 班次**: ✅Task4 炮塔真实开火+兵营士兵完成。turretStep纯函数(射程240/cd1.2s/伤害8+8×lv); 袭击期间遍历炮塔开火+ping特效; startRaid按兵营等级召唤2×lv士兵实体(hp40)。87单元全绿。

@@ -44,6 +44,21 @@ APH.CFG = {
     enemies: 18,
   },
 
+  /* 防御炮塔 (Task4) */
+  turret: {
+    range: 240,
+    cd: 1.2,
+    dmgBase: 8,
+    dmgPerLv: 8,
+  },
+  /* 兵营士兵 */
+  soldier: {
+    hp: 40,
+    speed: 120,
+    dmg: 6,
+    perBarracks: 2,      // 每级兵营+2兵
+  },
+
   /* 战斗 */
   combat: {
     plasmaDmg: 13,
