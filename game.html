@@ -2180,11 +2180,13 @@ APH.Ent = (function(){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
     ctx.save(); ctx.translate(e.x,e.y);
-    /* T12 玩家高可见度: 脚下呼吸光圈(任何背景下都能一眼找到角色) */
-    var pulse=0.35+0.3*Math.sin(time*3);
-    ctx.strokeStyle='rgba(89,217,255,'+(pulse*0.8)+')';
-    ctx.lineWidth=2;
-    ctx.beginPath(); ctx.ellipse(0,4,16+pulse*3,8+pulse*1.5,0,0,U.TAU); ctx.stroke();
+    /* T12 玩家高可见度光圈(H键可关, 诊断用) */
+    if(!s.showMarkerOff){
+      var pulse=0.35+0.3*Math.sin(time*3);
+      ctx.strokeStyle='rgba(89,217,255,'+(pulse*0.8)+')';
+      ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(0,4,16+pulse*3,8+pulse*1.5,0,0,U.TAU); ctx.stroke();
+    }
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
     ctx.translate(0,-bobbing);
@@ -2212,12 +2214,14 @@ APH.Ent = (function(){
     ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
     ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
     ctx.stroke();
-    /* T12 头顶浮动三角(你在这里) */
-    ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
-    var ty=-38-Math.sin(time*3)*2.5;
-    ctx.beginPath();
-    ctx.moveTo(0,ty); ctx.lineTo(-5,ty-7); ctx.lineTo(5,ty-7);
-    ctx.closePath(); ctx.fill();
+    /* T12 头顶浮动三角(H键可关) */
+    if(!s.showMarkerOff){
+      ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
+      var ty=-38-Math.sin(time*3)*2.5;
+      ctx.beginPath();
+      ctx.moveTo(0,ty); ctx.lineTo(-5,ty-7); ctx.lineTo(5,ty-7);
+      ctx.closePath(); ctx.fill();
+    }
     ctx.globalAlpha=1;
     ctx.restore();
   }
@@ -3543,6 +3547,9 @@ window.APH = window.APH || {};
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
+      /* H=角色标记开关(诊断: 判断右下角小人是否游戏内元素) */
+      if(e.code==='KeyH'){ s.showMarker=!s.showMarker;
+        APH.UI.floatText(s.showMarker?'角色标记: 开':'角色标记: 关','#8fa3cc'); }
       /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }

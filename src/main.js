@@ -842,6 +842,9 @@ window.APH = window.APH || {};
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
+      /* H=角色标记开关(诊断: 判断右下角小人是否游戏内元素) */
+      if(e.code==='KeyH'){ s.showMarker=!s.showMarker;
+        APH.UI.floatText(s.showMarker?'角色标记: 开':'角色标记: 关','#8fa3cc'); }
       /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
