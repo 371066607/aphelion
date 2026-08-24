@@ -9,6 +9,9 @@ window.APH = window.APH || {};
 (function(){
   'use strict';
   var U=APH.U, CFG=APH.CFG, T=CFG.entType;
+  /* 真实可视区域(canvas实际显示尺寸), 预览面板缩放/分栏安全 */
+  function vpW(){ var v=APH.World.getViewport(); return (v&&v.w)||innerWidth; }
+  function vpH(){ var v=APH.World.getViewport(); return (v&&v.h)||innerHeight; }
 
   /* ================= 全局状态（唯一实例） ================= */
   APH.state = {
@@ -399,8 +402,8 @@ window.APH = window.APH || {};
         ly = s.py+(s.moving?Math.sin(s.face)*CFG.lookAhead:0);
     s.camX=U.lerp(s.camX,lx,1-Math.pow(CFG.camLerp,dt));
     s.camY=U.lerp(s.camY,ly,1-Math.pow(CFG.camLerp,dt));
-    s.camX=U.clamp(s.camX,innerWidth/2-80,CFG.WORLD-innerWidth/2+80);
-    s.camY=U.clamp(s.camY,innerHeight/2-80,CFG.WORLD-innerHeight/2+80);
+    s.camX=U.clamp(s.camX,vpW()/2-80,CFG.WORLD-vpW()/2+80);
+    s.camY=U.clamp(s.camY,vpH()/2-80,CFG.WORLD-vpH()/2+80);
     if(s.shake>0) s.shake-=dt*2.2;
   }
 
@@ -454,7 +457,7 @@ window.APH = window.APH || {};
       if(aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
         s.war.raidSpawnT=.7;
         var f=s.spec.enemies.factions[Math.floor(Math.random()*s.spec.enemies.factions.length)];
-        var ang=Math.random()*U.TAU, d=Math.max(innerWidth,innerHeight)*.62;
+        var ang=Math.random()*U.TAU, d=Math.max(vpW(),vpH())*.62;
         var ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40),
             ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
         var en=APH.Ent.makeEnemy(f,ex,ey);
@@ -643,8 +646,8 @@ window.APH = window.APH || {};
 
     if(tickN%30===0){
       /* 屏幕坐标探针: 角色在视口内的实际像素位置(应≈vw/2,vh/2) */
-      var sx=Math.round(s.px-s.camX+innerWidth/2),
-          sy=Math.round(s.py-s.camY+innerHeight/2);
+      var sx=Math.round(s.px-s.camX+vpW()/2),
+          sy=Math.round(s.py-s.camY+vpH()/2);
       document.title='▶'+tickN+' 屏幕('+sx+','+sy+') 视口['+
         innerWidth+'x'+innerHeight+'] DPR'+(window.devicePixelRatio||1)+
         ' cv('+document.getElementById('cv').width+'x'+
@@ -710,7 +713,7 @@ window.APH = window.APH || {};
     if(s.strictCam){ s.camX=s.px; s.camY=s.py; return; }
     var dx=(s.px-s.camX), dy=(s.py-s.camY);
     /* 硬上限: 偏差超过视口22%立即对齐(异常保护) */
-    var hard=Math.min(innerWidth,innerHeight)*0.22;
+    var hard=Math.min(vpW(),vpH())*0.22;
     if(Math.abs(dx)>hard || Math.abs(dy)>hard){
       console.warn('[cam] 偏差自愈 dx='+Math.round(dx)+' dy='+Math.round(dy));
       s.camX=s.px; s.camY=s.py;
@@ -939,11 +942,11 @@ window.APH = window.APH || {};
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
         /* 建造模式: 点地放置 */
         if(s.scene==='home'&&s.buildMode){
-          var wx=e.clientX-innerWidth/2+s.camX, wy=e.clientY-innerHeight/2+s.camY;
+          var wx=e.clientX-vpW()/2+s.camX, wy=e.clientY-vpH()/2+s.camY;
           tryPlace(s.buildMode,wx,wy);
           return;
         }
-        var t={x:e.clientX-innerWidth/2+APH.state.camX, y:e.clientY-innerHeight/2+APH.state.camY};
+        var t={x:e.clientX-vpW()/2+APH.state.camX, y:e.clientY-vpH()/2+APH.state.camY};
         APH.state.target=t;
         APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
       }
@@ -1016,11 +1019,13 @@ window.APH = window.APH || {};
       document.body.appendChild(diag);
       setInterval(function(){
         var st=APH.state;
-        var sx=Math.round(st.px-st.camX+innerWidth/2),
-            sy=Math.round(st.py-st.camY+innerHeight/2);
-        diag.innerHTML='scr '+sx+','+sy+' / win '+innerWidth+'x'+innerHeight+
+        var sx=Math.round(st.px-st.camX+vpW()/2),
+            sy=Math.round(st.py-st.camY+vpH()/2);
+        diag.innerHTML='scr '+sx+','+sy+' / 视口 '+vpW()+'x'+vpH()+
+          ' / win '+innerWidth+'x'+innerHeight+
           '<br>cam '+Math.round(st.camX)+','+Math.round(st.camY)+
-          ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征');
+          ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征')+
+          (st.strictCam?' [锁定]':'');
       },250);
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();

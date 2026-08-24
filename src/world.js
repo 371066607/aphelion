@@ -23,8 +23,15 @@ APH.World = (function(){
   }
   function resize(){
     DPR = Math.min(window.devicePixelRatio||1, 2);
-    VW = innerWidth; VH = innerHeight;
+    /* 可视区域测量: rect 无效(未布局/被CSS约束)时回退 innerWidth */
+    var rect = null;
+    try{ if(cv.getBoundingClientRect) rect = cv.getBoundingClientRect(); }catch(e){}
+    var rw = (rect && rect.width>320) ? Math.round(rect.width) : window.innerWidth;
+    var rh = (rect && rect.height>240) ? Math.round(rect.height) : window.innerHeight;
+    VW = Math.max(320, rw); VH = Math.max(240, rh);
     cv.width = VW*DPR; cv.height = VH*DPR;
+    /* CSS: 让canvas始终铺满视口(不用inline固定像素, 避免300x150默认值污染) */
+    cv.style.width = '100vw'; cv.style.height = '100vh';
     ctx.setTransform(DPR,0,0,DPR,0,0);
     buildVignette();
   }

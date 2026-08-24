@@ -91,3 +91,12 @@
   结论: 相机/渲染逻辑经第三方环境验证正确。截图存 docs_render_centered.png。
   用户此前所见=移动中的相机滞后(设计行为)+probeRun按钮误认的组合。
   现有三重保险: selfCenter硬阈值22%+每帧软拉30%+C键严格锁定。
+
+- **2026-08-24 12:15 · 班次**: 🎯【真根因落网——canvas默认尺寸污染】
+  无头Chrome小窗(800x520)渲染暴露: 诊断角标显示"视口 300x200"!
+  = canvas 默认尺寸。resize() 用 getBoundingClientRect 初值时 canvas 未布局,
+  rect.width 返回默认300 → VW/VH 被锁死300x200 + inline style 固定像素
+  → 游戏世界挤在左上角小画布, 用户全屏下看到角色错位"右下角"。
+  修复: rect无效(<320)回退innerWidth; CSS改用100vw/100vh铺满; 加安全下限。
+  验证: 小窗重渲 scr 400,217 = 视口800x433正中 ✓ 角色居中 ✓ 地形岩石信标正常 ✓
+  截图 docs_render_exp_fixed.png。全部测试绿。
