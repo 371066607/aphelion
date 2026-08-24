@@ -3739,6 +3739,7 @@ window.APH = window.APH || {};
       APH.UI.updHUD();
       document.title='✓就绪 殖民地'+(APH.LLM.enabled()?' ·AI':'');
       /* 自动化验证通道: autostart=1 跳过开场; exp=1 直接着陆远征 */
+      var s = APH.state;
       var _q=(typeof location!=='undefined'&&location.search)||'';
       if(_q.indexOf('autostart=1')>=0){
         startGame();
