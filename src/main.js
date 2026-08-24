@@ -952,6 +952,13 @@ window.APH = window.APH || {};
       /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
+      /* G=建造面板(动森风) */
+      if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){
+        var bp=document.getElementById('buildPanel');
+        var show=bp.style.display==='none';
+        bp.style.display=show?'':'none';
+        if(show) renderBuildPanel();
+      }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -1273,6 +1280,71 @@ window.APH = window.APH || {};
     body.innerHTML=html;
     document.getElementById('codexSub').textContent=
       '殖民地数据库 · 远征档案实时同步';
+  }
+
+  /* ================= Task6: 建造面板(动森风) ================= */
+  function toggleBuildPanel(){
+    var el=document.getElementById('buildPanel');
+    if(!el) return;
+    var show=el.style.display==='none';
+    el.style.display=show?'':'none';
+    if(show) renderBuildPanel();
+  }
+  function renderBuildPanel(){
+    var s=APH.state;
+    document.getElementById('bpResearch').textContent=s.meta.research;
+    /* 队列进度 */
+    var qEl=document.getElementById('bpQueue');
+    if(s.colony.buildQueue&&s.colony.buildQueue.length){
+      var qh='<b style="color:#794f27;font-size:12px">施工中</b> ';
+      s.colony.buildQueue.forEach(function(q){
+        var def=APH.Colony.get(q.bid);
+        qh+='<span style="display:inline-block;background:#f0e8d8;border-radius:50px;'+
+           'padding:4px 14px;margin-right:8px;color:#725d42;font-size:11px">'+
+           def.name+' ⏳'+Math.ceil(q.remain)+'s</span>';
+      });
+      qEl.innerHTML=qh;
+    }else qEl.innerHTML='';
+    /* 建筑卡片网格(动森NookPhone配色) */
+    var colors=['#82d5bb','#f7cd67','#e59266','#889df0','#fc736d','#8ac68a','#b77dee','#d1da49','#e18c6f'];
+    var html='';
+    var i=0;
+    Object.keys(APH.Colony.list()).forEach(function(bid){
+      if(bid==='bl_landing_pad') return;
+      var def=APH.Colony.get(bid);
+      var n=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
+      var afford=s.meta.research>=def.cost, notMax=n<def.max;
+      var ok=afford&&notMax;
+      var col=colors[i%colors.length]; i++;
+      var countTxt=n+'/'+def.max;
+      html+='<div data-bid="'+bid+'" style="cursor:'+(ok?'pointer':'not-allowed')+';'+
+        'opacity:'+(ok?1:.45)+';background:'+col+';border-radius:18px;padding:14px 16px;'+
+        'border:2px solid #fff;box-shadow:0 3px 10px rgba(61,52,40,.1);transition:all .25s cubic-bezier(.4,0,.2,1)" '+
+        'onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'+
+        '<b style="color:#fff;font-size:14px;text-shadow:0 1px 2px rgba(61,52,40,.3)">'+def.name+'</b>'+
+        '<span style="float:right;color:#fff;font-size:11px">'+countTxt+'</span><br>'+
+        '<span style="display:inline-block;background:#f7f3df;color:#794f27;border-radius:50px;'+
+        'padding:2px 10px;font-size:11px;font-weight:700;margin-top:6px">'+def.cost+' 研究点</span>'+
+        '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
+        'padding:2px 10px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>'+
+        '<div style="color:rgba(255,255,255,.92);font-size:11px;margin-top:6px;line-height:1.5">'+def.desc+'</div>'+
+        (ok?'':'<div style="color:#fff;font-size:10px;margin-top:4px;font-weight:700">'+
+          (afford?'已达数量上限':'研究点不足')+'</div>')+
+        '</div>';
+    });
+    document.getElementById('bpGrid').innerHTML=html;
+    /* 点击卡片 → 进入放置模式 */
+    Array.prototype.forEach.call(document.getElementById('bpGrid').children,function(card){
+      card.addEventListener('click',function(){
+        var bid=card.getAttribute('data-bid');
+        var def=APH.Colony.get(bid);
+        var n=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
+        if(s.meta.research<def.cost||n>=def.max) return;
+        s.buildMode=bid;
+        document.getElementById('buildPanel').style.display='none';
+        APH.UI.setHint('建造: '+def.name+' — 点击空地放置');
+      });
+    });
   }
 
   /* ================= U8 居民名册 ================= */
