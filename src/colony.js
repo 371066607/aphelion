@@ -196,20 +196,34 @@ APH.Colony = (function(){
   }
 
 
-  /* ---------- Task2: 建造队列(纯函数) ----------
-     并行上限3; 顺序完工。q项 {bid,x,y,remain}。
-     返回 {queue:剩余, done:[{bid,x,y}]} */
-  function queueTick(queue, dt){
+  /* ---------- Task2(v2): 建造队列——蓝图需人物到场施工 ----------
+     q项 {bid,x,y,total,progress}
+     只有玩家站在蓝图旁(<90px)进度才增长; builderBonus=建造专长加成。 */
+  function queueTick(queue, dt, playerNearPos, builderBonus){
+    var bonus = 1 + (builderBonus||0);
+    var out = [];
     var done = [];
-    var active = 0;
-    var out = queue.map(function(item){
-      if (active >= 3) return item;
-      active++;
-      var r = item.remain - dt;
-      if (r <= 0){ done.push({bid:item.bid,x:item.x,y:item.y}); return null; }
-      return Object.assign({}, item, {remain:r});
-    }).filter(Boolean);
+    queue.forEach(function(item){
+      item = Object.assign({}, item);
+      var near = playerNearPos &&
+                 U.dst(playerNearPos.x, playerNearPos.y, item.x, item.y) < 90;
+      if (near){
+        item.progress = Math.min(1, (item.progress||0) + dt*bonus/item.total);
+        item.building = true;
+      }else{
+        item.building = false;
+      }
+      if ((item.progress||0) >= 1) done.push({bid:item.bid,x:item.x,y:item.y});
+      else out.push(item);
+    });
     return { queue: out, done: done };
+  }
+
+  /* 建造专长加成系数: 最高建造技能×0.15 */
+  function builderBonusOf(residents){
+    return residents.reduce(function(a,r){
+      return Math.max(a,(r.skills&&r.skills.sk_build)||0);
+    },0)*0.15;
   }
 
   /* ---------- 科技树 v1 (ADR-9: te_ 前缀; 消耗研究点) ----------
@@ -253,6 +267,7 @@ APH.Colony = (function(){
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf,
+    builderBonusOf:builderBonusOf,
     upgradeCost:upgradeCost, canUpgrade:canUpgrade,
     mineOutput:mineOutput, labOutput:labOutput,
     ensurePad:ensurePad,

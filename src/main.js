@@ -436,14 +436,36 @@ window.APH = window.APH || {};
     var bb=document.getElementById('buildBtn');
     if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
 
-    /* Task2: 建造队列推进 */
+    /* Task2v2: 建造队列——蓝图需玩家到场施工 */
     if(s.colony.buildQueue && s.colony.buildQueue.length){
-      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt);
+      var bb=APH.Colony.builderBonusOf(s.meta.residents||[]);
+      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt,
+        {x:s.px,y:s.py}, bb);
       s.colony.buildQueue=qr.queue;
+      /* 施工粒子: 正在施工的蓝图冒尘 */
+      s.colony.buildQueue.forEach(function(q){
+        if(q.building && Math.random()<dt*6){
+          s.parts.push({t:'dust',x:q.x+U.rr(-20,20),y:q.y+U.rr(-10,10),life:.5,max:.5});
+        }
+      });
+      /* 同步蓝图实体进度 */
+      s.colony.buildQueue.forEach(function(q){
+        s.entities.forEach(function(en){
+          if(en.type===T.BLUEPRINT && en.bid===q.bid &&
+             Math.abs(en.x-q.x)<2 && Math.abs(en.y-q.y)<2){
+            en.progress=q.progress||0; en.building=q.building;
+          }
+        });
+      });
       qr.done.forEach(function(d){
         var b={id:d.bid,x:d.x,y:d.y,lv:1};
         s.colony.buildings.push(b);
-        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,b.lv);
+        /* 移除对应蓝图实体 */
+        s.entities=s.entities.filter(function(en){
+          return !(en.type===T.BLUEPRINT&&en.bid===d.bid&&
+                   Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2);
+        });
+        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
         var justBuilt=s.entities[s.entities.length-1];
         if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
         saveColony();
@@ -735,6 +757,7 @@ window.APH = window.APH || {};
       projectile:function(e,t){ APH.Ent.drawProj(e,t); },
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -805,6 +828,7 @@ window.APH = window.APH || {};
       projectile:function(e,t){},
       dropped:function(e,t){},
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -843,7 +867,7 @@ window.APH = window.APH || {};
     /* Task2: 进入建造队列(工期), 完工后由 updateHome 放置实体 */
     s.colony.buildQueue = s.colony.buildQueue||[];
     s.colony.buildQueue.push({bid:bid,x:Math.round(wx),y:Math.round(wy),
-                              remain:def.buildTime||0});
+                              total:def.buildTime||5, progress:0});
     APH.Save.saveMeta(s.meta);
     saveColony();
     U.emit('queued',{id:bid});

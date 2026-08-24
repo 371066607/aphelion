@@ -57,27 +57,26 @@ test('buyTech: 扣费+升级+效果由applyTech解释(数据分离)', () => {
   if(!r2.owned.te_weaponry) throw new Error('独立计数失效');
 });
 
-test('buildQueue: 工期推进与完工出队', () => {
-  let q = [{bid:'bl_mine',x:600,y:600,remain:20}];
-  q = Colony.queueTick(q, 10).queue;
-  if (q[0].remain !== 10) throw new Error('应剩10: '+q[0].remain);
-  const r = Colony.queueTick(q, 12);
-  if (r.queue.length !== 0) throw new Error('应完工出队');
-  if (r.done.length!==1 || r.done[0].bid!=='bl_mine') throw new Error('done应含采矿机');
+test('buildQueue v2: 玩家在场进度增长', () => {
+  let q=[{bid:'bl_mine',x:600,y:600,total:20,progress:0}];
+  const r=Colony.queueTick(q, 2, {x:610,y:610}, 0);   // 玩家在旁
+  if (r.done.length!==0) throw new Error('不应完工');
 });
-test('buildQueue: 并行内同时推进', () => {
-  const r = Colony.queueTick([
-    {bid:'bl_lab', x:500,y:500, remain:5},
-    {bid:'bl_mine',x:700,y:700, remain:5},
-  ], 5);
-  if (r.done.length!==2) throw new Error('并行3内应同时完工2项: '+r.done.length);
+test('buildQueue v2: 玩家离开进度冻结', () => {
+  let q=[{bid:'bl_mine',x:600,y:600,total:20,progress:0.5}];
+  const r=Colony.queueTick(q, 5, {x:2000,y:2000}, 0);  // 玩家远离
+  if (r.queue[0].progress !== 0.5) throw new Error('离场进度应冻结');
+  if (r.queue[0].building !== false) throw new Error('building应为false');
 });
-test('buildQueue: 并行上限3(第4项不推进)', () => {
-  const r = Colony.queueTick([
-    {bid:'bl_mine',remain:9},{bid:'bl_mine',remain:9},
-    {bid:'bl_mine',remain:9},{bid:'bl_mine',remain:9},
-  ], 1);
-  if (r.queue[3].remain !== 9) throw new Error('第4项不应推进: '+r.queue[3].remain);
+test('buildQueue v2: 进度满完工出队', () => {
+  let q=[{bid:'bl_mine',x:600,y:600,total:20,progress:0.9}];
+  const r=Colony.queueTick(q, 5, {x:605,y:605}, 0);
+  if (r.done.length!==1 || r.done[0].bid!=='bl_mine') throw new Error('应完工');
+});
+test('builderBonusOf: 最高建造技能×0.15', () => {
+  const a={skills:{sk_build:4}}, b={skills:{sk_build:8}};
+  if (Colony.builderBonusOf([a])!==0.6) throw new Error('技能4→0.6');
+  if (Colony.builderBonusOf([a,b])!==1.2) throw new Error('取最高8→1.2');
 });
 
 test('canUpgrade: 费用与上限校验', () => {

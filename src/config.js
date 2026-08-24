@@ -109,6 +109,7 @@ APH.CFG = {
     SOLDIER: 'soldier',
     PROJECTILE: 'projectile',
     DROPPED: 'dropped',
+    BLUEPRINT: 'blueprint',
   },
 
   /* 存档 */
