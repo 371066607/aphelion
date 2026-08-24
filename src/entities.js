@@ -73,6 +73,25 @@ APH.Ent = (function(){
     ctx.fillStyle='rgba(0,0,0,.32)';
     ctx.beginPath(); ctx.ellipse(1,4,s*1.15,s*.55,0,0,U.TAU); ctx.fill();
 
+    /* N2: 敌人8帧序列帧(idle/move/attack/hurt/death), 士兵不适用 */
+    var factionSheet = {fx_maw:'enemy_lighteater', fx_spit:'enemy_acidsplitter',
+                        fx_bulwark:'enemy_siloshell'}[e.faction.id]||'';
+    var sheetName = e.isSoldier ? '' : factionSheet;
+    if (!e.isSoldier && window.APH.Sprites && APH.Sprites.isReady(sheetName)){
+      var st;
+      if (e.dead)                    st=7;                       // death
+      else if (e.hitFlash>0)         st=6;                       // hurt
+      else if (e.atkT>0)             st=(Math.floor(time*14)%2)+4; // attack 4-5
+      else if (e.moving)             st=(Math.floor(e.walkPh/Math.PI)%2)+2; // move 2-3
+      else                           st=Math.floor(time*3)%2;    // idle 0-1
+      var sc2 = s*2.9/128 * (e.geneJit?1:1);
+      ctx.translate(-s*1.45,-s*2.4);
+      APH.Sprites.draw(ctx, sheetName, 0, 0, st, sc2);
+      ctx.globalAlpha=1;
+      ctx.restore();
+      return;
+    }
+
     /* 肢(步态摆动) */
     ctx.strokeStyle=colD; ctx.lineWidth=2.2; ctx.lineCap='round';
     for(var l=0;l<g.limbs;l++){

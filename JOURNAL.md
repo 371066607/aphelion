@@ -160,3 +160,7 @@
   sprites.js新增drawPlayerFrame专用接口; drawPlayer接入: 保留蓝圈/影子/iFrame闪烁,
   由s.face弧度换算四向, walkPh驱动迈步帧; 无图回退程序化小人。无头Chrome验证精细宇航员渲染✓。
   构建1144KB; 90单元+8场景全绿。
+
+- **19:02 · 班次**: ✅N2 敌人三阵营8帧序列帧接入。
+  噬光群囊/酸吐者/硅壳壁垒各8帧(idle×2/move×2/attack×2/hurt/death), 按状态选帧。
+  faction.id→sheet名映射; 士兵保持程序化暖橙配色。建筑8帧重生成batch4后台进行中(用户要求全部8帧)。

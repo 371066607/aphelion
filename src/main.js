@@ -1144,9 +1144,13 @@ window.APH = window.APH || {};
           /* 2列x4行角色行走表 */
           APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:2, rows:4,
                                      count:8, fps:6, loop:true });
+        }else if (name.indexOf('enemy_')===0){
+          /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death) */
+          APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
+                                     count:8, fps:7, loop:true });
         }else{
-          APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:4, rows:1,
-                                     count:4, fps:5, loop:true });
+          APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
+                                     count:8, fps:6, loop:true });
         }
       });
       APH.Sprites.loadAll();
