@@ -100,3 +100,13 @@ test('productionTick: 消费建筑等级', () => {
   Colony.productionTick(meta,[{id:'bl_mine',lv:3},{id:'bl_lab'}]);
   if(meta.res.mineral!==6||meta.research!==1) throw new Error('等级产出未生效');
 });
+
+test('housingCapacity: 基础2+房3×lv+医疗1', () => {
+  if (Colony.housingCapacity([]) !== 2) throw new Error('空=2');
+  const cap = Colony.housingCapacity([{id:'bl_house',lv:1},{id:'bl_clinic'}]);
+  if (cap !== 6) throw new Error('应6: '+cap);
+});
+test('refundOf: 半价退款, 发射台不可拆', () => {
+  if (Colony.refundOf(Colony.get('bl_mine')) !== 22) throw new Error('45半价=22');
+  if (Colony.refundOf(Colony.get('bl_landing_pad')) !== 0) throw new Error('pad不可拆');
+});

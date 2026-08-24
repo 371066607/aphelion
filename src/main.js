@@ -924,6 +924,28 @@ window.APH = window.APH || {};
           }
         }
       }
+      /* X=拆除最近建筑(半价退款, 发射台不可拆) */
+      if(e.code==='KeyX'&&s.mode==='running'&&s.scene==='home'){
+        var bestX=null,bdX=120;
+        s.colony.buildings.forEach(function(b,idx){
+          if(b.id==='bl_landing_pad') return;
+          var d=U.dst(s.px,s.py,b.x,b.y);
+          if(d<bdX){bdX=d;bestX={b:b,idx:idx};}
+        });
+        if(!bestX){ APH.UI.floatText('附近没有可拆除的建筑','#8fa3cc'); }
+        else{
+          var def3=APH.Colony.get(bestX.b.id);
+          var refund=APH.Colony.refundOf(def3);
+          s.meta.research+=refund;
+          s.colony.buildings.splice(bestX.idx,1);
+          s.entities=s.entities.filter(function(en){
+            return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
+          });
+          APH.Save.saveMeta(s.meta); saveColony();
+          APH.UI.floatText('🧨 '+def3.name+' 已拆除 (+'+refund+'研究点)','#ffc857');
+          U.emit('demolished',{id:bestX.b.id});
+        }
+      }
       /* C=相机锁定: 角色永远钉在屏幕正中(关闭lookAhead平滑) */
       if(e.code==='KeyC'){ s.strictCam=!s.strictCam;
         APH.UI.floatText(s.strictCam?'📷 相机锁定(角色恒居中)':'📷 相机平滑跟随','#59d9ff'); }
@@ -1317,8 +1339,7 @@ window.APH = window.APH || {};
 
   /* ================= P6 居民系统 ================= */
   function housingCap(){
-    /* 住宅容量: 居住舱本体2席, 医疗舱每座+1(临时设计, 后续住宅建筑扩展) */
-    return 2 + APH.state.colony.buildings.filter(function(b){return b.id==='bl_clinic';}).length;
+    return APH.Colony.housingCapacity(APH.state.colony.buildings);
   }
   function residentsTick(){
     var s=APH.state, m=s.meta;
