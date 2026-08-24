@@ -2502,14 +2502,12 @@ APH.Ent = (function(){
         /* 白天混30%融合版柔化, 夜晚全量 */
         ctx.save();
         ctx.globalAlpha = dL>0.85 ? 0.3 : Math.min(1, (0.85-dL)/0.85*1.15);
-        var sc2 = szS*2.9/128;
-        var fw2=128*sc2, fh2=128*sc2;
         var pos2 = APH.Sprites.framePos(defS, frame);
         ctx.drawImage(tinted, pos2.sx, pos2.sy, 128, 128,
-          e.x-fw2/2, (e.y+6)-fh2*0.9, fw2, fh2);
+          e.x-64, (e.y+6)-105, 128, 128);
         ctx.restore();
       } else {
-        APH.Sprites.draw(ctx, e.bid, e.x, e.y+6, frame, szS*2.9/128);
+        APH.Sprites.draw(ctx, e.bid, e.x, e.y+6, frame, 1.0);
       }
       return;
     }
