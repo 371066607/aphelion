@@ -2602,66 +2602,7 @@ APH.Ent = (function(){
   }
 
   /* 建筑绘制(殖民地/远征通用) */
-  function drawBuilding(b, time){
-    var def = b.def || {name:'?',size:44};
-    var s2 = def.size;
-    ctx.save();
-    ctx.translate(b.x,b.y);
-    /* 影子 */
-    ctx.fillStyle='rgba(0,0,0,.32)';
-    ctx.beginPath(); ctx.ellipse(3,s2*.28,s2*.62,s2*.3,0,0,U.TAU); ctx.fill();
-
-    if(b.bid==='bl_landing_pad'){
-      /* 发射台: 大平台 + 指引灯 */
-      var pul=.5+.5*Math.sin(time*2.4);
-      ctx.fillStyle='#232c42';
-      ctx.beginPath(); ctx.ellipse(0,0,s2*.85,s2*.5,0,0,U.TAU); ctx.fill();
-      ctx.strokeStyle='rgba(255,200,87,'+(.45+pul*.4)+')';
-      ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0,0,s2*.7,s2*.38,0,0,U.TAU); ctx.stroke();
-      for(var i=0;i<4;i++){
-        var a=i/4*U.TAU+.6;
-        ctx.fillStyle='rgba(255,200,87,'+(.5+pul*.5)+')';
-        ctx.beginPath();
-        ctx.arc(Math.cos(a)*s2*.68,Math.sin(a)*s2*.36,2.6,0,U.TAU); ctx.fill();
-      }
-      ctx.fillStyle='#39435c'; ctx.fillRect(-3,-s2*1.1,6,s2*1.1);
-      ctx.fillStyle=(Math.sin(time*3)>0)?'#7dffab':'#2a4a35';
-      ctx.beginPath(); ctx.arc(0,-s2*1.15,3.4,0,U.TAU); ctx.fill();
-    }else{
-      /* 通用小屋: 基座+穹顶+类别色带 */
-      var hue={ bl_warehouse:35, bl_mine:200, bl_lab:280, bl_barracks:0,
-                bl_turret:120, bl_clinic:160 }[b.bid]||50;
-      var bg=ctx.createRadialGradient(-s2*.2,-s2*.25,3,0,0,s2*.65);
-      bg.addColorStop(0,'#e8ecf5'); bg.addColorStop(1,'#a8b2c8');
-      ctx.fillStyle=bg;
-      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.fill();
-      ctx.strokeStyle='hsl('+hue+',70%,60%)'; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.ellipse(0,0,s2*.55,s2*.42,0,0,U.TAU); ctx.stroke();
-      /* 类别标记 */
-      ctx.fillStyle='hsl('+hue+',75%,65%)';
-      if(b.bid==='bl_turret'){
-        ctx.fillRect(-2.5,-s2*.75,5,s2*.5);
-        ctx.beginPath(); ctx.arc(0,-s2*.72,4.5,0,U.TAU); ctx.fill();
-      }else{
-        ctx.beginPath(); ctx.arc(0,-s2*.1,4.5,0,U.TAU); ctx.fill();
-      }
-      /* 窗灯 */
-      ctx.fillStyle='rgba(255,233,196,'+(.7+.3*Math.sin(time*2+b.x))+')';
-      ctx.beginPath(); ctx.arc(s2*.22,-s2*.05,2.4,0,U.TAU); ctx.fill();
-    }
-    ctx.restore();
-    /* 建造模式提示名 */
-    if(APH.state.buildMode){
-      ctx.save();
-      ctx.fillStyle='rgba(160,180,220,.75)';
-      ctx.font='10px sans-serif'; ctx.textAlign='center';
-      ctx.fillText(def.name,b.x,b.y-s2*.8);
-      ctx.restore();
-    }
-  }
-
-  return {
+    return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
