@@ -402,9 +402,23 @@ APH.Ent = (function(){
         ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
       }
       var defS = APH.Sprites.sheetDef(e.bid);
-      APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
-        APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time),
-        szS*2.9/128);
+      var frame = APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time);
+      /* 环境融合: 白天原版; 越暗越用降饱和tint版(消"贴纸感") */
+      var dL = APH.World.daylight ? APH.World.daylight() : 1;
+      var tinted = APH.Sprites.getTinted(e.bid);
+      if (tinted){
+        /* 白天混30%融合版柔化, 夜晚全量 */
+        ctx.save();
+        ctx.globalAlpha = dL>0.85 ? 0.3 : Math.min(1, (0.85-dL)/0.85*1.15);
+        var sc2 = szS*2.9/128;
+        var fw2=128*sc2, fh2=128*sc2;
+        var pos2 = APH.Sprites.framePos(defS, frame);
+        ctx.drawImage(tinted, pos2.sx, pos2.sy, 128, 128,
+          e.x-fw2/2, (e.y+6)-fh2*0.9, fw2, fh2);
+        ctx.restore();
+      } else {
+        APH.Sprites.draw(ctx, e.bid, e.x, e.y+6, frame, szS*2.9/128);
+      }
       return;
     }
     /* Task4: 防御炮塔——底座+可旋转炮管 */

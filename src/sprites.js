@@ -17,6 +17,7 @@ APH.Sprites = (function(){
   var SHEETS = {};          // name -> def {src,fw,fh,cols,rows,count,fps,loop}
   var IMAGES = {};          // name -> HTMLImageElement | null
   var readyCount = 0;
+  var TINTED = {};                    // name -> 环境融合版canvas
 
   function define(name, def){
     SHEETS[name] = {
@@ -43,18 +44,32 @@ APH.Sprites = (function(){
       var img = new Image();
       img.onload = function(){
         /* 强制完整解码后再标记ready, 避免首帧drawImage画出半解码白条 */
-        if (img.decode) {
-          img.decode().then(function(){
-            IMAGES[name] = img;
-            if (--pending <= 0 && onReady) onReady();
-          }).catch(function(){
-            IMAGES[name] = null;
-            if (--pending <= 0 && onReady) onReady();
-          });
-        } else {
+        var done = function(){ if(--pending<=0 && onReady) onReady(); };
+        var finish = function(){
+          /* 预烘焙"环境融合版": 降饱和35%+暗青tint, 用于夜晚/远景 */
+          try{
+            var c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+            var g=c.getContext('2d');
+            g.drawImage(img,0,0);
+            var id=g.getImageData(0,0,c.width,c.height), px=id.data;
+            for(var i=0;i<px.length;i+=4){
+              if(px[i+3]<8) continue;
+              var lum=px[i]*.3+px[i+1]*.59+px[i+2]*.11;
+              px[i]  =Math.round(px[i]  *.62+lum*.22+6);   // 降饱和+暗部偏绿
+              px[i+1]=Math.round(px[i+1]*.62+lum*.26+10);
+              px[i+2]=Math.round(px[i+2]*.62+lum*.22+14);
+            }
+            g.putImageData(id,0,0);
+            TINTED[name]=c;
+          }catch(e){ /* 跨域等异常忽略 */ }
           IMAGES[name] = img;
-          if (--pending <= 0 && onReady) onReady();
-        }
+          done();
+        };
+        if (img.decode) {
+          img.decode().then(finish).catch(function(){
+            IMAGES[name] = null; done();
+          });
+        } else { finish(); }
       };
       img.onerror = function(){
         IMAGES[name] = null;               // 标记失败, isReady 返回 false
@@ -129,6 +144,7 @@ APH.Sprites = (function(){
     define:define, loadAll:loadAll, isReady:isReady, allRegistered:allRegistered,
     framePos:framePos, advance:advance, frameAt:frameAt,
     draw:draw, drawPlayerFrame:drawPlayerFrame, sheetDef:sheetDef,
+    getTinted:function(n){ return TINTED[n]; },
     _images:IMAGES,
   };
 })();
