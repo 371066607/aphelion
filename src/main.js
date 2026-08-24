@@ -593,6 +593,17 @@ window.APH = window.APH || {};
   /* ================= 主循环 ================= */
   var lastT=performance.now(), tickN=0;
   function frame(now){
+    try{
+      _frameBody(now);
+    }catch(err){
+      /* 帧异常自愈: 记录并继续下一帧(防一条坏帧杀死整个rAF链) */
+      frameErrors=(frameErrors||0)+1;
+      console.error('[frame]',frameErrors,err.message,err.stack&&err.stack.split('\n')[1]);
+      if(frameErrors>200){ throw err; }   // 死循环保护
+      lastT=now;                          // 重置时钟防dt爆冲
+    }
+  }
+  function _frameBody(now){
     requestAnimationFrame(frame);
     tickN++;
     if(tickN%30===0){

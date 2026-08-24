@@ -235,6 +235,11 @@ APH.Ent = (function(){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
     ctx.save(); ctx.translate(e.x,e.y);
+    /* T12 玩家高可见度: 脚下呼吸光圈(任何背景下都能一眼找到角色) */
+    var pulse=0.35+0.3*Math.sin(time*3);
+    ctx.strokeStyle='rgba(89,217,255,'+(pulse*0.8)+')';
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(0,4,16+pulse*3,8+pulse*1.5,0,0,U.TAU); ctx.stroke();
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
     ctx.translate(0,-bobbing);
@@ -262,6 +267,12 @@ APH.Ent = (function(){
     ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
     ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
     ctx.stroke();
+    /* T12 头顶浮动三角(你在这里) */
+    ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
+    var ty=-38-Math.sin(time*3)*2.5;
+    ctx.beginPath();
+    ctx.moveTo(0,ty); ctx.lineTo(-5,ty-7); ctx.lineTo(5,ty-7);
+    ctx.closePath(); ctx.fill();
     ctx.globalAlpha=1;
     ctx.restore();
   }

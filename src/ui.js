@@ -140,8 +140,9 @@ APH.UI = (function(){
     if(document.getElementById('probeRun')) return;
     var pb=document.createElement('button');
     pb.id='probeRun';
-    pb.style.cssText='position:fixed;bottom:8px;right:10px;z-index:50;background:#0c1220;'+
-      'border:1px solid #223252;color:#6f84ab;font-size:11px;padding:4px 9px;border-radius:7px;';
+    pb.style.cssText='position:fixed;bottom:8px;left:10px;z-index:50;background:rgba(12,18,32,.55);'+
+      'border:1px solid rgba(34,50,82,.6);color:#4a5b7d;font-size:10px;padding:3px 8px;border-radius:7px;'+
+      'pointer-events:none;';
     pb.textContent='● 0s';
     document.body.appendChild(pb);
     probeT=setInterval(function(){
