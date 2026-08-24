@@ -385,6 +385,9 @@ APH.Ent = (function(){
     }
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
+      if(APH.state.debugMark){ ctx.save(); ctx.strokeStyle='#ff2222'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.moveTo(e.x-30,e.y-30); ctx.lineTo(e.x+30,e.y+30);
+        ctx.moveTo(e.x+30,e.y-30); ctx.lineTo(e.x-30,e.y+30); ctx.stroke(); ctx.restore(); }
       var szS=(e.def&&e.def.size)||44;
       /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -401,9 +404,10 @@ APH.Ent = (function(){
         ctx.lineWidth=3;
         ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
       }
+      var defS = APH.Sprites.sheetDef(e.bid);
       APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
-        APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
-        szS*2.8/128);
+        APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time),
+        szS*2.9/128);
       return;
     }
     /* Task4: 防御炮塔——底座+可旋转炮管 */
@@ -433,6 +437,8 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    if(APH.state.debugMark){ ctx.save(); ctx.fillStyle='#22ff22';
+      ctx.beginPath(); ctx.arc(e.x,e.y-40,10,0,U.TAU); ctx.fill(); ctx.restore(); }
     /* 通用建筑: 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;

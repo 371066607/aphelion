@@ -2475,6 +2475,9 @@ APH.Ent = (function(){
     }
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
+      if(APH.state.debugMark){ ctx.save(); ctx.strokeStyle='#ff2222'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.moveTo(e.x-30,e.y-30); ctx.lineTo(e.x+30,e.y+30);
+        ctx.moveTo(e.x+30,e.y-30); ctx.lineTo(e.x-30,e.y+30); ctx.stroke(); ctx.restore(); }
       var szS=(e.def&&e.def.size)||44;
       /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -2491,9 +2494,10 @@ APH.Ent = (function(){
         ctx.lineWidth=3;
         ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
       }
+      var defS = APH.Sprites.sheetDef(e.bid);
       APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
-        APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
-        szS*2.8/128);
+        APH.Sprites.frameAt({fps:6,count:(defS&&defS.count)||8,loop:true}, time),
+        szS*2.9/128);
       return;
     }
     /* Task4: 防御炮塔——底座+可旋转炮管 */
@@ -2523,6 +2527,8 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    if(APH.state.debugMark){ ctx.save(); ctx.fillStyle='#22ff22';
+      ctx.beginPath(); ctx.arc(e.x,e.y-40,10,0,U.TAU); ctx.fill(); ctx.restore(); }
     /* 通用建筑: 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;
@@ -2852,6 +2858,7 @@ APH.Sprites = (function(){
       img.src = d.src;
     });
   }
+  function sheetDef(name){ return SHEETS[name]; }
   function isReady(name){
     var d = SHEETS[name];
     if (!d) return false;
@@ -2916,7 +2923,7 @@ APH.Sprites = (function(){
   return {
     define:define, loadAll:loadAll, isReady:isReady, allRegistered:allRegistered,
     framePos:framePos, advance:advance, frameAt:frameAt,
-    draw:draw, drawPlayerFrame:drawPlayerFrame,
+    draw:draw, drawPlayerFrame:drawPlayerFrame, sheetDef:sheetDef,
     _images:IMAGES,
   };
 })();
@@ -4274,10 +4281,11 @@ window.APH = window.APH || {};
         startGame();
         /* 仅诊断(?debugmark): 自动放一座采矿机验证sprite渲染 */
         if(_q.indexOf('debugmark')>=0){
-          var px2=s.px+60, py2=s.py-40;
-          s.colony.buildings.push({id:'bl_mine',x:px2,y:py2,lv:1});
-          APH.Colony.placeBuildingEntity('bl_mine',px2,py2);
-          document.title='AUTO: started +mine';
+          [['bl_mine',60,-40],['bl_farm',-70,-30],['bl_house',90,40],['bl_lab',-60,80]].forEach(function(it){
+            s.colony.buildings.push({id:it[0],x:s.px+it[1],y:s.py+it[2],lv:1});
+            APH.Colony.placeBuildingEntity(it[0],s.px+it[1],s.py+it[2],1);
+          });
+          document.title='AUTO: started +4bldg';
           /* 屏幕空间自检: 固定坐标画帧0, 排除世界变换干扰 */
           setTimeout(function(){
             var c2=document.getElementById('cv').getContext('2d');

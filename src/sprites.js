@@ -53,6 +53,7 @@ APH.Sprites = (function(){
       img.src = d.src;
     });
   }
+  function sheetDef(name){ return SHEETS[name]; }
   function isReady(name){
     var d = SHEETS[name];
     if (!d) return false;
@@ -117,7 +118,7 @@ APH.Sprites = (function(){
   return {
     define:define, loadAll:loadAll, isReady:isReady, allRegistered:allRegistered,
     framePos:framePos, advance:advance, frameAt:frameAt,
-    draw:draw, drawPlayerFrame:drawPlayerFrame,
+    draw:draw, drawPlayerFrame:drawPlayerFrame, sheetDef:sheetDef,
     _images:IMAGES,
   };
 })();

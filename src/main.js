@@ -1186,10 +1186,11 @@ window.APH = window.APH || {};
         startGame();
         /* 仅诊断(?debugmark): 自动放一座采矿机验证sprite渲染 */
         if(_q.indexOf('debugmark')>=0){
-          var px2=s.px+60, py2=s.py-40;
-          s.colony.buildings.push({id:'bl_mine',x:px2,y:py2,lv:1});
-          APH.Colony.placeBuildingEntity('bl_mine',px2,py2);
-          document.title='AUTO: started +mine';
+          [['bl_mine',60,-40],['bl_farm',-70,-30],['bl_house',90,40],['bl_lab',-60,80]].forEach(function(it){
+            s.colony.buildings.push({id:it[0],x:s.px+it[1],y:s.py+it[2],lv:1});
+            APH.Colony.placeBuildingEntity(it[0],s.px+it[1],s.py+it[2],1);
+          });
+          document.title='AUTO: started +4bldg';
           /* 屏幕空间自检: 固定坐标画帧0, 排除世界变换干扰 */
           setTimeout(function(){
             var c2=document.getElementById('cv').getContext('2d');
