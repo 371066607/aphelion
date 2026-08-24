@@ -184,3 +184,15 @@
   全链路自动化检查: 14/14 sprite加载✓ / 零页面错误✓ / home→expedition切换✓ /
   敌人8帧sprite渲染确认(紫色噬光群囊: 小黄眼+触须)✓ / 玩家行走sprite✓。
   QA脚本存档/tmp/qa_enemy_test.py(CDP直连模式可复用)。
+
+- **22:32 · 事故复盘**: 用户指出"贴图是什么玩意"——
+  像素比对发现 batch4(bash关联数组版)生成的 farm/house/pad 等多张sheet内容几乎相同(均色差仅2.3/255),
+  全是"圆形平台塔楼"而非各自建筑! 根因: bash的declare -A在tee管道子shell中变量展开失败,
+  所有prompt退化成相同内容。codex照单全收。
+  修复: 改用python逐张调用(/tmp/regen_sprites.py), 后台重生成中。batch4全部作废。
+
+- **23:16 · 贴图事故修复完成**: batch4作废根因=bash关联数组
+  在管道子shell中展开失败→10张prompt相同→生成10张"发射台"变体。改用python逐张调用
+  (/tmp/regen_sprites.py)重生成全部10张, MD5唯一性校验通过(无重复)。
+  CDP终验: 采矿车(钻头+尾烟)/温室农场(绿植穹顶)/居住舱(冒烟小屋)/实验室(望远镜圆顶)
+  全部正确渲染, 精致卡通风格。构建1452KB; 全量回归绿。
