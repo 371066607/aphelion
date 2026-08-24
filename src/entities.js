@@ -247,6 +247,22 @@ APH.Ent = (function(){
     }
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
+    /* N1: 行走序列帧渲染(2列x4行表; 无图回退程序化小人) */
+    if (window.APH.Sprites && APH.Sprites.isReady('player_walk')){
+      /* 由 s.face 弧度换算四向: 右0/下π/2/左±π/上-π/2 → 行号 下0/左1/右2/上3 */
+      var ang=(s.face!==undefined)?s.face:Math.PI/2;
+      var dirIdx=0;
+      var c=Math.cos(ang), si=Math.sin(ang);
+      if(Math.abs(c)>=Math.abs(si)) dirIdx = (c>=0)?2:1;    // 右2 / 左1
+      else dirIdx = (si>=0)?0:3;                            // 下0 / 上3
+      var stepIdx = e.moving ? (Math.floor(e.walkPh/Math.PI)%2===0?1:0) : 0;
+      var sc = 34/128*2.6;                              // 显示高约88px→实际~46px
+      ctx.translate(-22,-bobbing);
+      APH.Sprites.drawPlayerFrame(ctx,'player_walk',dirIdx,stepIdx,0,0,sc);
+      ctx.globalAlpha=1;
+      ctx.restore();
+      return;
+    }
     ctx.translate(0,-bobbing);
     /* 受击无敌帧闪烁 */
     if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;

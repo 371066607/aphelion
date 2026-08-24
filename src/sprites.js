@@ -92,6 +92,16 @@ APH.Sprites = (function(){
 
   /* ---------- 绘制 ---------- */
   /* 以底部中心为锚点画第 index 帧, scale 控制显示大小 */
+  /* 玩家专用: 2列x4行布局。dir 0=下1=左2=右3=上; step 0=站立1=迈步 */
+  function drawPlayerFrame(g, name, dir, step, x, y, scale){
+    var img = IMAGES[name];
+    if (!img || !img.width) return false;
+    var fw = img.width/2, fh = img.height/4;
+    var sx = (step?1:0)*fw, sy = dir*fh;
+    g.drawImage(img, sx, sy, fw, fh, x, y, fw*scale, fh*scale);
+    return true;
+  }
+
   function draw(ctx2d, name, x, y, index, scale){
     var d = SHEETS[name], img = IMAGES[name];
     if (!d || !img) return false;
@@ -107,7 +117,7 @@ APH.Sprites = (function(){
   return {
     define:define, loadAll:loadAll, isReady:isReady, allRegistered:allRegistered,
     framePos:framePos, advance:advance, frameAt:frameAt,
-    draw:draw,
+    draw:draw, drawPlayerFrame:drawPlayerFrame,
     _images:IMAGES,
   };
 })();

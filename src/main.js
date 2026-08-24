@@ -1140,8 +1140,14 @@ window.APH = window.APH || {};
       /* M1 序列帧注册与异步加载 */
       var SD = window.APH.SPRITE_DATA || {};
       Object.keys(SD).forEach(function(name){
-        APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:4, rows:1,
-                                   count:4, fps:5, loop:true });
+        if (name==='player_walk'){
+          /* 2列x4行角色行走表 */
+          APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:2, rows:4,
+                                     count:8, fps:6, loop:true });
+        }else{
+          APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:4, rows:1,
+                                     count:4, fps:5, loop:true });
+        }
       });
       APH.Sprites.loadAll();
       /* 常驻诊断角标(左上小字): 相机与玩家屏幕坐标实时可见 */
