@@ -141,6 +141,12 @@ APH.World = (function(){
       else if(e.type === 'crystal' && !e.taken) hole(e.x, e.y-8, 42, .5);
     });
     g.globalCompositeOperation = 'source-over';
+
+    /* Task5+: 建筑自带微光(夜间可见) */
+    (s.colony? s.colony.buildings : []).forEach(function(b){
+      if(b.id==='bl_landing_pad') return;
+      hole(b.x, b.y, 70, .45);
+    });
     ctx.drawImage(darkCv, 0, 0, VW, VH);
   }
 

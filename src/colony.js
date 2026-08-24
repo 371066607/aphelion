@@ -116,12 +116,13 @@ APH.Colony = (function(){
   }
 
   /* ---------- 建筑实体 ---------- */
-  function placeBuildingEntity(bid, x, y){
+  function placeBuildingEntity(bid, x, y, lv){
     var s = APH.state;
     var def = BUILDINGS[bid];
     s.entities.push({
       id:'be_'+bid+'_'+s.colony.buildings.length,
-      type:T.BUILDING, bid:bid, x:x, y:y, def:def,
+      type:T.BUILDING, bid:bid, x:x, y:y, def:def, lv:lv||1,
+      cd:0,
     });
   }
 

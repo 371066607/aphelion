@@ -1006,12 +1006,13 @@ APH.Colony = (function(){
   }
 
   /* ---------- 建筑实体 ---------- */
-  function placeBuildingEntity(bid, x, y){
+  function placeBuildingEntity(bid, x, y, lv){
     var s = APH.state;
     var def = BUILDINGS[bid];
     s.entities.push({
       id:'be_'+bid+'_'+s.colony.buildings.length,
-      type:T.BUILDING, bid:bid, x:x, y:y, def:def,
+      type:T.BUILDING, bid:bid, x:x, y:y, def:def, lv:lv||1,
+      cd:0,
     });
   }
 
@@ -1904,6 +1905,12 @@ APH.World = (function(){
       else if(e.type === 'crystal' && !e.taken) hole(e.x, e.y-8, 42, .5);
     });
     g.globalCompositeOperation = 'source-over';
+
+    /* Task5+: 建筑自带微光(夜间可见) */
+    (s.colony? s.colony.buildings : []).forEach(function(b){
+      if(b.id==='bl_landing_pad') return;
+      hole(b.x, b.y, 70, .45);
+    });
     ctx.drawImage(darkCv, 0, 0, VW, VH);
   }
 
@@ -2414,13 +2421,24 @@ APH.Ent = (function(){
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
       var szS=(e.def&&e.def.size)||44;
+      /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(247,243,223,.28)';
+      ctx.beginPath(); ctx.ellipse(0,6,szS*.72,szS*.36,0,0,U.TAU); ctx.fill();
       ctx.fillStyle='rgba(0,0,0,.32)';
-      ctx.beginPath(); ctx.ellipse(3,5,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(3,7,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
       ctx.restore();
-      APH.Sprites.draw(ctx, e.bid, e.x, e.y+4,
+      /* 建成脉冲: builtT 3秒内金色扩散环 */
+      if(e.builtT!==undefined && e.builtT<3){
+        e.builtT+=0.016;
+        var k=e.builtT/3;
+        ctx.strokeStyle='rgba(255,200,87,'+(1-k)+')';
+        ctx.lineWidth=3;
+        ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
+      }
+      APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
         APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
-        szS*2.4/128);
+        szS*2.8/128);
       return;
     }
     /* 通用建筑: 影子+主体+屋顶灯 */
@@ -3410,9 +3428,11 @@ window.APH = window.APH || {};
       var qr=APH.Colony.queueTick(s.colony.buildQueue, dt);
       s.colony.buildQueue=qr.queue;
       qr.done.forEach(function(d){
-        var b={id:d.bid,x:d.x,y:d.y};
+        var b={id:d.bid,x:d.x,y:d.y,lv:1};
         s.colony.buildings.push(b);
-        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y);
+        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,b.lv);
+        var justBuilt=s.entities[s.entities.length-1];
+        if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
         saveColony();
         U.emit('built',{id:d.bid});
         APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
@@ -4121,6 +4141,13 @@ window.APH = window.APH || {};
           s.colony.buildings.push({id:'bl_mine',x:px2,y:py2,lv:1});
           APH.Colony.placeBuildingEntity('bl_mine',px2,py2);
           document.title='AUTO: started +mine';
+          /* 屏幕空间自检: 固定坐标画帧0, 排除世界变换干扰 */
+          setTimeout(function(){
+            var c2=document.getElementById('cv').getContext('2d');
+            c2.setTransform(1,0,0,1,0,0);
+            window.__sprOk=APH.Sprites.draw(c2,'bl_mine',80,650,0,1.0);
+            document.title+=' spr='+window.__sprOk;
+          },1500);
         }
         var pad0=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
         if(pad0){ s.px=pad0.x; s.py=pad0.y+30; }   // 出生即站在发射台上

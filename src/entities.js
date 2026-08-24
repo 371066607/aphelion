@@ -348,13 +348,24 @@ APH.Ent = (function(){
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
       var szS=(e.def&&e.def.size)||44;
+      /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(247,243,223,.28)';
+      ctx.beginPath(); ctx.ellipse(0,6,szS*.72,szS*.36,0,0,U.TAU); ctx.fill();
       ctx.fillStyle='rgba(0,0,0,.32)';
-      ctx.beginPath(); ctx.ellipse(3,5,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(3,7,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
       ctx.restore();
-      APH.Sprites.draw(ctx, e.bid, e.x, e.y+4,
+      /* 建成脉冲: builtT 3秒内金色扩散环 */
+      if(e.builtT!==undefined && e.builtT<3){
+        e.builtT+=0.016;
+        var k=e.builtT/3;
+        ctx.strokeStyle='rgba(255,200,87,'+(1-k)+')';
+        ctx.lineWidth=3;
+        ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
+      }
+      APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
         APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
-        szS*2.4/128);
+        szS*2.8/128);
       return;
     }
     /* 通用建筑: 影子+主体+屋顶灯 */

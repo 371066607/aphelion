@@ -441,9 +441,11 @@ window.APH = window.APH || {};
       var qr=APH.Colony.queueTick(s.colony.buildQueue, dt);
       s.colony.buildQueue=qr.queue;
       qr.done.forEach(function(d){
-        var b={id:d.bid,x:d.x,y:d.y};
+        var b={id:d.bid,x:d.x,y:d.y,lv:1};
         s.colony.buildings.push(b);
-        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y);
+        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,b.lv);
+        var justBuilt=s.entities[s.entities.length-1];
+        if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
         saveColony();
         U.emit('built',{id:d.bid});
         APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
@@ -1152,6 +1154,13 @@ window.APH = window.APH || {};
           s.colony.buildings.push({id:'bl_mine',x:px2,y:py2,lv:1});
           APH.Colony.placeBuildingEntity('bl_mine',px2,py2);
           document.title='AUTO: started +mine';
+          /* 屏幕空间自检: 固定坐标画帧0, 排除世界变换干扰 */
+          setTimeout(function(){
+            var c2=document.getElementById('cv').getContext('2d');
+            c2.setTransform(1,0,0,1,0,0);
+            window.__sprOk=APH.Sprites.draw(c2,'bl_mine',80,650,0,1.0);
+            document.title+=' spr='+window.__sprOk;
+          },1500);
         }
         var pad0=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
         if(pad0){ s.px=pad0.x; s.py=pad0.y+30; }   // 出生即站在发射台上
