@@ -432,6 +432,10 @@ window.APH = window.APH || {};
     s.o2=Math.min(CFG.player.o2Max, s.o2+dt*10);
     s.hp=Math.min(CFG.player.hpMax, s.hp+dt*6);
 
+    /* 建造入口按钮显隐 */
+    var bb=document.getElementById('buildBtn');
+    if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
+
     /* Task2: 建造队列推进 */
     if(s.colony.buildQueue && s.colony.buildQueue.length){
       var qr=APH.Colony.queueTick(s.colony.buildQueue, dt);
@@ -952,13 +956,8 @@ window.APH = window.APH || {};
       /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
-      /* G=建造面板(动森风) */
-      if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){
-        var bp=document.getElementById('buildPanel');
-        var show=bp.style.display==='none';
-        bp.style.display=show?'':'none';
-        if(show) renderBuildPanel();
-      }
+      /* G=建造目录(左侧按钮/底部row) */
+      if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){ toggleBuildRow(); }
       /* T=科技购买(仅殖民地): 循环选择并直接购买 */
       if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
@@ -1138,6 +1137,7 @@ window.APH = window.APH || {};
       enterHome();
       bindInput();
       bindLLMPanel();
+      bindBuildUI();
       APH.UI.updHUD();
       document.title='✓就绪 殖民地'+(APH.LLM.enabled()?' ·AI':'');
       /* 自动化验证通道: autostart=1 跳过开场; exp=1 直接着陆远征 */
@@ -1282,68 +1282,53 @@ window.APH = window.APH || {};
       '殖民地数据库 · 远征档案实时同步';
   }
 
-  /* ================= Task6: 建造面板(动森风) ================= */
-  function toggleBuildPanel(){
-    var el=document.getElementById('buildPanel');
-    if(!el) return;
-    var show=el.style.display==='none';
-    el.style.display=show?'':'none';
-    if(show) renderBuildPanel();
+  /* ================= Task6: 建造目录(左入口+底部row) ================= */
+  function toggleBuildRow(force){
+    var btn=document.getElementById('buildBtn');
+    var row=document.getElementById('buildRow');
+    if(!btn||!row) return;
+    var willShow = (force===true) ? true : row.style.display==='none';
+    row.style.display = willShow?'':'none';
+    if(willShow) renderBuildRow();
   }
-  function renderBuildPanel(){
+  function renderBuildRow(){
     var s=APH.state;
-    document.getElementById('bpResearch').textContent=s.meta.research;
-    /* 队列进度 */
-    var qEl=document.getElementById('bpQueue');
+    document.getElementById('brResearch').textContent='研究点 '+s.meta.research;
+    var qEl=document.getElementById('brQueue');
     if(s.colony.buildQueue&&s.colony.buildQueue.length){
-      var qh='<b style="color:#794f27;font-size:12px">施工中</b> ';
-      s.colony.buildQueue.forEach(function(q){
-        var def=APH.Colony.get(q.bid);
-        qh+='<span style="display:inline-block;background:#f0e8d8;border-radius:50px;'+
-           'padding:4px 14px;margin-right:8px;color:#725d42;font-size:11px">'+
-           def.name+' ⏳'+Math.ceil(q.remain)+'s</span>';
-      });
-      qEl.innerHTML=qh;
-    }else qEl.innerHTML='';
-    /* 建筑卡片网格(动森NookPhone配色) */
+      qEl.textContent='施工中 '+s.colony.buildQueue.length+
+        ' 项 · '+Math.ceil(s.colony.buildQueue[0].remain)+'s';
+    }else qEl.textContent='';
+    var grid=document.getElementById('brCards');
+    grid.innerHTML='';
     var colors=['#82d5bb','#f7cd67','#e59266','#889df0','#fc736d','#8ac68a','#b77dee','#d1da49','#e18c6f'];
-    var html='';
     var i=0;
     Object.keys(APH.Colony.list()).forEach(function(bid){
       if(bid==='bl_landing_pad') return;
       var def=APH.Colony.get(bid);
       var n=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
-      var afford=s.meta.research>=def.cost, notMax=n<def.max;
-      var ok=afford&&notMax;
-      var col=colors[i%colors.length]; i++;
-      var countTxt=n+'/'+def.max;
-      html+='<div data-bid="'+bid+'" style="cursor:'+(ok?'pointer':'not-allowed')+';'+
-        'opacity:'+(ok?1:.45)+';background:'+col+';border-radius:18px;padding:14px 16px;'+
-        'border:2px solid #fff;box-shadow:0 3px 10px rgba(61,52,40,.1);transition:all .25s cubic-bezier(.4,0,.2,1)" '+
-        'onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">'+
-        '<b style="color:#fff;font-size:14px;text-shadow:0 1px 2px rgba(61,52,40,.3)">'+def.name+'</b>'+
-        '<span style="float:right;color:#fff;font-size:11px">'+countTxt+'</span><br>'+
+      var ok=s.meta.research>=def.cost && n<def.max;
+      var card=document.createElement('div');
+      card.style.cssText='flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:'+
+        (ok?'pointer':'not-allowed')+';opacity:'+(ok?1:.45)+';background:'+colors[i%colors.length]+
+        ';border:2px solid #fff;box-shadow:0 3px 8px rgba(61,52,40,.12);transition:transform .25s cubic-bezier(.4,0,.2,1)';
+      card.innerHTML='<b style="color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(61,52,40,.35)">'+
+        def.name+'</b><span style="float:right;color:#fff;font-size:10px">'+n+'/'+def.max+'</span><br>'+
         '<span style="display:inline-block;background:#f7f3df;color:#794f27;border-radius:50px;'+
-        'padding:2px 10px;font-size:11px;font-weight:700;margin-top:6px">'+def.cost+' 研究点</span>'+
+        'padding:1px 9px;font-size:11px;font-weight:700;margin-top:4px">'+def.cost+'点</span>'+
         '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
-        'padding:2px 10px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>'+
-        '<div style="color:rgba(255,255,255,.92);font-size:11px;margin-top:6px;line-height:1.5">'+def.desc+'</div>'+
-        (ok?'':'<div style="color:#fff;font-size:10px;margin-top:4px;font-weight:700">'+
-          (afford?'已达数量上限':'研究点不足')+'</div>')+
-        '</div>';
-    });
-    document.getElementById('bpGrid').innerHTML=html;
-    /* 点击卡片 → 进入放置模式 */
-    Array.prototype.forEach.call(document.getElementById('bpGrid').children,function(card){
-      card.addEventListener('click',function(){
-        var bid=card.getAttribute('data-bid');
-        var def=APH.Colony.get(bid);
-        var n=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
-        if(s.meta.research<def.cost||n>=def.max) return;
-        s.buildMode=bid;
-        document.getElementById('buildPanel').style.display='none';
-        APH.UI.setHint('建造: '+def.name+' — 点击空地放置');
-      });
+        'padding:1px 9px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>';
+      if(ok){
+        card.addEventListener('click',function(){
+          s.buildMode=bid;
+          toggleBuildRow(false);                 // 收起row, 进入放置
+          APH.UI.setHint('建造: '+def.name+' — 点击空地放置');
+        });
+        card.addEventListener('mouseover',function(){card.style.transform='translateY(-2px)';});
+        card.addEventListener('mouseout',function(){card.style.transform='';});
+      }
+      grid.appendChild(card);
+      i++;
     });
   }
 
@@ -1506,6 +1491,11 @@ window.APH = window.APH || {};
     }
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  function bindBuildUI(){
+    var btn=document.getElementById('buildBtn');
+    if(!btn) return;
+    btn.addEventListener('click',function(){ toggleBuildRow(); });
+  }
   function autoAssign(buildingId, skillKey, perBuilding){
     var s=APH.state, m=s.meta;
     var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
