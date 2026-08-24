@@ -502,10 +502,12 @@ window.APH = window.APH || {};
         var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
         var fired=APH.Combat.turretStep(tw,raidFoes,dt);
         b.cd=tw.cd;
-        if(fired){
-          s.parts.push({t:'ping',x:b.x,y:b.y-20,life:.3,max:.3});
-          U.emit('turretFired',{});
+        /* 视觉: 炮管指向目标 + 开火后坐动画 */
+        if(fired && tw.lastTarget){
+          b.aimA=Math.atan2(tw.lastTarget.y-b.y, tw.lastTarget.x-b.x);
+          b.fireT=1;
         }
+        if(b.fireT>0) b.fireT=Math.max(0,b.fireT-dt*3);
       });
 
       /* 波次刷怪(袭击敌人从地图边缘冲基地) */

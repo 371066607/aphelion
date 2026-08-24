@@ -243,6 +243,7 @@ APH.Combat = (function(){
       if(d<bd){bd=d;best=en;}
     });
     if(!best) return false;
+    turret.lastTarget=best;                 // 供视觉层取炮管朝向
     best.hp-=turretDamage(turret.lv);
     best.hitFlash=0.1;
     turret.cd=CFG.turret.cd;

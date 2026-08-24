@@ -58,10 +58,13 @@ APH.Ent = (function(){
   function drawEnemy(e, time){
     var g = e.faction.gene;
     var s = 11 * g.size * (e.geneJit?e.geneJit.size:1) * (e.isBoss?1.9:1);
+    /* Task4: 驻守士兵=友军, 固定暖橙色调与敌人区分 */
+    var hue = e.isSoldier ? 30 : g.hue;
+    var sat = e.isSoldier ? 75 : 62;
     var step = Math.sin(e.walkPh);
-    var col = 'hsl('+g.hue+',62%,52%)';
-    var colD = 'hsl('+g.hue+',55%,36%)';
-    var colL = 'hsl('+g.hue+',70%,66%)';
+    var col = 'hsl('+hue+','+sat+'%,52%)';
+    var colD = 'hsl('+hue+','+(sat-7)+'%,36%)';
+    var colL = 'hsl('+hue+','+(sat+8)+'%,66%)';
     var ang = Math.atan2(APH.state.py-e.y, APH.state.px-e.x);
 
     ctx.save();
@@ -366,6 +369,33 @@ APH.Ent = (function(){
       APH.Sprites.draw(ctx, e.bid, e.x, e.y+6,
         APH.Sprites.frameAt({fps:5,count:4,loop:true}, time),
         szS*2.8/128);
+      return;
+    }
+    /* Task4: 防御炮塔——底座+可旋转炮管 */
+    if(e.bid==='bl_turret'){
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.32)';
+      ctx.beginPath(); ctx.ellipse(3,5,22,11,0,0,U.TAU); ctx.fill();
+      /* 底座 */
+      var g2=ctx.createRadialGradient(0,-4,4,0,0,20);
+      g2.addColorStop(0,'#5a6a80'); g2.addColorStop(1,'#242c40');
+      ctx.fillStyle=g2;
+      ctx.beginPath(); ctx.arc(0,0,18,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='#c4b89e'; ctx.lineWidth=1.6; ctx.stroke();
+      /* 炮管(指向 aimA, 开火时后坐) */
+      var recoil=(e.fireT&&e.fireT>0)? -4*e.fireT : 0;
+      ctx.rotate(e.aimA||0);
+      ctx.fillStyle='#19c8b9';
+      ctx.fillRect(6+recoil,-3.5,16,7);
+      ctx.fillStyle='#0f1420';
+      ctx.fillRect(20+recoil,-4.2,4,8.4);
+      /* 等级徽点 */
+      var lvN=e.lv||1;
+      for(var li=0;li<lvN;li++){
+        ctx.fillStyle='#ffc857';
+        ctx.beginPath(); ctx.arc(-12+li*7,10,2.4,0,U.TAU); ctx.fill();
+      }
+      ctx.restore();
       return;
     }
     /* 通用建筑: 影子+主体+屋顶灯 */
