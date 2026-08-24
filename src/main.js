@@ -709,12 +709,16 @@ window.APH = window.APH || {};
     /* strict 模式: 无条件锁死相机到玩家 */
     if(s.strictCam){ s.camX=s.px; s.camY=s.py; return; }
     var dx=(s.px-s.camX), dy=(s.py-s.camY);
-    var maxOff=Math.min(innerWidth,innerHeight)*0.25;
-    if(Math.abs(dx)>maxOff || Math.abs(dy)>maxOff){
+    /* 硬上限: 偏差超过视口22%立即对齐(异常保护) */
+    var hard=Math.min(innerWidth,innerHeight)*0.22;
+    if(Math.abs(dx)>hard || Math.abs(dy)>hard){
       console.warn('[cam] 偏差自愈 dx='+Math.round(dx)+' dy='+Math.round(dy));
       s.camX=s.px; s.camY=s.py;
-      s.vx=0; s.vy=0;
+      return;
     }
+    /* 软居中: 每帧额外把偏差的30%收掉(叠加在lerp之上, 保证稳态偏差<40px) */
+    s.camX += dx*0.30;
+    s.camY += dy*0.30;
   }
 
   function drawTutorialArrow(time){
@@ -1004,6 +1008,20 @@ window.APH = window.APH || {};
       var seed=(Date.now()%100000)|0;
       APH.SFX.bindBus();
       APH.SFX.restore(meta);
+      /* 常驻诊断角标(左上小字): 相机与玩家屏幕坐标实时可见 */
+      var diag=document.createElement('div');
+      diag.id='camDiag';
+      diag.style.cssText='position:fixed;top:2px;right:4px;z-index:60;color:#4a5b7d;'+
+        'font:9px monospace;text-align:right;line-height:1.3;pointer-events:none;';
+      document.body.appendChild(diag);
+      setInterval(function(){
+        var st=APH.state;
+        var sx=Math.round(st.px-st.camX+innerWidth/2),
+            sy=Math.round(st.py-st.camY+innerHeight/2);
+        diag.innerHTML='scr '+sx+','+sy+' / win '+innerWidth+'x'+innerHeight+
+          '<br>cam '+Math.round(st.camX)+','+Math.round(st.camY)+
+          ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征');
+      },250);
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
       bindInput();

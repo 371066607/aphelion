@@ -269,13 +269,18 @@ APH.Ent = (function(){
     ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
     ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
     ctx.stroke();
-    /* T12 头顶浮动三角(H键可关) */
+    /* T12 头顶浮动三角 + 实时屏幕坐标(诊断铁证) */
     if(!s.showMarkerOff){
       ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
       var ty=-38-Math.sin(time*3)*2.5;
       ctx.beginPath();
       ctx.moveTo(0,ty); ctx.lineTo(-5,ty-7); ctx.lineTo(5,ty-7);
       ctx.closePath(); ctx.fill();
+      var scrX=Math.round(e.x-s.camX+innerWidth/2),
+          scrY=Math.round(e.y-s.camY+innerHeight/2);
+      ctx.fillStyle='rgba(89,217,255,.9)';
+      ctx.font='bold 10px monospace'; ctx.textAlign='center';
+      ctx.fillText('scr('+scrX+','+scrY+')', 0, ty-12);
     }
     ctx.globalAlpha=1;
     ctx.restore();
