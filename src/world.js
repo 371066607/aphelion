@@ -143,6 +143,7 @@ APH.World = (function(){
     g.globalCompositeOperation = 'source-over';
 
     /* Task5+: 建筑自带微光(夜间可见) */
+    var s = APH.state;
     (s.colony? s.colony.buildings : []).forEach(function(b){
       if(b.id==='bl_landing_pad') return;
       hole(b.x, b.y, 70, .45);
@@ -300,7 +301,7 @@ APH.World = (function(){
 
   return {
     initCanvas:initCanvas, buildTerrain:buildTerrain,
-    daylight:daylight, render:render,
+    daylight:daylight, drawDarkness:drawDarkness, render:render,
     getViewport:function(){ return {w:VW,h:VH}; },
   };
 })();

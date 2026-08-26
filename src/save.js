@@ -67,11 +67,23 @@ APH.Save = (function(){
       m = {
         v: CFG.save.VERSION,
         research: 0,
-        tech: [],                      // 已购科技 id
+        tech: {},                      // 已购科技 { techId: lv }
+        res: { mineral:0, food:0, leather:0 },
+        residents: [],
+        residentSeq: 0,
         stats: { landings:0, deaths:0, kills:0, scans:0, playSec:0 },
         currentPlanet: null,
       };
     }
+    if(Array.isArray(m.tech)){
+      var tObj = {};
+      m.tech.forEach(function(k){ if(typeof k==='string') tObj[k]=1; });
+      m.tech = tObj;
+    }
+    if(!m.res) m.res = { mineral:0, food:0, leather:0 };
+    if(m.res.leather===undefined) m.res.leather = 0;
+    if(!m.residents) m.residents = [];
+    if(m.residentSeq===undefined) m.residentSeq = 0;
     return m;
   }
   function saveMeta(m){ write(CFG.save.KEY_META, m); }

@@ -109,3 +109,111 @@ test('refundOf: 半价退款, 发射台不可拆', () => {
   if (Colony.refundOf(Colony.get('bl_mine')) !== 22) throw new Error('45半价=22');
   if (Colony.refundOf(Colony.get('bl_landing_pad')) !== 0) throw new Error('pad不可拆');
 });
+
+/* ---- 2026-08-25 建筑系统QA回归 ---- */
+test('carryMaxOf: 仓库加成纯函数化(重启不丢/拆除自动回退)', () => {
+  const base = window.APH.CFG.player.carryMax;   // 40
+  if (Colony.carryMaxOf([]) !== base) throw new Error('无仓库=基础'+base);
+  if (Colony.carryMaxOf([{id:'bl_warehouse'},{id:'bl_warehouse'}]) !== base+40)
+    throw new Error('两仓库应+'+40);
+  if (Colony.carryMaxOf([{id:'bl_mine',lv:3}]) !== base) throw new Error('非仓库不加成');
+});
+
+test('buildColonyWorld: 实体重建保留lv(重载后炮塔不退1级)', () => {
+  const prevEnt = window.APH.Ent;
+  window.APH.Ent = { makeRock:(x,y)=>({id:'rock',type:'rock',x,y}) };
+  try{
+    window.APH.state = { colony:{ buildings:[
+        {id:'bl_turret',x:1500,y:900,lv:3},
+        {id:'bl_mine',x:800,y:800,lv:2},
+      ], buildQueue:[] } };
+    Colony.buildColonyWorld(42);
+    const t = window.APH.state.entities.find(e=>e.bid==='bl_turret');
+    const m = window.APH.state.entities.find(e=>e.bid==='bl_mine');
+    if (!t || t.lv!==3) throw new Error('炮塔实体lv应=3, 实际='+(t&&t.lv));
+    if (!m || m.lv!==2) throw new Error('采矿机实体lv应=2');
+  } finally { window.APH.Ent = prevEnt; }
+});
+
+test('buildColonyWorld: 施工队列重实体化为蓝图(重载后蓝图仍可见)', () => {
+  const prevEnt = window.APH.Ent;
+  window.APH.Ent = { makeRock:(x,y)=>({id:'rock',type:'rock',x,y}) };
+  try{
+    window.APH.state = { colony:{ buildings:[{id:'bl_house',x:1400,y:1300,lv:1}],
+      buildQueue:[{bid:'bl_farm',x:900,y:900,total:15,progress:0.4}] } };
+    Colony.buildColonyWorld(42);
+    const bp = window.APH.state.entities.find(e=>e.type==='blueprint');
+    if (!bp || bp.bid!=='bl_farm') throw new Error('蓝图实体应重建');
+    if (bp.progress!==0.4) throw new Error('蓝图进度应保留');
+  } finally { window.APH.Ent = prevEnt; }
+});
+
+/* ---- 占位格(2026-08-25: 建筑不再全是1格) ---- */
+test('footprintOf: cells×48格网', () => {
+  const f1=Colony.footprintOf('bl_warehouse'), f2=Colony.footprintOf('bl_turret');
+  if(f1.w!==96||f1.h!==96) throw new Error('2x2应96px: '+JSON.stringify(f1));
+  if(f2.w!==48||f2.h!==48) throw new Error('1x1应48px: '+JSON.stringify(f2));
+});
+test('canPlace: 占位矩形碰撞——贴邻拒绝/隔空可放/1x1与2x2混排', () => {
+  // warehouse 2x2(96px) 中心600 → 占位552-648
+  let r=Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], 999, 'bl_warehouse', 690, 600);
+  if(r.ok) throw new Error('中心距90<96 应重叠拒绝');
+  r=Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], 999, 'bl_warehouse', 760, 600);
+  if(!r.ok) throw new Error('中心距160>96 应可放: '+(r&&r.why));
+  // 1x1炮塔侵入2x2仓库占位
+  r=Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], 999, 'bl_turret', 660, 600);
+  if(r.ok) throw new Error('1x1距60<72 应拒绝');
+  r=Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], 999, 'bl_turret', 700, 600);
+  if(!r.ok) throw new Error('1x1距100>72 应可放: '+(r&&r.why));
+});
+test('建筑目录: 大建筑2x2/小建筑1x1 且带dispH', () => {
+  const L=Colony.list();
+  ['bl_warehouse','bl_barracks','bl_lab','bl_farm','bl_pasture','bl_house','bl_clinic'].forEach(id=>{
+    if(!L[id].cells || L[id].cells[0]!==2) throw new Error(id+' 应2x2');
+    if(!L[id].dispH) throw new Error(id+' 缺dispH');
+  });
+  ['bl_mine','bl_turret'].forEach(id=>{
+    if(!L[id].cells || L[id].cells[0]!==1) throw new Error(id+' 应1x1');
+  });
+});
+
+/* ---- U6 畜牧群增长(2026-08-26): herd自然增长+产肉/皮 ---- */
+test('ranchTick: 无牧民不增长不出皮, 有羊仍出肉', () => {
+  const p={herd:2, lv:1}, res={};
+  const o=Colony.ranchTick(p, 0, res, ()=>0.01);   // 必中增长窗
+  if(o.grew) throw new Error('无牧民(skill=0)不应增长');
+  if(o.foodGain!==1) throw new Error('herd=2应产1肉: '+o.foodGain);
+  if(res.food!==1) throw new Error('res.food未入账');
+  if(o.leatherGain!==0||res.leather) throw new Error('skill=0不应产皮');
+});
+test('ranchTick: 增长概率受技能调制且封顶cap=3+lv*2', () => {
+  const p={herd:7, lv:2};                          // cap=7 已满
+  const o=Colony.ranchTick(p, 5, {}, ()=>0.0);
+  if(o.grew||p.herd!==7) throw new Error('满cap不应增长');
+  const p2={herd:6, lv:2};
+  const o2=Colony.ranchTick(p2, 0.01, {}, ()=>0.05); // 概率0.22*(1+0.06*0.01)≈0.22>0.05
+  if(!o2.grew||p2.herd!==7) throw new Error('低概率窗内rand<prob应增长');
+});
+test('ranchTick: 皮革阈值3只起, 随herd/等级线性', () => {
+  const res={};
+  Colony.ranchTick({herd:2, lv:1}, 3, res, ()=>0.99); // herd=2<3 无皮
+  if(res.leather) throw new Error('herd<3不应产皮');
+  Colony.ranchTick({herd:3, lv:1}, 3, res, ()=>0.99); // floor(3/3)=1皮
+  if(res.leather!==1) throw new Error('herd=3应+1皮: '+res.leather);
+  Colony.ranchTick({herd:6, lv:1}, 3, res, ()=>0.99); // floor(6/3)=2皮
+  if(res.leather!==3) throw new Error('herd=6应再+2皮: '+res.leather);
+  Colony.ranchTick({herd:4, lv:2}, 3, res, ()=>0.99); // floor((4+1)/3)=1皮(lv放宽)
+  if(res.leather!==4) throw new Error('lv2 her=4应+1皮: '+res.leather);
+});
+test('畜牧圈升级: 皮革专属货币, 研究点不可替代', () => {
+  const def=Colony.get('bl_pasture');
+  if(!def.upg||def.upg.costRes!=='leather') throw new Error('pasture应costRes=leather');
+  const cost=Colony.upgradeCost(def,1);            // round(55*1.6)=88
+  let r=Colony.canUpgrade({lv:1}, def, 9999, 87);
+  if(r.ok) throw new Error('皮革不足应拒绝');
+  if(r.why.indexOf('皮革')<0) throw new Error('拒绝原因应提皮革: '+r.why);
+  r=Colony.canUpgrade({lv:1}, def, 9999, 88);
+  if(!r.ok||r.costRes!=='leather'||r.cost!==88) throw new Error('皮革够88应可升');
+  r=Colony.canUpgrade({lv:2}, def, 9999, 999);
+  if(r.ok) throw new Error('maxLv=2已达顶');
+});

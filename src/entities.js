@@ -330,6 +330,35 @@ APH.Ent = (function(){
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
   };
   function drawBuilding(e,time){
+    /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
+    if(e.type===T.BLUEPRINT){
+      var bp=e.progress||0;
+      var bc=(window.APH.Colony&&APH.Colony.get(e.bid)||{});
+      var bcell=bc.cells||[1,1];
+      var bw=bcell[0]*CFG.GRID*0.62, bh=bw*0.5;
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(255,200,87,.10)';
+      ctx.beginPath(); ctx.ellipse(0,4,bw,bh,0,0,U.TAU); ctx.fill();
+      ctx.strokeStyle='rgba(255,200,87,.85)'; ctx.lineWidth=2;
+      ctx.setLineDash([7,6]); ctx.lineDashOffset=-time*14;
+      ctx.beginPath(); ctx.ellipse(0,4,bw,bh,0,0,U.TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      if(bp>0){
+        ctx.strokeStyle='#59d9ff'; ctx.lineWidth=3.5;
+        ctx.beginPath(); ctx.arc(0,-36,12,-Math.PI/2,-Math.PI/2+bp*U.TAU); ctx.stroke();
+        ctx.fillStyle='#59d9ff'; ctx.font='bold 10px monospace'; ctx.textAlign='center';
+        ctx.fillText(Math.round(bp*100)+'%', 0, -54);
+      }
+      /* 锤子: 施工中敲击, 等待到场时悬停 */
+      var ham=e.building?Math.abs(Math.sin(time*7))*6:0;
+      ctx.strokeStyle='#c4b89e'; ctx.lineWidth=3.5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(-5,-16+ham); ctx.lineTo(6,-24+ham); ctx.stroke();
+      ctx.save(); ctx.translate(8,-25+ham); ctx.rotate(.6);
+      ctx.fillStyle='#8fa3cc'; ctx.fillRect(-5,-3.5,10,7);
+      ctx.restore();
+      ctx.restore();
+      return;
+    }
     if(e.bid==='bl_rival_base'){
       /* 敌对基地: 暗红堡垒+血条 */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -385,13 +414,19 @@ APH.Ent = (function(){
     }
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
-      var szS=(e.def&&e.def.size)||44;
+      /* 占位格→地台尺寸; dispH/内容高→显示缩放(治"建筑比人物矮") */
+      var cells=(e.def&&e.def.cells)||[1,1];
+      var pw=cells[0]*CFG.GRID*0.62, ph=pw*0.5;
+      var defS = APH.Sprites.sheetDef(e.bid);
+      var contentH=(defS&&defS.contentH)||96;
+      var dispH=(e.def&&e.def.dispH)||contentH;
+      var sc=dispH/contentH;
       /* 底座平台(动森风: 浅色圆形地台, 保证任何地形上可见) */
       ctx.save(); ctx.translate(e.x,e.y);
       ctx.fillStyle='rgba(247,243,223,.28)';
-      ctx.beginPath(); ctx.ellipse(0,6,szS*.72,szS*.36,0,0,U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0,6,pw,ph,0,0,U.TAU); ctx.fill();
       ctx.fillStyle='rgba(0,0,0,.32)';
-      ctx.beginPath(); ctx.ellipse(3,7,szS*.52,szS*.26,0,0,U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(3,7,pw*.72,ph*.72,0,0,U.TAU); ctx.fill();
       ctx.restore();
       /* 建成脉冲: builtT 3秒内金色扩散环 */
       if(e.builtT!==undefined && e.builtT<3){
@@ -399,25 +434,26 @@ APH.Ent = (function(){
         var k=e.builtT/3;
         ctx.strokeStyle='rgba(255,200,87,'+(1-k)+')';
         ctx.lineWidth=3;
-        ctx.beginPath(); ctx.ellipse(e.x,e.y+4,(20+k*40),(10+k*20),0,0,U.TAU); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(e.x,e.y+4,pw*(0.4+k*0.8),ph*(0.4+k*0.8),0,0,U.TAU); ctx.stroke();
       }
-      var defS = APH.Sprites.sheetDef(e.bid);
-      /* 动作幅度收敛: 只循环低幅度帧(0-3), 高潮帧(跳跃/爆发)不再日常播放 */
-      var total = Math.min((defS&&defS.count)||8, 4);
+      /* 动作幅度收敛 v2: 只播实测平静的帧(idleFrames, 配准后帧差≤30%),
+         未配准合格的 sheet 一律静态帧0——生成帧是独立重画, 循环=上下瞬跳 */
+      var total = (defS&&defS.idleFrames) || 1;
       var frame = APH.Sprites.frameAt({fps:2.5, count:total, loop:true}, time);
-      /* 环境融合: 白天原版; 越暗越用降饱和tint版(消"贴纸感") */
+      /* 环境融合: 不搞透明度——白天原版/深夜降饱和tint版整张切换, 永远全不透明。
+         锚点y=e.y+10(地台椭圆中下部); baseline=帧0实测内容底边 → 画稿底边贴地不悬浮 */
       var dL = APH.World.daylight ? APH.World.daylight() : 1;
-      var tinted = APH.Sprites.getTinted(e.bid);
+      var tinted = dL<0.45 ? APH.Sprites.getTinted(e.bid) : null;
       if (tinted){
-        /* 白天混30%融合版柔化, 夜晚全量 */
-        ctx.save();
-        ctx.globalAlpha = dL>0.85 ? 0.3 : Math.min(1, (0.85-dL)/0.85*1.15);
         var pos2 = APH.Sprites.framePos(defS, frame);
-        ctx.drawImage(tinted, pos2.sx, pos2.sy, 128, 128,
-          e.x-64, (e.y+6)-105, 128, 128);
-        ctx.restore();
+        var base=(defS&&defS.baseline)||0;
+        var cw=(defS&&defS.fw)||128;
+        var fw2=cw*sc, fh2=cw*sc;
+        var topY = base ? (e.y+10)-base*sc : (e.y+10)-fh2*((defS&&defS.anchorY)||0.9);
+        ctx.drawImage(tinted, pos2.sx, pos2.sy, cw, cw,
+          e.x-fw2/2, topY, fw2, fh2);
       } else {
-        APH.Sprites.draw(ctx, e.bid, e.x, e.y+6, frame, 1.0);
+        APH.Sprites.draw(ctx, e.bid, e.x, e.y+10, frame, sc);
       }
       return;
     }

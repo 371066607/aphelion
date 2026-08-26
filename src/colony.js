@@ -13,42 +13,60 @@ APH.Colony = (function(){
   'use strict';
   var U = APH.U, CFG = APH.CFG, T = CFG.entType;
 
-  /* ---------- 建筑目录 (ADR-9: bl_ 前缀; 成本单位=研究点) ---------- */
+  /* ---------- 建筑目录 (ADR-9: bl_ 前缀; 成本单位=研究点) ----------
+     dispH: 目标显示内容高px(管线实测内容高→比例缩放, 治"建筑比人物矮")
+     cells: 占位格[宽,高]×48px格网(ADR-4), 非全部1x1——大建筑占2x2 */
   var BUILDINGS = {
     bl_landing_pad: { name:'发射台', cost:0,  size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
     bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3, buildTime:12,
+      dispH:95, cells:[2,2],
       desc:'+20 负重上限(永久)。' },
     bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4, buildTime:20,
+      dispH:100, cells:[1,1],
       desc:'每30秒产出 2×等级 矿材。',
       upg:{ effectPerLv:2, maxLv:3 } },
     bl_lab:         { name:'研究站', cost:60, size:48, max:2, buildTime:25,
+      dispH:113, cells:[2,2],
       desc:'+1×等级 研究点/分钟。',
       upg:{ effectPerLv:1, maxLv:2 } },
     bl_barracks:    { name:'兵营', cost:80, size:56, max:2, buildTime:30,
+      dispH:86, cells:[2,2],
       desc:'训练士兵驻守殖民地。(Phase4)' },
     bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6, buildTime:25,
+      dispH:68, cells:[1,1],
       desc:'自动攻击来袭敌人, 伤害随等级。',
       upg:{ effectPerLv:8, maxLv:3 } },
     bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1, buildTime:22,
+      dispH:115, cells:[2,2],
       desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
     bl_farm:        { name:'水培农场', cost:35, size:52, max:4, buildTime:15,
+      dispH:115, cells:[2,2],
       desc:'种植食物。有居民务农时每分钟产粮。' },
     bl_house:       { name:'居住舱', cost:40, size:46, max:6, buildTime:15,
+      dispH:128, cells:[2,2],
       desc:'住宅容量 +3。居民是殖民地的心跳。' },
     bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2, buildTime:18,
-      desc:'饲养星绵羊。定期产肉皮。(U6)' },
+      dispH:97, cells:[2,2],
+      desc:'饲养星绵羊。羊群自然增长, 定期产肉/皮。',
+      upg:{ maxLv:2, costRes:'leather' } },
   };
 
   /* ---------- Task3: 建筑等级 ---------- */
   function upgradeCost(def, curLv){
     return Math.round(def.cost * Math.pow(1.6, curLv));
   }
-  function canUpgrade(b, def, research){
+  function canUpgrade(b, def, research, leather){
     if (!def.upg) return {ok:false, why:'不可升级'};
     var lv = b.lv||1;
-    if (lv > def.upg.maxLv) return {ok:false, why:'已达最高等级'};
+    /* maxLv=最高可达等级: lv已到顶即拒绝(原为lv>maxLv, 实际可超限升1级) */
+    if (lv >= def.upg.maxLv) return {ok:false, why:'已达最高等级'};
     var cost = upgradeCost(def, lv);
+    /* 畜牧圈升级用皮革(专属货币); 其余建筑用研究点 */
+    if (def.upg.costRes === 'leather'){
+      if ((leather||0) < cost) return {ok:false, why:'皮革不足(需 '+cost+')'};
+      return {ok:true, cost:cost, costRes:'leather'};
+    }
     if (research < cost) return {ok:false, why:'研究点不足(需'+cost+')'};
     return {ok:true, cost:cost};
   }
@@ -65,8 +83,20 @@ APH.Colony = (function(){
     return cap;
   }
   function refundOf(def){
-    if (!def || def.id==='bl_landing_pad') return 0;
+    /* BUILDINGS 表的 def 无 id 字段, 用对象同一性比对发射台 */
+    if (!def || def===BUILDINGS.bl_landing_pad) return 0;
     return Math.floor(def.cost/2);
+  }
+
+  /* 仓库负重加成(纯函数): 每 warehouse +20。
+     取代曾直接改 CFG.player.carryMax 的做法——那会随重启丢失、拆除不回退。 */
+  function carryBonus(buildings){
+    var n=0;
+    (buildings||[]).forEach(function(b){ if(b.id==='bl_warehouse') n++; });
+    return 20*n;
+  }
+  function carryMaxOf(buildings){
+    return CFG.player.carryMax + carryBonus(buildings);
   }
 
   function list(){ return BUILDINGS; }
@@ -110,8 +140,14 @@ APH.Colony = (function(){
       placed++;
     }
 
-    /* 已建建筑实体化 */
-    s.colony.buildings.forEach(function(b){ placeBuildingEntity(b.id, b.x, b.y); });
+    /* 已建建筑实体化(必须带lv——否则重载后炮塔伤害/徽点全部退回1级) */
+    s.colony.buildings.forEach(function(b){ placeBuildingEntity(b.id, b.x, b.y, b.lv); });
+    /* 施工队列的蓝图实体再实体化(实体不落盘而队列落盘, 重载后蓝图不可见) */
+    (s.colony.buildQueue||[]).forEach(function(q){
+      s.entities.push({id:'bp_'+q.bid+'_'+q.x+'_'+q.y,
+        type:T.BLUEPRINT, bid:q.bid, x:q.x, y:q.y,
+        progress:q.progress||0, building:false});
+    });
     ensurePad();
   }
 
@@ -138,7 +174,13 @@ APH.Colony = (function(){
   }
 
   /* ---------- 建造逻辑(纯函数部分) ---------- */
-  /* 可否建造: 资源够 + 数量未满 + 位置合法(离核心/其他建筑不太近) */
+  /* 占位格: cells×48px格网(ADR-4), 中心对齐 */
+  function footprintOf(bid){
+    var def = BUILDINGS[bid]||{};
+    var c = def.cells||[1,1];
+    return { w: c[0]*CFG.GRID, h: c[1]*CFG.GRID };
+  }
+  /* 可否建造: 资源够 + 数量未满 + 位置合法(离核心不太近 + 占位矩形不重叠) */
   function canPlace(colonyBuildings, research, bid, x, y){
     var def = BUILDINGS[bid];
     if(!def) return { ok:false, why:'未知建筑' };
@@ -146,13 +188,14 @@ APH.Colony = (function(){
     if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
     if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
+    var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
     for(var i=0;i<colonyBuildings.length;i++){
       var b = colonyBuildings[i];
-      var other = BUILDINGS[b.id];
-      var minD = (def.size + (other?other.size:40)) * .62;
-      if(U.dst(x,y,b.x,b.y) < minD) return { ok:false, why:'与其他建筑重叠' };
+      var of = footprintOf(b.id), ohw = of.w/2, ohh = of.h/2;
+      if(Math.abs(x-b.x) < hw+ohw && Math.abs(y-b.y) < hh+ohh)
+        return { ok:false, why:'与其他建筑重叠' };
     }
-    if(x<60||y<60||x>CFG.WORLD-60||y>CFG.WORLD-60) return { ok:false, why:'超出殖民地边界' };
+    if(x-hw<60||y-hh<60||x+hw>CFG.WORLD-60||y+hh>CFG.WORLD-60) return { ok:false, why:'超出殖民地边界' };
     return { ok:true };
   }
 
@@ -168,6 +211,28 @@ APH.Colony = (function(){
   }
   function harvestYield(plot){
     return plot.stage===3 ? 3 : 0;               // 成熟收3粮
+  }
+
+  /* ---------- U6 畜牧群增长(纯函数, 每生产跳一调) ----------
+     pasture: {herd:牲畜数, lv}   skill:最高畜牧技能
+     羊群按概率自然增长(封顶 cap=3+lv*2); 产肉/皮随 herd 增长。
+     rng 可注入(默认 Math.random, ADR-5 表现随机)供测试定值。 */
+  function ranchTick(pasture, skill, res, rng){
+    var rand = rng || Math.random;
+    var herd = (pasture && pasture.herd)||0;
+    var lv = (pasture && pasture.lv)||1;
+    var grew = false;
+    var cap = 3 + lv*2;
+    if (skill>0 && herd<cap && rand() < 0.22*(1+skill*0.06)){ herd++; grew=true; }
+    /* 产肉: 有羊即出, 随 herd 增长; 产皮: 3只起出, 等级+1只阈值宽松 */
+    var foodGain = herd>0 ? Math.max(1, Math.round(herd/2)) : 0;
+    var leatherGain = (skill>0 && herd>=3) ? Math.floor((herd + (lv-1))/3) : 0;
+    if (pasture) pasture.herd = herd;
+    if (res){
+      res.food    = (res.food    ||0) + foodGain;
+      res.leather = (res.leather ||0) + leatherGain;
+    }
+    return { herd:herd, cap:cap, grew:grew, foodGain:foodGain, leatherGain:leatherGain };
   }
 
   /* ---------- U5 岗位产出(纯函数) ----------
@@ -262,11 +327,13 @@ APH.Colony = (function(){
     list:list, get:get,
     TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
     farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
+    ranchTick:ranchTick,
     buildColonyWorld:buildColonyWorld,
-    canPlace:canPlace, productionTick:productionTick,
+    canPlace:canPlace, footprintOf:footprintOf, productionTick:productionTick,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf,
+    carryBonus:carryBonus, carryMaxOf:carryMaxOf,
     builderBonusOf:builderBonusOf,
     upgradeCost:upgradeCost, canUpgrade:canUpgrade,
     mineOutput:mineOutput, labOutput:labOutput,

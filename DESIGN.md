@@ -79,8 +79,10 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 ```
 codex exec 生图（动森风 prompt 模板，统一色板：奶油#f7f3df/薄荷#19c8b9/深棕描边#4c3c33）
 → PIL 切帧裁边缩放 128 格
-→ base64 内联 src/sprite_data.js（自动生成勿手改）
-→ sprites.js 注册加载渲染（无图回退程序化绘制）
+→ python3 assets/build_sprites.py：全部帧 alpha 质心配准到帧0（生成帧是独立重画，不配准=循环时上下瞬跳）
+   + 实测帧间差异定 idleFrames（差异>30% 的 sheet 日常只播静态帧0）
+   + base64 内联 src/sprite_data.js（自动生成勿手改）
+→ sprites.js 注册加载渲染（无图回退程序化绘制）；建筑昼夜=原版/tint版整张切换，全不透明
 ```
 
 - 建筑：4 帧横排 sheet（10/10 全部完成）

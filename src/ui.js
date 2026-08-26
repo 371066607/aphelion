@@ -20,7 +20,8 @@ APH.UI = (function(){
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);
-    $('bCW').style.width = U.clamp(cw/APH.CFG.player.carryMax*100,0,100)+'%';
+    var capNow = APH.Colony.carryMaxOf(s.colony&&s.colony.buildings);
+    $('bCW').style.width = U.clamp(cw/capNow*100,0,100)+'%';
     $('vCW').textContent = cw;
     /* T4 战争态势: 有战斗记录或袭击过才显示 */
     var war=s.war||{}, rowWar=$('rowWar');

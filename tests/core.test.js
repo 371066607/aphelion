@@ -37,10 +37,16 @@ test('事件总线单监听者抛错不拖垮其他', () => {
 test('meta 默认结构与写读一致 (ADR-2)', () => {
   const m1 = Save.loadMeta();
   if (m1.v !== 1) throw new Error('默认 meta 应带 v=1, got ' + m1.v);
+  if (Array.isArray(m1.tech) || typeof m1.tech !== 'object')
+    throw new Error('meta.tech 应为 Object 而非 Array: ' + typeof m1.tech);
+  if (!m1.res || m1.res.leather === undefined)
+    throw new Error('meta.res 应初始化包含 leather');
   m1.research = 42;
+  m1.tech.te_weaponry = 2;
   Save.saveMeta(m1);
   const m2 = Save.loadMeta();
   if (m2.research !== 42) throw new Error('research 未持久化');
+  if (m2.tech.te_weaponry !== 2) throw new Error('tech 键值对象未持久化');
 });
 test('planet 缓存读写与按 id 隔离', () => {
   Save.savePlanet('P_AAA', { id: 'P_AAA', laws: [1, 2] });

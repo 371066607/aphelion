@@ -51,7 +51,8 @@ let frameFn=null;
 /* ---------- 加载模块(顺序同 build.py) ---------- */
 const SRC = path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','save.js','planet.js','llm.js',
-                'combat.js','colony.js','rivals.js','world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
+                'colony.js','rivals.js','residents.js','combat.js',
+                'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 
@@ -128,6 +129,18 @@ test('死亡循环: 死亡后重新着陆仍在殖民地', () => {
   S.nearPad=true; M.debugPressE();
   // 此时 scene 可能仍是 expedition(nearPad 在着陆舱旁) — 回家后应为 home
   A(S.scene==='home'||S.scene==='expedition', '状态机不应卡死');
+});
+
+test('夜间渲染与暗幕: drawDarkness 正常处理建筑光源挖洞(零未定义错误)', () => {
+  S.colony = {
+    buildings: [
+      { id:'bl_mine', x:1000, y:1000, lv:1 },
+      { id:'bl_turret', x:1100, y:1100, lv:2 },
+      { id:'bl_landing_pad', x:1100, y:1340, lv:1 }
+    ]
+  };
+  // daylight=0 (深夜)
+  window.APH.World.drawDarkness(0);
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

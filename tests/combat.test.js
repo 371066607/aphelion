@@ -126,3 +126,39 @@ test('soldierCount: 兵营等级×2', () => {
   if (C.soldierCount([{bid:'bl_barracks',lv:1}])!==2) throw new Error('1级=2');
   if (C.soldierCount([{bid:'bl_barracks',lv:2}])!==4) throw new Error('2级=4');
 });
+
+test('raidBaseSuccess: 击毁敌对基地正常掉落战利品与保底遗件(零未定义错误)', () => {
+  /* 自带最小 state fixture: tests/run.js 不加载 main.js(APH.state 的唯一定义点),
+     单跑本文件时 state 不存在; 不依赖 colony.test.js 字母序先跑造成的全局泄漏 */
+  const prevState = window.APH.state;
+  window.APH.state = {
+    entities: [], parts: [], war: { raids:0, wins:0 },
+    meta: { stats: {} }, px: 0, py: 0, shake: 0,
+    colony: { buildings: [] }, carry: {}, cry: 0, found: 0,
+  };
+  try {
+    const s = window.APH.state;
+    const base = {
+      type: window.APH.CFG.entType.BUILDING,
+      bid: 'bl_rival_base',
+      x: 500, y: 500, hp: 1, dead: false,
+      rivalId: 'rv_test', rivalName: '测试前哨',
+    };
+    s.entities = [
+      { type: window.APH.CFG.entType.PLAYER, x: 0, y: 0 },
+      base,
+      C.makeProj(495, 500, 430, 0, 'player', 10)
+    ];
+    let emitted = false;
+    window.APH.U.on('raidSuccess', data => { if(data.rivalId==='rv_test') emitted=true; });
+    C.updateCombat(0.02, false);
+    if (!base.dead) throw new Error('基地受击后应被摧毁');
+    const drops = s.entities.filter(e => e.type === window.APH.CFG.entType.DROPPED);
+    if (drops.length < 7) throw new Error('掠夺应掉落≥7件(6随机+1保底), got ' + drops.length);
+    if (!drops.some(d => d.itemId === 'it_relic')) throw new Error('掠夺应包含保底遗件');
+    if (!emitted) throw new Error('raidSuccess 事件未触发');
+  } finally {
+    window.APH.state = prevState;
+  }
+});
+

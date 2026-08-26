@@ -290,14 +290,14 @@ APH.Combat = (function(){
     for(var i=0;i<6;i++){
       var loot=rollLoot(U.makeRng((Date.now()+i*77)&0xffff));
       s.entities.push({ id:'dp_rb'+i, type:T.DROPPED,
-        x:base.x+(R()*120-60), y:base.y+(R()*90-45),
-        itemId:loot.id, n:loot.n, bobA:R()*U.TAU });
+        x:base.x+(Math.random()*120-60), y:base.y+(Math.random()*90-45),
+        itemId:loot.id, n:loot.n, bobA:Math.random()*U.TAU });
     }
     /* 高价值保底 */
     s.entities.push({ id:'dp_relic', type:T.DROPPED,
       x:base.x, y:base.y, itemId:'it_relic', n:2, bobA:0 });
     s.shake=1;
-    APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
+    if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
     U.emit('raidSuccess',{ rivalId:base.rivalId });
   }
 
@@ -316,7 +316,7 @@ APH.Combat = (function(){
       U.emit('gameOver',{});
       s.meta.stats.deaths++;
       APH.Save.saveMeta(s.meta);
-      APH.UI.showDeath('你被 '+source+'终结了。', {
+      if(window.APH.UI && APH.UI.showDeath) APH.UI.showDeath('你被 '+source+'终结了。', {
         cry:s.cry, found:s.found, total:s.totalBeacons,
         carry:s.carry, runLoot:s.runLoot, survived:s.clock-(s.landedAt||0),
       });
@@ -345,16 +345,17 @@ APH.Combat = (function(){
       if(e.type !== T.DROPPED || e.dead) return;
       e.bobA += dt*3;
       if(U.dst(e.x,e.y,s.px,s.py) < 26){
-        var r = addToCarry(s.carry, e.itemId, e.n, CFG.player.carryMax);
+        var r = addToCarry(s.carry, e.itemId, e.n,
+          APH.Colony.carryMaxOf(s.colony&&s.colony.buildings));
         if(r.ok){
           e.dead = true;
           s.carry = r.carry;
           s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
           U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
           var nm = CFG.items[e.itemId].name;
-          APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
+          if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
         }else{
-          APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
+          if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
         }
       }
     });

@@ -22,14 +22,18 @@ APH.Sprites = (function(){
   function define(name, def){
     SHEETS[name] = {
       src: def.src,
-      fw: def.fw || 64,
-      fh: def.fh || 64,
+      fw: def.fw || 0,                    /* 0=加载时按图高自动探测格宽(横排表) */
+      fh: def.fh || 0,
       cols: def.cols || 4,
       rows: def.rows || 1,
       count: def.count || (def.cols||4)*(def.rows||1),
       fps: def.fps || 6,
       loop: def.loop !== false,
       anchorY: def.anchorY || 0.9,        // 底部锚点比例(建筑落地感)
+      baseline: def.baseline || 0,        // 帧0内容底边(px, 实测)。>0时优先于anchorY:
+                                          // 内容底边精确落在锚点y上(治画稿偏上导致的悬浮)
+      contentH: def.contentH || 0,        // 帧0内容高(px, 实测)——配合dispH算缩放
+      idleFrames: def.idleFrames || 0,    // 日常循环帧数(0=调用方自行决定)
     };
     return SHEETS[name];
   }
@@ -46,6 +50,12 @@ APH.Sprites = (function(){
         /* 强制完整解码后再标记ready, 避免首帧drawImage画出半解码白条 */
         var done = function(){ if(--pending<=0 && onReady) onReady(); };
         var finish = function(){
+          /* 横排方格表自动探测格宽(128/256格混用): 格宽=图高, 帧数=宽/高 */
+          if (img.width > img.height && (!d.fw || !d.fh)){
+            d.fh = img.height; d.fw = img.height;
+            d.cols = Math.max(1, Math.round(img.width / img.height));
+            d.rows = 1;
+          }
           /* 预烘焙"环境融合版": 降饱和35%+暗青tint, 用于夜晚/远景 */
           try{
             var c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
@@ -134,9 +144,11 @@ APH.Sprites = (function(){
     var pos = framePos(d, index);
     var sc = scale || 1;
     var w = d.fw*sc, h = d.fh*sc;
+    /* baseline>0: 内容底边落在锚点y; 否则退回帧框比例锚(anchorY) */
+    var top = d.baseline ? (y - d.baseline*sc) : (y - h*d.anchorY);
     ctx2d.drawImage(img,
       pos.sx, pos.sy, d.fw, d.fh,
-      x - w/2, y - h*d.anchorY, w, h);
+      x - w/2, top, w, h);
     return true;
   }
 

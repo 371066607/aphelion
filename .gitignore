@@ -4,3 +4,8 @@ node_modules/
 *.log
 *.tmp
 .nightlock
+
+# FreeBuff 桌面工具的本地缓存(SQLite/UUID), 非项目资产
+.freebuff/
+# build_sprites.py 改写原图前的一次性备份
+*.bak

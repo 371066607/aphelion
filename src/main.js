@@ -69,8 +69,9 @@ window.APH = window.APH || {};
     if(s.scene==='expedition') return;
     /* T9: 超重出发提醒(不阻止, 只提示——玩家的选择权在他手里) */
     var loadW=APH.Combat.carryWeight(s.carry);
-    if(loadW > CFG.player.carryMax*.7){
-      APH.UI.floatText('⚠ 负重 '+loadW+'/'+CFG.player.carryMax+
+    var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
+    if(loadW > capNow*.7){
+      APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
         ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
     }
     var seed=(Date.now()%100000)|0;
@@ -163,7 +164,7 @@ window.APH = window.APH || {};
     }else{
       APH.UI.floatText('空手而归','#8fa3cc');
     }
-    var foundN=s.found, cryN=s.carry[CFG.items.it_crystal_ore]||0;
+    var foundN=s.found, cryN=s.carry['it_crystal_ore']||0;
     s.carry={};
     enterHome();
     U.emit('returnedHome',{ research:gained, beacons:foundN });
@@ -471,7 +472,6 @@ window.APH = window.APH || {};
         saveColony();
         U.emit('built',{id:d.bid});
         APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
-        if(d.bid==='bl_warehouse') CFG.player.carryMax+=20;
         s.parts.push({t:'ping',x:d.x,y:d.y,life:.9,max:.9});
       });
     }
@@ -858,23 +858,33 @@ window.APH = window.APH || {};
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
     var s=APH.state;
+    /* ADR-4 格网吸附: 中心对齐48px格点, 占位格随之对齐 */
+    var gx=Math.round(wx/CFG.GRID)*CFG.GRID,
+        gy=Math.round(wy/CFG.GRID)*CFG.GRID;
     /* V1: 建造专长折扣 */
     var mul=APH.Res.globalBonuses(s.meta.residents||[]).buildCostMul;
     var effCost=Math.max(1,Math.round(APH.Colony.get(bid).cost*mul));
-    var check=APH.Colony.canPlace(s.colony.buildings, s.meta.research, bid, wx, wy);
+    /* 占位碰撞把在建蓝图也算上(否则两座2x2可叠放) */
+    var occupied=s.colony.buildings.concat((s.colony.buildQueue||[]).map(function(q){
+      return {id:q.bid,x:q.x,y:q.y};
+    }));
+    var check=APH.Colony.canPlace(occupied, s.meta.research, bid, gx, gy);
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
     if(s.meta.research<def.cost*mul){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
     s.meta.research-=effCost;
     /* Task2: 进入建造队列(工期), 完工后由 updateHome 放置实体 */
     s.colony.buildQueue = s.colony.buildQueue||[];
-    s.colony.buildQueue.push({bid:bid,x:Math.round(wx),y:Math.round(wy),
+    var qpos={x:gx,y:gy};
+    s.colony.buildQueue.push({bid:bid,x:qpos.x,y:qpos.y,
                               total:def.buildTime||5, progress:0});
+    /* 蓝图实体: 没有它施工队列在场景里完全不可见(2026-08-25 QA发现) */
+    s.entities.push({id:'bp_'+bid+'_'+s.colony.buildQueue.length,
+      type:T.BLUEPRINT, bid:bid, x:qpos.x, y:qpos.y, progress:0, building:false});
     APH.Save.saveMeta(s.meta);
     saveColony();
     U.emit('queued',{id:bid});
     APH.UI.floatText('🔨 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
-    if(def.id==='bl_warehouse') CFG.player.carryMax+=20;   // 仓库永久扩容
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
   }
   function saveColony(){
@@ -914,7 +924,8 @@ window.APH = window.APH || {};
           }
         }
       }
-      /* 调试热键(自动化验证协议):
+      /* 调试热键(自动化验证协议, 仅 ?autostart=1 / ?debugkeys=1 通道生效——
+         曾与正式键位冲突: 按G开建造面板的同时被传送600px):
          T=传送到最近未扫描信标并启动真实扫描管线
          G=向东传送600px, 触发舱外耗氧路径
          K=在视野边缘生成一只敌人(战斗管线验证) */
@@ -944,10 +955,17 @@ window.APH = window.APH || {};
         if(!best){ APH.UI.floatText('附近没有可升级的建筑','#8fa3cc'); }
         else{
           var def2=APH.Colony.get(best.id);
-          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research);
+          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research,
+            s.meta.res&&s.meta.res.leather);
           if(r3.ok){
-            s.meta.research-=r3.cost;
+            if(r3.costRes==='leather') s.meta.res.leather-=r3.cost;
+            else s.meta.research-=r3.cost;
             best.lv=(best.lv||1)+1;
+            /* 同步实体lv: 炮塔伤害/等级徽点读实体, 不同步则升级当场不生效 */
+            s.entities.forEach(function(en){
+              if(en.type===T.BUILDING&&en.bid===best.id&&
+                 U.dst(en.x,en.y,best.x,best.y)<5) en.lv=best.lv;
+            });
             APH.Save.saveMeta(s.meta); saveColony();
             APH.UI.floatText('⬆ '+def2.name+' → Lv'+best.lv,'#59d9ff');
             U.emit('upgraded',{id:best.id,lv:best.lv});
@@ -1007,12 +1025,12 @@ window.APH = window.APH || {};
           APH.UI.floatText('✕ 无法研究','#ff9a9a');
         }
       }
-      if(e.code==='KeyK'&&s.mode==='running'){
+      if(e.code==='KeyK'&&s.mode==='running'&&s.debugKeys){
         var f=s.spec.enemies.factions[0];
         s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
         document.title='DBG 已生成 '+f.name;
       }
-      if(e.code==='KeyT'&&s.mode==='running'){
+      if(e.code==='KeyT'&&s.mode==='running'&&s.debugKeys){
         var nb=null,bd=1e9;
         s.entities.forEach(function(en){
           if(en.type!==T.BEACON||en.done) return;
@@ -1027,7 +1045,7 @@ window.APH = window.APH || {};
           document.title='DBG 已传送到 '+nb.name.slice(0,10);
         }else document.title='DBG 无未扫描信标';
       }
-      if(e.code==='KeyG'&&s.mode==='running'){
+      if(e.code==='KeyG'&&s.mode==='running'&&s.debugKeys){
         s.px=U.clamp(s.px+600,40,CFG.WORLD-40);
         s.camX=s.px; s.target=null;
         document.title='DBG 已东移600px';
@@ -1126,7 +1144,7 @@ window.APH = window.APH || {};
     try{
       var meta=APH.Save.loadMeta();
       if(!meta.tech) meta.tech={};
-      if(!meta.res) meta.res={mineral:0, food:0};
+      if(!meta.res) meta.res={mineral:0, food:0, leather:0};
       if(!meta.residents) meta.residents=[];   // P6 居民名册
       if(meta.residentSeq===undefined) meta.residentSeq=0;
       APH.state.meta=meta;
@@ -1139,18 +1157,33 @@ window.APH = window.APH || {};
       APH.SFX.restore(meta);
       /* M1 序列帧注册与异步加载 */
       var SD = window.APH.SPRITE_DATA || {};
+      /* 动作幅度收敛 v2 + 基线锚点 + 内容高: idle=配准后帧差≤30%的待机帧数,
+         baseline=帧0内容底边(治悬浮), h=帧0内容高(配合BUILDINGS.dispH比例缩放)。
+         数据来源: python3 assets/build_sprites.py 实测输出(2026-08-26 HD 256格版)。 */
+      var SPRITE_META = {
+        /* 兵营idle:2为用户选定例外——帧差37%是旗帜摆动(自然内容变化), 配准后无跳动 */
+        bl_barracks:{idle:2,baseline:171,h:88}, bl_clinic:{idle:1,baseline:244,h:162},
+        bl_farm:{idle:1,baseline:241,h:158}, bl_house:{idle:1,baseline:244,h:174},
+        bl_lab:{idle:1,baseline:243,h:156}, bl_landing_pad:{idle:1,baseline:243,h:162},
+        bl_mine:{idle:1,baseline:175,h:134}, bl_pasture:{idle:1,baseline:177,h:94},
+        bl_turret:{idle:1,baseline:173,h:72}, bl_warehouse:{idle:1,baseline:169,h:90},
+      };
       Object.keys(SD).forEach(function(name){
         if (name==='player_walk'){
           /* 2列x4行角色行走表 */
           APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:2, rows:4,
                                      count:8, fps:6, loop:true });
         }else if (name.indexOf('enemy_')===0){
-          /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death) */
+          /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death); 敌人锚点由drawEnemy手工translate, 不用baseline */
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
                                      count:8, fps:4.5, loop:true });
         }else{
-          APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
-                                     count:8, fps:3, loop:true });
+          var meta = SPRITE_META[name]||{};
+          /* fw:0 = 加载时按图高自动探测格宽(128/256格通用) */
+          APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:8, rows:1,
+                                     count:8, fps:3, loop:true,
+                                     idleFrames: meta.idle||1, baseline: meta.baseline||0,
+                                     contentH: meta.h||0 });
         }
       });
       APH.Sprites.loadAll();
@@ -1181,6 +1214,9 @@ window.APH = window.APH || {};
       /* 自动化验证通道: autostart=1 跳过开场; exp=1 直接着陆远征 */
       var s = APH.state;
       var _q=(typeof location!=='undefined'&&location.search)||'';
+      /* 调试热键通道(T传送/K刷怪/G东移): 仅显式 ?debugkeys=1 开启(不随autostart隐含),
+         玩家默认不可触发 */
+      s.debugKeys = _q.indexOf('debugkeys=1')>=0;
       if(_q.indexOf('autostart=1')>=0){
         document.title='AUTO: q命中';
         startGame();
@@ -1342,8 +1378,10 @@ window.APH = window.APH || {};
     document.getElementById('brResearch').textContent='研究点 '+s.meta.research;
     var qEl=document.getElementById('brQueue');
     if(s.colony.buildQueue&&s.colony.buildQueue.length){
-      qEl.textContent='施工中 '+s.colony.buildQueue.length+
-        ' 项 · '+Math.ceil(s.colony.buildQueue[0].remain)+'s';
+      /* 剩余秒=工期×未完成比例(队列项无 remain 字段, 旧代码读 undefined→恒显 NaNs) */
+      var q0=s.colony.buildQueue[0];
+      var remain=Math.ceil((q0.total||0)*(1-(q0.progress||0)));
+      qEl.textContent='施工中 '+s.colony.buildQueue.length+' 项 · '+remain+'s';
     }else qEl.textContent='';
     var grid=document.getElementById('brCards');
     grid.innerHTML='';
@@ -1352,7 +1390,11 @@ window.APH = window.APH || {};
     Object.keys(APH.Colony.list()).forEach(function(bid){
       if(bid==='bl_landing_pad') return;
       var def=APH.Colony.get(bid);
-      var n=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
+      /* 数量口径须与 canPlace 一致: 已完工 + 施工中蓝图都占上限,
+         否则卡片显示 n/max 可点、放置时却被"已达数量上限"拒(假可点) */
+      var nBuilt=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
+      var nQueued=(s.colony.buildQueue||[]).filter(function(q){return q.bid===bid;}).length;
+      var n=nBuilt+nQueued;
       var ok=s.meta.research>=def.cost && n<def.max;
       var card=document.createElement('div');
       card.style.cssText='flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:'+
@@ -1363,7 +1405,9 @@ window.APH = window.APH || {};
         '<span style="display:inline-block;background:#f7f3df;color:#794f27;border-radius:50px;'+
         'padding:1px 9px;font-size:11px;font-weight:700;margin-top:4px">'+def.cost+'点</span>'+
         '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
-        'padding:1px 9px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>';
+        'padding:1px 9px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>'+
+        ((def.cells&&def.cells[0]>1)?'<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;'+
+          'border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px">'+def.cells[0]+'×'+def.cells[1]+'</span>':'');
       if(ok){
         card.addEventListener('click',function(){
           s.buildMode=bid;
@@ -1399,6 +1443,7 @@ window.APH = window.APH || {};
     var s=APH.state, m=s.meta;
     var body=document.getElementById('resBody'); if(!body) return;
     document.getElementById('resFood').textContent=m.res.food||0;
+    document.getElementById('resLeather').textContent=m.res.leather||0;
     document.getElementById('resPop').textContent=m.residents.length+'/'+housingCap();
     if(!m.residents.length){
       body.innerHTML='<div style="color:#39435c;margin-top:40px;text-align:center">'+
@@ -1473,11 +1518,20 @@ window.APH = window.APH || {};
         b.plot={stage:1,t:0};
       }
     });
-    /* 畜牧(U6简化): 有牧民时每跳概率+1肉 */
-    if(ranchers.length && Math.random()<0.35*ranchers.length){
-      m.res.food=(m.res.food||0)+2;
-      APH.UI.floatText('🐑 畜牧产出 +2 食物','#c8e89a');
-    }
+    /* U6 畜牧: 羊群自然增长, 产肉/皮(纯函数 ranchTick, 每牧场一调) */
+    var pastures=s.colony.buildings.filter(function(b){return b.id==='bl_pasture';});
+    var bestRancher=ranchers.reduce(function(acc,r){
+      return (acc===null||(r.skills.sk_ranch>(acc.skills.sk_ranch||0)))?r:acc;
+    },null);
+    var rSk=bestRancher?(bestRancher.skills.sk_ranch||0):0;
+    pastures.forEach(function(b){
+      if(b.herd===undefined) b.herd=1;           // 新牧场自带1只
+      var out=APH.Colony.ranchTick(b, rSk, m.res);
+      if(out.leatherGain>0)
+        APH.UI.floatText('🐑 畜牧产出 +'+out.foodGain+'肉 +'+out.leatherGain+'皮','#c8e89a');
+      else if(out.foodGain>0)
+        APH.UI.floatText('🐑 畜牧产出 +'+out.foodGain+' 食物','#c8e89a');
+    });
 
     /* V1 全局专长加成 */
     var gb=APH.Res.globalBonuses(m.residents);
