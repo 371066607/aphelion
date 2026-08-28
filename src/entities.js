@@ -76,6 +76,12 @@ APH.Ent = (function(){
 
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.isSoldier && window.APH.Humanoid) {
+      /* #1: 士兵仍是程序化小人，缩放到与玩家 drawH 等高 */
+      s = (CFG.humanoid && CFG.humanoid.chibiBodyR) || 21.5;
+      ctx.scale(APH.Humanoid.chibiScale(), APH.Humanoid.chibiScale());
+      ctx.translate(0, -s);
+    }
     /* 影子 */
     ctx.fillStyle='rgba(0,0,0,.32)';
     ctx.beginPath(); ctx.ellipse(1,4,s*1.15,s*.55,0,0,U.TAU); ctx.fill();
@@ -669,13 +675,17 @@ APH.Ent = (function(){
     var bob=Math.sin((time||0)*(walking?8:2)+(e.x||0))*(walking?2.2:1.2);
     var ill=e.illness||0;
     var mood=e.mood!=null?e.mood:70;
+    var chibiSc=window.APH.Humanoid?APH.Humanoid.chibiScale():1;
+    ctx.save();
+    ctx.scale(chibiSc, chibiSc);
     ctx.fillStyle=ill>=50?'#6a8a62':(ill>=20?'#a8b07a':'#c8a882');
     ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
     ctx.fillStyle=mood<40?'#e8c4b0':'#ffe9c4';
     ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
     ctx.fillStyle='#6b4a32';
     ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
-    drawResidentMarks(e, bob, -22);
+    ctx.restore();
+    drawResidentMarks(e, bob, -(CFG.humanoid&&CFG.humanoid.drawH||78)+8);
     ctx.restore();
   }
 
@@ -700,6 +710,9 @@ APH.Ent = (function(){
     ctx.fillStyle='rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
     var bob=Math.sin((time||0)*2.4+(e.x||0))*1.6;
+    var chibiSc=window.APH.Humanoid?APH.Humanoid.chibiScale():1;
+    ctx.save();
+    ctx.scale(chibiSc, chibiSc);
     ctx.fillStyle='#3d6a6e';
     ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
     ctx.fillStyle='#c4e8e4';
@@ -708,6 +721,7 @@ APH.Ent = (function(){
     ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
     ctx.fillStyle='#794f27';
     ctx.beginPath(); ctx.ellipse(8,-6+bob,4,5,0.3,0,U.TAU); ctx.fill();
+    ctx.restore();
     drawVisitorMarks(e);
     ctx.restore();
   }

@@ -166,6 +166,16 @@ test('poseFor: appearance 选脸，缺 walk sheet 回退脸 0', () => {
   if (fb.sheet !== 'hum_0_nopack_walk') throw new Error('缺图应回退脸0, got '+fb.sheet);
 });
 
+test('chibiScale: 程序化小人拉到玩家 drawH', () => {
+  if (typeof H.chibiScale !== 'function') throw new Error('Humanoid.chibiScale 未导出');
+  var cfg = window.APH.CFG.humanoid;
+  var want = cfg.drawH / cfg.chibiH;
+  var got = H.chibiScale();
+  if (got !== want) throw new Error('chibiScale 应为 '+want+' (drawH/chibiH), got '+got);
+  if (got <= 1) throw new Error('小人应放大到贴图身高, got '+got);
+  if (cfg.chibiBodyR * 2 !== cfg.chibiH) throw new Error('chibiBodyR×2 应为 chibiH, got '+cfg.chibiBodyR);
+});
+
 test('sheetLayout: 脸 1–3 与玩家同布局', () => {
   var i, w, idle;
   for (i = 1; i <= 3; i++) {

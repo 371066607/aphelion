@@ -437,3 +437,7 @@
   验证: `python3 build.py` 构建成功 27049KB 以 `</html>` 收尾；单元 245/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 16 张 sheet ready，spriteScale 与玩家相同（walk 0.325 / idle 0.3305）；rs_3/0/1/2 → 脸 0/1/2/3；家园排队四张脸居民无包、过客有包，能分出不同的人。
   下一步: 父 issue #1 收口（玩家/居民/过客五官套齐）。
 
+- **2026-08-29 · 班次**: ✅#1 收口。士兵仍程序化，按 `chibiScale`（drawH/chibiH）拉到与玩家 78px 等高；居民/过客无图回退同样放大。脸 1–3 左/背有包未重跑 Codex（配额 07:29），沿用盖包。
+  验证: `python3 build.py` 构建成功 27050KB 以 `</html>` 收尾；单元 246/0（+chibiScale）；场景 27/0；perf 3/0；boss 7/0。Chrome 玩家+居民贴图并排同高，橙色士兵 blob 缩放到 drawH。
+  下一步: 无（人形 epic #1 关）。
+

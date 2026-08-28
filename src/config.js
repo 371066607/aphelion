@@ -20,6 +20,7 @@ APH.CFG = {
   humanoid: {
     drawH: 78,                 // 所有人形目标内容高
     chibiH: 43,                // 程序化小人未缩放的发顶到脚
+    chibiBodyR: 21.5,          // 士兵程序化半径；脚钉后直径 ≈ chibiH
     walkPerDir: 8,
     idlePerDir: 4,
     idleFps: 1,                // 4 帧一轮 ≈ 4s，慢呼吸，不像喘气
