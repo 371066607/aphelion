@@ -861,6 +861,10 @@ window.APH = window.APH || {};
       });
       saveColony();
     }else if(id==='ev_raid'){
+      /* 惊醒所有正在睡眠中的居民 */
+      (m.residents||[]).forEach(function(r){
+        if(r.isSleeping) APH.Res.disturbSleep(r);
+      });
       if(!launchRivalRaid()) return;               // 没有备战的敌殖民地则无声跳过
     }
     var negCfg=(E.deck||{})[id]||{};
@@ -2599,6 +2603,9 @@ window.APH = window.APH || {};
   }
   function residentsTick(){
     var s=APH.state, m=s.meta;
+    /* 深度生存: 床位分配 (Survival #15) */
+    APH.Res.assignBeds(s.colony.buildings, m.residents);
+
     /* U4 需求结算: 生产跳只掉饱食; 吃饭要走到仓库或粮堆 */
     m.residents.forEach(function(r){
       APH.Res.needsTick(r, false);

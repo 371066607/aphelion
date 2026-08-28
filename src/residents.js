@@ -58,6 +58,10 @@ APH.Res = (function(){
       food:80+Math.floor(rng()*15),                          // 80~94
       illness:0,                                             // 病情 0~100 (F: ailments 聚合值)
       ailments:[],                                           // F: [{type,sev,age}] 最多 ailMax 条
+      rest:100,                                              // 深度生存: 精力 (Survival #15)
+      isSleeping:false,                                      // 是否处于睡眠中
+      bedId:null,                                            // 绑定的床位 ID (null 为打地铺)
+      sleepDisturbed:0,                                      // 惊醒剩余跳数
       job:null,                                              // 指派岗位 bl_xxx|null
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
@@ -70,11 +74,16 @@ APH.Res = (function(){
   }
 
   /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
-     每30游戏秒一跳: 掉饱食; 真吃饭在走位里(仓/地上堆). 饿→心情掉且涨病; 不饿死. */
+     每30游戏秒一跳: 掉饱食; 真吃饭在走位里(仓/地上堆). 饿→心情掉且涨病; 不饿死.
+     深度生存: 结算精力消耗与睡眠恢复。 */
   function needsTick(r, hasFood){
     var C=RS();
     var out={ ate:false };
     r.illness = r.illness||0;
+    r.rest = r.rest!=null ? r.rest : 100;
+    r.isSleeping = !!r.isSleeping;
+    r.sleepDisturbed = r.sleepDisturbed||0;
+
     var eatBelow=C.eatBelow!=null?C.eatBelow:60;
     var eatGain=C.eatGain!=null?C.eatGain:25;
     var drain=C.foodDrain!=null?C.foodDrain:6;
@@ -99,6 +108,33 @@ APH.Res = (function(){
     var moodSickAt=C.moodSickAt!=null?C.moodSickAt:40;
     var moodSick=C.moodSick!=null?C.moodSick:3;
     if(r.illness>moodSickAt) r.mood=Math.max(0, r.mood-moodSick);
+
+    /* 深度生存: 精力自然衰减与睡眠恢复 (Survival #15) */
+    var restDrain=C.restDrain!=null?C.restDrain:7;
+    var restSleepAt=C.restSleepAt!=null?C.restSleepAt:20;
+    var restWakeAt=C.restWakeAt!=null?C.restWakeAt:100;
+    var bedRec=C.bedRecover!=null?C.bedRecover:25;
+    var floorRec=C.floorRecover!=null?C.floorRecover:18;
+
+    if(r.isSleeping){
+      var rec = r.bedId ? bedRec : floorRec;
+      r.rest = Math.min(100, r.rest + rec);
+      if(r.rest >= restWakeAt) r.isSleeping = false;
+    }else{
+      r.rest = Math.max(0, r.rest - restDrain);
+      if(r.rest < restSleepAt) r.isSleeping = true;
+    }
+
+    /* 床铺舒适度 vs 地铺惩罚 */
+    var bedMood = C.bedMood!=null?C.bedMood:3;
+    var floorMood = C.floorMood!=null?C.floorMood:-5;
+    if(r.bedId){
+      if(r.mood < cap) r.mood += bedMood;
+    }else if(r.isSleeping){
+      r.mood = Math.max(0, r.mood + floorMood);
+    }
+
+    if(r.sleepDisturbed > 0) r.sleepDisturbed--;
     return out;
   }
 
@@ -742,10 +778,35 @@ APH.Res = (function(){
       .catch(function(){ r.bio=fallbackBio(r); return r; });
   }
 
+  /* 惊醒判定(纯函数): 睡眠中遭遇袭击/炮火/斗殴时强行唤醒, 附带心情惩罚与持续跳数 */
+  function disturbSleep(r){
+    if(!r || !r.isSleeping) return false;
+    var C=RS();
+    r.isSleeping = false;
+    r.sleepDisturbed = C.disturbedTicks!=null ? C.disturbedTicks : 3;
+    var hit = Math.abs(C.disturbedMood!=null ? C.disturbedMood : 4);
+    r.mood = Math.max(0, (r.mood||0) - hit);
+    return true;
+  }
+
+  /* 床位分配(纯函数): 按居住舱(bl_house)与医疗舱(bl_clinic)总容量分配床位, 超容者打地铺 */
+  function assignBeds(buildings, residents){
+    var cap = (APH.Colony && APH.Colony.housingCapacity) ? APH.Colony.housingCapacity(buildings||[]) : 2;
+    (residents||[]).forEach(function(r, idx){
+      if(idx < cap){
+        r.bedId = r.bedId || ('bed_' + (idx + 1));
+      }else{
+        r.bedId = null;
+      }
+    });
+    return residents;
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
+    disturbSleep:disturbSleep, assignBeds:assignBeds,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,

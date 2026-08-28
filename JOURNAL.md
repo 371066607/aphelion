@@ -441,3 +441,9 @@
   验证: `python3 build.py` 构建成功 27050KB 以 `</html>` 收尾；单元 246/0（+chibiScale）；场景 27/0；perf 3/0；boss 7/0。Chrome 玩家+居民贴图并排同高，橙色士兵 blob 缩放到 drawH。
   下一步: 无（人形 epic #1 关）。
 
+- **2026-08-29 · 班次**: ✅#15 精力消耗、床位绑定与睡眠机制 (Survival 1/6)。
+  `meta.residents` 新增 `rest`（0~100）/ `isSleeping` / `bedId` / `sleepDisturbed` 字段并兼容旧档；`needsTick` 自然衰减 7/跳，<20 入睡，床铺恢复 +25/跳（满 100 醒来），地铺慢 30% (+18/跳)；`assignBeds` 纯函数按居住舱与医疗舱总容量绑定床位（有床 +3 心情，地铺 -5 心情）；`disturbSleep` 遭遇袭击强行唤醒并附加 -4 心情（3 跳）；`assignByPriority` 睡眠居民跳过排岗。
+  验证: `python3 build.py` 构建成功 27054KB 以 `</html>` 收尾；新增 `tests/survival.test.js`；单元 254/0；场景 27/0；perf 3/0；boss 7/0。
+  下一步: #16 三维机能损毁模型 (Survival 2/6)。
+
+

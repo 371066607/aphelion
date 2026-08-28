@@ -211,6 +211,16 @@ APH.CFG = {
     brawlIll: 8,               // 斗殴: 双方病情上涨
     brawlBondHit: 8,           // 斗殴: 好感损失
     tantrumMoodHit: 5,         // 怠工抱怨: 周围居民心情损失
+    /* 深度生存: 精力/睡眠/床位 (Survival #15) */
+    restDrain: 7,              // 生产跳自然精力衰减
+    restSleepAt: 20,           // 精力低于此值入睡
+    restWakeAt: 100,           // 精力回满醒来
+    bedRecover: 25,            // 床铺睡眠恢复 /跳
+    floorRecover: 18,          // 地铺睡眠恢复 /跳 (慢 ~30%)
+    bedMood: 3,                // 有床舒适心情增益
+    floorMood: -5,             // 无床打地铺心情惩罚
+    disturbedMood: -4,         // 惊醒心情惩罚
+    disturbedTicks: 3,         // 惊醒持续跳数
   },
 
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */

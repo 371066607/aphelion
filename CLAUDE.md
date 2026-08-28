@@ -87,3 +87,18 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 - **canvas 默认尺寸污染**：布局完成前 `getBoundingClientRect()` 返回 300×200 默认值会锁死视口——涉及显示尺寸的测量必须防御布局时序。
 - **bash 关联数组在管道子 shell 中展开失败**：批量生图曾因此 10 张 prompt 相同——批处理用 python 循环逐张调用并做 MD5 唯一性校验。
 - **测试构造须遵守世界规则**：如敌人 y 坐标被 clamp ≥30，违反规则的测试数据会产生假阳性/假阴性。
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
+
