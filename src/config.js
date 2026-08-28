@@ -221,6 +221,14 @@ APH.CFG = {
     floorMood: -5,             // 无床打地铺心情惩罚
     disturbedMood: -4,         // 惊醒心情惩罚
     disturbedTicks: 3,         // 惊醒持续跳数
+    /* 深度生存: 三维机能损毁 (Survival #16) */
+    woundMoveCut: 0.005,       // 外伤削弱移动
+    woundManipCut: 0.004,      // 外伤削弱操作
+    infectManipCut: 0.008,     // 感染削弱操作
+    plagueConCut: 0.009,       // 疫病削弱认知
+    painConCut: 0.003,         // 疼痛削弱认知
+    tiredConCut: 0.2,          // 极度疲倦削弱认知
+    coldMoveCut: 0.003,        // 严寒暴露削弱移动
   },
 
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */

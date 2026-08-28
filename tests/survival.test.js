@@ -99,3 +99,47 @@ test('assignByPriority: 睡眠中的居民不被派岗', function(){
   if (assigned.rs_sleep !== null) throw new Error('睡眠中的居民不应上岗，实际: ' + assigned.rs_sleep);
   if (assigned.rs_awake !== 'bl_farm') throw new Error('清醒居民应上岗，实际: ' + assigned.rs_awake);
 });
+
+test('capacities: 健康居民三维机能均为 1.0 (100%)', function(){
+  var r = APH.Res.generate('cap1', 12345);
+  var cap = APH.Res.capacitiesOf(r);
+  if (cap.moving !== 1.0) throw new Error('健康居民 moving 应为 1.0，实际: ' + cap.moving);
+  if (cap.manipulation !== 1.0) throw new Error('健康居民 manipulation 应为 1.0，实际: ' + cap.manipulation);
+  if (cap.consciousness !== 1.0) throw new Error('健康居民 consciousness 应为 1.0，实际: ' + cap.consciousness);
+});
+
+test('capacities: 外伤削弱移动与操作机能', function(){
+  var r = APH.Res.generate('cap2', 12345);
+  r.ailments = [{ type: 'wound', sev: 40, age: 0 }];
+  r.illness = 40;
+  var cap = APH.Res.capacitiesOf(r);
+  // moving: 1.0 - 40*0.005 = 0.8
+  // manipulation: 1.0 - 40*0.004 = 0.84
+  if (Math.abs(cap.moving - 0.8) > 0.01) throw new Error('moving 应为 0.8，实际: ' + cap.moving);
+  if (Math.abs(cap.manipulation - 0.84) > 0.01) throw new Error('manipulation 应为 0.84，实际: ' + cap.manipulation);
+});
+
+test('capacities: 严重疫病削弱认知并作为全局上限', function(){
+  var r = APH.Res.generate('cap3', 12345);
+  r.ailments = [{ type: 'plague', sev: 50, age: 0 }];
+  r.illness = 50;
+  var cap = APH.Res.capacitiesOf(r);
+  // consciousness: 1.0 - 50*0.009 - 50*0.003 = 1.0 - 0.45 - 0.15 = 0.40
+  // moving & manipulation capped by consciousness 0.40
+  if (Math.abs(cap.consciousness - 0.40) > 0.01) throw new Error('consciousness 应为 0.40，实际: ' + cap.consciousness);
+  if (cap.moving > 0.4001) throw new Error('moving 应被 consciousness 压制在 0.40 以下，实际: ' + cap.moving);
+  if (cap.manipulation > 0.4001) throw new Error('manipulation 应被 consciousness 压制在 0.40 以下，实际: ' + cap.manipulation);
+});
+
+test('efficiency: 整合 manipulation 机能损耗', function(){
+  var r = APH.Res.generate('cap4', 12345);
+  r.food = 100;
+  r.mood = 100;
+  r.ailments = [{ type: 'infection', sev: 60, age: 0 }];
+  r.illness = 60;
+  var eff = APH.Res.efficiency(r);
+  var cap = APH.Res.capacitiesOf(r);
+  if (eff <= 0) throw new Error('eff 应大于 0');
+  if (cap.manipulation >= 1.0) throw new Error('感染者 manipulation 应小于 1.0');
+});
+

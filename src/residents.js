@@ -802,11 +802,49 @@ APH.Res = (function(){
     return residents;
   }
 
+  /* 三维机能损毁派生(纯函数): Moving, Manipulation, Consciousness (0%~100%) (Survival #16) */
+  function capacitiesOf(r){
+    if(!r) return { moving:1.0, manipulation:1.0, consciousness:1.0 };
+    var C=RS();
+    var woundSev=0, infectSev=0, plagueSev=0;
+    (r.ailments||[]).forEach(function(a){
+      if(a.type==='wound') woundSev += (a.sev||0);
+      else if(a.type==='infection') infectSev += (a.sev||0);
+      else if(a.type==='plague') plagueSev += (a.sev||0);
+    });
+    var painTotal = r.illness||0;
+    var coldExposure = r.exposure||0;
+    var restVal = r.rest!=null ? r.rest : 100;
+
+    var woundMoveK = C.woundMoveCut!=null ? C.woundMoveCut : 0.005;
+    var coldMoveK = C.coldMoveCut!=null ? C.coldMoveCut : 0.003;
+    var infectManipK = C.infectManipCut!=null ? C.infectManipCut : 0.008;
+    var woundManipK = C.woundManipCut!=null ? C.woundManipCut : 0.004;
+    var plagueConK = C.plagueConCut!=null ? C.plagueConCut : 0.009;
+    var painConK = C.painConCut!=null ? C.painConCut : 0.003;
+    var tiredConK = C.tiredConCut!=null ? C.tiredConCut : 0.2;
+
+    var moving = Math.max(0.1, Math.min(1.0, 1.0 - (woundSev * woundMoveK) - (coldExposure * coldMoveK)));
+    var manipulation = Math.max(0.1, Math.min(1.0, 1.0 - (infectSev * infectManipK) - (woundSev * woundManipK)));
+    var conPenalty = (plagueSev * plagueConK) + (painTotal * painConK) + (restVal < 15 ? tiredConK : 0);
+    var consciousness = Math.max(0.0, Math.min(1.0, 1.0 - conPenalty));
+
+    // 认知机能作为全局天花板上限
+    moving = Math.min(moving, consciousness);
+    manipulation = Math.min(manipulation, consciousness);
+
+    return {
+      moving: Math.round(moving * 1000) / 1000,
+      manipulation: Math.round(manipulation * 1000) / 1000,
+      consciousness: Math.round(consciousness * 1000) / 1000
+    };
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
-    disturbSleep:disturbSleep, assignBeds:assignBeds,
+    disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,
