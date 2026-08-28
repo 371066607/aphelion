@@ -1683,12 +1683,18 @@ window.APH = window.APH || {};
         bl_turret:{idle:1,baseline:173,h:72}, bl_warehouse:{idle:1,baseline:169,h:90},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
-        player_idle:{baseline:248,h:236},
-        hum_0_nopack_walk:{baseline:248,h:240},
-        hum_0_nopack_idle:{baseline:248,h:236},
-        hum_0_pack_walk:{baseline:248,h:240},
-        hum_0_pack_idle:{baseline:248,h:236}
+        player_idle:{baseline:248,h:236}
       };
+      (function(){
+        var i, k;
+        for (i = 0; i < 4; i++) {
+          k = 'hum_'+i+'_';
+          SPRITE_META[k+'nopack_walk'] = {baseline:248,h:240};
+          SPRITE_META[k+'nopack_idle'] = {baseline:248,h:236};
+          SPRITE_META[k+'pack_walk'] = {baseline:248,h:240};
+          SPRITE_META[k+'pack_idle'] = {baseline:248,h:236};
+        }
+      })();
       Object.keys(SD).forEach(function(name){
         var layout = window.APH.Humanoid && APH.Humanoid.sheetLayout(name);
         if (layout){

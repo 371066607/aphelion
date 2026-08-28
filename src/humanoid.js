@@ -91,6 +91,35 @@ APH.Humanoid = (function(){
     };
   }
 
+  /* 绘制用：appearance 选脸；该脸 walk 未就绪则回退脸 0；idle 未就绪则该向 walk 第 0 帧 */
+  function poseFor(input, isReady){
+    input = input || {};
+    var role = input.role || 'resident';
+    var look = appearance(role, input.id);
+    var pack = (input.pack != null) ? !!input.pack : look.pack;
+    var fi = look.faceIdx;
+    var ready = typeof isReady === 'function' ? isReady : function(){ return true; };
+    var walkKey = sheetKey(role, fi, pack, 'walk');
+    if (!ready(walkKey)) fi = 0;
+    var p = pose({
+      moving: input.moving,
+      face: input.face,
+      walkPh: input.walkPh,
+      time: input.time,
+      role: role,
+      pack: pack,
+      faceIdx: fi
+    });
+    if (!ready(p.sheet) && p.cycle === 'idle') {
+      var wk = sheetKey(role, fi, pack, 'walk');
+      if (ready(wk)) {
+        p.sheet = wk;
+        p.frame = p.dir * (hum().walkPerDir || 8);
+      }
+    }
+    return p;
+  }
+
   function spriteScale(contentH){
     var H = hum();
     var ch = contentH || 211;
@@ -109,6 +138,7 @@ APH.Humanoid = (function(){
     faceIdx: faceIdx,
     appearance: appearance,
     pose: pose,
+    poseFor: poseFor,
     spriteScale: spriteScale,
     chibiScale: chibiScale
   };

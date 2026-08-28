@@ -634,30 +634,31 @@ APH.Ent = (function(){
     ctx.fillText(e.name||'居民', 0, 16);
   }
 
+  function drawNpcSprite(e, time, role, pack){
+    if (!(window.APH.Sprites && window.APH.Humanoid)) return false;
+    var pose = APH.Humanoid.poseFor({
+      role: role, id: e.rid || e.id, moving: !!e.walking, face: e.face,
+      walkPh: e.walkPh, time: time, pack: pack
+    }, function(name){ return APH.Sprites.isReady(name); });
+    var sheet = pose.sheet;
+    if (!APH.Sprites.isReady(sheet)) return false;
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
+    var defS=APH.Sprites.sheetDef(sheet);
+    var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
+    var sc=APH.Humanoid.spriteScale(ch);
+    if(e.hitFlash>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
+    APH.Sprites.draw(ctx, sheet, 0, 0, pose.frame, sc);
+    ctx.globalAlpha=1;
+    return true;
+  }
+
   function drawResident(e,time){
     if(!ctx) return;
     ctx.save();
     ctx.translate(e.x, e.y);
     var walking=!!e.walking;
-    var sprWalk='hum_0_nopack_walk';
-    var sprOk=window.APH.Sprites && window.APH.Humanoid && APH.Sprites.isReady(sprWalk);
-    if(sprOk){
-      /* #5: 只出脸 0 无包；脸 1–3 是 #7 */
-      var pose=APH.Humanoid.pose({ moving:walking, face:e.face, walkPh:e.walkPh,
-                                   time:time, role:'resident', pack:false, faceIdx:0 });
-      var sheet=pose.sheet, frame=pose.frame;
-      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
-        sheet=sprWalk;
-        frame=pose.dir*((CFG.humanoid&&CFG.humanoid.walkPerDir)||8);
-      }
-      ctx.fillStyle='rgba(0,0,0,.28)';
-      ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
-      var defS=APH.Sprites.sheetDef(sheet)||APH.Sprites.sheetDef(sprWalk);
-      var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
-      var sc=APH.Humanoid.spriteScale(ch);
-      if(e.hitFlash>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
-      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
-      ctx.globalAlpha=1;
+    if(drawNpcSprite(e, time, 'resident', false)){
       var top=-(CFG.humanoid&&CFG.humanoid.drawH||78);
       drawResidentMarks(e, 0, top+8, top+40);
       ctx.restore();
@@ -691,24 +692,7 @@ APH.Ent = (function(){
     if(!ctx) return;
     ctx.save();
     ctx.translate(e.x, e.y);
-    var walking=!!e.walking;
-    var sprWalk='hum_0_pack_walk';
-    var sprOk=window.APH.Sprites && window.APH.Humanoid && APH.Sprites.isReady(sprWalk);
-    if(sprOk){
-      /* #6: 只出脸 0 有包；脸 1–3 是 #7 */
-      var pose=APH.Humanoid.pose({ moving:walking, face:e.face, walkPh:e.walkPh,
-                                   time:time, role:'visitor', pack:true, faceIdx:0 });
-      var sheet=pose.sheet, frame=pose.frame;
-      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
-        sheet=sprWalk;
-        frame=pose.dir*((CFG.humanoid&&CFG.humanoid.walkPerDir)||8);
-      }
-      ctx.fillStyle='rgba(0,0,0,.28)';
-      ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
-      var defS=APH.Sprites.sheetDef(sheet)||APH.Sprites.sheetDef(sprWalk);
-      var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
-      var sc=APH.Humanoid.spriteScale(ch);
-      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
+    if(drawNpcSprite(e, time, 'visitor', true)){
       drawVisitorMarks(e);
       ctx.restore();
       return;

@@ -433,3 +433,7 @@
   验证: `python3 build.py` 构建成功 11528KB 以 `</html>` 收尾；单元 241/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 过客贴图有包、与玩家/居民 spriteScale 相同（walk 0.325 / idle 0.3305）；闲逛 `hum_0_pack_walk` 四向，站住 `hum_0_pack_idle` 四向。
   下一步: #7 脸 1–3（过客有包 / 居民无包），仍被 #6 解锁后可动手。
 
+- **2026-08-29 · 班次**: ✅#7 脸 1–3 无包/有包 × walk/idle。四张脸：0 黑 bob、1 栗侧分、2 黑顶髻、3 铜红波浪。`poseFor` 用 appearance 选脸（FNV-1a % 4）；缺 walk 回退脸 0。`drawResident`/`drawVisitor` 共用 `drawNpcSprite`。sheet `hum_{0-3}_{nopack|pack}_{walk|idle}` 同锚 baseline=248、内容高 240/236。正面有包 walk/idle 走 Codex identity；左/背有包在配额用尽后用脸 0 薄荷包图层盖到该脸无包上（换装不是换人）。
+  验证: `python3 build.py` 构建成功 27049KB 以 `</html>` 收尾；单元 245/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 16 张 sheet ready，spriteScale 与玩家相同（walk 0.325 / idle 0.3305）；rs_3/0/1/2 → 脸 0/1/2/3；家园排队四张脸居民无包、过客有包，能分出不同的人。
+  下一步: 父 issue #1 收口（玩家/居民/过客五官套齐）。
+
