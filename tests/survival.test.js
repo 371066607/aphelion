@@ -279,6 +279,34 @@ test('exposure: 严重暴露 (>80) 转化为急性感染病症', function(){
   if (r.exposure >= 80) throw new Error('转化后 exposure 应被重置/回落');
 });
 
+test('survival_integration: 居民生存全属性在名册与实体模型中完整流通', function(){
+  var r = APH.Res.generate('full1', 12345);
+  r.rest = 15;
+  r.recreation = 10;
+  r.exposure = 60;
+  r.ailments = [{ type: 'wound', sev: 20, age: 0 }];
+  r.illness = 20;
+
+  // 1. 机能计算
+  var cap = APH.Res.capacitiesOf(r);
+  if (cap.moving >= 1.0 || cap.manipulation >= 1.0) throw new Error('机能应受损');
+
+  // 2. 状态推进
+  APH.Res.needsTick(r, false);
+  if (!r.isSleeping) throw new Error('精力 < 20 应进入睡眠');
+
+  // 3. 娱乐补充
+  APH.Res.enjoyRecreation(r, 80);
+  if (r.recreation < 80) throw new Error('娱乐值应补充至高水平');
+
+  // 4. 击倒保护
+  r.ailments = [{ type: 'plague', sev: 80, age: 0 }];
+  r.illness = 80;
+  var isDown = APH.Res.checkDowned(r);
+  if (!isDown || !r.downed) throw new Error('重度疫病应触发击倒');
+});
+
+
 
 
 

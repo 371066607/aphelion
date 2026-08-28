@@ -2194,8 +2194,14 @@ window.APH = window.APH || {};
          :' · '+jobTxt)+'</span><br>'+
         '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
         (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
+        '<div style="margin-top:4px;font-size:11px">'+
         '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
+        '&nbsp;&nbsp;精力 '+foodBar(r.rest!=null?r.rest:100)+(r.isSleeping?' <span style="color:#8fd4ff">💤[睡眠]</span>':'')+
+        '&nbsp;&nbsp;娱乐 '+foodBar(r.recreation!=null?r.recreation:80)+
+        (r.exposure>0 ? ('&nbsp;&nbsp;<span style="color:#ffb35c">暴露 '+sickBar(r.exposure)+'</span>') : '')+
         '&nbsp;&nbsp;病情 '+sickBar(r.illness||0)+
+        /* 深度生存: 击倒状态与三维机能 */
+        (r.downed ? ' <span style="color:#ff4757;font-weight:700">[🚨 击倒 · 濒死 '+Math.max(0,Math.round(r.bleedOutTimer||0))+'s]</span>' : '')+
         /* F: 病症分型标签(疫病红/感染橙/外伤灰) */
         (r.ailments&&r.ailments.length
           ? ' <span style="font-size:11px">'+r.ailments.map(function(a){
@@ -2204,6 +2210,14 @@ window.APH = window.APH || {};
                 (APH.Res.AILMENT_NAMES[a.type]||a.type)+' '+Math.round(a.sev)+']</span>';
             }).join(' ')+'</span>'
           : '')+
+        '</div>'+
+        (function(){
+          var cap=APH.Res.capacitiesOf(r);
+          return '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">'+
+            '机能: 移动 '+Math.round(cap.moving*100)+'% · 操作 '+Math.round(cap.manipulation*100)+'% · 认知 '+Math.round(cap.consciousness*100)+'%'+
+            (r.bedId ? (' · <span style="color:#7dffab">床位['+r.bedId+']</span>') : ' · <span style="color:#ffb35c">露宿打地铺</span>')+
+            '</div>';
+        })()+
         '</div>';
     });
     /* 关系摘要 */
@@ -2282,11 +2296,15 @@ window.APH = window.APH || {};
         e={
           id:r.id, type:T.RESIDENT, x:home.x, y:home.y,
           name:r.name, rid:r.id, job:r.job, mood:r.mood, food:r.food,
-          illness:r.illness||0, walking:false, face:Math.PI/2, walkPh:0,
+          illness:r.illness||0, rest:r.rest, recreation:r.recreation, exposure:r.exposure,
+          isSleeping:!!r.isSleeping, downed:!!r.downed,
+          walking:false, face:Math.PI/2, walkPh:0,
         };
         s.entities.push(e);
       }else{
         e.name=r.name; e.job=r.job; e.mood=r.mood; e.food=r.food; e.illness=r.illness||0;
+        e.rest=r.rest; e.recreation=r.recreation; e.exposure=r.exposure;
+        e.isSleeping=!!r.isSleeping; e.downed=!!r.downed;
       }
       e.tx=tgt.x; e.ty=tgt.y;
       keep[r.id]=true;

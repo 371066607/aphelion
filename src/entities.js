@@ -635,6 +635,16 @@ APH.Ent = (function(){
       ctx.font='10px sans-serif'; ctx.textAlign='center';
       ctx.fillText('💢', 0, iconY-8+bob);
     }
+    if(e.isSleeping){
+      ctx.fillStyle='#8fd4ff';
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💤', 0, iconY-14+bob);
+    }
+    if(e.downed){
+      ctx.fillStyle='#ff4757';
+      ctx.font='11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🚨', 0, iconY-16+bob);
+    }
     ctx.fillStyle='#f7f3df';
     ctx.font='9px sans-serif'; ctx.textAlign='center';
     ctx.fillText(e.name||'居民', 0, 16);
