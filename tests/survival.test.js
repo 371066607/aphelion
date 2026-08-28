@@ -233,5 +233,52 @@ test('rescue: 倒计时归零判定死亡并产生悼念心情减益', function(
   if (r2.mood > 72) throw new Error('同伴死亡 r2 应受到悼念心情减益，实际 mood: ' + r2.mood);
 });
 
+test('exposure: 居民生成带默认暴露值 0', function(){
+  var r = APH.Res.generate('exp1', 12345);
+  if (r.exposure !== 0) throw new Error('exposure 初始值应为 0，实际: ' + r.exposure);
+});
+
+test('exposure: 极端天气室外累积，避难所内快速消退', function(){
+  var r = APH.Res.generate('exp2', 12345);
+  r.exposure = 20;
+
+  // 1. 极端天气室外 +10
+  APH.Res.exposureTick(r, false, true, 'lw_night_acid');
+  if (r.exposure !== 30) throw new Error('极端天气室外应累积至 30，实际: ' + r.exposure);
+
+  // 2. 避难所内消退 -15
+  APH.Res.exposureTick(r, true, true, 'lw_night_acid');
+  if (r.exposure !== 15) throw new Error('避难所内消退后应为 15，实际: ' + r.exposure);
+});
+
+test('exposure: isSheltered 判定建筑与核心范围', function(){
+  var buildings = [{ x: 1000, y: 1000, size: 48 }];
+  var hab = { x: 1100, y: 1100, r: 92 };
+
+  // 靠近建筑 -> 避难所
+  var sheltered1 = APH.Res.isSheltered({ x: 1010, y: 1010 }, buildings, hab);
+  if (!sheltered1) throw new Error('靠近建筑应判定为避难所');
+
+  // 靠近核心 -> 避难所
+  var sheltered2 = APH.Res.isSheltered({ x: 1120, y: 1120 }, buildings, hab);
+  if (!sheltered2) throw new Error('靠近核心应判定为避难所');
+
+  // 开阔荒野 -> 非避难所
+  var sheltered3 = APH.Res.isSheltered({ x: 500, y: 500 }, buildings, hab);
+  if (sheltered3) throw new Error('开阔荒野不应判定为避难所');
+});
+
+test('exposure: 严重暴露 (>80) 转化为急性感染病症', function(){
+  var r = APH.Res.generate('exp3', 12345);
+  r.exposure = 85;
+  r.ailments = [];
+
+  APH.Res.exposureTick(r, false, true, 'lw_night_acid');
+  if (r.ailments.length === 0) throw new Error('严重酸雨暴露应转化为感染病症');
+  if (r.ailments[0].type !== 'infection') throw new Error('酸雨暴露应转化为 infection');
+  if (r.exposure >= 80) throw new Error('转化后 exposure 应被重置/回落');
+});
+
+
 
 

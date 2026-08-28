@@ -92,6 +92,7 @@ APH.Save = (function(){
       if(r.bedId===undefined) r.bedId = null;
       if(r.sleepDisturbed===undefined) r.sleepDisturbed = 0;
       if(r.recreation===undefined) r.recreation = 80;
+      if(r.exposure===undefined) r.exposure = 0;
       if(r.downed===undefined) r.downed = false;
       if(r.bleedOutTimer===undefined) r.bleedOutTimer = null;
     });

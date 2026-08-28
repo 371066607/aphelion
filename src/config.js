@@ -235,6 +235,14 @@ APH.CFG = {
     bleedOutTime: 90,          // 濒死倒计时 90 秒
     deathGriefMood: -8,        // 居民死亡全员悲痛心情
     deathGriefTicks: 4,        // 悲痛持续跳数
+    /* 深度生存: 外星环境暴露与避难所 (Survival #19) */
+    exposureGain: 10,          // 极端天气室外每跳累积
+    shelterCooldown: 15,       // 避难所内每跳消退
+    exposureDiscomfortAt: 50,  // 暴露不适阈值
+    exposureDiscomfortMood: -4,// 暴露不适心情减益
+    exposureAcuteAt: 80,       // 急性伤病转化阈值
+    exposureAcuteSev: 12,      // 转化伤病严重度
+    shelterRadius: 48,         // 建筑避难所判定半径
     /* 深度生存: 三维机能损毁 (Survival #16) */
     woundMoveCut: 0.005,       // 外伤削弱移动
     woundManipCut: 0.004,      // 外伤削弱操作

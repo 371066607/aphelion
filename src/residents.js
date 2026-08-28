@@ -63,6 +63,7 @@ APH.Res = (function(){
       bedId:null,                                            // 绑定的床位 ID (null 为打地铺)
       sleepDisturbed:0,                                      // 惊醒剩余跳数
       recreation:80,                                         // 深度生存: 娱乐值 (Survival #18)
+      exposure:0,                                            // 深度生存: 气候暴露值 (Survival #19)
       downed:false,                                          // 深度生存: 击倒状态 (Survival #17)
       bleedOutTimer:null,                                    // 濒死失血倒计时 (s)
       rescuedBy:null,                                        // 救援人 ID
@@ -918,12 +919,54 @@ APH.Res = (function(){
     return { dead: dead, medUsed: medUsed };
   }
 
+  /* 室内避难所判定(纯函数): 核心区域或靠近已建成建筑(<=48px)判定为室内避难所 (Survival #19) */
+  function isSheltered(pos, buildings, hab){
+    if(!pos) return false;
+    var H = hab || CFG.HAB || { x:1100, y:1100, r:92 };
+    if(U.dst(pos.x, pos.y, H.x, H.y) <= (H.r || 92)) return true;
+    var r = (CFG.residents && CFG.residents.shelterRadius != null) ? CFG.residents.shelterRadius : 48;
+    return (buildings||[]).some(function(b){
+      return U.dst(pos.x, pos.y, b.x, b.y) <= ((b.size||32)/2 + r);
+    });
+  }
+
+  /* 气候暴露与急性伤病转化(纯函数): 极端天气室外累积、避难所消退、>80 转化伤病 (Survival #19) */
+  function exposureTick(r, sheltered, hasExtremeWeather, weatherType){
+    if(!r) return r;
+    var C = RS();
+    var gain = C.exposureGain!=null ? C.exposureGain : 10;
+    var cool = C.shelterCooldown!=null ? C.shelterCooldown : 15;
+    r.exposure = r.exposure!=null ? r.exposure : 0;
+
+    if(hasExtremeWeather && !sheltered){
+      r.exposure = Math.min(100, r.exposure + gain);
+    }else{
+      r.exposure = Math.max(0, r.exposure - cool);
+    }
+
+    var disAt = C.exposureDiscomfortAt!=null ? C.exposureDiscomfortAt : 50;
+    var disMood = C.exposureDiscomfortMood!=null ? C.exposureDiscomfortMood : -4;
+    if(r.exposure >= disAt){
+      r.mood = Math.max(0, (r.mood||0) + disMood);
+    }
+
+    var acuteAt = C.exposureAcuteAt!=null ? C.exposureAcuteAt : 80;
+    var acuteSev = C.exposureAcuteSev!=null ? C.exposureAcuteSev : 12;
+    if(r.exposure >= acuteAt){
+      var type = (weatherType==='lw_night_acid' || weatherType==='toxic') ? 'infection' : 'wound';
+      addAilment(r, type, acuteSev);
+      r.exposure = 40;
+    }
+    return r;
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
+    isSheltered:isSheltered, exposureTick:exposureTick,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,
