@@ -413,3 +413,7 @@
   验证: `python3 build.py` 构建成功 5470KB 以 `</html>` 收尾；单元 227/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园四向 + `?exp=1` 远征四向均见同一人、无多头多肢、脚贴光圈。
   下一步: #1 剩余过客/居民 identity 与 idle sheet。
 
+- **2026-08-28 23:55 · 班次**: ✅#4 玩家 idle 16 帧（下/左/右/上各 4）。Codex 先锁正面/左侧/背面 standing identity（右侧由左侧镜像），再脚钉缩放做呼吸——保证 idle 是同一人、双脚不迈。`Humanoid.sheetLayout` 让 `*_idle` 注册 16 帧而不是掉进建筑 8 帧。`build_sprites.py` 对 `*_idle_sheet` 也走脚底对齐。`player_idle` baseline=248 contentH=236。
+  验证: `python3 build.py` 构建成功 6347KB 以 `</html>` 收尾；单元 229/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园四向站住是 idle（脚并拢呼吸）不是走循环第 0 帧；右走向是 walk 迈步；`?exp=1` 远征同一张 idle。
+  下一步: #1 剩余过客/居民 identity 与 walk/idle sheet。
+

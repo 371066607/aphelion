@@ -293,7 +293,7 @@ APH.Ent = (function(){
         sheet='player_walk';
         frame=pose.dir*(APH.CFG.humanoid.walkPerDir||8);
       }
-      var defS = APH.Sprites.sheetDef('player_walk');
+      var defS = APH.Sprites.sheetDef(sheet) || APH.Sprites.sheetDef('player_walk');
       var ch = (defS && defS.contentH) || 211;
       var sc = APH.Humanoid.spriteScale(ch);
       if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;

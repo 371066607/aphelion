@@ -1681,13 +1681,20 @@ window.APH = window.APH || {};
         bl_lab:{idle:1,baseline:243,h:156}, bl_landing_pad:{idle:1,baseline:243,h:162},
         bl_mine:{idle:1,baseline:175,h:134}, bl_pasture:{idle:1,baseline:177,h:94},
         bl_turret:{idle:1,baseline:173,h:72}, bl_warehouse:{idle:1,baseline:169,h:90},
+        /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
+        player_walk:{baseline:248,h:240},
+        player_idle:{baseline:248,h:236}
       };
       Object.keys(SD).forEach(function(name){
-        if (name==='player_walk'){
-          /* 32帧横排: 下/左/右/上 各8帧走循环 */
-          APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:32, rows:1,
-                                     count:32, fps:10, loop:true,
-                                     baseline:248, contentH:240, anchorY:0.96 });
+        var layout = window.APH.Humanoid && APH.Humanoid.sheetLayout(name);
+        if (layout){
+          /* ADR-0001: *_walk 32 帧 / *_idle 16 帧横排，脚底锚点 */
+          var metaH = SPRITE_META[name]||{};
+          var hum = (CFG.humanoid)||{};
+          APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:layout.cols, rows:1,
+                                     count:layout.count, fps:layout.fps, loop:true,
+                                     baseline: metaH.baseline||hum.sheetBaseline||0,
+                                     contentH: metaH.h||hum.sheetContentH||0, anchorY:0.96 });
         }else if (name.indexOf('enemy_')===0){
           /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death); 敌人锚点由drawEnemy手工translate, 不用baseline */
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,

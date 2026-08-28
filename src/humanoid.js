@@ -9,7 +9,7 @@ APH.Humanoid = (function(){
   var CFG = APH.CFG;
 
   function hum(){
-    return (CFG && CFG.humanoid) || { walkPerDir:8, idlePerDir:4, idleFps:4, drawH:78, chibiH:43 };
+    return (CFG && CFG.humanoid) || { walkPerDir:8, idlePerDir:4, idleFps:4, walkFps:10, drawH:78, chibiH:43, sheetBaseline:248, sheetContentH:240 };
   }
 
   /* 下0 左1 右2 上3 — 与现有玩家朝向分档一致 */
@@ -28,6 +28,21 @@ APH.Humanoid = (function(){
     var ward = pack ? 'pack' : 'nopack';
     var cyc = cycle === 'idle' ? 'idle' : 'walk';
     return 'hum_' + fi + '_' + ward + '_' + cyc;
+  }
+
+  /* 人形横排 sheet 几何: walk 32 / idle 16。建筑/敌人返回 null。 */
+  function sheetLayout(name){
+    var H = hum();
+    if (!name || typeof name !== 'string') return null;
+    if (/_walk$/.test(name)) {
+      var wn = (H.walkPerDir || 8) * 4;
+      return { cols: wn, count: wn, fps: H.walkFps || 10 };
+    }
+    if (/_idle$/.test(name)) {
+      var inn = (H.idlePerDir || 4) * 4;
+      return { cols: inn, count: inn, fps: H.idleFps || 4 };
+    }
+    return null;
   }
 
   function faceIdx(id){
@@ -90,6 +105,7 @@ APH.Humanoid = (function(){
   return {
     dirOf: dirOf,
     sheetKey: sheetKey,
+    sheetLayout: sheetLayout,
     faceIdx: faceIdx,
     appearance: appearance,
     pose: pose,

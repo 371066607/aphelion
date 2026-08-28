@@ -98,7 +98,7 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 ```
 codex exec 生图（动森风 prompt 模板，统一色板：奶油#f7f3df/薄荷#19c8b9/深棕描边#4c3c33）
 → PIL 切帧裁边缩放 128 格
-→ python3 assets/build_sprites.py：建筑/敌人 alpha 质心配准到帧0；**走循环**（`*_walk_sheet.png`）按内容底边（踩地脚）对齐——抬腿会把质心拽高，质心配准=循环时脚上下跳
+→ python3 assets/build_sprites.py：建筑/敌人 alpha 质心配准到帧0；**人形 walk/idle**（`*_walk_sheet.png` / `*_idle_sheet.png`）按内容底边（踩地脚）对齐——抬腿或呼吸会把质心拽高，质心配准=循环时脚上下跳
    + 实测帧间差异定 idleFrames（差异>30% 的 sheet 日常只播静态帧0）
    + base64 内联 src/sprite_data.js（自动生成勿手改）
 → sprites.js 注册加载渲染（无图回退程序化绘制）；建筑昼夜=原版/tint版整张切换，全不透明
@@ -108,6 +108,6 @@ codex exec 生图（动森风 prompt 模板，统一色板：奶油#f7f3df/薄�
 - 玩家 / 人形：**修订 2026-08-28**（见 `docs/adr/0001-humanoid-sprite-sheets.md`）：走循环 32 帧横排（下/左/右/上各 8），idle 16 帧另张（各 4）。由 `s.face` 换算向。不再使用 2×4。走循环配准=脚底，不走质心。
 - 敌人：8 帧（待机×2/移动×2/攻击×2/受击/死亡）
 
-**ADR-11 修订 2026-08-28**：玩家 walk 重画后，质心配准与「脚在地上、循环不上下跳」冲突；登记规则按 sheet 种类分：建筑/敌人质心，`*_walk_sheet` 脚底。
+**ADR-11 修订 2026-08-28**：玩家 walk 重画后，质心配准与「脚在地上、循环不上下跳」冲突；登记规则按 sheet 种类分：建筑/敌人质心，`*_walk_sheet` / `*_idle_sheet` 脚底（idle 呼吸同样会把胸口质心拽高）。
 
 **License 红线**：animal-island-ui 风格仅借鉴不引库（CC BY-NC 禁商用）；游戏为个人学习项目。

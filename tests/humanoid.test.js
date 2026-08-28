@@ -14,6 +14,16 @@ test('sheetKey: 玩家 walk/idle 固定键', () => {
   if (H.sheetKey('player', 3, true, 'idle') !== 'player_idle') throw new Error('玩家待机应为 player_idle');
 });
 
+test('sheetLayout: 玩家 idle 16 帧横排，walk 32', () => {
+  if (typeof H.sheetLayout !== 'function') throw new Error('Humanoid.sheetLayout 未导出');
+  var idle = H.sheetLayout('player_idle');
+  if (!idle) throw new Error('player_idle 应有布局');
+  if (idle.cols !== 16 || idle.count !== 16) throw new Error('idle 应为 16 帧横排, got '+JSON.stringify(idle));
+  var walk = H.sheetLayout('player_walk');
+  if (!walk || walk.cols !== 32 || walk.count !== 32) throw new Error('walk 应为 32 帧横排, got '+JSON.stringify(walk));
+  if (H.sheetLayout('bl_house')) throw new Error('建筑不应走人形布局');
+});
+
 test('sheetKey: 居民无包、过客有包、键不撞', () => {
   if (H.sheetKey('resident', 0, false, 'walk') !== 'hum_0_nopack_walk') throw new Error('居民走: '+H.sheetKey('resident',0,false,'walk'));
   if (H.sheetKey('visitor', 0, true, 'walk') !== 'hum_0_pack_walk') throw new Error('过客走: '+H.sheetKey('visitor',0,true,'walk'));
@@ -53,6 +63,19 @@ test('pose: 站住走 idle 出口，不是 walk 第 0 帧', () => {
   /* idleFps=4, time=1.25 → floor(5)%4=1; 右=dir2 → 2*4+1=9 */
   if (p.frame !== 9) throw new Error('右待机第 1 呼吸帧应为 9, got '+p.frame);
   if (p.sheet === 'player_walk' && p.frame === 16) throw new Error('不可用走循环第 0 帧冒充呼吸');
+});
+
+test('pose: idle 四向 下0 左4 右8 上12，不吃 walkPh', () => {
+  var cases = [[Math.PI/2, 0], [Math.PI, 4], [0, 8], [-Math.PI/2, 12]];
+  var i, p;
+  for (i = 0; i < cases.length; i++) {
+    p = H.pose({ moving:false, face:cases[i][0], walkPh:99, time:0, role:'player' });
+    if (p.sheet !== 'player_idle') throw new Error('应为 player_idle, got '+p.sheet);
+    if (p.cycle !== 'idle') throw new Error('应为 idle');
+    if (p.frame !== cases[i][1]) throw new Error('face '+cases[i][0]+' idle 帧应为 '+cases[i][1]+', got '+p.frame);
+  }
+  p = H.pose({ moving:false, face:Math.PI/2, walkPh:0, time:1.0, role:'player' });
+  if (p.frame !== 0) throw new Error('idle 满 4 帧应回到 0, got '+p.frame);
 });
 
 test('pose: 过客有包 idle 键', () => {

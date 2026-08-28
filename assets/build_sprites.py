@@ -126,7 +126,8 @@ def _shift_frame(fr, dx, dy, margin):
     return big.crop((margin, margin, margin + cell, margin + H))
 
 def register_sheet(path):
-    """横排方格表配准。建筑走质心; 玩家走循环对齐内容底边(踩地脚), 否则抬腿会把整帧拽上下跳。"""
+    """横排方格表配准。建筑走质心; 人形 walk/idle 对齐内容底边(踩地脚)。
+    走循环抬腿会把质心拽高; idle 呼吸会把胸口质心拽高——都用脚底才不上下跳。"""
     im = Image.open(path).convert('RGBA')
     W, H = im.size
     cell = cell_of(W, H)
@@ -135,7 +136,8 @@ def register_sheet(path):
     frames = W // cell
     margin = cell // 2
     moved = 0
-    use_feet = os.path.basename(path).endswith('_walk_sheet.png')
+    base = os.path.basename(path)
+    use_feet = base.endswith('_walk_sheet.png') or base.endswith('_idle_sheet.png')
     if use_feet:
         y0 = foot_y(im.crop((0, 0, cell, H)))
         for i in range(frames):
@@ -274,7 +276,7 @@ def main():
 
     print('== 重生成 src/sprite_data.js ==')
     lines = [
-        '/* 自动生成: python3 assets/build_sprites.py (假透明已清除; 建筑/敌人质心, 走循环脚底, 勿手改) */',
+        '/* 自动生成: python3 assets/build_sprites.py (假透明已清除; 建筑/敌人质心, 人形 walk/idle 脚底, 勿手改) */',
         'window.APH.SPRITE_DATA = window.APH.SPRITE_DATA || {};',
     ]
     for f in sorted(os.listdir(ASSETS)):
