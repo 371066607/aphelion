@@ -134,7 +134,9 @@ APH.Sprites = (function(){
     if (!img || !img.width) return false;
     var fw = img.width/2, fh = img.height/4;
     var sx = (step?1:0)*fw, sy = dir*fh;
-    g.drawImage(img, sx, sy, fw, fh, x, y, fw*scale, fh*scale);
+    /* 与 draw() 一致: (x,y) 是脚底中心, 不要用左上角, 否则光环/影子会对不齐 */
+    var dw = fw*scale, dh = fh*scale;
+    g.drawImage(img, sx, sy, fw, fh, x - dw/2, y - dh, dw, dh);
     return true;
   }
 

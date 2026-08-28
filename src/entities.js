@@ -273,17 +273,19 @@ APH.Ent = (function(){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
     ctx.save(); ctx.translate(e.x,e.y);
-    /* T12 玩家高可见度光圈(H键可关, 诊断用) */
+    var sprOk = window.APH.Sprites && APH.Sprites.isReady('player_walk');
+    /* T12 光圈: sprite 脚底锚在原点故圈心贴脚; 程序化小人站原点上方故圈心略偏南 */
+    var hx = sprOk ? -3 : 1, hy = sprOk ? 0 : 4;
     if(!s.showMarkerOff){
       var pulse=0.35+0.3*Math.sin(time*3);
       ctx.strokeStyle='rgba(89,217,255,'+(pulse*0.8)+')';
       ctx.lineWidth=2;
-      ctx.beginPath(); ctx.ellipse(0,4,16+pulse*3,8+pulse*1.5,0,0,U.TAU); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(hx,hy,16+pulse*3,8+pulse*1.5,0,0,U.TAU); ctx.stroke();
     }
     ctx.fillStyle='rgba(0,0,0,.35)';
-    ctx.beginPath(); ctx.ellipse(1,4,11,5.5,0,0,U.TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx,hy,11,5.5,0,0,U.TAU); ctx.fill();
     /* N1: 行走序列帧渲染(2列x4行表; 无图回退程序化小人) */
-    if (window.APH.Sprites && APH.Sprites.isReady('player_walk')){
+    if (sprOk){
       /* 由 s.face 弧度换算四向: 右0/下π/2/左±π/上-π/2 → 行号 下0/左1/右2/上3 */
       var ang=(s.face!==undefined)?s.face:Math.PI/2;
       var dirIdx=0;
@@ -291,8 +293,8 @@ APH.Ent = (function(){
       if(Math.abs(c)>=Math.abs(si)) dirIdx = (c>=0)?2:1;    // 右2 / 左1
       else dirIdx = (si>=0)?0:3;                            // 下0 / 上3
       var stepIdx = e.moving ? (Math.floor(e.walkPh/Math.PI)%2===0?1:0) : 0;
-      var sc = 34/128*2.6;                              // 显示高约88px→实际~46px
-      ctx.translate(-22,-bobbing);
+      var sc = 34/128*2.6;                              // 显示高约88px
+      ctx.translate(0,-bobbing);
       APH.Sprites.drawPlayerFrame(ctx,'player_walk',dirIdx,stepIdx,0,0,sc);
       ctx.globalAlpha=1;
       ctx.restore();
