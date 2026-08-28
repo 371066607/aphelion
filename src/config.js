@@ -22,7 +22,7 @@ APH.CFG = {
     chibiH: 43,                // 程序化小人未缩放的发顶到脚
     walkPerDir: 8,
     idlePerDir: 4,
-    idleFps: 2,                // 4 帧一轮 ≈ 2s，呼吸不是喘气
+    idleFps: 1,                // 4 帧一轮 ≈ 4s，慢呼吸，不像喘气
     walkFps: 10,
     sheetBaseline: 248,        // 256 格人形脚底（walk/idle 同锚）
     sheetContentH: 240         // 走循环实测内容高；idle 缺 meta 时同此以免跳高
