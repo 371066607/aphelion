@@ -603,13 +603,68 @@ APH.Ent = (function(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
   }
 
+  function drawResidentMarks(e, bob, iconY, haulY){
+    var ill=e.illness||0;
+    if(ill>=20){
+      ctx.fillStyle='#ff6d7a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('✚', 11, iconY+bob);
+    }
+    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
+    if((e.food||100)<eatBelow){
+      ctx.fillStyle='#c8e89a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🍽', -11, iconY+bob);
+    }
+    if(e.haulCarry && e.haulCarry.itemId){
+      var hc=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
+      var hy=haulY!=null?haulY:-8;
+      ctx.fillStyle=hc.tint||'#ffdf8f';
+      ctx.fillRect(7,hy+bob,7,7);
+      ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
+      ctx.strokeRect(7,hy+bob,7,7);
+    }
+    if(e.breaking){
+      ctx.fillStyle='#ff6d7a';
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💢', 0, iconY-8+bob);
+    }
+    ctx.fillStyle='#f7f3df';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'居民', 0, 16);
+  }
+
   function drawResident(e,time){
     if(!ctx) return;
     ctx.save();
     ctx.translate(e.x, e.y);
+    var walking=!!e.walking;
+    var sprWalk='hum_0_nopack_walk';
+    var sprOk=window.APH.Sprites && window.APH.Humanoid && APH.Sprites.isReady(sprWalk);
+    if(sprOk){
+      /* #5: 只出脸 0 无包；脸 1–3 是 #7 */
+      var pose=APH.Humanoid.pose({ moving:walking, face:e.face, walkPh:e.walkPh,
+                                   time:time, role:'resident', pack:false, faceIdx:0 });
+      var sheet=pose.sheet, frame=pose.frame;
+      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
+        sheet=sprWalk;
+        frame=pose.dir*((CFG.humanoid&&CFG.humanoid.walkPerDir)||8);
+      }
+      ctx.fillStyle='rgba(0,0,0,.28)';
+      ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
+      var defS=APH.Sprites.sheetDef(sheet)||APH.Sprites.sheetDef(sprWalk);
+      var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
+      var sc=APH.Humanoid.spriteScale(ch);
+      if(e.hitFlash>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
+      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
+      ctx.globalAlpha=1;
+      var top=-(CFG.humanoid&&CFG.humanoid.drawH||78);
+      drawResidentMarks(e, 0, top+8, top+40);
+      ctx.restore();
+      return;
+    }
     ctx.fillStyle='rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
-    var walking=!!e.walking;
     var bob=Math.sin((time||0)*(walking?8:2)+(e.x||0))*(walking?2.2:1.2);
     var ill=e.illness||0;
     var mood=e.mood!=null?e.mood:70;
@@ -619,32 +674,7 @@ APH.Ent = (function(){
     ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
     ctx.fillStyle='#6b4a32';
     ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
-    if(ill>=20){
-      ctx.fillStyle='#ff6d7a';
-      ctx.font='9px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('✚', 11, -22+bob);
-    }
-    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
-    if((e.food||100)<eatBelow){
-      ctx.fillStyle='#c8e89a';
-      ctx.font='9px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('🍽', -11, -22+bob);
-    }
-    if(e.haulCarry && e.haulCarry.itemId){
-      var hc=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
-      ctx.fillStyle=hc.tint||'#ffdf8f';
-      ctx.fillRect(7,-8+bob,7,7);
-      ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
-      ctx.strokeRect(7,-8+bob,7,7);
-    }
-    if(e.breaking){                          // B: 心情崩溃标记
-      ctx.fillStyle='#ff6d7a';
-      ctx.font='10px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('💢', 0, -30+bob);
-    }
-    ctx.fillStyle='#f7f3df';
-    ctx.font='9px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(e.name||'居民', 0, 16);
+    drawResidentMarks(e, bob, -22);
     ctx.restore();
   }
 

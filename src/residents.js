@@ -642,6 +642,11 @@ APH.Res = (function(){
     return { ok:false, why:'未知操作' };
   }
 
+  function bumpWalkPh(e, dt){
+    var fps=(CFG.humanoid&&CFG.humanoid.walkFps)!=null?CFG.humanoid.walkFps:10;
+    e.walkPh=(e.walkPh||0)+(dt||0)*fps;
+  }
+
   /* 直线走向目标(无寻路): 到达后停下. 坐标不落盘 */
   function walkToward(e, target, dt, speed){
     if(!e || !target) return e;
@@ -662,6 +667,7 @@ APH.Res = (function(){
     e.x+=dx/d*step; e.y+=dy/d*step;
     e.walking=true;
     e.face=Math.atan2(dy, dx);
+    bumpWalkPh(e, dt);
     return e;
   }
 
@@ -687,6 +693,9 @@ APH.Res = (function(){
     }
     e.x = U.clamp(e.x, 40, CFG.WORLD - 40);
     e.y = U.clamp(e.y, 40, CFG.WORLD - 40);
+    e.walking = true;
+    e.face = e.wanderA || 0;
+    bumpWalkPh(e, dt);
     return e;
   }
 

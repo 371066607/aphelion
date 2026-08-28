@@ -425,3 +425,7 @@
   验证: humanoid 测试绿；构建绿。
   下一步: 实机看慢呼吸；#1 过客/居民 sheet。
 
+- **2026-08-29 · 班次**: ✅#5 居民脸 0、无包、walk+idle。Codex 锁黑短发 bob identity（无包、奶油服薄荷袖），四向走循环 32 帧 + 站立 identity 脚钉呼吸 idle 16 帧。`drawResident` 走 Humanoid.pose（缺脸回退脸 0）；`walkToward`/`wanderStep` 推进 `walkPh`。sheet `hum_0_nopack_walk/idle` 与玩家同锚 baseline=248、内容高 240/236。
+  验证: `python3 build.py` 构建成功 8875KB 以 `</html>` 收尾；单元 234/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园居民贴图、无包、与玩家 spriteScale 相同（walk 0.325 / idle 0.3305）；走向岗位 `hum_0_nopack_walk` 四向，站住 `hum_0_nopack_idle` 四向。
+  下一步: #6 过客脸 0 有包 walk+idle。
+

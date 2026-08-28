@@ -290,6 +290,23 @@ test('walkToward: 不越过目标', () => {
   Res.walkToward(e, {x:10,y:0}, 1, 100);
   if(e.x!==10 || e.y!==0 || e.walking) throw new Error('不应越过: '+JSON.stringify(e));
 });
+test('walkToward: 走动推进 walkPh，停下冻结', () => {
+  const e={x:0,y:0,walkPh:0};
+  Res.walkToward(e, {x:100,y:0}, 1, 40);
+  if(!e.walking) throw new Error('应在走');
+  if(!(e.walkPh>0)) throw new Error('走时应推进 walkPh, got '+e.walkPh);
+  const ph=e.walkPh;
+  Res.walkToward(e, {x:100,y:0}, 2, 40);
+  if(e.walking) throw new Error('应停下');
+  if(e.walkPh!==ph) throw new Error('停下不应继续推进 walkPh, got '+e.walkPh+' vs '+ph);
+});
+test('wanderStep: 游荡时 walking、朝向、walkPh', () => {
+  const e={x:1100,y:1100,wanderA:0,wanderT:10,walkPh:0};
+  Res.wanderStep(e, 1, {x:1100,y:1100}, 220, ()=>0.5);
+  if(!e.walking) throw new Error('游荡应为 walking');
+  if(e.face==null || isNaN(e.face)) throw new Error('应有朝向, got '+e.face);
+  if(!(e.walkPh>0)) throw new Error('游荡应推进 walkPh, got '+e.walkPh);
+});
 
 /* ---------- B: 心情崩溃 ---------- */
 test('breakTypeOf: 性格分流四种崩溃', () => {

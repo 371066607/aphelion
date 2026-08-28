@@ -84,6 +84,27 @@ test('pose: 过客有包 idle 键', () => {
   if (p.frame !== 0) throw new Error('下向 idle 第 0 帧应为 0, got '+p.frame);
 });
 
+test('pose: 居民脸 0 无包 walk', () => {
+  var p = H.pose({ moving:true, face:Math.PI/2, walkPh:3.2, time:9, role:'resident', faceIdx:0, pack:false });
+  if (p.sheet !== 'hum_0_nopack_walk') throw new Error('居民走: '+p.sheet);
+  if (p.cycle !== 'walk') throw new Error('cycle 应为 walk, got '+p.cycle);
+  if (p.frame !== 3) throw new Error('向下走第 3 帧应为 3, got '+p.frame);
+});
+
+test('pose: 居民脸 0 无包 idle，不吃 walkPh', () => {
+  var p = H.pose({ moving:false, face:0, walkPh:99, time:1.2, role:'resident', faceIdx:0, pack:false });
+  if (p.sheet !== 'hum_0_nopack_idle') throw new Error('居民待机: '+p.sheet);
+  if (p.cycle !== 'idle') throw new Error('站住应为 idle, got '+p.cycle);
+  if (p.frame !== 9) throw new Error('右待机第 1 呼吸帧应为 9, got '+p.frame);
+});
+
+test('sheetLayout: 居民 nopack 与玩家同布局', () => {
+  var w = H.sheetLayout('hum_0_nopack_walk');
+  var idle = H.sheetLayout('hum_0_nopack_idle');
+  if (!w || w.cols !== 32 || w.count !== 32) throw new Error('居民 walk 应为 32, got '+JSON.stringify(w));
+  if (!idle || idle.cols !== 16 || idle.count !== 16) throw new Error('居民 idle 应为 16, got '+JSON.stringify(idle));
+});
+
 test('appearance: 过客有包、居民无包、脸 0–3', () => {
   var v = H.appearance('visitor', 'alpha');
   var r = H.appearance('resident', 'alpha');

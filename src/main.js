@@ -1683,7 +1683,9 @@ window.APH = window.APH || {};
         bl_turret:{idle:1,baseline:173,h:72}, bl_warehouse:{idle:1,baseline:169,h:90},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
-        player_idle:{baseline:248,h:236}
+        player_idle:{baseline:248,h:236},
+        hum_0_nopack_walk:{baseline:248,h:240},
+        hum_0_nopack_idle:{baseline:248,h:236}
       };
       Object.keys(SD).forEach(function(name){
         var layout = window.APH.Humanoid && APH.Humanoid.sheetLayout(name);
@@ -2268,7 +2270,7 @@ window.APH = window.APH || {};
         e={
           id:r.id, type:T.RESIDENT, x:home.x, y:home.y,
           name:r.name, rid:r.id, job:r.job, mood:r.mood, food:r.food,
-          illness:r.illness||0, walking:false,
+          illness:r.illness||0, walking:false, face:Math.PI/2, walkPh:0,
         };
         s.entities.push(e);
       }else{
