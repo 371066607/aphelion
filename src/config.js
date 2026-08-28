@@ -16,6 +16,15 @@ APH.CFG = {
   HAB: { x: 1100, y: 1100, r: 92 },
   DAY_LEN: 210,                // 一天的秒数
 
+  /* 人形贴图 (ADR-0001) */
+  humanoid: {
+    drawH: 78,                 // 所有人形目标内容高
+    chibiH: 43,                // 程序化小人未缩放的发顶到脚
+    walkPerDir: 8,
+    idlePerDir: 4,
+    idleFps: 4
+  },
+
   /* 玩家 */
   player: {
     walkSpeed: 150,

@@ -34,6 +34,7 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 |---|---|---|
 | config.js | `APH.CFG` | 全局数值表 (ADR-10: 代码零魔数) |
 | utils.js | `APH.U` | 工具 + 事件总线 `on/off/emit` (ADR-8) |
+| humanoid.js | `APH.Humanoid` | 人形 pose 缝：朝向/走停/脸/包 → sheet+帧 (ADR-0001) |
 | save.js | `APH.Save` | 三层存档读写/迁移收口 |
 | planet.js | `APH.Planet` | PlanetSpec 生成/tier 难度 |
 | llm.js | `APH.LLM` | OpenAI 兼容适配器+双层缓存+配额 |
@@ -62,7 +63,7 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 
 ### 视觉资产管线 (ADR-11)
 
-生图(codex exec，动森风统一色板) → PIL 切帧缩放 128 格 → `python3 assets/build_sprites.py`(帧质心配准+实测定 idleFrames+重生成 sprite_data.js) → sprites.js 注册加载渲染(无图回退程序化绘制)。建筑 8 帧 sheet；玩家 2×4 四向；敌人按状态选帧。建筑昼夜渲染=原版/tint 版整张切换，**全不透明，禁止用透明度混合**(用户红线)；日常只播实测平静帧，未配准合格的 sheet 静态帧 0。
+生图(codex exec，动森风统一色板) → PIL 切帧缩放 128 格 → `python3 assets/build_sprites.py`(帧质心配准+实测定 idleFrames+重生成 sprite_data.js) → sprites.js 注册加载渲染(无图回退程序化绘制)。建筑 8 帧 sheet；人形走 32 帧横排 + idle 16 帧另张（ADR-0001）；敌人按状态选帧。建筑昼夜渲染=原版/tint 版整张切换，**全不透明，禁止用透明度混合**(用户红线)；日常只播实测平静帧，未配准合格的 sheet 静态帧 0。
 
 ### 测试体系
 

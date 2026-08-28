@@ -15,6 +15,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 MODULE_ORDER = [
     "config.js",
     "utils.js",
+    "humanoid.js",
     "save.js",
     "planet.js",
     "llm.js",

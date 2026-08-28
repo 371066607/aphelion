@@ -285,17 +285,19 @@ APH.Ent = (function(){
     ctx.fillStyle='rgba(0,0,0,.35)';
     ctx.beginPath(); ctx.ellipse(hx,hy,11,5.5,0,0,U.TAU); ctx.fill();
     /* N1: 行走序列帧渲染(2列x4行表; 无图回退程序化小人) */
-    if (sprOk){
-      /* 由 s.face 弧度换算四向: 右0/下π/2/左±π/上-π/2 → 行号 下0/左1/右2/上3 */
+    if (sprOk && window.APH.Humanoid){
       var ang=(s.face!==undefined)?s.face:Math.PI/2;
-      var dirIdx=0;
-      var c=Math.cos(ang), si=Math.sin(ang);
-      if(Math.abs(c)>=Math.abs(si)) dirIdx = (c>=0)?2:1;    // 右2 / 左1
-      else dirIdx = (si>=0)?0:3;                            // 下0 / 上3
-      var stepIdx = e.moving ? (Math.floor(e.walkPh/Math.PI)%2===0?1:0) : 0;
-      var sc = 34/128*2.6;                              // 显示高约88px
-      ctx.translate(0,-bobbing);
-      APH.Sprites.drawPlayerFrame(ctx,'player_walk',dirIdx,stepIdx,0,0,sc);
+      var pose=APH.Humanoid.pose({ moving:!!e.moving, face:ang, walkPh:e.walkPh, time:time, role:'player' });
+      var sheet=pose.sheet, frame=pose.frame;
+      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
+        sheet='player_walk';
+        frame=pose.dir*(APH.CFG.humanoid.walkPerDir||8);
+      }
+      var defS = APH.Sprites.sheetDef('player_walk');
+      var ch = (defS && defS.contentH) || 211;
+      var sc = APH.Humanoid.spriteScale(ch);
+      if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
+      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
       ctx.globalAlpha=1;
       ctx.restore();
       return;

@@ -1,0 +1,99 @@
+/* ============================================================
+   Aphelion · humanoid.js — 人形 pose 缝 (ADR-0001)
+   挂载: window.APH.Humanoid
+   ============================================================ */
+window.APH = window.APH || {};
+
+APH.Humanoid = (function(){
+  'use strict';
+  var CFG = APH.CFG;
+
+  function hum(){
+    return (CFG && CFG.humanoid) || { walkPerDir:8, idlePerDir:4, idleFps:4, drawH:78, chibiH:43 };
+  }
+
+  /* 下0 左1 右2 上3 — 与现有玩家朝向分档一致 */
+  function dirOf(ang){
+    if (ang == null || isNaN(ang)) ang = Math.PI/2;
+    var c = Math.cos(ang), si = Math.sin(ang);
+    if (Math.abs(c) >= Math.abs(si)) return c >= 0 ? 2 : 1;
+    return si >= 0 ? 0 : 3;
+  }
+
+  function sheetKey(role, faceIdx, pack, cycle){
+    if (role === 'player') return cycle === 'idle' ? 'player_idle' : 'player_walk';
+    var fi = (faceIdx|0);
+    if (fi < 0) fi = 0;
+    if (fi > 3) fi = 3;
+    var ward = pack ? 'pack' : 'nopack';
+    var cyc = cycle === 'idle' ? 'idle' : 'walk';
+    return 'hum_' + fi + '_' + ward + '_' + cyc;
+  }
+
+  function faceIdx(id){
+    var h = 2166136261;
+    var s = String(id == null ? '' : id);
+    var i;
+    for (i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) % 4;
+  }
+
+  function appearance(role, id){
+    return {
+      faceIdx: faceIdx(id),
+      pack: role === 'visitor'
+    };
+  }
+
+  function pose(input){
+    input = input || {};
+    var H = hum();
+    var walkN = H.walkPerDir || 8;
+    var idleN = H.idlePerDir || 4;
+    var fps = H.idleFps || 4;
+    var dir = dirOf(input.face);
+    var moving = !!input.moving;
+    var role = input.role || 'player';
+    var pack = !!input.pack;
+    var fi = input.faceIdx;
+    if (fi == null) fi = 0;
+    var cycle = moving ? 'walk' : 'idle';
+    var frame;
+    if (moving) {
+      frame = dir * walkN + ((Math.floor(input.walkPh) | 0) % walkN + walkN) % walkN;
+    } else {
+      var t = input.time || 0;
+      frame = dir * idleN + ((Math.floor(t * fps) % idleN) + idleN) % idleN;
+    }
+    return {
+      dir: dir,
+      cycle: cycle,
+      frame: frame,
+      sheet: sheetKey(role, fi, pack, cycle)
+    };
+  }
+
+  function spriteScale(contentH){
+    var H = hum();
+    var ch = contentH || 211;
+    return (H.drawH || 78) / ch;
+  }
+
+  function chibiScale(){
+    var H = hum();
+    return (H.drawH || 78) / (H.chibiH || 43);
+  }
+
+  return {
+    dirOf: dirOf,
+    sheetKey: sheetKey,
+    faceIdx: faceIdx,
+    appearance: appearance,
+    pose: pose,
+    spriteScale: spriteScale,
+    chibiScale: chibiScale
+  };
+})();
