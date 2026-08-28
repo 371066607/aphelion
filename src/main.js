@@ -463,6 +463,9 @@ window.APH = window.APH || {};
     s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
     s.nearVisitor = nearestVisitor(s);
     updateVisitors(dt);
+    /* C: 游商走了/离远了自动收面板 */
+    var tpO=document.getElementById('tradePanel');
+    if(tpO && tpO.style.display!=='none' && !currentTrader()) toggleTradePanel(false);
     if(s.nearVisitor){
       var vp=s.nearVisitor.profile||s.nearVisitor;
       var skn=APH.Res.SKILL_NAMES[vp.mainSkill]||'';
@@ -477,6 +480,7 @@ window.APH = window.APH || {};
           ? '  [F] 请客(-'+mealCost+'粮)'
           : '  [F] 没粮请客';
       }
+      if(s.nearVisitor.trade) mealBit+='  [T] 交易';
       if((s.nearVisitor.askCd||0)>0){
         APH.UI.setHint(vp.name+' 还想再看看… · 印象'+imp+mealBit);
       }else{
@@ -531,9 +535,12 @@ window.APH = window.APH || {};
       var bb=APH.Colony.builderBonusOf(s.meta.residents||[]);
       var near=[{x:s.px,y:s.py}];
       var builders={};
+      var wpB=s.meta.workPrio||{};
       (s.meta.residents||[]).forEach(function(r){
         if(!APH.Colony.isBuilder(r)) return;
         if(r.job && r.job!=='blueprint') return;
+        if(APH.Res.isBroken && APH.Res.isBroken(r)) return;   // 崩溃者不施工
+        if(wpB[r.id] && wpB[r.id].sk_build===0) return;       // D: 建造被禁止
         builders[r.id]=true;
       });
       s.entities.forEach(function(en){
@@ -583,7 +590,10 @@ window.APH = window.APH || {};
       });
       var nightP=APH.World.daylight()<.5;
       var hmods=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightP);
-      var out=APH.Colony.productionTick(s.meta, s.colony.buildings, s.meta.residents||[], hmods);
+      var prodWorkers=(s.meta.residents||[]).filter(function(r){
+        return !(APH.Res.isBroken && APH.Res.isBroken(r));   // 崩溃者缺勤
+      });
+      var out=APH.Colony.productionTick(s.meta, s.colony.buildings, prodWorkers, hmods);
       (out.piles||[]).forEach(function(p){
         APH.Combat.spawnDrop(p.x+16, p.y+14, p.itemId, p.n, {stock:true});
       });
@@ -591,6 +601,7 @@ window.APH = window.APH || {};
         APH.UI.floatText('生产: '+(out.mineral?'矿材×'+out.mineral+'堆在地上 ':'')+(out.research?'+'+out.research+' 研究点':''),'#9fe8c8');
       /* AI殖民地同步成长(同拍) */
       tickRivals(30/60);
+      storyTick(30/60);                           // ADR-12 先于居民跳, 兽群本跳×3 才吃得到
       residentsTick();                            // P6-U2/U4/U7
     }
 
@@ -608,6 +619,7 @@ window.APH = window.APH || {};
       });
       s.colony.buildings.forEach(function(b){
         if(b.id!=='bl_turret') return;
+        if((b.offlineT||0)>0) return;              // ev_solar_flare: 火控停机
         var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
         var fired=APH.Combat.turretStep(tw,raidFoes,dt);
         b.cd=tw.cd;
@@ -619,33 +631,88 @@ window.APH = window.APH || {};
         if(b.fireT>0) b.fireT=Math.max(0,b.fireT-dt*3);
       });
 
-      /* 波次刷怪(袭击敌人从地图边缘冲基地) */
+      var RT=CFG.raidTactics||{};
+
+      /* 阶段E: 围攻扎营期(炮击/倒计时/拆营判定) */
+      siegeTick(dt);
+
+      /* 阶段E: 双波间歇 */
+      if(s.war.betweenWaves){
+        s.war.nextWaveT-=dt;
+        APH.UI.setHint('⚠ 第二波正在集结 '+Math.ceil(Math.max(0,s.war.nextWaveT))+'s — 方向会变!');
+        if(s.war.nextWaveT<=0){
+          s.war.betweenWaves=false;
+          s.war.spawned=0;
+          s.war.waveAngle=(s.war.waveAngle||0)+(RT.wave2Angle!=null?RT.wave2Angle:2.4);
+          APH.UI.floatText('⚠ 第二波袭击!','#ff9a9a');
+        }
+      }
+
+      /* 波次刷怪(袭击敌人从地图边缘冲基地; 围攻则刷在营地旁) */
       s.war.raidSpawnT=(s.war.raidSpawnT||0)-dt;
       var aliveEnemies=0;
       s.entities.forEach(function(e){
         if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) aliveEnemies++;
       });
-      if(aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
+      if(!s.war.betweenWaves && !s.war.routed &&
+         aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
         s.war.raidSpawnT=.7;
         var f=APH.Planet.pickRaidFaction(s.lastExpedition, s.seed);
-        var ang=Math.random()*U.TAU, d=Math.max(vpW(),vpH())*.62;
-        var ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40),
-            ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
+        var ang=(s.war.waveAngle!=null)
+          ? s.war.waveAngle+(Math.random()-.5)*.9
+          : Math.random()*U.TAU;
+        var d=Math.max(vpW(),vpH())*.62;
+        var ex,ey;
+        var camping=s.war.siege && s.war.siege.phase==='camp';
+        if(camping){
+          ex=U.clamp(s.war.siege.cx+U.rr(-60,60),40,CFG.WORLD-40);
+          ey=U.clamp(s.war.siege.cy+U.rr(-60,60),40,CFG.WORLD-40);
+        }else{
+          ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40);
+          ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
+        }
         var en=APH.Ent.makeEnemy(f,ex,ey);
-        en.state='chase';                       // 直接冲基地
+        if(camping){
+          en.sieging=true; en.campX=s.war.siege.cx; en.campY=s.war.siege.cy;
+          en.state='idle';
+        }else{
+          en.state='chase';                     // 直接冲基地
+        }
+        if(s.war.tactic==='pillage') en.pillager=true;
         s.entities.push(en);
         s.war.spawned++;
       }
-      if(s.war.spawned>=s.war.wave.count){
+
+      /* 阶段E: 溃退判定——伤亡比例达阈值全体撤退 */
+      if(!s.war.routed){
+        var totalPlanned=(s.war.wave.count||1)*((s.war.wave.waves||1));
+        var routAt=RT.routAt!=null?RT.routAt:.6;
+        if((s.war.casualties||0) >= Math.ceil(totalPlanned*routAt))
+          raidRetreat('⚠ 伤亡过重, 敌军溃退!', false);
+      }
+
+      if(!s.war.betweenWaves && s.war.spawned>=s.war.wave.count){
         var left=0;
         s.entities.forEach(function(e){
           if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) left++;
         });
         if(left===0){
-          s.war.raidActive=false; s.war.wins++;
-          saveWar();
-          APH.UI.floatText('✔ 袭击被击退! 战争态势提升','#7dffab');
-          U.emit('raidDefended',{});
+          if(!s.war.routed && (s.war.wavesLeft||0)>0){
+            s.war.wavesLeft--;
+            s.war.betweenWaves=true;
+            s.war.nextWaveT=RT.waveGap!=null?RT.waveGap:45;
+          }else{
+            s.war.raidActive=false;
+            clearSiegeCamp();
+            if(s.war.escaped){
+              APH.UI.floatText('⚠ 盗掠者满载而归…下次早点拦截','#ffb35c');
+            }else{
+              s.war.wins++;
+              APH.UI.floatText('✔ 袭击被击退! 战争态势提升','#7dffab');
+              U.emit('raidDefended',{});
+            }
+            saveWar();
+          }
         }
       }
     }
@@ -665,23 +732,239 @@ window.APH = window.APH || {};
       var g=APH.Rivals.growthTick(r.rival, minutes);
       r.rival.military=g.military; r.rival.economy=g.economy;
       r.anger += minutes;
-      /* 袭击决策(只在玩家在家时可发动; 远征时暂停积累愤怒) */
+      /* 袭击决策(ADR-12): 军力/时机成熟只标记备战,
+         实际开打由事件导演的 ev_raid 统一调度(保证喘息窗口) */
       var def=playerDefPower();
       var decision=APH.Rivals.shouldRaid(r.rival, def, r.anger);
-      if(decision.should && !s.war.raidActive && s.war.raidWarn<=0){
-        r.anger=0;
-        s.war.raidFrom=r.rival.name;
-        s.war.raidWarn=12;                      // 预警12s(原型缩短, 正式版60s)
-        s.war.pendingWave=APH.Rivals.raidWave(r.rival);
-        saveRivals();
-      }
+      r.wantRaid = !!decision.should;
     });
   }
+  /* ev_raid 落地: 从备战的敌殖民地里挑军力最强者发动 */
+  function launchRivalRaid(){
+    var s=APH.state;
+    if(s.war.raidActive || s.war.raidWarn>0) return false;
+    if(!s.rivalStates) loadRivals();
+    var pick=null;
+    (s.rivalStates||[]).forEach(function(r){
+      if(!r.wantRaid) return;
+      if(!pick || r.rival.military>pick.rival.military) pick=r;
+    });
+    if(!pick) return false;
+    pick.anger=0; pick.wantRaid=false;
+    s.war.raidFrom=pick.rival.name;
+    s.war.raidWarn=12;                      // 预警12s(原型缩短, 正式版60s)
+    s.war.pendingWave=APH.Rivals.raidWave(pick.rival);
+    saveRivals();
+    return true;
+  }
+  /* ---- ADR-12 事件叙事者: 上下文汇总 + 节奏推进 + 效果落地 ---- */
+  function storyCtx(){
+    var s=APH.state, m=s.meta;
+    var buildings=(s.colony&&s.colony.buildings)||[];
+    var wealth=APH.Events.wealthScore(m, extraRes(), buildings);
+    var moodAvg=100;
+    if(m.residents && m.residents.length){
+      var sum=0; m.residents.forEach(function(r){ sum+=r.mood||0; });
+      moodAvg=sum/m.residents.length;
+    }
+    var rivalReady=false;
+    (s.rivalStates||[]).forEach(function(r){ if(r.wantRaid) rivalReady=true; });
+    return {
+      wealth:wealth, threat:APH.Events.threatLevel(wealth),
+      moodAvg:moodAvg,
+      raidActive:!!(s.war.raidActive || s.war.raidWarn>0),
+      residentCount:(m.residents||[]).length,
+      hasSpareBed:housingCap()>(m.residents||[]).length,
+      hasPasture:buildings.some(function(b){return b.id==='bl_pasture';}),
+      hasFarm:buildings.some(function(b){return b.id==='bl_farm';}),
+      hasTurret:buildings.some(function(b){return b.id==='bl_turret';}),
+      visitorSlot:visitorCount()<((CFG.visitor&&CFG.visitor.max)||2),
+      rivalReady:rivalReady,
+    };
+  }
+  function storyTick(dtMin){
+    var s=APH.state, m=s.meta;
+    if(s.scene!=='home') return;
+    m.events=m.events||{ nextIn:null, sinceNeg:1e9, lastNeg:0, cooldowns:{}, history:[] };
+    var seed=((s.seed||7)*613 + Math.floor(s.clock||0)*29 +
+              ((m.events.history||[]).length)*101)>>>0;
+    var rng=U.makeRng(seed);
+    var out=APH.Events.directorTick(m.events, storyCtx(), rng, dtMin);
+    var lastNeg=m.events.lastNeg||0;
+    m.events=Object.assign({}, out.state, { history:m.events.history||[], lastNeg:lastNeg });
+    if(out.fired){
+      m.events.history.push({ id:out.fired, at:Math.round(s.clock||0) });
+      var hMax=(CFG.events&&CFG.events.historyMax!=null)?CFG.events.historyMax:40;
+      if(m.events.history.length>hMax) m.events.history.shift();
+      if(out.neg) m.events.lastNeg=Math.round(s.clock||0);
+      applyEvent(out.fired, rng);
+      saveMetaQuiet();
+    }
+  }
+  function applyEvent(id, rng){
+    var s=APH.state, m=s.meta;
+    var E=CFG.events||{};
+    var buildings=(s.colony&&s.colony.buildings)||[];
+    var rand=rng||Math.random;
+    var t=APH.Events.textOf(id);
+    if(id==='ev_droppod'){
+      var mR=E.droppodMineral||[4,8], fR=E.droppodFood||[2,4];
+      var mn=mR[0]+Math.floor(rand()*(mR[1]-mR[0]+1));
+      var fn=fR[0]+Math.floor(rand()*(fR[1]-fR[0]+1));
+      var dR=E.droppodDist||[160,240];
+      var ang=rand()*U.TAU, d=dR[0]+rand()*((dR[1]||dR[0])-dR[0]);
+      var x=U.clamp(CFG.HAB.x+Math.cos(ang)*d, 80, CFG.WORLD-80);
+      var y=U.clamp(CFG.HAB.y+Math.sin(ang)*d, 80, CFG.WORLD-80);
+      var jit=E.droppodJitter!=null?E.droppodJitter:26;
+      APH.Combat.spawnDrop(x, y, 'it_mineral', mn, {stock:true, jitter:jit});
+      APH.Combat.spawnDrop(x+30, y+16, 'it_food', fn, {stock:true, jitter:jit});
+      s.parts.push({t:'ping',x:x,y:y,life:.9,max:.9});
+      s.shake=Math.min(1,s.shake+.3);
+    }else if(id==='ev_refugee_wave'){
+      var n=1+(rand()<(E.refugeeSecondP!=null?E.refugeeSecondP:.5)?1:0);
+      for(var i=0;i<n;i++) spawnVisitor(null, {origin:'地球难民船'});
+    }else if(id==='ev_herd'){
+      var hmul=E.herdMul!=null?E.herdMul:3;
+      buildings.forEach(function(b){
+        if(b.id!=='bl_pasture') return;
+        b.herdMul=hmul;                          // 本跳牧场产出×3(ranchTick 消耗)
+      });
+      saveColony();
+    }else if(id==='ev_aurora'){
+      var boost=E.auroraMood!=null?E.auroraMood:10;
+      (m.residents||[]).forEach(function(r){ r.mood=Math.min(100,(r.mood||0)+boost); });
+    }else if(id==='ev_trader_caravan'){
+      spawnVisitor(null, {origin:'游商后代'});
+    }else if(id==='ev_plague'){
+      var ratio=E.plagueRatio!=null?E.plagueRatio:0.3;
+      var ill=E.plagueIll!=null?E.plagueIll:15;
+      var hitN=0;
+      (m.residents||[]).forEach(function(r){
+        if(rand()>=ratio) return;
+        APH.Res.hurtResident(r, ill, 'plague');    // F: 疫病分型, 必须用药除根
+        hitN++;
+      });
+      if(hitN===0 && (m.residents||[]).length){    // 疫病至少感染一人
+        APH.Res.hurtResident(m.residents[Math.floor(rand()*m.residents.length)], ill, 'plague');
+      }
+      syncResidentEntities();
+    }else if(id==='ev_blight'){
+      var cut=E.blightCut!=null?E.blightCut:0.5;
+      buildings.forEach(function(b){
+        if(b.id!=='bl_farm' || !b.plot) return;
+        b.plot={ stage:Math.floor((b.plot.stage||0)*cut), t:0 };
+      });
+      saveColony();
+    }else if(id==='ev_solar_flare'){
+      buildings.forEach(function(b){
+        if(b.id==='bl_turret') b.offlineT=(b.offlineT||0)+(E.flareOffline!=null?E.flareOffline:60);
+      });
+      saveColony();
+    }else if(id==='ev_raid'){
+      if(!launchRivalRaid()) return;               // 没有备战的敌殖民地则无声跳过
+    }
+    var negCfg=(E.deck||{})[id]||{};
+    APH.UI.floatText((negCfg.neg?'⚠ ':'◆ ')+t.name, negCfg.neg?'#ff9a9a':'#8fd4ff');
+    APH.UI.showCard(t.name, t.lore);
+    APH.Events.enrichEvent(id, s.seed).then(function(rich){
+      if(rich && rich.lore && rich.lore!==t.lore) APH.UI.showCard(rich.name, rich.lore);
+    });
+    U.emit('storyEvent', { id:id });
+  }
+
   function playerDefPower(){
     var s=APH.state;
     var turrets=s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length;
     return 10 + turrets*12 + (s.meta.tech.te_weaponry||0)*5;
   }
+  /* ---- 阶段E: 袭击战术辅助 ---- */
+  function setupSiegeCamp(){
+    var s=APH.state;
+    var t=((CFG.raidTactics||{}).tactics||{}).siege||{};
+    var d=t.campDist!=null?t.campDist:500;
+    var ang=s.war.waveAngle||0;
+    var cx=U.clamp(CFG.HAB.x+Math.cos(ang)*d,80,CFG.WORLD-80);
+    var cy=U.clamp(CFG.HAB.y+Math.sin(ang)*d,80,CFG.WORLD-80);
+    var hp=t.campHp!=null?t.campHp:60;
+    var camp={ id:'bl_siege_camp_'+Date.now(), type:T.BUILDING, bid:'bl_siege_camp',
+               x:cx, y:cy, hp:hp, maxHp:hp };
+    s.entities.push(camp);
+    s.war.siege={ phase:'camp',
+                  t:(t.campSec!=null?t.campSec:90),
+                  shellT:(t.shellPeriod!=null?t.shellPeriod:15),
+                  campId:camp.id, cx:cx, cy:cy };
+    APH.UI.floatText('⚠ 敌军在外围扎营围攻!','#ff9a9a');
+  }
+  function siegeTick(dt){
+    var s=APH.state;
+    var sg=s.war.siege;
+    if(!sg || sg.phase!=='camp') return;
+    var t=((CFG.raidTactics||{}).tactics||{}).siege||{};
+    var camp=null;
+    s.entities.forEach(function(e){ if(e.id===sg.campId && !e.dead) camp=e; });
+    if(!camp){                              // 营地被拆(事件兜底)
+      sg.phase='done';
+      if(!s.war.routed) raidRetreat('✔ 围攻营地被摧毁, 敌军溃退!', false);
+      return;
+    }
+    sg.t-=dt; sg.shellT-=dt;
+    if(sg.shellT<=0){
+      sg.shellT=t.shellPeriod!=null?t.shellPeriod:15;
+      /* 炮击: 向最近建筑发一发远程弹, 命中后停机 */
+      var tgt=null, td=1e9;
+      (s.colony.buildings||[]).forEach(function(b){
+        if(b.id==='bl_landing_pad') return;
+        var bd=U.dst(sg.cx,sg.cy,b.x,b.y);
+        if(bd<td){ td=bd; tgt=b; }
+      });
+      if(tgt){
+        var dx=tgt.x-sg.cx, dy=tgt.y-sg.cy, dd=Math.sqrt(dx*dx+dy*dy)||1;
+        var spd=t.shellSpeed!=null?t.shellSpeed:280;
+        var pj=APH.Combat.makeProj(sg.cx, sg.cy, dx/dd*spd, dy/dd*spd, 'siege', 0);
+        pj.life=t.shellLife!=null?t.shellLife:5;
+        pj.offlineSec=t.shellOffline!=null?t.shellOffline:20;
+        s.entities.push(pj);
+        APH.UI.floatText('💥 围攻炮击!','#ff9a9a');
+      }
+    }
+    APH.UI.setHint('⚠ 敌军扎营围攻中 '+Math.ceil(Math.max(0,sg.t))+'s — 出击拆营可解围!');
+    if(sg.t<=0){
+      sg.phase='charge';                    // 扎营结束转强攻
+      camp.dead=true;
+      s.entities.forEach(function(e){
+        if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier&&e.sieging){
+          e.sieging=false; e.state='chase';
+        }
+      });
+      APH.UI.floatText('⚠ 扎营结束, 敌军发起总攻!','#ff9a9a');
+    }
+  }
+  /* 全体溃退: escaped=true 表示盗掠得手(不掉赃物) */
+  function raidRetreat(msg, escaped){
+    var s=APH.state, RT=CFG.raidTactics||{};
+    if(s.war.routed) return;
+    s.war.routed=true;
+    s.war.escaped=!!escaped;
+    s.war.wavesLeft=0; s.war.betweenWaves=false;
+    if(s.war.wave) s.war.spawned=Math.max(s.war.spawned||0, s.war.wave.count||0);
+    var dropRng=U.makeRng((((s.seed||7)*911)+Math.floor(s.clock||0)*17+(s.war.casualties||0)*13)>>>0);
+    s.entities.forEach(function(e){
+      if(e.type!==T.ENEMY||e.dead||e.isSoldier) return;
+      e.retreat=true; e.sieging=false;
+      if(!escaped && dropRng()<(RT.routDropChance!=null?RT.routDropChance:.5))
+        APH.Combat.spawnDrop(e.x, e.y, 'it_mineral', 1, {jitter:14});
+    });
+    clearSiegeCamp();
+    APH.UI.floatText(msg, escaped?'#ffb35c':'#ffd97a');
+  }
+  function clearSiegeCamp(){
+    var s=APH.state;
+    s.entities.forEach(function(e){
+      if(e.type===T.BUILDING && e.bid==='bl_siege_camp') e.dead=true;
+    });
+    if(s.war.siege) s.war.siege.phase='done';
+  }
+
   function startRaid(){
     var s=APH.state;
     s.war.raidActive=true;
@@ -702,7 +985,15 @@ window.APH = window.APH || {};
       APH.Save.saveMeta(s.meta);
     }
     s.war.wave=s.war.pendingWave||{count:4};
+    s.war.tactic=s.war.wave.tactic||'assault';
     s.war.spawned=0; s.war.raidSpawnT=0;
+    s.war.casualties=0; s.war.stolen=0;
+    s.war.routed=false; s.war.escaped=false;
+    s.war.wavesLeft=Math.max(0,(s.war.wave.waves||1)-1);
+    s.war.betweenWaves=false; s.war.nextWaveT=0;
+    s.war.waveAngle=Math.random()*U.TAU;
+    s.war.siege=null;
+    if(s.war.tactic==='siege') setupSiegeCamp();
     APH.UI.setHint('');
     document.getElementById('vig').style.opacity=.5;
     setTimeout(function(){document.getElementById('vig').style.opacity=0;},900);
@@ -1087,11 +1378,27 @@ window.APH = window.APH || {};
       if(e.code==='KeyP'&&s.mode==='running'&&s.scene==='home'){
         cycleSelectedJob();
       }
-      if(s.mode==='running'&&s.scene==='home' && /^Digit[1-9]$/.test(e.code)){
+      if(s.mode==='running'&&s.scene==='home' && /^Digit[0-9]$/.test(e.code)){
+        var tp2=document.getElementById('tradePanel');
         var rp2=document.getElementById('resPanel');
-        if(rp2 && rp2.style.display!=='none'){
-          s.resSel=parseInt(e.code.slice(5),10)-1;
-          renderResPanel();
+        if(tp2 && tp2.style.display!=='none' && e.code!=='Digit0'){
+          doTradeRow(parseInt(e.code.slice(5),10)-1);
+        }else if(rp2 && rp2.style.display!=='none' && /^Digit[0-3]$/.test(e.code)){
+          setPrioAtCursor(parseInt(e.code.slice(5),10));   // D: 设优先级
+        }
+      }
+      if(s.mode==='running'&&s.scene==='home' &&
+         /^Arrow(Up|Down|Left|Right)$/.test(e.code)){
+        var tpA=document.getElementById('tradePanel');
+        var rpA=document.getElementById('resPanel');
+        if(tpA && tpA.style.display!=='none' && /^Arrow(Up|Down)$/.test(e.code)){
+          moveTradeSel(e.code);
+          s.keys[e.code]=false;
+          if(e.preventDefault) e.preventDefault();
+        }else if(rpA && rpA.style.display!=='none'){
+          movePrioCursor(e.code);
+          s.keys[e.code]=false;
+          if(e.preventDefault) e.preventDefault();
         }
       }
       /* B=建造模式(仅殖民地): 循环选择建筑, 点地放置, 右键/Esc取消 */
@@ -1105,6 +1412,10 @@ window.APH = window.APH || {};
           : '建造模式关闭');
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
+      if(e.code==='Escape'){
+        var tpE=document.getElementById('tradePanel');
+        if(tpE && tpE.style.display!=='none') toggleTradePanel(false);
+      }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
       if(e.code==='KeyH'){ s.showMarker=!s.showMarker;
@@ -1173,8 +1484,11 @@ window.APH = window.APH || {};
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
       /* G=建造目录(左侧按钮/底部row) */
       if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){ toggleBuildRow(); }
-      /* T=科技购买(仅殖民地): 循环选择并直接购买 */
-      if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
+      /* T=科技购买(仅殖民地): 循环选择并直接购买; 靠近游商时改开交易面板 */
+      if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'&&
+         s.nearVisitor && s.nearVisitor.trade){
+        toggleTradePanel();
+      }else if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
         var tids=Object.keys(APH.Colony.TECHS);
         var ti=tids.indexOf(s.techSel);
         s.techSel=tids[(ti+1)%tids.length];
@@ -1183,7 +1497,11 @@ window.APH = window.APH || {};
         APH.UI.setHint('[回车购买] '+tdef.name+' Lv'+lv+'/'+tdef.max+
           ' · '+tdef.desc+' · '+tdef.cost+'研究点 (再按T换, Enter买)');
       }
-      if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'&&s.techSel){
+      if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'){
+        var tpEnt=document.getElementById('tradePanel');
+        if(tpEnt && tpEnt.style.display!=='none' && currentTrader()){
+          doTradeRow(s.tradeSel||0);
+        }else if(s.techSel){
         var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech);
         if(r2.ok){
           s.meta.tech=r2.owned;
@@ -1192,6 +1510,7 @@ window.APH = window.APH || {};
           APH.UI.floatText('✔ 研究完成: '+APH.Colony.TECHS[s.techSel].name,'#59d9ff');
         }else{
           APH.UI.floatText('✕ 无法研究','#ff9a9a');
+        }
         }
       }
       if(e.code==='KeyK'&&s.mode==='running'&&s.debugKeys){
@@ -1307,6 +1626,30 @@ window.APH = window.APH || {};
   /* ================= 事件订阅 (ADR-8 示范) ================= */
   U.on('crystalPicked', function(){ /* Phase1: 音效挂这里 */ });
   U.on('beaconScanned', function(b){ /* Phase2: 动态档案生成挂这里 */ });
+  /* 阶段E: 袭击伤亡计数(溃退判定依据) */
+  U.on('enemyKilled', function(p){
+    var s=APH.state;
+    if(!s.war || !s.war.raidActive) return;
+    var en=p&&p.en;
+    if(!en || en.isSoldier || en.retreat) return;
+    s.war.casualties=(s.war.casualties||0)+1;
+  });
+  /* 阶段E: 盗掠计数——偷够 stealCap 即得手撤退 */
+  U.on('raidStole', function(){
+    var s=APH.state;
+    if(!s.war || !s.war.raidActive || s.war.routed) return;
+    s.war.stolen=(s.war.stolen||0)+1;
+    if(s.war.tactic!=='pillage') return;
+    var t=((CFG.raidTactics||{}).tactics||{}).pillage||{};
+    if(s.war.stolen>=(t.stealCap!=null?t.stealCap:6))
+      raidRetreat('⚠ 盗掠者偷够就跑!', true);
+  });
+  /* 阶段E: 围攻营地被玩家弹丸拆毁 → 全体溃退 */
+  U.on('siegeCampDown', function(){
+    var s=APH.state;
+    if(!s.war || !s.war.raidActive || s.war.routed) return;
+    raidRetreat('✔ 围攻营地被摧毁, 敌军溃退!', false);
+  });
 
   /* ================= 启动 ================= */
   function boot(){
@@ -1602,6 +1945,107 @@ window.APH = window.APH || {};
     });
   }
 
+  /* ================= C: 游商交易面板 ================= */
+  var RES_LABEL={ mineral:'矿材', food:'食物', leather:'皮革', med:'药品', alloy:'合金', crystal:'晶体矿' };
+  function tradeRowCount(tr){
+    if(!tr||!tr.trade) return 0;
+    return (tr.trade.sells||[]).length+(tr.trade.buys||[]).length;
+  }
+  function moveTradeSel(code){
+    var s=APH.state, tr=currentTrader();
+    var n=tradeRowCount(tr); if(!n) return;
+    if(s.tradeSel==null) s.tradeSel=0;
+    if(code==='ArrowUp') s.tradeSel=(s.tradeSel+n-1)%n;
+    if(code==='ArrowDown') s.tradeSel=(s.tradeSel+1)%n;
+    renderTradePanel();
+  }
+  function ensureTradePanel(){
+    var el=document.getElementById('tradePanel');
+    if(el) return el;
+    el=document.createElement('div');
+    el.id='tradePanel';
+    el.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;'+
+      'background:rgba(10,14,24,.96);border:1px solid #223252;border-radius:14px;'+
+      'padding:18px 22px;min-width:340px;max-height:70vh;overflow:auto;color:#cdd9f5;'+
+      'font-size:12px;line-height:1.9;display:none';
+    document.body.appendChild(el);
+    return el;
+  }
+  function currentTrader(){
+    var s=APH.state;
+    return (s.nearVisitor && s.nearVisitor.trade && !s.nearVisitor.dead) ? s.nearVisitor : null;
+  }
+  function toggleTradePanel(force){
+    var el=ensureTradePanel();
+    var show=(force===undefined) ? el.style.display==='none' : !!force;
+    if(show && !currentTrader()) show=false;
+    el.style.display=show?'':'none';
+    if(show){ APH.state.tradeSel=0; renderTradePanel(); }
+  }
+  function tradeMulNow(){
+    var gb=APH.Res.globalBonuses(APH.state.meta.residents||[]);
+    return gb.tradeMul||0;
+  }
+  function renderTradePanel(){
+    var s=APH.state;
+    var el=ensureTradePanel();
+    var tr=currentTrader();
+    if(!tr){ el.style.display='none'; return; }
+    var mul=tradeMulNow();
+    var stock=tr.trade;
+    var html='<b style="color:#ffc857;font-size:13px">游商 · '+esc(tr.name||'')+'</b>'+
+      '<span style="float:right;color:#8fa3cc">矿材 '+
+      APH.Colony.stockOf(s.meta.res, s.entities, 'mineral')+'</span><br>'+
+      (mul>0?'<span style="color:#8fd4ff">社交议价 '+Math.round(mul*100)+'%</span><br>':'');
+    var row=1;
+    html+='<div style="margin-top:8px;color:#9fe8c8">买入(扣矿材)</div>';
+    stock.sells.forEach(function(it,i){
+      var cost=Math.max(1, Math.round(it.price*(1-mul)));
+      var sel=(s.tradeSel||0)===i;
+      html+='<div style="color:'+((it.n||0)>0?'#cdd9f5':'#39435c')+
+        (sel?';background:#1a2838;border-radius:4px;padding:0 6px':'')+'">'+
+        (sel?'▸ ':'['+row+'] ')+
+        (RES_LABEL[it.key]||it.key)+' ×'+(it.n||0)+' · '+cost+'矿/件</div>';
+      row++;
+    });
+    html+='<div style="margin-top:8px;color:#ffc857">卖出(得矿材)</div>';
+    stock.buys.forEach(function(of,i){
+      var gain=Math.max(1, Math.round(of.price*(1+mul)));
+      var idx=stock.sells.length+i;
+      var sel=(s.tradeSel||0)===idx;
+      html+='<div style="color:'+((of.n||0)>0?'#cdd9f5':'#39435c')+
+        (sel?';background:#1a2838;border-radius:4px;padding:0 6px':'')+'">'+
+        (sel?'▸ ':'['+row+'] ')+
+        (RES_LABEL[of.key]||of.key)+' (还收'+(of.n||0)+') · '+gain+'矿/件 · 库存 '+
+        (of.key==='crystal'
+          ? APH.Colony.itemCount(s.entities,'it_crystal_ore')
+          : APH.Colony.stockOf(s.meta.res, s.entities, of.key==='alloy'?'mineral':of.key))+
+        '</div>';
+      row++;
+    });
+    html+='<div style="margin-top:10px;color:#5d6f96">↑↓选 · Enter成交 · 数字键也可 · [T]/[Esc] 关闭</div>';
+    el.innerHTML=html;
+  }
+  function doTradeRow(i){
+    var s=APH.state;
+    var tr=currentTrader();
+    if(!tr) { toggleTradePanel(false); return; }
+    var stock=tr.trade;
+    var kind, idx;
+    if(i < stock.sells.length){ kind='buy'; idx=i; }
+    else { kind='sell'; idx=i-stock.sells.length; }
+    var r=APH.Res.tradeOnce(s.meta, s.entities, stock, kind, idx, tradeMulNow());
+    if(!r.ok){ APH.UI.floatText('✕ '+r.why,'#ff9a9a'); renderTradePanel(); return; }
+    if(r.kind==='buy')
+      APH.UI.floatText('🛒 买入 '+(RES_LABEL[r.key]||r.key)+' -'+r.cost+'矿','#9fe8c8');
+    else
+      APH.UI.floatText('💰 卖出 '+(RES_LABEL[r.key]||r.key)+' +'+r.gain+'矿','#ffe28a');
+    saveMetaQuiet();
+    saveColony();
+    renderTradePanel();
+    U.emit('traded', r);
+  }
+
   /* ================= U8 居民名册 ================= */
   function toggleResPanel(){
     var el=document.getElementById('resPanel');
@@ -1626,6 +2070,74 @@ window.APH = window.APH || {};
            'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
            Math.max(0,Math.min(100,f))+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f);
   }
+  /* ---- D: 工作优先级网格(方向键选格 / 0~3 设值) ---- */
+  function prioCursor(){
+    var s=APH.state;
+    if(!s.prioSel) s.prioSel={r:0,c:0};
+    return s.prioSel;
+  }
+  function movePrioCursor(code){
+    var s=APH.state, m=s.meta;
+    var cur=prioCursor();
+    var rows=(m.residents||[]).length, cols=APH.Res.SKILLS.length;
+    if(!rows) return;
+    cur.r=Math.min(cur.r, rows-1);
+    if(code==='ArrowUp') cur.r=(cur.r+rows-1)%rows;
+    if(code==='ArrowDown') cur.r=(cur.r+1)%rows;
+    if(code==='ArrowLeft') cur.c=(cur.c+cols-1)%cols;
+    if(code==='ArrowRight') cur.c=(cur.c+1)%cols;
+    s.resSel=cur.r;
+    renderResPanel();
+  }
+  function setPrioAtCursor(v){
+    var s=APH.state, m=s.meta;
+    var cur=prioCursor();
+    var r=(m.residents||[])[cur.r];
+    if(!r) return;
+    m.workPrio=m.workPrio||{};
+    if(!m.workPrio[r.id]) m.workPrio[r.id]=APH.Res.defaultPrio(r);
+    var sk=APH.Res.SKILLS[cur.c];
+    m.workPrio[r.id][sk]=U.clamp(v,0,3);
+    r.jobLocked=false;                     // 改优先级 = 交还自动调度
+    saveMetaQuiet();
+    renderResPanel();
+    APH.UI.floatText(r.name+' · '+APH.Res.SKILL_NAMES[sk]+' 优先级 → '+v,'#8fd4ff');
+  }
+  var PRIO_COLOR=['#39435c','#ffc857','#cdd9f5','#5d6f96'];
+  var PRIO_LABEL=['禁','优','普','闲'];
+  function prioGridHtml(m){
+    var s=APH.state;
+    var cur=prioCursor();
+    var wp=m.workPrio||{};
+    var html='<div style="margin-bottom:14px">'+
+      '<div style="color:#ffc857;margin-bottom:4px">工作优先级 · 方向键选格, 数字 0~3 设值 '+
+      '<span style="color:#5d6f96">(0禁止 1优先 2普通 3闲时; 列头亮=技能高)</span></div>'+
+      '<table style="border-collapse:collapse;font-size:11px"><tr><td></td>';
+    APH.Res.SKILLS.forEach(function(sk){
+      html+='<td style="padding:2px 7px;color:#8fa3cc">'+APH.Res.SKILL_NAMES[sk]+'</td>';
+    });
+    html+='</tr>';
+    (m.residents||[]).forEach(function(r, ri){
+      html+='<tr><td style="padding:2px 7px;color:'+((s.resSel||0)===ri?'#ffc857':'#cdd9f5')+'">'+
+        esc(r.name)+'</td>';
+      var p=wp[r.id]||APH.Res.defaultPrio(r);
+      APH.Res.SKILLS.forEach(function(sk, ci){
+        var v=p[sk]!=null?p[sk]:2;
+        var lv=(r.skills&&r.skills[sk])||0;
+        var isCur=(cur.r===ri && cur.c===ci);
+        var bg=lv>=6?'rgba(125,255,171,.16)':(lv>=3?'rgba(125,255,171,.07)':'transparent');
+        html+='<td style="padding:2px 0;text-align:center"><span style="display:inline-block;'+
+          'width:30px;border-radius:4px;padding:1px 0;background:'+bg+';color:'+PRIO_COLOR[v]+';'+
+          'border:1px solid '+(isCur?'#ffc857':'#1a2334')+';'+
+          (v===0?'text-decoration:line-through;':'')+'">'+
+          v+PRIO_LABEL[v]+'</span></td>';
+      });
+      html+='</tr>';
+    });
+    html+='</table></div>';
+    return html;
+  }
+
   function renderResPanel(){
     var s=APH.state, m=s.meta;
     var body=document.getElementById('resBody'); if(!body) return;
@@ -1641,7 +2153,7 @@ window.APH = window.APH || {};
         '殖民地还没有居民。<br>过客会来拜访家园，走近他们按 [E] 招募。</div>';
       return;
     }
-    var html='';
+    var html=prioGridHtml(m);
     m.residents.forEach(function(r, idx){
       var skHtml = APH.Res.SKILLS.map(function(sk){
         var v=(r.skills&&r.skills[sk])||0;
@@ -1650,8 +2162,11 @@ window.APH = window.APH || {};
       }).join(' · ');
       var jobTxt=r.job?(APH.Colony.get(r.job)||{}).name||r.job:(r.mainSkill==='sk_farm'?'待岗(适合务农)':'闲居');
       var sel=(s.resSel||0)===idx;
+      var brkTag=(APH.Res.isBroken&&APH.Res.isBroken(r))
+        ? ' <span style="color:#ff6d7a;font-weight:700">[崩溃·'+
+          (APH.Res.BREAK_NAMES[r.breakType]||r.breakType)+']</span>' : '';
       html+='<div style="border:1px solid '+(sel?'#ffc857':'#1a2334')+';border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#0c1220">'+
-        '<b style="font-size:13px">'+(idx+1)+'. '+r.name+'</b>'+
+        '<b style="font-size:13px">'+(idx+1)+'. '+r.name+'</b>'+brkTag+
         ' <span style="color:#8fa3cc;font-size:11px">'+moodFace(r.mood)+' '+r.trait+
         ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
          :' · '+jobTxt)+'</span><br>'+
@@ -1659,6 +2174,14 @@ window.APH = window.APH || {};
         (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
         '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
         '&nbsp;&nbsp;病情 '+sickBar(r.illness||0)+
+        /* F: 病症分型标签(疫病红/感染橙/外伤灰) */
+        (r.ailments&&r.ailments.length
+          ? ' <span style="font-size:11px">'+r.ailments.map(function(a){
+              var col=a.type==='plague'?'#ff6d7a':(a.type==='infection'?'#ffb35c':'#8fa3cc');
+              return '<span style="color:'+col+'">['+
+                (APH.Res.AILMENT_NAMES[a.type]||a.type)+' '+Math.round(a.sev)+']</span>';
+            }).join(' ')+'</span>'
+          : '')+
         '</div>';
     });
     /* 关系摘要 */
@@ -1839,6 +2362,17 @@ window.APH = window.APH || {};
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
       if(e.hitFlash>0) e.hitFlash=Math.max(0,e.hitFlash-dt);
       var r=residentOf(e);
+      /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
+      if(!raid && r && APH.Res.isBroken(r)){
+        e.breaking=r.breakType;
+        if(r.breakType==='wander'){
+          APH.Res.wanderStep(e, dt, CFG.HAB, (CFG.visitor&&CFG.visitor.yardR)||220);
+        }else{
+          e.walking=false;
+        }
+        return;
+      }
+      e.breaking=null;
       var hungry=r && r.food!=null && r.food<eatBelow;
       if(!raid && hungry){
         if(!tryEatHere(e, r, grabR, dumpR) && r.food<eatBelow){
@@ -1911,6 +2445,10 @@ window.APH = window.APH || {};
       wanderA:ang+Math.PI, wanderT:0.2, stayT:stay, askCd:0,
       impression:(CFG.recruit&&CFG.recruit.impressStart)||50, fed:false,
     };
+    /* C: 游商随身带一份 seeded 货单 */
+    if(APH.Res.joinIntentOf(profile)==='trader'){
+      ent.trade=APH.Res.makeTraderStock(((s.seed||7)*131 + (s.meta.residentSeq||0)*977)>>>0);
+    }
     s.entities.push(ent);
     APH.UI.floatText('过客 '+profile.name+' 来拜访了','#8fd4ff');
     U.emit('visitorArrived', profile);
@@ -2043,28 +2581,99 @@ window.APH = window.APH || {};
     m.residents.forEach(function(r){
       APH.Res.needsTick(r, false);
     });
-    /* U5 自动指派: 农牧优先, 再诊所, 再矿/实验室; 跳过玩家锁岗 */
-    autoAssign('bl_farm','sk_farm',2);
-    autoAssign('bl_pasture','sk_ranch',2);
-    autoAssign('bl_clinic','sk_social',1);
-    autoAssign('bl_mine','sk_craft',1);
-    autoAssign('bl_workshop','sk_craft',1);
-    autoAssign('bl_lab','sk_lore',1);
+    /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
+    m.workPrio=m.workPrio||{};
+    m.residents.forEach(function(r){
+      if(!m.workPrio[r.id]) m.workPrio[r.id]=APH.Res.defaultPrio(r);
+    });
+    var hasQAssign=(s.colony.buildQueue||[]).length>0;
+    var assign=APH.Colony.assignByPriority(m.residents, s.colony.buildings,
+                                           m.workPrio, hasQAssign);
+    m.residents.forEach(function(r){
+      if(r.jobLocked) return;
+      var nj=(assign[r.id]!==undefined)?assign[r.id]:null;
+      if(r.job!==nj){
+        r.job=nj;
+        if(nj) APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(nj).name+'工作','#8fd4ff');
+      }
+    });
     var hasClinic=(s.colony.buildings||[]).some(function(b){ return b.id==='bl_clinic'; });
     var medicSkill=0;
     m.residents.forEach(function(r){
+      if(APH.Res.isBroken && APH.Res.isBroken(r)) return;    // 崩溃的医生缺勤
       if(r.job==='bl_clinic') medicSkill=Math.max(medicSkill, (r.skills&&r.skills.sk_social)||0);
     });
     var tickSeed=((s.seed||7)*1009 + Math.floor(s.clock||0)*17 + (m.residentSeq||0)*13)>>>0;
     var sickRng=U.makeRng(tickSeed);
+    var clinicR=(CFG.residents&&CFG.residents.clinicNearR!=null)?CFG.residents.clinicNearR:80;
     m.residents.forEach(function(r){
-      APH.Res.clinicTick(r, {hasClinic:hasClinic, medicSkill:medicSkill, rng:sickRng});
+      var inClinic=false;
+      if(hasClinic){
+        var ent=null;
+        s.entities.forEach(function(e){
+          if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) ent=e;
+        });
+        if(ent){
+          (s.colony.buildings||[]).forEach(function(b){
+            if(b.id==='bl_clinic' && U.dst(ent.x,ent.y,b.x,b.y)<clinicR) inClinic=true;
+          });
+        }
+      }
+      APH.Res.clinicTick(r, {hasClinic:hasClinic, inClinic:inClinic, medicSkill:medicSkill, rng:sickRng});
     });
+    /* B: 心情崩溃状态机(seeded) + 崩溃行为落地 */
+    var breakRng=U.makeRng((tickSeed^0x5EED2B)>>>0);
+    var CB=CFG.residents||{};
+    m.residents.forEach(function(r){
+      var b=APH.Res.breakTick(r, breakRng);
+      if(b.started){
+        APH.UI.floatText('💢 '+r.name+' 崩溃了: '+APH.Res.BREAK_NAMES[b.started],'#ff9a9a');
+        if(b.started==='brawl'){
+          var mate=APH.Res.lowestBondMate(r, m.residents, m.bonds||{});
+          if(mate){
+            var ill=CB.brawlIll!=null?CB.brawlIll:8;
+            APH.Res.hurtResident(mate, ill, 'wound', {mood: CB.brawlMoodHit!=null?CB.brawlMoodHit:15});
+            APH.Res.hurtResident(r, ill, 'wound', {mood: false});
+            m.bonds=APH.Res.applyBond(m.bonds||{}, r.id, mate.id,
+              -(CB.brawlBondHit!=null?CB.brawlBondHit:8));
+            APH.UI.floatText('⚡ '+r.name+' 和 '+mate.name+' 打了一架','#ff9a9a');
+          }
+        }else if(b.started==='tantrum'){
+          var hit=CB.tantrumMoodHit!=null?CB.tantrumMoodHit:5;
+          var tR=CB.tantrumR!=null?CB.tantrumR:140;
+          var meE=null;
+          s.entities.forEach(function(e){
+            if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) meE=e;
+          });
+          m.residents.forEach(function(o){
+            if(o===r || !meE) return;
+            var oe=null;
+            s.entities.forEach(function(e){
+              if(e.type===T.RESIDENT && (e.rid===o.id||e.id===o.id)) oe=e;
+            });
+            if(oe && U.dst(meE.x,meE.y,oe.x,oe.y)<=tR)
+              o.mood=Math.max(0,(o.mood||0)-hit);
+          });
+        }else if(b.started==='binge'){
+          if(APH.Colony.takeStock(m.res, s.entities, 'food', 1).ok){
+            r.food=Math.min(100,(r.food||0)+((CB.eatGain!=null)?CB.eatGain:25));
+            APH.UI.floatText('🍲 '+r.name+' 暴食了一顿','#ffc857');
+          }
+        }
+      }else if(b.ended){
+        APH.UI.floatText(r.name+' 平静下来了','#8fd4ff');
+      }
+    });
+    /* 崩溃者本跳不参与任何生产 */
+    var workers=m.residents.filter(function(r){ return !APH.Res.isBroken(r); });
     if(hasClinic && haveStock('med')>0){
-      var sickest=null;
+      var sickest=null, bestScore=-1;
       m.residents.forEach(function(r){
         if((r.illness||0)<=0) return;
-        if(!sickest || r.illness>sickest.illness) sickest=r;
+        /* F: 疫病患者优先用药(药是唯一根治手段) */
+        var plagued=(r.ailments||[]).some(function(a){ return a.type==='plague'; });
+        var score=(r.illness||0)+(plagued?1000:0);
+        if(score>bestScore){ bestScore=score; sickest=r; }
       });
       if(sickest){
         APH.Res.applyMed(sickest);
@@ -2073,9 +2682,9 @@ window.APH = window.APH || {};
       }
     }
 
-    /* U3/U5 农场与岗位产出 */
-    var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
-    var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
+    /* U3/U5 农场与岗位产出(崩溃者缺勤) */
+    var farmers=workers.filter(function(r){return r.job==='bl_farm';});
+    var ranchers=workers.filter(function(r){return r.job==='bl_pasture';});
     var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
     var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
     var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
@@ -2115,7 +2724,7 @@ window.APH = window.APH || {};
     });
 
     var shops=s.colony.buildings.filter(function(b){return b.id==='bl_workshop';});
-    var crafters=m.residents.filter(function(r){return r.job==='bl_workshop';});
+    var crafters=workers.filter(function(r){return r.job==='bl_workshop';});
     shops.forEach(function(b){
       var w=crafters.shift();
       if(!w) return;
@@ -2181,24 +2790,7 @@ window.APH = window.APH || {};
     if(!btn) return;
     btn.addEventListener('click',function(){ toggleBuildRow(); });
   }
-  function autoAssign(buildingId, skillKey, perBuilding){
-    var s=APH.state, m=s.meta;
-    var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
-    var onJob = m.residents.filter(function(r){return r.job===buildingId;});
-    if(onJob.length>=slots) return;
-    var hasQ=(s.colony.buildQueue||[]).length>0;
-    var free=m.residents.filter(function(r){
-      if(r.job || r.jobLocked) return false;
-      if(hasQ && APH.Colony.isBuilder(r)) return false;
-      return true;
-    })
-      .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
-    while(onJob.length<slots && free.length){
-      var r=free.shift();
-      r.job=buildingId;
-      APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(buildingId).name+'工作','#8fd4ff');
-    }
-  }
+  /* (D) 旧 autoAssign 已被 Colony.assignByPriority 取代 */
   
   
   /* 调试接口(标题探针之外的程序化验证通道) */
@@ -2227,6 +2819,11 @@ window.APH = window.APH || {};
     cycleSelectedJob:cycleSelectedJob,
     perfGuard:perfGuard,
     startRaid:startRaid,
+    storyTick:storyTick,
+    applyEvent:applyEvent,
+    launchRivalRaid:launchRivalRaid,
+    toggleTradePanel:toggleTradePanel,
+    doTradeRow:doTradeRow,
     updateHome:updateHome,
     updateSurvival:updateSurvival,
     returnHome:returnHome,

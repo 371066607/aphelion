@@ -241,6 +241,13 @@ test('ranchTick: 效率打折减产', () => {
   if(!(o2.foodGain < o1.foodGain)) throw new Error('病牧应少肉: '+o2.foodGain+' vs '+o1.foodGain);
   if(!(o2.leatherGain < o1.leatherGain)) throw new Error('病牧应少皮: '+o2.leatherGain+' vs '+o1.leatherGain);
 });
+test('ranchTick: herdMul 本跳产出×3 并消耗', () => {
+  const p={herd:6, lv:1, herdMul:3};
+  const o=Colony.ranchTick(p, 3, {}, ()=>0.99, 1);
+  if(o.foodGain!==9) throw new Error('肉应×3=9 got '+o.foodGain);
+  if(o.leatherGain!==6) throw new Error('皮应×3=6 got '+o.leatherGain);
+  if(p.herdMul!==1) throw new Error('herdMul 应用后应收口');
+});
 
 test('queueTick: 居民坐标数组可施工, 远离冻结', () => {
   let q=[{bid:'bl_mine',x:600,y:600,total:20,progress:0.5}];

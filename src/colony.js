@@ -290,7 +290,12 @@ APH.Colony = (function(){
       foodGain = Math.round(foodGain * e);
       leatherGain = Math.round(leatherGain * e);
     }
-    if (pasture) pasture.herd = herd;
+    var hmul=(pasture && pasture.herdMul)!=null?pasture.herdMul:1;
+    if(hmul!==1){
+      foodGain=Math.round(foodGain*hmul);
+      leatherGain=Math.round(leatherGain*hmul);
+    }
+    if(pasture){ pasture.herd = herd; pasture.herdMul=1; }
     return { herd:herd, cap:cap, grew:grew, foodGain:foodGain, leatherGain:leatherGain };
   }
 
@@ -462,6 +467,27 @@ APH.Colony = (function(){
     return n-left;
   }
 
+  /* 按 itemId 计/扣地上堆(晶体矿等无 store 字段的货) */
+  function itemCount(entities, itemId){
+    var n=0;
+    (entities||[]).forEach(function(e){
+      if(e && !e.dead && e.type===T.DROPPED && e.itemId===itemId) n+=e.n||1;
+    });
+    return n;
+  }
+  function takeDropped(entities, itemId, n){
+    var left=n||0;
+    if(left<=0) return 0;
+    (entities||[]).forEach(function(e){
+      if(left<=0) return;
+      if(!e||e.dead||e.type!==T.DROPPED||e.itemId!==itemId) return;
+      var take=Math.min(e.n||1, left);
+      e.n-=take; left-=take;
+      if((e.n||0)<=0) e.dead=true;
+    });
+    return n-left;
+  }
+
   /* 先仓后堆. 不把地上 magically 搬进仓, 堆会缩小. */
   function takeStock(res, entities, key, n){
     res=res||{};
@@ -533,6 +559,74 @@ APH.Colony = (function(){
   function isBuilder(r){
     if(!r||!r.skills) return false;
     return r.mainSkill==='sk_build' || r.subSkill==='sk_build' || (r.skills.sk_build||0)>=3;
+  }
+
+  /* ---------- D: 工作优先级调度(纯函数, RimWorld 式) ----------
+     prio: { rid: {sk_farm:0~3, ...} }  0=禁止 1=优先 2=普通 3=闲时
+     规则: 手动锁岗(jobLocked)不动; 崩溃者缺勤;
+           有施工队列时建造者(sk_build 未禁止)留空去施工;
+           按 1→2→3 级逐层填岗, 同级按技能高者优先。
+     返回 { rid: bl_xxx|null }。 */
+  var JOB_SKILL={ bl_farm:'sk_farm', bl_pasture:'sk_ranch', bl_clinic:'sk_social',
+                  bl_mine:'sk_craft', bl_workshop:'sk_craft', bl_lab:'sk_lore' };
+  var JOB_SLOTS={ bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1 };
+  function prioOf(prio, r, sk){
+    var p=prio && prio[r.id];
+    return (p && p[sk]!=null) ? p[sk] : 2;
+  }
+  function assignByPriority(residents, buildings, prio, queueBusy){
+    prio=prio||{};
+    var SLOTS=(CFG.jobs&&CFG.jobs.slots)||JOB_SLOTS;
+    var slots={};
+    Object.keys(SLOTS).forEach(function(bid){
+      var n=(buildings||[]).filter(function(b){ return b.id===bid; }).length;
+      if(n>0) slots[bid]=n*SLOTS[bid];
+    });
+    var out={};
+    var broken=function(r){
+      return !!(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r));
+    };
+    var sickAt=(CFG.residents&&CFG.residents.sickSkipAt!=null)?CFG.residents.sickSkipAt:60;
+    (residents||[]).forEach(function(r){
+      if(!r.jobLocked) return;
+      out[r.id]=r.job||null;                     // 手动锁岗不动
+      if(r.job && slots[r.job]!=null) slots[r.job]--;
+    });
+    (residents||[]).forEach(function(r){
+      if(out[r.id]!==undefined) return;
+      if(broken(r)){ out[r.id]=null; return; }   // 崩溃者缺勤
+      if((r.illness||0)>sickAt){ out[r.id]=null; return; }  // 重病跳过
+      if(queueBusy && isBuilder(r) && prioOf(prio,r,'sk_build')>0){
+        out[r.id]=null; return;                  // 建造者留给蓝图
+      }
+    });
+    [1,2,3].forEach(function(level){
+      /* 同级粘性: 当前岗位仍是本级 → 原地留任(避免每跳乱换岗);
+         更高优先级(更小数字)的空位仍会在前一轮把人抢走 */
+      (residents||[]).forEach(function(r){
+        if(out[r.id]!==undefined) return;
+        var bid=r.job;
+        if(!bid || slots[bid]==null || slots[bid]<=0) return;
+        if(prioOf(prio,r,JOB_SKILL[bid])!==level) return;
+        out[r.id]=bid; slots[bid]--;
+      });
+      Object.keys(slots).forEach(function(bid){
+        var sk=JOB_SKILL[bid];
+        while(slots[bid]>0){
+          var best=null;
+          (residents||[]).forEach(function(r){
+            if(out[r.id]!==undefined) return;
+            if(prioOf(prio,r,sk)!==level) return;
+            if(!best || ((r.skills&&r.skills[sk])||0) > ((best.skills&&best.skills[sk])||0))
+              best=r;
+          });
+          if(!best) break;
+          out[best.id]=bid; slots[bid]--;
+        }
+      });
+    });
+    (residents||[]).forEach(function(r){ if(out[r.id]===undefined) out[r.id]=null; });
+    return out;
   }
 
   /* 蓝图施工: nearPos 为 {x,y} 或坐标数组(玩家+建造岗居民) */
@@ -612,12 +706,14 @@ APH.Colony = (function(){
     housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf,
     carryBonus:carryBonus, carryMaxOf:carryMaxOf,
     builderBonusOf:builderBonusOf, isBuilder:isBuilder,
+    assignByPriority:assignByPriority, JOB_SKILL:JOB_SKILL, JOB_SLOTS:JOB_SLOTS,
     upgradeCost:upgradeCost, canUpgrade:canUpgrade,
     mineOutput:mineOutput, labOutput:labOutput,
     shortageBrief:shortageBrief, cycleJob:cycleJob, JOB_CYCLE:JOB_CYCLE,
     stockItem:stockItem, collectHome:collectHome, stockpileSpot:stockpileSpot,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
+    itemCount:itemCount, takeDropped:takeDropped,
     stockLabel:stockLabel, takeFromGround:takeFromGround,
     takeStock:takeStock, ensureStock:ensureStock,
     ensurePad:ensurePad,

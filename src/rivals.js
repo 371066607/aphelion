@@ -58,13 +58,35 @@ APH.Rivals = (function(){
 
   /* ---------- 袭击波次生成(纯函数) ----------
      按 AI 军力决定波次规模; 返回敌人 faction 权重表引用由调用方定,
-     这里只产出数量配置 */
+     这里只产出数量配置。
+     阶段E: 追加 tactic(按 trait 分流: 强攻/盗掠/围攻) 与 waves
+     (军力 ≥ bigWaveAt 拆两波, count 为单波数量)。旧字段签名不变。 */
+  function tacticOf(trait){
+    var RT=CFG.raidTactics||{};
+    var map=RT.byTrait||{};
+    return map[trait]||'assault';
+  }
   function raidWave(rival){
+    var RT=CFG.raidTactics||{};
     var m = rival.military;
-    if(m<25)  return { count:3,  elite:false, label:'侦察袭扰' };
-    if(m<50)  return { count:5,  elite:false, label:'正规袭击' };
-    if(m<90)  return { count:7,  elite:true,  label:'重装突击' };
-    return        { count:10, elite:true,  label:'全面进攻' };
+    var base;
+    if(m<25)       base={ count:3,  elite:false, label:'侦察袭扰' };
+    else if(m<50)  base={ count:5,  elite:false, label:'正规袭击' };
+    else if(m<90)  base={ count:7,  elite:true,  label:'重装突击' };
+    else           base={ count:10, elite:true,  label:'全面进攻' };
+    var tac=tacticOf(rival.trait);
+    var t=(RT.tactics&&RT.tactics[tac])||{};
+    base.tactic=tac;
+    base.count=Math.max(1, Math.round(base.count*(t.countMul!=null?t.countMul:1)));
+    if(t.label) base.label=t.label+'·'+base.label;
+    if(m >= (RT.bigWaveAt!=null?RT.bigWaveAt:90)){
+      base.waves=2;
+      base.count=Math.max(1, Math.ceil(base.count/2));  // count=单波数量
+    }else{
+      base.waves=1;
+    }
+    base.total=base.count*base.waves;                   // 全袭击总兵力
+    return base;
   }
 
   return {

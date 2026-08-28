@@ -178,7 +178,27 @@ APH.Combat = (function(){
     return { x:best.x, y:best.y, kind:'building', b:best };
   }
 
-  /* 士兵找最近的非友军敌人 */
+  /* 阶段E: 盗掠者目标——最近地上物堆 > 仓库, 都没有则原地(等撤退指令) */
+  function pickPillageFocus(en, s){
+    var best=null, bd=1e9;
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.type!==T.DROPPED) return;
+      var d=U.dst(en.x,en.y,e.x,e.y);
+      if(d<bd){ bd=d; best=e; }
+    });
+    if(best) return { x:best.x, y:best.y, kind:'pile' };
+    var wh=null, wd=1e9;
+    ((s.colony&&s.colony.buildings)||[]).forEach(function(b){
+      if(b.id!=='bl_warehouse') return;
+      var d=U.dst(en.x,en.y,b.x,b.y);
+      if(d<wd){ wd=d; wh=b; }
+    });
+    if(wh) return { x:wh.x, y:wh.y, kind:'building', b:wh };
+    /* 无可偷之物: 奔家园中心游荡(炮塔可清), 避免原地僵持 */
+    return { x:CFG.HAB.x, y:CFG.HAB.y, kind:'pile' };
+  }
+
+  /* 士兵找最近的非友军敌人 / 围攻营地 */
   function nearestRaidFoe(en, entities){
     var best=null, bd=1e9;
     for(var i=0;i<entities.length;i++){
@@ -189,12 +209,29 @@ APH.Combat = (function(){
     }
     return best;
   }
+  function nearestSiegeCamp(en, entities){
+    var best=null, bd=1e9;
+    for(var i=0;i<entities.length;i++){
+      var o=entities[i];
+      if(!o || o.dead || o.type!==T.BUILDING || o.bid!=='bl_siege_camp') continue;
+      var d=U.dst(en.x,en.y,o.x,o.y);
+      if(d<bd){ bd=d; best=o; }
+    }
+    return best;
+  }
   function stepSoldier(en, dt, night){
     var s=APH.state;
     var foe=nearestRaidFoe(en, s.entities);
+    var camp=nearestSiegeCamp(en, s.entities);
     en.atkCd=(en.atkCd||0)-dt;
     en.wanderA=(en.wanderA||0)+(U.rr(-1,1))*dt*2;
-    if(!foe){
+    var target=foe, kind='foe';
+    if(camp){
+      var cd=U.dst(en.x,en.y,camp.x,camp.y);
+      var fd=foe?U.dst(en.x,en.y,foe.x,foe.y):1e9;
+      if(!foe || cd<=fd+30){ target=camp; kind='camp'; }
+    }
+    if(!target){
       en.state='idle';
       var idle=moveIntent(en, { px:en.x, py:en.y, night:!!night });
       en.x+=idle.vx*dt; en.y+=idle.vy*dt;
@@ -203,21 +240,31 @@ APH.Combat = (function(){
       if(en.hp<=0) en.dead=true;
       return;
     }
-    var dist=U.dst(en.x,en.y,foe.x,foe.y);
+    var dist=U.dst(en.x,en.y,target.x,target.y);
     var maxHp=en.maxHp||en.faction.hp||1;
     var c={
       dist:dist, night:!!night,
       hpPct:en.hp/maxHp,
       heardShot:false,
-      px:foe.x, py:foe.y,
+      px:target.x, py:target.y,
     };
     en.state=fsmStep(en, c);
-    if(en.state==='attack' && en.atkCd<=0){
+    var meleeR=kind==='camp'
+      ? ((((CFG.raidTactics||{}).tactics||{}).siege||{}).campMeleeR||40)
+      : CFG.enemy.attackR;
+    if(dist<=meleeR && en.atkCd<=0){
+      en.state='attack';
       en.atkCd=CFG.enemy.attackCd;
-      foe.hp-=(CFG.soldier.dmg||en.faction.dmg||6);
-      foe.hitFlash=0.1;
-      U.emit('enemyHit', foe);
-      if(foe.hp<=0) killEnemy(foe);
+      if(kind==='camp'){
+        target.hp-=(CFG.soldier.dmg||en.faction.dmg||6);
+        target.hitFlash=0.1;
+        if(target.hp<=0){ target.dead=true; U.emit('siegeCampDown', target); }
+      }else{
+        foe.hp-=(CFG.soldier.dmg||en.faction.dmg||6);
+        foe.hitFlash=0.1;
+        U.emit('enemyHit', foe);
+        if(foe.hp<=0) killEnemy(foe);
+      }
     }
     var mi=moveIntent(en, c);
     en.x+=mi.vx*dt; en.y+=mi.vy*dt;
@@ -245,8 +292,44 @@ APH.Combat = (function(){
         return;
       }
 
-      /* 感知: 家园袭击优先冲仓库/农场/工坊, 玩家靠近则改追人 */
-      var focus = (s.scene==='home') ? pickRaidFocus(en, s) : { x:s.px, y:s.py, kind:'player' };
+      /* 阶段E: 溃退者——背向家园撤离, 越界消失 */
+      if(en.retreat){
+        var RT=CFG.raidTactics||{};
+        var rdx=en.x-CFG.HAB.x, rdy=en.y-CFG.HAB.y;
+        var rl=Math.sqrt(rdx*rdx+rdy*rdy)||1;
+        var rspd=en.faction.speed*(RT.fleeSpdMul!=null?RT.fleeSpdMul:1.15);
+        en.state='flee';
+        en.x=U.clamp(en.x+rdx/rl*rspd*dt,30,CFG.WORLD-30);
+        en.y=U.clamp(en.y+rdy/rl*rspd*dt,30,CFG.WORLD-30);
+        en.walkPh=(en.walkPh||0)+dt*9;
+        if(rl>(RT.fleeDespawnR||1000)) en.dead=true;
+        if(en.hp<=0) killEnemy(en);
+        return;
+      }
+
+      /* 阶段E: 围攻扎营——绕营地游走, 不进攻(被打死照常掉落) */
+      if(en.sieging){
+        var SRT=CFG.raidTactics||{};
+        en.state='idle';
+        en.wanderA=(en.wanderA||0)+(U.rr(-1,1))*dt*1.5;
+        var wr=(SRT.siegeWanderR!=null?SRT.siegeWanderR:46);
+        var stx=(en.campX||en.x)+Math.cos(en.wanderA)*wr;
+        var sty=(en.campY||en.y)+Math.sin(en.wanderA)*wr;
+        var sdx=stx-en.x, sdy=sty-en.y;
+        var sl=Math.sqrt(sdx*sdx+sdy*sdy)||1;
+        var sspd=en.faction.speed*(SRT.siegeWalkMul!=null?SRT.siegeWalkMul:.35);
+        en.x=U.clamp(en.x+sdx/sl*sspd*dt,30,CFG.WORLD-30);
+        en.y=U.clamp(en.y+sdy/sl*sspd*dt,30,CFG.WORLD-30);
+        en.walkPh=(en.walkPh||0)+dt*3;
+        if(en.hp<=0) killEnemy(en);
+        return;
+      }
+
+      /* 感知: 家园袭击优先冲仓库/农场/工坊, 玩家靠近则改追人;
+         盗掠者(阶段E)只奔地上物堆/仓库 */
+      var focus = (s.scene==='home')
+        ? (en.pillager ? pickPillageFocus(en, s) : pickRaidFocus(en, s))
+        : { x:s.px, y:s.py, kind:'player' };
       var dist = U.dst(en.x, en.y, focus.x, focus.y);
       var echo = s.scene==='expedition' && window.APH.Planet && APH.Planet.hasLaw
         && APH.Planet.hasLaw(s.spec, 'lw_echo');
@@ -278,8 +361,9 @@ APH.Combat = (function(){
       en.atkCd -= dt;
       en.wanderA += (U.rr(-1,1)) * dt * 2;
 
-      /* spitter 远程(仍瞄准玩家) */
-      if(shouldSpit(en, Object.assign({}, c, { dist:U.dst(en.x,en.y,s.px,s.py), px:s.px, py:s.py }))){
+      /* spitter 远程(仍瞄准玩家); 盗掠者不伤人 */
+      if(!en.pillager &&
+         shouldSpit(en, Object.assign({}, c, { dist:U.dst(en.x,en.y,s.px,s.py), px:s.px, py:s.py }))){
         en.atkCd = 2.2;
         var ddx = s.px-en.x, ddy = s.py-en.y, dd = Math.sqrt(ddx*ddx+ddy*ddy)||1;
         s.entities.push(makeProj(en.x, en.y, ddx/dd*CFG.enemy.projSpeed, ddy/dd*CFG.enemy.projSpeed, 'enemy', en.faction.dmg));
@@ -287,7 +371,18 @@ APH.Combat = (function(){
       }
 
       /* 近战: 士兵 → 玩家 → 居民 → 建筑掠夺 */
-      if(en.state === 'attack' && en.atkCd <= 0){
+      if(en.state === 'attack' && en.atkCd <= 0 && en.pillager){
+        /* 盗掠者(阶段E): 不打建筑不伤人, 只从仓库偷资源(不致停机) */
+        en.atkCd = CFG.enemy.attackCd;
+        if(focus.kind==='building' && focus.b){
+          var pl=raidPillage(s.meta, null);
+          if(pl.food||pl.mineral||pl.med){
+            if(window.APH.UI && APH.UI.floatText)
+              APH.UI.floatText('⚠ 仓库被盗掠','#ff9a9a');
+            U.emit('raidStole', en);
+          }
+        }
+      }else if(en.state === 'attack' && en.atkCd <= 0){
         en.atkCd = CFG.enemy.attackCd;
         var solHit=null, sd=CFG.enemy.attackR;
         s.entities.forEach(function(o){
@@ -348,12 +443,16 @@ APH.Combat = (function(){
       if(p.side === 'player'){
         for(var ei=0; ei<s.entities.length; ei++){
           var en=s.entities[ei];
-          if(en.type === T.BUILDING && en.bid==='bl_rival_base' && !en.dead
+          if(en.type === T.BUILDING && (en.bid==='bl_rival_base'||en.bid==='bl_siege_camp')
+             && !en.dead
              && segDist(segX0,segY0,p.x,p.y,en.x,en.y) < 44){
             p.dead=true; en.hp-=p.dmg;
             s.shake=Math.min(1,s.shake+.15);
             U.emit('rivalBaseHit',en);
-            if(en.hp<=0){ raidBaseSuccess(en); }
+            if(en.hp<=0){
+              if(en.bid==='bl_rival_base') raidBaseSuccess(en);
+              else { en.dead=true; U.emit('siegeCampDown', en); }  // 阶段E: 拆营→溃退
+            }
             break;
           }
           if(en.type !== T.ENEMY || en.dead || en.isSoldier) continue;
@@ -364,6 +463,20 @@ APH.Combat = (function(){
             s.shake = Math.min(1, s.shake+.12);
             U.emit('enemyHit', en);
             if(en.hp <= 0) killEnemy(en);
+            break;
+          }
+        }
+      }else if(p.side === 'siege'){
+        var blds=(s.colony&&s.colony.buildings)||[];
+        for(var bi=0; bi<blds.length; bi++){
+          var tb=blds[bi];
+          if(!tb || tb.id==='bl_landing_pad') continue;
+          if(segDist(segX0,segY0,p.x,p.y,tb.x,tb.y) < 36){
+            p.dead=true;
+            tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
+            s.shake=Math.min(1,(s.shake||0)+.3);
+            if(window.APH.UI && APH.UI.floatText)
+              APH.UI.floatText('💥 围攻炮击! 建筑停机','#ff9a9a');
             break;
           }
         }
@@ -440,6 +553,7 @@ APH.Combat = (function(){
     var it=(CFG.items&&CFG.items[best.itemId])||{};
     if(window.APH.UI && APH.UI.floatText)
       APH.UI.floatText('⚠ 地上被抢走 '+(it.name||best.itemId)+'×'+(best.n||1),'#ff9a9a');
+    U.emit('raidStole', en);
     return true;
   }
 

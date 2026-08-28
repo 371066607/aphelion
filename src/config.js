@@ -170,10 +170,34 @@ APH.CFG = {
     moodSick: 3,
     effSickAt: 20,
     effSickFloor: 0.35,
+    /* F 健康分型 (ailments: wound/infection/plague) */
+    ailMax: 2,                 // 每人同时最多几条病症
+    woundInfectAge: 2,         // 外伤拖满此跳数未进舱 → 升级感染
+    infectBump: 5,             // 升级感染时病情加重
+    infectMood: 8,             // 升级感染的心情打击
+    plagueFloor: 12,           // 无药时医疗舱压疫病的地板(压不能除)
+    medPlagueMul: 2,           // 药对疫病效果倍率
+    effInfectFloor: 0.25,      // 感染者效率地板(低于普通病)
     raidWound: 18,
     raidMood: 12,
     raidIFrame: 0.8,
     medHeal: 8,
+    sickSkipAt: 60,            // 病情超过此值不派岗
+    tantrumR: 140,             // 怠工抱怨影响半径(px)
+    clinicNearR: 80,           // 进舱判定: 离医疗舱此距离内
+    /* 心情崩溃(RimWorld mental break; 时间单位=生产跳30s) */
+    breakMinorAt: 35,          // 心情低于此值开始掷骰
+    breakMajorAt: 15,          // 低于此值概率×breakMajorMul
+    breakChance: 0.08,
+    breakMajorMul: 3,
+    breakTicksMin: 1,          // 崩溃持续跳数
+    breakTicksMax: 2,
+    breakCdTicks: 10,          // 崩溃后冷却(10跳=5分钟)
+    breakRecoverMood: 45,      // 宣泄回弹: 结束后心情至少回到此值
+    brawlMoodHit: 15,          // 斗殴: 对方心情损失
+    brawlIll: 8,               // 斗殴: 双方病情上涨
+    brawlBondHit: 8,           // 斗殴: 好感损失
+    tantrumMoodHit: 5,         // 怠工抱怨: 周围居民心情损失
   },
 
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
@@ -232,6 +256,100 @@ APH.CFG = {
     dumpR: 36,           // 卸到仓库/发射台
     stackR: 44,          // 同种叠堆
     stealR: 28,          // 袭击顺手偷地上
+  },
+
+  /* 贸易(游商; 矿材=硬通货, 不新增货币物品)
+     出售=游商卖给你(药品/合金/皮革); 收购=游商买你的(食物/皮革/晶体矿) */
+  trade: {
+    sellBase: { med: 6, alloy: 4, leather: 3 },
+    buyBase:  { food: 1, leather: 2, crystal: 3 },
+    priceJitter: 0.25,         // 游商个体价格浮动 ±25% (seeded)
+    stockMin: 2,               // 每种商品库存件数下限
+    stockMax: 6,
+    demandExtra: 2,            // 收购需求额外件数
+    listMin: 2,                // 买卖栏各上架 2~3 种
+    listMax: 3,
+    socialPricePerLv: 0.02,    // 最高社交每级改善 2% 价格
+    socialPriceCap: 0.12,
+  },
+
+  /* 岗位席位(建筑数×每座席位 = 可派岗上限) */
+  jobs: {
+    slots: { bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1 },
+  },
+
+  /* 事件叙事者 (ADR-12: 事件导演; 单位分钟) */
+  events: {
+    checkPeriod: 30,           // 与 ADR-6 生产跳对齐(秒); 导演每跳检查一次
+    intervalMin: 2.2,          // 事件间隔下限
+    intervalMax: 4.5,          // 事件间隔上限
+    firstDelay: 3,             // 开局宽限
+    restMinutes: [2, 4],      // 负面事件后强制 2~4 分钟喘息窗口
+    moodMercyAt: 40,           // 心情均值低于此值 → 负面权重×moodMercyMul
+    moodMercyMul: 0.5,
+    wealthPerThreat: 120,      // 每 120 财富 +1 威胁级
+    threatMax: 5,
+    threatNegMul: 0.15,        // 每威胁级负面权重 +15%
+    wealthPerPop: 40,          // 人口财富权重
+    wealthPerTech: 40,         // 科技财富权重
+    wealthLeather: 2,          // 皮革折算财富
+    wealthMed: 3,              // 药品折算财富
+    /* 卡组: w=权重 cd=冷却(分钟) neg=负面 */
+    deck: {
+      ev_droppod:       { w: 10, cd: 5 },
+      ev_refugee_wave:  { w: 7,  cd: 8 },
+      ev_herd:          { w: 8,  cd: 7 },
+      ev_aurora:        { w: 8,  cd: 6 },
+      ev_trader_caravan:{ w: 9,  cd: 7 },
+      ev_plague:        { w: 8,  cd: 9,  neg: true },
+      ev_blight:        { w: 8,  cd: 8,  neg: true },
+      ev_solar_flare:   { w: 7,  cd: 8,  neg: true },
+      ev_raid:          { w: 14, cd: 5,  neg: true },
+    },
+    baseWeights: {
+      ev_droppod:10, ev_refugee_wave:7, ev_herd:8, ev_aurora:8,
+      ev_trader_caravan:9, ev_plague:8, ev_blight:8, ev_solar_flare:7, ev_raid:14,
+    },
+    /* 事件效果数值 */
+    droppodMineral: [4, 8],
+    droppodFood: [2, 4],
+    droppodDist: [160, 240],  // 坠落点距家园
+    droppodJitter: 26,
+    refugeeSecondP: 0.5,      // 第二名难民概率
+    historyMax: 40,
+    auroraMood: 10,
+    plagueRatio: 0.3,          // 疫病感染人口比例
+    plagueIll: 15,
+    herdMul: 3,                // 兽群过境: 本跳牧场产出×3
+    flareOffline: 60,          // 耀斑炮塔停机秒数
+    blightCut: 0.5,            // 枯萎: 农田进度保留比例
+  },
+
+  /* 袭击战术 (阶段E: rival 个性 → 战术分流) */
+  raidTactics: {
+    byTrait: { aggressive:'assault', trader:'pillage', expansionist:'siege' },
+    tactics: {
+      assault: { countMul: 1.2, label: '强攻' },
+      pillage: { countMul: 0.7, label: '盗掠', stealCap: 6 },   // 偷够即撤
+      siege:   { countMul: 1.0, label: '围攻',
+                 campDist: 500,        // 扎营距家园距离(px)
+                 campSec: 90,          // 扎营时长(秒), 结束转强攻
+                 shellPeriod: 15,      // 炮击间隔(秒)
+                 campHp: 60,           // 营地可拆血量
+                 shellOffline: 20,   // 每发炮击建筑停机秒数
+                 shellSpeed: 280,     // 围攻弹速度
+                 shellLife: 5,        // 弹丸寿命(须能飞完 campDist)
+                 campMeleeR: 40 },    // 士兵拆营近战距离
+    },
+    bigWaveAt: 90,        // 军力 ≥ 此值 → 拆两波
+    waveGap: 45,          // 波次间隔(秒)
+    wave2Angle: 2.4,      // 第二波换向(rad)
+    routAt: 0.6,          // 伤亡比例 ≥60% → 全体溃退
+    routDropChance: 0.5,  // 溃退者掉落随身赃物概率
+    fleeDespawnR: 1000,   // 溃退者离家园此距离消失(须<轴向可达上限1070, 防卡边)
+    fleeSpdMul: 1.15,
+    siegeWanderR: 46,
+    siegeWalkMul: 0.35,
   },
 
   /* 存档 */

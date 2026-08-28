@@ -290,3 +290,287 @@ test('walkToward: 不越过目标', () => {
   Res.walkToward(e, {x:10,y:0}, 1, 100);
   if(e.x!==10 || e.y!==0 || e.walking) throw new Error('不应越过: '+JSON.stringify(e));
 });
+
+/* ---------- B: 心情崩溃 ---------- */
+test('breakTypeOf: 性格分流四种崩溃', () => {
+  if(Res.breakTypeOf('暴脾气')!=='brawl') throw new Error('暴脾气→斗殴');
+  if(Res.breakTypeOf('独行')!=='wander'||Res.breakTypeOf('谨慎')!=='wander')
+    throw new Error('独行/谨慎→出走');
+  if(Res.breakTypeOf('话痨')!=='tantrum'||Res.breakTypeOf('乐观')!=='tantrum')
+    throw new Error('话痨/乐观→怠工');
+  if(Res.breakTypeOf('勤恳')!=='binge') throw new Error('勤恳→暴食');
+  if(Res.breakTypeOf('未知性格')!=='wander') throw new Error('未知性格兜底出走');
+});
+test('breakTick: 心情高不崩溃', () => {
+  const r={id:'rs_a',mood:80,trait:'暴脾气'};
+  const b=Res.breakTick(r, ()=>0);           // rng=0 必命中(若有资格)
+  if(b.started) throw new Error('心情80不该崩溃');
+  if(Res.isBroken(r)) throw new Error('不应进入崩溃态');
+});
+test('breakTick: 低心情命中掷骰 → 按性格进入崩溃', () => {
+  const r={id:'rs_a',mood:20,trait:'暴脾气'};
+  const b=Res.breakTick(r, ()=>0);
+  if(b.started!=='brawl') throw new Error('暴脾气低心情应斗殴: '+JSON.stringify(b));
+  if(!Res.isBroken(r)) throw new Error('应进入崩溃态');
+  if(!(r.breakT>=1 && r.breakT<=2)) throw new Error('持续1~2跳: '+r.breakT);
+});
+test('breakTick: 大崩溃阈值下概率×3', () => {
+  // chance=0.08; mood 20(轻度) rng=0.1 不命中; mood 10(重度) 0.24>0.1 命中
+  const a={id:'rs_a',mood:20,trait:'勤恳'};
+  const ba=Res.breakTick(a, ()=>0.1);
+  if(ba.started) throw new Error('轻度阈值 0.1>0.08 不该命中');
+  const b={id:'rs_b',mood:10,trait:'勤恳'};
+  const bb=Res.breakTick(b, ()=>0.1);
+  if(bb.started!=='binge') throw new Error('重度阈值 0.1<0.24 应命中');
+});
+test('breakTick: 结束宣泄回弹 + 进冷却, 冷却期不复发', () => {
+  const r={id:'rs_a',mood:5,trait:'话痨'};
+  Res.breakTick(r, ()=>0);                   // 进入崩溃(1跳)
+  r.breakT=1;
+  const end=Res.breakTick(r, ()=>0);
+  if(end.ended!=='tantrum') throw new Error('应结束: '+JSON.stringify(end));
+  if(r.mood<45) throw new Error('宣泄回弹至少45: '+r.mood);
+  if(!(r.breakCd>0)) throw new Error('应进冷却');
+  r.mood=5;
+  const again=Res.breakTick(r, ()=>0);
+  if(again.started) throw new Error('冷却期不得复发');
+});
+test('lowestBondMate: 挑好感最低的同事', () => {
+  const a={id:'rs_a'}, b={id:'rs_b'}, c={id:'rs_c'};
+  const bonds={ 'rs_a|rs_b':80, 'rs_a|rs_c':20 };
+  const m=Res.lowestBondMate(a,[a,b,c],bonds);
+  if(m!==c) throw new Error('应挑 rs_c(好感20)');
+  const m2=Res.lowestBondMate(a,[a],bonds);
+  if(m2!==null) throw new Error('没同事应返回null');
+});
+
+/* ---------- C: 游商贸易 ---------- */
+test('makeTraderStock: 同seed确定, 结构合法, 价格≥1', () => {
+  const a=Res.makeTraderStock(42), b=Res.makeTraderStock(42);
+  if(JSON.stringify(a)!==JSON.stringify(b)) throw new Error('同seed应同货单');
+  if(a.sells.length<2 || a.sells.length>3) throw new Error('出售应2~3种: '+a.sells.length);
+  if(a.buys.length<2 || a.buys.length>3) throw new Error('收购应2~3种: '+a.buys.length);
+  const ok=['food','leather','med','alloy','crystal'];
+  a.sells.concat(a.buys).forEach(it => {
+    if(!(it.price>=1) || !(it.n>=1)) throw new Error('价格/库存非法: '+JSON.stringify(it));
+    if(ok.indexOf(it.key)<0) throw new Error('未知商品: '+it.key);
+  });
+});
+test('tradeOnce: 买入扣矿得货, 矿不够拒绝且不扣账', () => {
+  const meta={ res:{ mineral:10, med:0 } };
+  const stock={ sells:[{key:'med',n:2,price:6}], buys:[] };
+  const r=Res.tradeOnce(meta,[],stock,'buy',0,0);
+  if(!r.ok || r.cost!==6) throw new Error('买入应成交: '+JSON.stringify(r));
+  if(meta.res.mineral!==4 || meta.res.med!==1) throw new Error('账不对: '+JSON.stringify(meta.res));
+  if(stock.sells[0].n!==1) throw new Error('游商库存应-1');
+  const r2=Res.tradeOnce(meta,[],stock,'buy',0,0);
+  if(r2.ok) throw new Error('矿4<6应拒绝');
+  if(meta.res.mineral!==4) throw new Error('拒绝时不得扣账');
+});
+test('tradeOnce: 卖出得矿, 社交议价加成', () => {
+  const meta={ res:{ mineral:0, food:5 } };
+  const stock={ sells:[], buys:[{key:'food',n:3,price:2}] };
+  const r=Res.tradeOnce(meta,[],stock,'sell',0,0.1);
+  if(!r.ok) throw new Error('卖出应成交: '+JSON.stringify(r));
+  // 2×1.1=2.2 → round 2
+  if(meta.res.mineral!==2 || meta.res.food!==4) throw new Error('账不对: '+JSON.stringify(meta.res));
+  if(stock.buys[0].n!==2) throw new Error('收购需求应-1');
+});
+test('tradeOnce: 卖晶体矿扣地上堆', () => {
+  const meta={ res:{ mineral:0 } };
+  const ents=[{ type:'dropped', itemId:'it_crystal_ore', n:2, x:0, y:0 }];
+  const stock={ sells:[], buys:[{key:'crystal',n:3,price:3}] };
+  const r=Res.tradeOnce(meta, ents, stock, 'sell', 0, 0);
+  if(!r.ok) throw new Error('应卖出晶体: '+JSON.stringify(r));
+  if(ents[0].n!==1) throw new Error('地上应-1: '+ents[0].n);
+  if(meta.res.mineral!==3) throw new Error('应得3矿: '+meta.res.mineral);
+});
+test('tradeOnce: 没存货不能卖, 收购额度用完不再收', () => {
+  const meta={ res:{ mineral:0, food:0 } };
+  const stock={ sells:[], buys:[{key:'food',n:0,price:2}] };
+  const r=Res.tradeOnce(meta,[],stock,'sell',0,0);
+  if(r.ok) throw new Error('额度0应拒绝');
+  stock.buys[0].n=3;
+  const r2=Res.tradeOnce(meta,[],stock,'sell',0,0);
+  if(r2.ok) throw new Error('没粮应拒绝');
+});
+test('tradeOnce: 仓不够时用地上堆付款(先仓后堆)', () => {
+  const meta={ res:{ mineral:2, med:0 } };
+  const ents=[{ type:'dropped', itemId:'it_mineral', n:5, x:0, y:0 }];
+  const stock={ sells:[{key:'med',n:1,price:6}], buys:[] };
+  const r=Res.tradeOnce(meta, ents, stock, 'buy', 0, 0);
+  if(!r.ok) throw new Error('仓2+地5=7≥6应成交');
+  if(meta.res.mineral!==0) throw new Error('仓应扣光');
+  if(ents[0].n!==1) throw new Error('地上堆应扣4: '+ents[0].n);
+});
+/* ---------- D: 工作优先级 ---------- */
+test('defaultPrio: 主技能=1 其余=2', () => {
+  const p=Res.defaultPrio({ mainSkill:'sk_farm' });
+  if(p.sk_farm!==1) throw new Error('主技能应为1');
+  Res.SKILLS.forEach(sk => {
+    if(sk!=='sk_farm' && p[sk]!==2) throw new Error(sk+' 应为2');
+  });
+});
+test('defaultPrio: 有现职时按岗位对应技能=1', () => {
+  const p=Res.defaultPrio({ mainSkill:'sk_lore', job:'bl_farm' });
+  if(p.sk_farm!==1) throw new Error('现职农场应优先农: '+JSON.stringify(p));
+  if(p.sk_lore!==2) throw new Error('主技能不应盖过现职');
+});
+test('assignByPriority: 1级先满足且按技能高者', () => {
+  const bs=[{id:'bl_farm'},{id:'bl_mine'}];
+  const rs=[
+    { id:'rs_a', skills:{sk_farm:8, sk_craft:2} },
+    { id:'rs_b', skills:{sk_farm:3, sk_craft:6} },
+  ];
+  const prio={ rs_a:{sk_farm:1,sk_craft:2}, rs_b:{sk_farm:2,sk_craft:1} };
+  const out=Colony.assignByPriority(rs, bs, prio, false);
+  if(out.rs_a!=='bl_farm') throw new Error('rs_a 农1级应种田: '+out.rs_a);
+  if(out.rs_b!=='bl_mine') throw new Error('rs_b 矿1级应挖矿: '+out.rs_b);
+});
+test('assignByPriority: 0=禁止永不指派', () => {
+  const bs=[{id:'bl_farm'}];
+  const rs=[{ id:'rs_a', skills:{sk_farm:9} }];
+  const out=Colony.assignByPriority(rs, bs, { rs_a:{sk_farm:0} }, false);
+  if(out.rs_a!==null) throw new Error('禁止的活不该派: '+out.rs_a);
+});
+test('assignByPriority: 手动锁岗不动, 崩溃者缺勤', () => {
+  const bs=[{id:'bl_farm'},{id:'bl_lab'}];
+  const rs=[
+    { id:'rs_lock', job:'bl_lab', jobLocked:true, skills:{sk_farm:9} },
+    { id:'rs_brk', skills:{sk_farm:9}, breakType:'wander', breakT:1 },
+    { id:'rs_c', skills:{sk_farm:1} },
+  ];
+  const out=Colony.assignByPriority(rs, bs, {}, false);
+  if(out.rs_lock!=='bl_lab') throw new Error('锁岗应保留: '+out.rs_lock);
+  if(out.rs_brk!==null) throw new Error('崩溃者应缺勤: '+out.rs_brk);
+  if(out.rs_c!=='bl_farm') throw new Error('剩下的人应补farm: '+out.rs_c);
+});
+test('assignByPriority: 有施工队列时建造者留空', () => {
+  const bs=[{id:'bl_mine'}];
+  const rs=[{ id:'rs_bd', mainSkill:'sk_build', skills:{sk_build:7, sk_craft:5} }];
+  const busy=Colony.assignByPriority(rs, bs, {}, true);
+  if(busy.rs_bd!==null) throw new Error('施工期建造者应留空: '+busy.rs_bd);
+  const idle=Colony.assignByPriority(rs, bs, {}, false);
+  if(idle.rs_bd!=='bl_mine') throw new Error('没工地该去挖矿: '+idle.rs_bd);
+  const banned=Colony.assignByPriority(rs, bs, { rs_bd:{sk_build:0,sk_craft:2} }, true);
+  if(banned.rs_bd!=='bl_mine') throw new Error('建造被禁止时不留空: '+banned.rs_bd);
+});
+test('assignByPriority: 同级粘性——现职同级不换岗', () => {
+  const bs=[{id:'bl_clinic'},{id:'bl_workshop'}];
+  const rs=[{ id:'rs_w', job:'bl_workshop', skills:{sk_craft:5, sk_social:5} }];
+  const out=Colony.assignByPriority(rs, bs, {}, false);
+  if(out.rs_w!=='bl_workshop') throw new Error('同级应留任工坊: '+out.rs_w);
+});
+test('assignByPriority: 更高优先级空位会抢走现职', () => {
+  const bs=[{id:'bl_farm'},{id:'bl_mine'}];
+  const rs=[{ id:'rs_a', job:'bl_mine', skills:{sk_farm:5, sk_craft:5} }];
+  const out=Colony.assignByPriority(rs, bs, { rs_a:{sk_farm:1, sk_craft:2} }, false);
+  if(out.rs_a!=='bl_farm') throw new Error('农1级应把人从矿抢来: '+out.rs_a);
+});
+test('assignByPriority: 岗位数受建筑数约束', () => {
+  const bs=[{id:'bl_farm'}];      // 1 农场 = 2 席
+  const rs=[
+    { id:'r1', skills:{sk_farm:5} },
+    { id:'r2', skills:{sk_farm:4} },
+    { id:'r3', skills:{sk_farm:3} },
+  ];
+  const out=Colony.assignByPriority(rs, bs, {}, false);
+  const onFarm=Object.keys(out).filter(k=>out[k]==='bl_farm');
+  if(onFarm.length!==2) throw new Error('农场只有2席: '+onFarm.length);
+  if(out.r3!==null) throw new Error('技能最低者落选');
+});
+test('assignByPriority: 重病居民跳过指派', () => {
+  const bs=[{id:'bl_farm'}];
+  const rs=[{ id:'rs_s', skills:{sk_farm:9}, illness:80 }];
+  const out=Colony.assignByPriority(rs, bs, {}, false);
+  if(out.rs_s!==null) throw new Error('重病应缺勤: '+out.rs_s);
+  const mild=Colony.assignByPriority([{ id:'rs_m', skills:{sk_farm:5}, illness:20 }], bs, {}, false);
+  if(mild.rs_m!=='bl_farm') throw new Error('轻病仍应上岗: '+mild.rs_m);
+});
+
+test('globalBonuses: tradeMul 随社交封顶', () => {
+  const a=Res.generate('t1',3); a.skills.sk_social=3;
+  let gb=Res.globalBonuses([a]);
+  if(Math.abs(gb.tradeMul-0.06)>1e-9) throw new Error('社交3应6%: '+gb.tradeMul);
+  a.skills.sk_social=9;
+  gb=Res.globalBonuses([a]);
+  if(Math.abs(gb.tradeMul-0.12)>1e-9) throw new Error('封顶12%: '+gb.tradeMul);
+});
+
+/* ---------- F 健康分型 ---------- */
+test('ensureAilments: 旧档 illness>0 迁移为一条外伤', () => {
+  const r={illness:30};
+  Res.ensureAilments(r);
+  if(r.ailments.length!==1||r.ailments[0].type!=='wound'||r.ailments[0].sev!==30)
+    throw new Error('应迁移为外伤30: '+JSON.stringify(r.ailments));
+  const h={illness:0};
+  Res.ensureAilments(h);
+  if(h.ailments.length!==0) throw new Error('健康者应空数组');
+});
+test('addAilment: 同型合并, 满2条加到最重', () => {
+  const r={illness:0, ailments:[]};
+  Res.addAilment(r,'wound',10);
+  Res.addAilment(r,'wound',5);
+  if(r.ailments.length!==1||r.ailments[0].sev!==15) throw new Error('同型应合并15');
+  Res.addAilment(r,'plague',20);
+  if(r.ailments.length!==2) throw new Error('应2条');
+  Res.addAilment(r,'infection',6);            // 满了 → 加到最重(plague 20)
+  if(r.ailments.length!==2) throw new Error('不应超过 ailMax=2');
+  const pl=r.ailments.find(a=>a.type==='plague');
+  if(pl.sev!==26) throw new Error('应加到最重的疫病: '+pl.sev);
+  if(r.illness!==15+26) throw new Error('聚合值应41: '+r.illness);
+});
+test('hurtResident: type 参数分型(疫病)', () => {
+  const r={illness:0, mood:80, ailments:[]};
+  Res.hurtResident(r, 15, 'plague');
+  if(r.ailments[0].type!=='plague') throw new Error('应为疫病');
+  if(r.illness!==15) throw new Error('聚合15: '+r.illness);
+});
+test('ailmentAge: 外伤拖2跳未进舱 → 升级感染+掉心情', () => {
+  const r={illness:20, mood:70, ailments:[{type:'wound',sev:20,age:0}]};
+  Res.ailmentAge(r,{hasClinic:false});        // age 1
+  if(r.ailments[0].type!=='wound') throw new Error('1跳不应升级');
+  Res.ailmentAge(r,{hasClinic:false});        // age 2 → 升级
+  if(r.ailments[0].type!=='infection') throw new Error('2跳应升级感染');
+  if(r.ailments[0].sev!==25) throw new Error('升级应+infectBump=5: '+r.ailments[0].sev);
+  if(r.mood!==62) throw new Error('应掉心情8: '+r.mood);
+  const c={illness:20, mood:70, ailments:[{type:'wound',sev:20,age:5}]};
+  Res.ailmentAge(c,{hasClinic:true});
+  if(c.ailments[0].type!=='wound') throw new Error('在舱不应升级');
+  const far={illness:20, mood:70, ailments:[{type:'wound',sev:20,age:0}]};
+  Res.ailmentAge(far,{hasClinic:true, inClinic:false});
+  Res.ailmentAge(far,{hasClinic:true, inClinic:false});
+  if(far.ailments[0].type!=='infection') throw new Error('有舱但人没进舱应升级');
+});
+test('treatAilment: 优先级 感染>疫病>外伤', () => {
+  const r={illness:30, ailments:[{type:'wound',sev:10,age:0},{type:'infection',sev:20,age:0}]};
+  const hit=Res.treatAilment(r, 6, false);
+  if(hit!=='infection') throw new Error('应先治感染: '+hit);
+  if(r.ailments.find(a=>a.type==='infection').sev!==14) throw new Error('感染应-6');
+});
+test('plague: 无药只能压到地板, 用药×2 可除根', () => {
+  const r={illness:14, ailments:[{type:'plague',sev:14,age:0}]};
+  Res.treatAilment(r, 50, false);             // 医疗舱猛治
+  if(r.ailments[0].sev!==12) throw new Error('无药应压到地板12: '+r.ailments[0].sev);
+  Res.applyMed(r);                            // medHeal 8 ×2 = 16 ≥ 12
+  if(r.ailments.length!==0||r.illness!==0) throw new Error('用药应除根: '+r.illness);
+});
+test('clinicTick: 吃饱自愈只治外伤, 感染不自愈', () => {
+  const w={illness:10, food:80, ailments:[{type:'wound',sev:10,age:0}]};
+  Res.clinicTick(w,{hasClinic:false});
+  if(w.illness!==9) throw new Error('外伤应自愈-1: '+w.illness);
+  const inf={illness:10, food:80, ailments:[{type:'infection',sev:10,age:0}]};
+  Res.clinicTick(inf,{hasClinic:false});
+  if(inf.illness!==10) throw new Error('感染不应自愈: '+inf.illness);
+});
+test('efficiency: 感染者效率地板更低', () => {
+  const sick={mood:50, food:80, illness:100, ailments:[{type:'wound',sev:100,age:0}]};
+  const inf={mood:50, food:80, illness:100, ailments:[{type:'infection',sev:100,age:0}]};
+  const es=Res.efficiency(sick), ei=Res.efficiency(inf);
+  if(!(ei<es)) throw new Error('感染地板应更低: '+ei+' vs '+es);
+});
+test('needsTick: 饥饿病计为外伤', () => {
+  const r={food:20, mood:50, illness:0, ailments:[]};
+  Res.needsTick(r, false);
+  if(!r.ailments.some(a=>a.type==='wound')) throw new Error('饿出的病应为外伤');
+});

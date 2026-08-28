@@ -94,6 +94,12 @@ APH.Save = (function(){
       delete m.tech.exo_suit;
     }
     if(!m.war) m.war = { wins:0, raids:0 };
+    /* ADR-12 事件导演状态(分钟计): 旧档走默认值 */
+    if(!m.events) m.events = { nextIn:null, sinceNeg:1e9, lastNeg:0, restFor:null, cooldowns:{}, history:[] };
+    if(!m.events.cooldowns) m.events.cooldowns = {};
+    if(!m.events.history) m.events.history = [];
+    if(m.events.lastNeg==null) m.events.lastNeg = 0;
+    if(!m.workPrio) m.workPrio = {};
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');
       if(w){

@@ -377,4 +377,31 @@
 - **2026-08-28 07:15 · 班次**: ✅饿了走去吃饭。生产跳只掉饱食, 不隔空扣堆; 人直线走到最近仓库或地上粮再 `eatOnce`。饿优先于搬运; 头上 🍽。用药/工坊/盖房仍可取整张地图的堆。
   验证: `python3 build.py` 构建成功 3606KB, game.html 以 `</html>` 收尾; 单元 168/0; 场景 27/0(含远处不隔空吃、走到才吃); perf 3/0; boss 2/0。无头 Chrome `?autostart=1` 标题 `AUTO: q命中`, dump 无 Uncaught。未 commit。
 
+- **2026-08-28 11:40 · 班次**: ✅RimWorld 化阶段 A——事件叙事者。新模块 `events.js`(APH.Events, ADR-12): `wealthScore` 财富值(仓+地资源/建筑造价/人口/科技)为唯一威胁标尺; `pickEvent` 按权重抽卡, 负面事件后 2.5 分钟强制喘息、心情均值<40 负面权重减半、威胁级放大负面; `directorTick` 纯函数节奏器每生产跳推进。9 张卡(`ev_` 前缀进 ADR-9 修订): 补给舱/难民潮/兽群/极光/游商到访(占位) + 疫病/枯萎/耀斑(炮塔 offlineT 真停机)/袭击。敌殖民地袭击开打改由 `ev_raid` 统一调度(tickRivals 只标记 wantRaid)。事件横幅 floatText+showCard, LLM 富化异步降级。存档 `meta.events` 走 loadMeta 默认值。
+  验证: `python3 build.py` 构建成功 3621KB, game.html 以 `</html>` 收尾; 单元 181/0(新增 events.test.js 13 用例); 场景 27/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 B 心情崩溃。
+
+- **2026-08-28 11:55 · 班次**: ✅RimWorld 化阶段 B——心情崩溃。`Res.breakTick` 纯函数状态机: 心情<35 每生产跳掷骰 8%(＜15 概率×3) → 按性格分流(暴脾气→斗殴打好感最低同事/独行谨慎→出走院子游荡/话痨乐观→怠工抱怨拉全员心情/勤恳→暴食多吃一顿), 持续 1~2 跳, 结束宣泄回弹至 45 + 冷却 10 跳。崩溃者本跳退出采矿/农牧/工坊/医疗/施工/搬运; 头顶 💢, 名册标红 [崩溃·类型]。字段 breakType/breakT/breakCd 随名册落盘, 数值全进 `CFG.residents`。
+  验证: `python3 build.py` 构建成功 3627KB, game.html 以 `</html>` 收尾; 单元 187/0(新增 6 用例); 场景 27/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 C 游商贸易。
+
+- **2026-08-28 12:10 · 班次**: ✅RimWorld 化阶段 C——游商贸易。矿材=硬通货, 不新增货币物品。`Res.makeTraderStock`(seeded, 价格 ±25% 浮动, 买卖各 1~3 种: 卖药/粮/皮, 收粮/皮/药)+`Res.tradeOnce`(先仓后堆扣账, 拒绝时零扣账)。游商到访随身带货单; 走近提示 [T] 交易, 数字键成交一件, T/Esc 关(游商离开自动收面板); 靠近游商时 T 不再误触科技轮换。社交议价: 最高社交 2%/级封顶 12%(买更便宜卖更贵), 进 `globalBonuses.tradeMul`。`ev_trader_caravan` 事件卡已在阶段 A 挂上。数值全进 `CFG.trade`。
+  验证: `python3 build.py` 构建成功 3635KB, game.html 以 `</html>` 收尾; 单元 193/0(新增 6 用例); 场景 27/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 D 工作优先级面板。
+
+- **2026-08-28 12:25 · 班次**: ✅RimWorld 化阶段 D——工作优先级。`Colony.assignByPriority` 纯函数: 人×技能 0~3(0禁止/1优先/2普通/3闲时), 1→2→3 逐层填岗、同级按技能高者、同级粘性不乱换岗、更高优先级空位可抢现职; 手动锁岗(jobLocked)最高优先; 崩溃者缺勤; 施工期建造者留空(sk_build=0 则不留)。旧档无 `meta.workPrio` → `Res.defaultPrio`(主技能=1 其余=2)。R 面板顶部新增优先级网格: 方向键选格(面板开着时不动角色)、数字 0~3 设值、技能高的列绿底提示; 改优先级自动解除锁岗。替换掉六次 autoAssign。
+  验证: `python3 build.py` 构建成功; 单元 201/0(新增 8 用例); 场景 27/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 E 袭击多样性。
+
+- **2026-08-28 12:55 · 班次**: ✅RimWorld 化阶段 E——袭击多样性。`raidWave` 追加 tactic/waves/total(签名兼容): aggressive→强攻×1.2、trader→盗掠×0.7(不伤人不打建筑, 只偷地上物/仓库, 偷够 stealCap=6 满载而归)、expansionist→围攻(500px 外扎营90s, 每15s 炮击最近建筑停机20s, 营地60血可被玩家弹丸拆毁→全体溃退, 扎营结束转强攻); 军力≥90 拆两波间隔45s 且第二波换方向(+2.4rad); 伤亡≥60% 全体溃退且溃退者 50% 掉落赃物。数值全进 `CFG.raidTactics`。新事件: raidStole/siegeCampDown; 溃退/扎营/盗掠行为在 combat.js 敌人循环前置分支。修复: fleeDespawnR 1100→1000(轴向 clamp 上限 1070, 否则溃退者卡边袭击永不结束); 盗掠者无物可偷时奔家园中心防僵持。
+  验证: 构建绿; 单元 205/0(rivals +4); 场景 27/0; perf 3/0; boss 5/0(阶段E 冒烟 +3: 盗掠不伤人/溃退越界消失/拆营触发溃退)。未 commit。
+  下一步: 阶段 F 健康分型。
+
+- **2026-08-28 13:20 · 班次**: ✅RimWorld 化阶段 F——健康分型(六阶段收官)。居民追加 `ailments:[{type,sev,age}]`(≤2条), illness 保留聚合值(=Σsev clamp 100), 现有效率/心情公式零改动; 旧档/外部直改 illness 由 `ensureAilments` 迁移+按比例校准。分型规则: 袭击/斗殴→wound(吃饱自愈, 拖2跳未进舱升级 infection +5 sev/-8 心情); 饥饿/ambient→infection(不自愈, 效率地板 0.35→0.25); ev_plague→plague(医疗舱只能压到 12 地板, 用药×2 才除根, 用药目标优先疫病患者)。医疗舱治疗优先级 infection>plague>wound。R 面板病情条后追加分型标签(疫病红/感染橙/外伤灰)。入口全收口: needsTick/clinicTick/hurtResident(+type参数)/applyMed/brawl。
+  验证: 构建绿; 单元 214/0(F +9); 场景 27/0; perf 3/0; boss 5/0。中途修过一个 bug: clinicTick 自愈直改 sev 未同步聚合值, 被失配校准回滚(测试抓住)。未 commit。
+  下一步: 六阶段路线图全部完成; 可考虑 commit + 实机浏览器过一遍三种袭击战术的观感。
+
+- **2026-08-28 14:00 · 班次**: 🔧审查修复(Standards+Spec)。做错: 兽群改为本跳牧场产出×3(storyTick 提前到 residentsTick 前); 围攻改为真弹丸命中后停机; 外伤升级看本人是否进舱(inClinic)而非殖民地有没有诊所; 怠工抱怨只打周围 tantrumR; 斗殴复用 hurtResident。缺口: restMinutes=[2,4]+restFor; 货单改药品/合金/皮革 vs 食物/皮革/晶体矿, 买卖各 2~3 种; 交易 ↑↓+Enter; 重病 sickSkipAt 跳过派岗; 士兵可拆围攻营; save.js 补 workPrio/lastNeg。标准: 魔数进 CFG; 溃退掉落改 seeded; fleeDespawnR 回退 1000。饥饿/ambient 改回外伤(分型只留袭击→wound / 拖期→infection / 疫病事件→plague)。
+  验证: 构建绿; 单元 219/0; 场景 27/0; perf 3/0; boss 7/0。未 commit。
+
 

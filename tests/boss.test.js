@@ -28,7 +28,7 @@ const A=(c,m)=>{ if(!c) throw new Error(m||'断言失败'); };
 
 const SRC=path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
@@ -58,6 +58,79 @@ test('Boss击杀: 掉落≥4普通+1保底遗件', () => {
   A(dropped.length>=5,'Boss应掉≥5件, got '+dropped.length);
   A(dropped.some(d=>d.itemId==='it_relic'),'应有保底遗件');
 });
+/* ---- 阶段E 冒烟: 袭击战术 ---- */
+test('阶段E 盗掠者: 偷地上物、不伤玩家、raidStole 计数', () => {
+  APH.state.scene='home';
+  APH.state.colony={buildings:[]};
+  APH.state.hp=100;
+  APH.state.war.raidActive=true; APH.state.war.tactic='pillage';
+  APH.state.war.stolen=0; APH.state.war.routed=false;
+  APH.state.px=600; APH.state.py=600;
+  APH.state.entities=[{id:'player',type:T.PLAYER,x:600,y:600}];
+  const f=APH.state.spec.enemies.factions[0];
+  const en=APH.Ent.makeEnemy(f,600,620);
+  en.pillager=true; en.atkCd=0;
+  APH.state.entities.push(en);
+  APH.state.entities.push({id:'dp_t',type:T.DROPPED,x:602,y:622,itemId:'it_mineral',n:2});
+  APH.Combat.updateCombat(0.02,false);
+  A(APH.state.hp===100,'盗掠者不应伤玩家');
+  A(!APH.state.entities.some(e=>e.type===T.DROPPED),'应偷走地上物');
+  A((APH.state.war.stolen||0)>=1,'raidStole 应计数, got '+APH.state.war.stolen);
+});
+test('阶段E 溃退者: 背向家园撤离并越界消失', () => {
+  APH.state.scene='home';
+  APH.state.war.raidActive=true; APH.state.war.routed=true;
+  APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
+  const f=APH.state.spec.enemies.factions[0];
+  const HAB=APH.CFG.HAB;
+  const en=APH.Ent.makeEnemy(f, HAB.x+1020, HAB.y);   // 超 fleeDespawnR=1000
+  en.retreat=true;
+  APH.state.entities.push(en);
+  APH.Combat.updateCombat(0.02,false);
+  A(!APH.state.entities.some(e=>e.id===en.id),'越界溃退者应消失');
+});
+test('阶段E 围攻营地: 弹丸可拆并联动全体溃退', () => {
+  APH.state.scene='home';
+  APH.state.war.raidActive=true; APH.state.war.routed=false;
+  APH.state.war.tactic='siege'; APH.state.war.wave={count:3,waves:1};
+  APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
+  const camp={id:'bl_siege_camp_t',type:T.BUILDING,bid:'bl_siege_camp',
+              x:300,y:300,hp:10,maxHp:10};
+  APH.state.entities.push(camp);
+  let down=0; U.on('siegeCampDown',()=>{down++;});
+  APH.state.entities.push(APH.Combat.makeProj(300-8,300,430,0,'player',99999));
+  APH.Combat.updateCombat(0.02,false);
+  A(down===1,'应触发 siegeCampDown');
+  A(!APH.state.entities.some(e=>e.bid==='bl_siege_camp'),'营地应被移除');
+  A(APH.state.war.routed===true,'main 溃退联动应置 routed');
+});
+test('阶段E 围攻营地: 士兵可拆营', () => {
+  APH.state.scene='home';
+  APH.state.war.raidActive=true; APH.state.war.routed=false;
+  APH.state.colony={buildings:[]};
+  APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
+  const camp={id:'bl_siege_camp_s',type:T.BUILDING,bid:'bl_siege_camp',
+              x:400,y:300,hp:6,maxHp:10};
+  APH.state.entities.push(camp);
+  const f=APH.state.spec.enemies.factions[0];
+  const sol=APH.Ent.makeEnemy(f, 400, 300);
+  sol.isSoldier=true; sol.atkCd=0; sol.hp=40; sol.maxHp=40;
+  sol.faction=Object.assign({}, f, {speed:120, dmg:6});
+  APH.state.entities.push(sol);
+  APH.Combat.updateCombat(0.02,false);
+  A(camp.hp<6 || camp.dead, '士兵应打到营地, hp='+camp.hp);
+});
+test('阶段E 围攻弹丸: 命中建筑停机', () => {
+  APH.state.scene='home';
+  APH.state.colony={buildings:[{id:'bl_farm',x:400,y:300,offlineT:0}]};
+  APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
+  const p=APH.Combat.makeProj(400-8,300,430,0,'siege',0);
+  p.offlineSec=20; p.life=5;
+  APH.state.entities.push(p);
+  APH.Combat.updateCombat(0.02,false);
+  A((APH.state.colony.buildings[0].offlineT||0)>=20, '围攻弹应让建筑停机');
+});
+
 test('普通敌人: 仍然只掉1件', () => {
   APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
   APH.state.parts=[];

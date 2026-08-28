@@ -51,7 +51,7 @@ let frameFn=null;
 /* ---------- 加载模块(顺序同 build.py) ---------- */
 const SRC = path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }

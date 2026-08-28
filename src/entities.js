@@ -402,6 +402,32 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    if(e.bid==='bl_siege_camp'){
+      /* 阶段E 围攻营地: 帐篷+篝火+血条(可被玩家拆) */
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(4,10,44,20,0,0,U.TAU); ctx.fill();
+      /* 帐篷 */
+      ctx.fillStyle='#6e4030';
+      ctx.beginPath(); ctx.moveTo(-34,10); ctx.lineTo(0,-26); ctx.lineTo(34,10);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,140,90,.55)'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#2a1812';
+      ctx.beginPath(); ctx.moveTo(-9,10); ctx.lineTo(0,-4); ctx.lineTo(9,10);
+      ctx.closePath(); ctx.fill();
+      /* 篝火(闪烁) */
+      var fl=.6+.4*Math.sin(time*8);
+      ctx.fillStyle='rgba(255,170,60,'+fl+')';
+      ctx.beginPath(); ctx.arc(24,14,4.5,0,U.TAU); ctx.fill();
+      /* 血条 */
+      var cp=Math.max(0,e.hp/(e.maxHp||1));
+      ctx.fillStyle='rgba(10,12,24,.75)';
+      ctx.fillRect(-28,-38,56,6);
+      ctx.fillStyle=cp>.4?'#ffb35c':'#ff4d5e';
+      ctx.fillRect(-27,-37,54*cp,4);
+      ctx.restore();
+      return;
+    }
     if(e.bid==='bl_landing_pad'){
       /* 发射台: 圆台+光环+四角灯 */
       ctx.save(); ctx.translate(e.x,e.y);
@@ -606,6 +632,11 @@ APH.Ent = (function(){
       ctx.fillRect(7,-8+bob,7,7);
       ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
       ctx.strokeRect(7,-8+bob,7,7);
+    }
+    if(e.breaking){                          // B: 心情崩溃标记
+      ctx.fillStyle='#ff6d7a';
+      ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('💢', 0, -30+bob);
     }
     ctx.fillStyle='#f7f3df';
     ctx.font='9px sans-serif'; ctx.textAlign='center';

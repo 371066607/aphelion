@@ -56,7 +56,8 @@ APH.Res = (function(){
       skills:skills, mainSkill:main, subSkill:sub,
       mood:70+Math.floor(rng()*25),                          // 70~94
       food:80+Math.floor(rng()*15),                          // 80~94
-      illness:0,                                             // 病情 0~100, 0=健康
+      illness:0,                                             // 病情 0~100 (F: ailments 聚合值)
+      ailments:[],                                           // F: [{type,sev,age}] 最多 ailMax 条
       job:null,                                              // 指派岗位 bl_xxx|null
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
@@ -84,8 +85,7 @@ APH.Res = (function(){
     }
     var sickAt=C.hungerSickAt!=null?C.hungerSickAt:30;
     var sickAdd=C.hungerSick!=null?C.hungerSick:4;
-    var illMax=C.illnessMax!=null?C.illnessMax:100;
-    if(r.food<sickAt) r.illness=clampNeed(Math.round(r.illness+sickAdd), 0, illMax);
+    if(r.food<sickAt) addAilment(r, 'wound', sickAdd);        // 饿出的病=外伤
     var wellF=C.moodWellFood!=null?C.moodWellFood:65;
     var wellG=C.moodWellGain!=null?C.moodWellGain:2;
     var cap=C.moodCap!=null?C.moodCap:95;
@@ -120,58 +120,233 @@ APH.Res = (function(){
     var ill=r.illness||0;
     var at=C.effSickAt!=null?C.effSickAt:20;
     var floor=C.effSickFloor!=null?C.effSickFloor:0.35;
+    /* F: 感染的效率地板更低 */
+    var infected=false;
+    (r.ailments||[]).forEach(function(a){ if(a.type==='infection') infected=true; });
+    if(infected) floor=C.effInfectFloor!=null?C.effInfectFloor:0.25;
     var sickF=1;
     if(ill>at) sickF=Math.max(floor, 1-(ill-at)/100);
     return Math.round(moodF*foodF*sickF*100)/100;
   }
 
-  /* 医疗舱治疗(纯函数): 有舱基疗, 有医更快; 无舱且吃饱微愈; 否则少量 ambient 得病 */
+  /* ---------- F: 健康分型 (ailments 数组) ----------
+     illness 保留为聚合值(= 各 ailment sev 之和 clamp illnessMax),
+     所有现有公式(efficiency/moodSick)零改动; 得病/治疗入口改为操作 ailments。
+     分型: wound 外伤(自愈快) / infection 感染(不自愈, 拖出来的)
+           / plague 疫病(医疗舱只能压到地板, 必须用药除根)。 */
+  var AILMENT_NAMES={ wound:'外伤', infection:'感染', plague:'疫病' };
+  var TREAT_ORDER={ infection:0, plague:1, wound:2 };   // 医疗舱治疗优先级
+
+  /* 兼容旧档/外部直改 illness: 无数组按 wound 初始化;
+     聚合值与数组失配时按比例校准数组(illness 是唯一对外真值) */
+  function ensureAilments(r){
+    if(!r.ailments){
+      r.ailments=(r.illness||0)>0 ? [{type:'wound', sev:Math.round(r.illness), age:0}] : [];
+      return r.ailments;
+    }
+    var sum=0;
+    r.ailments.forEach(function(a){ sum+=a.sev||0; });
+    sum=Math.round(sum);
+    var ill=Math.round(r.illness||0);
+    if(sum!==ill){
+      if(ill<=0) r.ailments=[];
+      else if(sum<=0) r.ailments=[{type:'wound', sev:ill, age:0}];
+      else{
+        var k=ill/sum;
+        r.ailments.forEach(function(a){ a.sev=Math.max(0, a.sev*k); });
+      }
+    }
+    return r.ailments;
+  }
+  function syncIllness(r){
+    var C=RS();
+    var illMax=C.illnessMax!=null?C.illnessMax:100;
+    r.ailments=(r.ailments||[]).filter(function(a){ return (a.sev||0)>0.5; });
+    var sum=0;
+    r.ailments.forEach(function(a){ sum+=a.sev||0; });
+    r.illness=clampNeed(Math.round(sum), 0, illMax);
+    return r.illness;
+  }
+  /* 得病入口: 同型合并; 最多 ailMax 条, 满了加到最重的一条 */
+  function addAilment(r, type, sev){
+    if(!r || !sev) return r;
+    var C=RS();
+    var max=C.ailMax!=null?C.ailMax:2;
+    ensureAilments(r);
+    var same=null;
+    r.ailments.forEach(function(a){ if(a.type===type) same=a; });
+    if(same){
+      same.sev=clampNeed(same.sev+sev, 0, 100);
+    }else if(r.ailments.length<max){
+      r.ailments.push({type:type, sev:clampNeed(sev,0,100), age:0});
+    }else{
+      var worst=r.ailments[0];
+      r.ailments.forEach(function(a){ if(a.sev>worst.sev) worst=a; });
+      worst.sev=clampNeed(worst.sev+sev, 0, 100);
+    }
+    syncIllness(r);
+    return r;
+  }
+  /* 治疗入口: 医疗舱按 感染>疫病>外伤 取靶; 用药(isMed)优先疫病且效果×2;
+     无药时疫病只能压到 plagueFloor(压不能除) */
+  function treatAilment(r, amount, isMed){
+    ensureAilments(r);
+    if(!r.ailments.length || !amount){ syncIllness(r); return null; }
+    var C=RS();
+    var tgt=null;
+    if(isMed){
+      r.ailments.forEach(function(a){ if(a.type==='plague') tgt=a; });
+    }
+    if(!tgt){
+      tgt=r.ailments.slice().sort(function(a,b){
+        return (TREAT_ORDER[a.type]!=null?TREAT_ORDER[a.type]:9)
+             - (TREAT_ORDER[b.type]!=null?TREAT_ORDER[b.type]:9);
+      })[0];
+    }
+    var amt=amount;
+    if(tgt.type==='plague'){
+      if(isMed){
+        amt*=(C.medPlagueMul!=null?C.medPlagueMul:2);
+        tgt.sev=Math.max(0, tgt.sev-amt);
+      }else{
+        var fl=C.plagueFloor!=null?C.plagueFloor:12;
+        tgt.sev=Math.max(Math.min(fl,tgt.sev), tgt.sev-amt);
+      }
+    }else{
+      tgt.sev=Math.max(0, tgt.sev-amt);
+    }
+    var t=tgt.type;
+    syncIllness(r);
+    return t;
+  }
+  /* 病程推进(每生产跳): 外伤 age≥woundInfectAge 且本人未进医疗舱 → 升级感染 */
+  function ailmentAge(r, ctx){
+    ctx=ctx||{};
+    var C=RS();
+    ensureAilments(r);
+    var inClinic = ctx.inClinic;
+    if(inClinic==null) inClinic=!!ctx.hasClinic;   // 单测无坐标时回退
+    var upgraded=null;
+    r.ailments.forEach(function(a){
+      a.age=(a.age||0)+1;
+      if(a.type==='wound' && !inClinic &&
+         a.age>=(C.woundInfectAge!=null?C.woundInfectAge:2) && a.sev>0.5){
+        a.type='infection'; a.age=0;
+        a.sev=clampNeed(a.sev+(C.infectBump!=null?C.infectBump:5), 0, 100);
+        upgraded=a;
+      }
+    });
+    if(upgraded) r.mood=Math.max(0, (r.mood||0)-(C.infectMood!=null?C.infectMood:8));
+    syncIllness(r);
+    return upgraded ? { upgraded:upgraded.type } : {};
+  }
+
+  /* 医疗舱治疗(每生产跳): 有舱基疗, 有医更快; 无舱且吃饱只自愈外伤;
+     否则少量 ambient 得病(计为感染); 最后推进病程 */
   function clinicTick(r, ctx){
     ctx = ctx||{};
     var C=RS();
-    var illMax=C.illnessMax!=null?C.illnessMax:100;
-    r.illness = r.illness||0;
-    var heal=0;
+    ensureAilments(r);
     if(ctx.hasClinic){
-      heal = C.clinicHeal!=null?C.clinicHeal:6;
+      var heal = C.clinicHeal!=null?C.clinicHeal:6;
       var sk=ctx.medicSkill||0;
       if(sk>0)       heal += (C.medicHealPerLv!=null?C.medicHealPerLv:1.2)*sk;
-      r.illness = clampNeed(Math.round(r.illness-heal), 0, illMax);
-      return r;
+      treatAilment(r, heal, false);
+    }else{
+      var well=C.selfHealFood!=null?C.selfHealFood:65;
+      if((r.food||0)>=well){
+        /* F: 自愈只作用于外伤——感染要进舱, 疫病要用药 */
+        var self=C.selfHeal!=null?C.selfHeal:1;
+        var w=null;
+        r.ailments.forEach(function(a){ if(a.type==='wound') w=a; });
+        if(w){ w.sev=Math.max(0, w.sev-self); syncIllness(r); }
+      }else{
+        var rng = ctx.rng || Math.random;
+        var chance=C.ambientSickChance!=null?C.ambientSickChance:0.08;
+        var add=C.ambientSick!=null?C.ambientSick:2;
+        if(rng()<chance) addAilment(r, 'wound', add);
+      }
     }
-    var well=C.selfHealFood!=null?C.selfHealFood:65;
-    if((r.food||0)>=well){
-      var self=C.selfHeal!=null?C.selfHeal:1;
-      r.illness = clampNeed(Math.round(r.illness-self), 0, illMax);
-      return r;
-    }
-    var rng = ctx.rng || Math.random;
-    var chance=C.ambientSickChance!=null?C.ambientSickChance:0.08;
-    var add=C.ambientSick!=null?C.ambientSick:2;
-    if(rng()<chance) r.illness=clampNeed(Math.round(r.illness+add), 0, illMax);
+    ailmentAge(r, ctx);
     return r;
   }
 
-  /* 袭击打伤(纯函数): 涨病、掉心情, 不致死 */
-  function hurtResident(r, amount){
+  /* 袭击打伤(纯函数): 涨病、掉心情, 不致死。type 默认 wound(疫病事件传 'plague')
+     opts.mood: 覆盖心情打击; false=不掉心情(斗殴自伤只加病) */
+  function hurtResident(r, amount, type, opts){
     if(!r) return r;
+    if(type && typeof type==='object'){ opts=type; type='wound'; }
+    opts=opts||{};
     var C=RS();
-    var illMax=C.illnessMax!=null?C.illnessMax:100;
     var wound=amount!=null?amount:(C.raidWound!=null?C.raidWound:18);
-    var moodHit=C.raidMood!=null?C.raidMood:12;
-    r.illness=clampNeed(Math.round((r.illness||0)+wound), 0, illMax);
-    r.mood=Math.max(0, (r.mood||0)-moodHit);
+    addAilment(r, type||'wound', wound);
+    if(opts.mood!==false){
+      var moodHit=opts.mood!=null?opts.mood:(C.raidMood!=null?C.raidMood:12);
+      r.mood=Math.max(0, (r.mood||0)-moodHit);
+    }
     return r;
   }
 
-  /* 用药(纯函数): 医疗舱给最重病号额外治一截, 不致死也不变远征 */
+  /* 用药(纯函数): 优先根治疫病(×medPlagueMul), 否则按治疗优先级 */
   function applyMed(r){
     if(!r) return r;
     var C=RS();
-    var illMax=C.illnessMax!=null?C.illnessMax:100;
     var bonus=C.medHeal!=null?C.medHeal:8;
-    r.illness=clampNeed(Math.round((r.illness||0)-bonus), 0, illMax);
+    treatAilment(r, bonus, true);
     return r;
+  }
+
+  /* ---------- 心情崩溃(RimWorld mental break, 纯函数) ----------
+     心情跌破阈值 → 掷骰进入崩溃; 崩溃类型按性格分流;
+     结束时宣泄回弹(mood 至少回 breakRecoverMood) + 进冷却。
+     时间单位 = 生产跳(30s)。字段: breakType/breakT/breakCd 随名册落盘。 */
+  var BREAK_BY_TRAIT={
+    '暴脾气':'brawl', '独行':'wander', '谨慎':'wander',
+    '话痨':'tantrum', '乐观':'tantrum', '勤恳':'binge',
+  };
+  var BREAK_NAMES={ brawl:'斗殴', wander:'出走', tantrum:'怠工抱怨', binge:'暴食' };
+  function breakTypeOf(trait){ return BREAK_BY_TRAIT[trait]||'wander'; }
+  function isBroken(r){ return !!(r && r.breakType && (r.breakT||0)>0); }
+  /* 每生产跳一调: 推进崩溃状态机。返回 {started}|{ongoing}|{ended}|{} */
+  function breakTick(r, rng){
+    if(!r) return {};
+    var C=RS();
+    var rand=rng||Math.random;
+    if((r.breakCd||0)>0) r.breakCd--;
+    if(isBroken(r)){
+      r.breakT--;
+      if(r.breakT<=0){
+        var t=r.breakType;
+        r.breakType=null; r.breakT=0;
+        r.breakCd=C.breakCdTicks!=null?C.breakCdTicks:10;
+        var rec=C.breakRecoverMood!=null?C.breakRecoverMood:45;
+        r.mood=Math.max(r.mood||0, rec);                 // 宣泄回弹
+        return { ended:t };
+      }
+      return { ongoing:r.breakType };
+    }
+    var minor=C.breakMinorAt!=null?C.breakMinorAt:35;
+    var major=C.breakMajorAt!=null?C.breakMajorAt:15;
+    if((r.mood||0)>=minor || (r.breakCd||0)>0) return {};
+    var p=(C.breakChance!=null?C.breakChance:0.08)
+        * ((r.mood||0)<major ? (C.breakMajorMul!=null?C.breakMajorMul:3) : 1);
+    if(rand()>=p) return {};
+    r.breakType=breakTypeOf(r.trait);
+    var lo=C.breakTicksMin!=null?C.breakTicksMin:1;
+    var hi=C.breakTicksMax!=null?C.breakTicksMax:2;
+    r.breakT=lo+Math.floor(rand()*(hi-lo+1));
+    return { started:r.breakType, ticks:r.breakT };
+  }
+  /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
+  function lowestBondMate(r, residents, bonds){
+    var best=null, bv=1e9;
+    (residents||[]).forEach(function(o){
+      if(!o || o===r || o.id===r.id) return;
+      var k=r.id<o.id ? r.id+'|'+o.id : o.id+'|'+r.id;
+      var v=(bonds && bonds[k]!=null) ? bonds[k] : 50;
+      if(v<bv){ bv=v; best=o; }
+    });
+    return best;
   }
 
   /* ---------- U7: 社交关系(纯函数) ---------- */
@@ -204,10 +379,14 @@ APH.Res = (function(){
         return Math.max(acc, r.skills[sk]||0);
       },0);
     });
+    var TC=CFG.trade||{};
+    var perLv=TC.socialPricePerLv!=null?TC.socialPricePerLv:0.02;
+    var cap=TC.socialPriceCap!=null?TC.socialPriceCap:0.12;
     return {
       buildCostMul: Math.max(.4, 1 - best.sk_build*0.12),
       lorePerTick : best.sk_lore*0.5,
       moodBoost   : Math.min(2, best.sk_social*0.3),
+      tradeMul    : Math.min(cap, best.sk_social*perLv),
     };
   }
 
@@ -354,6 +533,115 @@ APH.Res = (function(){
     return { ok:true, impression:visitor.impression, food:meta.res.food, cost:need };
   }
 
+  /* D: 默认工作优先级——有现职按岗位对应技能=1, 否则主技能=1, 其余=2 */
+  function defaultPrio(r){
+    var p={};
+    SKILLS.forEach(function(sk){ p[sk]=2; });
+    var jobSk=null;
+    if(r && r.job && window.APH.Colony && APH.Colony.JOB_SKILL)
+      jobSk=APH.Colony.JOB_SKILL[r.job];
+    if(jobSk && p[jobSk]!=null) p[jobSk]=1;
+    else if(r && r.mainSkill && p[r.mainSkill]!=null) p[r.mainSkill]=1;
+    return p;
+  }
+
+  /* ---------- C: 游商贸易(矿材=硬通货, 纯函数) ----------
+     stock: { sells:[{key,n,price}], buys:[{key,n,price}] }
+     key 用仓储字段(food/leather/med); 价格 seeded 浮动 ±priceJitter。 */
+  function TR(){ return CFG.trade||{}; }
+  function makeTraderStock(seed){
+    var C=TR();
+    var rng=U.makeRng((seed||1)>>>0);
+    var jit=C.priceJitter!=null?C.priceJitter:0.25;
+    var lo=C.stockMin!=null?C.stockMin:2, hi=C.stockMax!=null?C.stockMax:6;
+    var extra=C.demandExtra!=null?C.demandExtra:2;
+    var nLo=C.listMin!=null?C.listMin:2, nHi=C.listMax!=null?C.listMax:3;
+    function jPrice(base){ return Math.max(1, Math.round(base*(1+(rng()*2-1)*jit))); }
+    function nStock(add){ return lo+add+Math.floor(rng()*(hi-lo+1)); }
+    function pickKeys(obj){
+      var keys=Object.keys(obj||{});
+      var n=nLo+Math.floor(rng()*((nHi-nLo)+1));
+      n=Math.max(1, Math.min(n, keys.length));
+      var arr=keys.slice();
+      for(var i=arr.length-1;i>0;i--){
+        var j=Math.floor(rng()*(i+1));
+        var t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+      }
+      return arr.slice(0,n);
+    }
+    var sellBase=C.sellBase||{med:6,alloy:4,leather:3};
+    var buyBase=C.buyBase||{food:1,leather:2,crystal:3};
+    var sells=[], buys=[];
+    pickKeys(sellBase).forEach(function(k){
+      sells.push({ key:k, n:nStock(0), price:jPrice(sellBase[k]) });
+    });
+    pickKeys(buyBase).forEach(function(k){
+      buys.push({ key:k, n:nStock(extra), price:jPrice(buyBase[k]) });
+    });
+    return { sells:sells, buys:buys };
+  }
+  /* 成交一件. kind='buy'(玩家买入,扣矿) | 'sell'(玩家卖出,得矿)
+     socialMul: 社交议价系数(买更便宜, 卖更值钱)。仓不够用地上堆(先仓后堆)。
+     alloy=合金按 storeN 折矿; crystal=地上 it_crystal_ore。 */
+  function creditGood(meta, entities, key, n){
+    n=n||1;
+    if(key==='alloy'){
+      var mul=((CFG.items&&CFG.items.it_alloy&&CFG.items.it_alloy.storeN)||3);
+      meta.res.mineral=(meta.res.mineral||0)+mul*n;
+      return;
+    }
+    if(key==='crystal'){
+      if(window.APH.Combat && APH.Combat.spawnDrop)
+        APH.Combat.spawnDrop(CFG.HAB.x, CFG.HAB.y+36, 'it_crystal_ore', n, {stock:true, jitter:10});
+      return;
+    }
+    meta.res[key]=(meta.res[key]||0)+n;
+  }
+  function debitGood(meta, entities, key, n){
+    n=n||1;
+    var Col=APH.Colony;
+    if(key==='crystal'){
+      if(!Col.takeDropped || Col.takeDropped(entities, 'it_crystal_ore', n)<n) return false;
+      return true;
+    }
+    if(key==='alloy'){
+      var mul=((CFG.items&&CFG.items.it_alloy&&CFG.items.it_alloy.storeN)||3);
+      if(Col.stockOf(meta.res, entities, 'mineral')<mul*n) return false;
+      Col.takeStock(meta.res, entities, 'mineral', mul*n);
+      return true;
+    }
+    if(Col.stockOf(meta.res, entities, key)<n) return false;
+    Col.takeStock(meta.res, entities, key, n);
+    return true;
+  }
+  function tradeOnce(meta, entities, stock, kind, idx, socialMul){
+    var Col=APH.Colony;
+    meta=meta||{}; meta.res=meta.res||{};
+    var mul=socialMul||0;
+    if(kind==='buy'){
+      var it=((stock&&stock.sells)||[])[idx];
+      if(!it || (it.n||0)<=0) return { ok:false, why:'没货了' };
+      var cost=Math.max(1, Math.round(it.price*(1-mul)));
+      if(Col.stockOf(meta.res, entities, 'mineral') < cost)
+        return { ok:false, why:'矿材不足(需'+cost+')' };
+      Col.takeStock(meta.res, entities, 'mineral', cost);
+      it.n--;
+      creditGood(meta, entities, it.key, 1);
+      return { ok:true, kind:'buy', key:it.key, cost:cost };
+    }
+    if(kind==='sell'){
+      var of=((stock&&stock.buys)||[])[idx];
+      if(!of || (of.n||0)<=0) return { ok:false, why:'不再收购' };
+      if(!debitGood(meta, entities, of.key, 1))
+        return { ok:false, why:'没有存货可卖' };
+      of.n--;
+      var gain=Math.max(1, Math.round(of.price*(1+mul)));
+      meta.res.mineral=(meta.res.mineral||0)+gain;
+      return { ok:true, kind:'sell', key:of.key, gain:gain };
+    }
+    return { ok:false, why:'未知操作' };
+  }
+
   /* 直线走向目标(无寻路): 到达后停下. 坐标不落盘 */
   function walkToward(e, target, dt, speed){
     if(!e || !target) return e;
@@ -432,11 +720,18 @@ APH.Res = (function(){
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
+    /* F 健康分型 */
+    AILMENT_NAMES:AILMENT_NAMES,
+    ensureAilments:ensureAilments, syncIllness:syncIllness,
+    addAilment:addAilment, treatAilment:treatAilment, ailmentAge:ailmentAge,
+    BREAK_NAMES:BREAK_NAMES, breakTypeOf:breakTypeOf, breakTick:breakTick,
+    isBroken:isBroken, lowestBondMate:lowestBondMate,
     canRecruit:canRecruit, recruitInto:recruitInto, wanderStep:wanderStep, walkToward:walkToward,
     joinIntentOf:joinIntentOf, joinChance:joinChance, attemptRecruit:attemptRecruit,
     chanceLabel:chanceLabel, recruitGate:recruitGate,
     hospitalityRate:hospitalityRate, tickImpression:tickImpression, offerMeal:offerMeal,
     socialTick:socialTick, applyBond:applyBond,
+    makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,
   };

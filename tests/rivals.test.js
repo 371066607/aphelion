@@ -37,11 +37,43 @@ test('warScore: 边界 0~100 且军力占主导', () => {
   const w = R.warScore(50,50,3,2);
   if(w!==30+9+4) throw new Error('50/50+战果应=43 got '+w);   // base30+wins9+raids4
 });
-test('raidWave: 规模随军力阶梯上升', () => {
+test('raidWave: 规模随军力阶梯上升(总兵力)', () => {
   const a=R.raidWave({military:15}), b=R.raidWave({military:40}),
         c=R.raidWave({military:70}), d=R.raidWave({military:120});
-  if(!(a.count<b.count && b.count<c.count && c.count<d.count))
-    throw new Error('阶梯应递增');
+  if(!(a.total<b.total && b.total<c.total && c.total<d.total))
+    throw new Error('阶梯应递增: '+[a.total,b.total,c.total,d.total]);
   if(a.elite||b.elite) throw new Error('低阶不应elite');
   if(!c.elite||!d.elite) throw new Error('高阶应elite');
+});
+
+/* ---- 阶段E: 战术分流 ---- */
+test('raidWave: trait → 战术分流(强攻/盗掠/围攻)', () => {
+  if(R.raidWave({military:40,trait:'aggressive'}).tactic!=='assault')
+    throw new Error('aggressive 应强攻');
+  if(R.raidWave({military:40,trait:'trader'}).tactic!=='pillage')
+    throw new Error('trader 应盗掠');
+  if(R.raidWave({military:40,trait:'expansionist'}).tactic!=='siege')
+    throw new Error('expansionist 应围攻');
+  if(R.raidWave({military:40}).tactic!=='assault')
+    throw new Error('无 trait 应回退强攻');
+});
+test('raidWave: 战术兵力系数——强攻×1.2 盗掠×0.7', () => {
+  const base=5;                                 // military 40 档
+  const a=R.raidWave({military:40,trait:'aggressive'});
+  const p=R.raidWave({military:40,trait:'trader'});
+  if(a.count!==Math.round(base*1.2)) throw new Error('强攻应'+Math.round(base*1.2)+' got '+a.count);
+  if(p.count!==Math.round(base*0.7)) throw new Error('盗掠应'+Math.round(base*0.7)+' got '+p.count);
+  if(p.count>=a.count) throw new Error('盗掠兵力应低于强攻');
+});
+test('raidWave: 军力≥90 拆两波且总量不缩水', () => {
+  const d=R.raidWave({military:120,trait:'aggressive'});
+  if(d.waves!==2) throw new Error('全面进攻应拆2波');
+  if(d.total<10) throw new Error('两波合计不应少于原10×1.2的一半×2, got '+d.total);
+  if(d.count*d.waves!==d.total) throw new Error('total 应=count×waves');
+  const c=R.raidWave({military:70,trait:'aggressive'});
+  if(c.waves!==1) throw new Error('军力<90 应单波');
+});
+test('raidWave: label 带战术前缀', () => {
+  const w=R.raidWave({military:40,trait:'expansionist'});
+  if(w.label.indexOf('围攻')!==0) throw new Error('label 应带战术前缀 got '+w.label);
 });
