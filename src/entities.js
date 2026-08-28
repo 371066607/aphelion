@@ -40,6 +40,13 @@ APH.Ent = (function(){
   }
   /* 敌人个体: 阵营基因 ±5% 抖动 */
   function makeEnemy(faction, x, y){
+    if(!faction || faction.hp==null){
+      faction = (window.APH.Planet && APH.Planet.pickRaidFaction)
+        ? APH.Planet.pickRaidFaction(APH.state && APH.state.lastExpedition, (APH.state && APH.state.seed) || 1)
+        : { id:'fx_maw', name:'噬光群囊', behavior:'melee_swarm',
+            gene:{hue:285,sides:5,limbs:6,size:1.0,spikes:3,eyes:2},
+            hp:26, speed:96, dmg:8, nightBoost:1.35 };
+    }
     var jit = function(){ return 1 + (Math.random()*.1 - .05); };
     return {
       id:nid('en'), type:T.ENEMY,
@@ -180,17 +187,26 @@ APH.Ent = (function(){
     }
   }
 
-  /* 掉落物绘制 */
+  /* 掉落物绘制: RimWorld 式地上堆, 带名称×数量 */
   function drawDropped(e, time){
-    var bob=Math.sin(e.bobA)*2.5;
+    var it=(CFG.items&&CFG.items[e.itemId])||{};
+    var col=it.tint||'#ffdf8f';
+    var bob=Math.sin(e.bobA||0)*2.2;
     ctx.save();
     ctx.translate(e.x, e.y+bob);
-    ctx.fillStyle='rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.ellipse(0,6-bob,8,3.4,0,0,U.TAU); ctx.fill();
-    ctx.shadowColor='#ffe28a'; ctx.shadowBlur=7;
-    ctx.fillStyle='#ffdf8f';
-    ctx.rotate(time*1.4);
-    ctx.fillRect(-3.4,-3.4,6.8,6.8);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,7-bob,9,3.6,0,0,U.TAU); ctx.fill();
+    ctx.shadowColor=col; ctx.shadowBlur=6;
+    ctx.fillStyle=col;
+    ctx.fillRect(-5,-5,10,10);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#2a2418'; ctx.lineWidth=1.2;
+    ctx.strokeRect(-5,-5,10,10);
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle='#f7f3df';
+    ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((it.name||'?')+'×'+(e.n||1), e.x, e.y-12+bob);
     ctx.restore();
   }
 
@@ -328,6 +344,7 @@ APH.Ent = (function(){
   var BLD_COLORS={
     bl_warehouse:'#b8874a', bl_mine:'#7a8aa0', bl_lab:'#59d9ff',
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
+    bl_farm:'#7a9a4a', bl_pasture:'#c8a882', bl_house:'#b8874a', bl_workshop:'#d4a574',
   };
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
@@ -556,12 +573,76 @@ APH.Ent = (function(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
   }
 
+  function drawResident(e,time){
+    if(!ctx) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
+    var walking=!!e.walking;
+    var bob=Math.sin((time||0)*(walking?8:2)+(e.x||0))*(walking?2.2:1.2);
+    var ill=e.illness||0;
+    var mood=e.mood!=null?e.mood:70;
+    ctx.fillStyle=ill>=50?'#6a8a62':(ill>=20?'#a8b07a':'#c8a882');
+    ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle=mood<40?'#e8c4b0':'#ffe9c4';
+    ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#6b4a32';
+    ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
+    if(ill>=20){
+      ctx.fillStyle='#ff6d7a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('✚', 11, -22+bob);
+    }
+    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
+    if((e.food||100)<eatBelow){
+      ctx.fillStyle='#c8e89a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🍽', -11, -22+bob);
+    }
+    if(e.haulCarry && e.haulCarry.itemId){
+      var hc=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
+      ctx.fillStyle=hc.tint||'#ffdf8f';
+      ctx.fillRect(7,-8+bob,7,7);
+      ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
+      ctx.strokeRect(7,-8+bob,7,7);
+    }
+    ctx.fillStyle='#f7f3df';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'居民', 0, 16);
+    ctx.restore();
+  }
+
+  function drawVisitor(e,time){
+    if(!ctx) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
+    var bob=Math.sin((time||0)*2.4+(e.x||0))*1.6;
+    ctx.fillStyle='#3d6a6e';
+    ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#c4e8e4';
+    ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#1a3a3e';
+    ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle='#794f27';
+    ctx.beginPath(); ctx.ellipse(8,-6+bob,4,5,0.3,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#8fd4ff';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'过客', 0, 16);
+    ctx.fillStyle='#5d6f96';
+    ctx.font='8px sans-serif';
+    ctx.fillText('过客', 0, 26);
+    ctx.restore();
+  }
+
   /* 建筑绘制(殖民地/远征通用) */
     return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
-    drawBeacon:drawBeacon, drawPlayer:drawPlayer,
+    drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     drawBuilding:drawBuilding,
     updatePlayer:updatePlayer, findPlayer:findPlayer,

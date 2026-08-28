@@ -92,6 +92,7 @@
   <div style="display:flex;align-items:center;margin-bottom:10px">
     <b style="color:#794f27;font-size:14px;font-weight:800;letter-spacing:2px">建 造</b>
     <span style="margin-left:10px;color:#19c8b9;font-weight:700;font-size:13px" id="brResearch"></span>
+    <span style="margin-left:8px;color:#794f27;font-weight:700;font-size:13px" id="brMineral"></span>
     <span id="brQueue" style="margin-left:auto;color:#9f927d;font-size:11px"></span>
   </div>
   <div id="brCards" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px"></div>
@@ -100,7 +101,8 @@
 
 <div id="resPanel" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:41;padding:56px 48px;overflow:auto">
   <h2 style="color:#9fe8c8;font-size:18px;letter-spacing:4px;margin:0 0 6px">殖 民 者 名 册</h2>
-  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">食物储备 <b id="resFood" style="color:#c8e89a">0</b> · 皮革 <b id="resLeather" style="color:#e0b089">0</b> · 人口 <b id="resPop" style="color:#cdd9f5">0</b></p>
+  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">食物 <b id="resFood" style="color:#c8e89a">0</b> · 矿材 <b id="resMineral" style="color:#9db1dc">0</b> · 皮革 <b id="resLeather" style="color:#e0b089">0</b> · 药品 <b id="resMed" style="color:#7dffab">0</b> · 人口 <b id="resPop" style="color:#cdd9f5">0</b></p>
+  <p style="color:#39435c;font-size:11px;margin:0 0 12px">数字键选人 · [P] 换岗 · [R] 关闭</p>
   <div id="resBody" style="max-width:720px;font-size:12px;line-height:1.8;color:#cdd9f5"></div>
   <p style="margin-top:26px;color:#39435c;font-size:11px">按 [R] 关闭</p>
 </div>
@@ -118,6 +120,7 @@
   <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
   <div class="row" id="rowWar" style="display:none"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span></div>
+  <div class="row" id="rowEco"><span class="lab">经营</span><span class="val" id="vEco" style="width:auto;flex:1;text-align:left;letter-spacing:0">矿0 粮0</span></div>
 </div>
 
 <div id="hint">跟随金色光柱</div>
@@ -138,13 +141,13 @@
 <div class="screen" id="intro">
   <div class="tag">COLONY FRONTIER · 07</div>
   <h1>远 日 点</h1>
-  <h2>APH-P1 · 未建档行星</h2>
-  <p>你是这颗星球的第一个殖民者。<br>
-     荒原上散布着 <b style="color:#ffc857">6 座先导信标</b>，找到并扫描它们。<br>
-     白天赶路；夜晚的世界只属于带光的人。<br>
-     粉色晶体可以提炼氧气——氧气归零前，回到居住舱。</p>
-  <button class="bigBtn" id="startBtn">踏 上 星 球</button>
-  <div id="ctrlHint">WASD / 方向键 移动 · Shift 疾跑 · 点击地面自动行走<br>触屏设备左下角虚拟摇杆 · 靠近信标出现扫描按钮 · 回车开始</div>
+  <h2>新曙光殖民地 · 家园</h2>
+  <p>这是你的家。先盖农场和住房。<br>
+     过客会来拜访——走近按 E 招募，F 请客吃饭。<br>
+     <b style="color:#ffc857">矿材用来建造</b>，研究点用来升级科技。<br>
+     缺了东西，再从发射台出门补给。</p>
+  <button class="bigBtn" id="startBtn">回 到 家 园</button>
+  <div id="ctrlHint">WASD 移动 · E 招募过客 · F 请客 · G 建造 · R 名册<br>触屏左下角摇杆 · 回车开始</div>
 </div>
 
 <div class="screen" id="end">
@@ -182,7 +185,10 @@ APH.CFG = {
     accel: 9,
     radius: 11,
     hpMax: 100,
-    healInHab: 7,              // 舱内回血 /s
+    healInHab: 7,              // 远征返回舱回血 /s
+    healAtClinic: 4,           // 家园靠近医疗舱回血 /s
+    clinicHealR: 80,           // 医疗舱治疗半径 px
+    o2HomeRefill: 10,          // 家园氧气补给 /s
     o2Max: 100,
     o2Drain: 0.72,
     o2Refill: 16,
@@ -232,6 +238,7 @@ APH.CFG = {
   enemy: {
     aggroR: 195,
     nightAggroMul: 1.6,
+    noiseAggroR: 300,          // 枪声 idle→alert 半径(须定义, 否则 heardShot 永不生效)
     deaggroR: 430,
     attackR: 27,
     attackCd: 1.15,
@@ -249,12 +256,15 @@ APH.CFG = {
     maxDistFromPlayer: 680,
   },
 
-  /* 物品表 (ADR-9: it_ 前缀; w=负重 v=研究点价值) */
+  /* 物品表 (ADR-9: it_ 前缀; w=负重 v=研究点价值; store=家园入库字段) */
   items: {
-    it_crystal_ore: { name: '晶体矿', w: 2, v: 2 },
-    it_mineral:     { name: '矿材',   w: 3, v: 4 },
-    it_alloy:       { name: '合金碎片', w: 5, v: 10 },
-    it_relic:       { name: '信标遗件', w: 1, v: 40 },
+    it_crystal_ore: { name: '晶体矿', w: 2, v: 2, tint:'#ff9ad0' },
+    it_mineral:     { name: '矿材',   w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
+    it_alloy:       { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
+    it_relic:       { name: '信标遗件', w: 1, v: 40, tint:'#ffc857' },
+    it_food:        { name: '食物',   w: 1, v: 0, tint:'#c8e89a', store:'food' },
+    it_med:         { name: '药品',   w: 1, v: 0, tint:'#7dffab', store:'med' },
+    it_leather:     { name: '皮革',   w: 2, v: 0, tint:'#d4a574', store:'leather' },
   },
 
   /* 实体 type 枚举 (ADR-3) */
@@ -269,6 +279,121 @@ APH.CFG = {
     PROJECTILE: 'projectile',
     DROPPED: 'dropped',
     BLUEPRINT: 'blueprint',
+    RESIDENT: 'resident',
+    VISITOR: 'visitor',
+  },
+
+  /* 经营（矿材盖房 / 开局赠矿 / 袭击掠夺） */
+  economy: {
+    startMineral: 100,
+    clinicHeal: 40,
+    pillageFood: 3,
+    pillageMineral: 2,
+    pillageMed: 1,
+    foodWarnTicks: 2,
+    mineralWarn: 15,
+  },
+
+  /* 家园气候 + 远征法则 */
+  laws: {
+    acidFarmMul: 0.5,
+    stormLabMul: 0,
+    stormPeriod: 90,
+    stormLen: 30,
+    echoSightMul: 0.45,        // lw_echo 目不能视: 视觉 aggro 缩小
+    echoNoiseMul: 1.8,         // lw_echo 循声: 枪声半径放大
+    sporePartR: 52,            // lw_spore_light 近距排开
+    sporeAttractR: 200,        // 中距趋光
+    sporeSpd: 36,
+  },
+
+  /* 殖民者需求(饱食/心情/病情). 不是玩家 HP/O2, 也不是远征消耗品 */
+  residents: {
+    illnessMax: 100,
+    eatBelow: 60,
+    eatGain: 25,
+    foodDrain: 6,
+    moodWellFood: 65,
+    moodWellGain: 2,
+    moodCap: 95,
+    moodStarveAt: 30,
+    moodStarve: 8,
+    moodHungryAt: 45,
+    moodHungry: 3,
+    hungerSickAt: 30,
+    hungerSick: 4,
+    ambientSickChance: 0.08,
+    ambientSick: 2,
+    selfHealFood: 65,
+    selfHeal: 1,
+    clinicHeal: 6,
+    medicHealPerLv: 1.2,
+    moodSickAt: 40,
+    moodSick: 3,
+    effSickAt: 20,
+    effSickFloor: 0.35,
+    raidWound: 18,
+    raidMood: 12,
+    raidIFrame: 0.8,
+    medHeal: 8,
+  },
+
+  /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
+  workshop: {
+    mineralCost: 2,
+    medGain: 1,
+  },
+
+  /* 过客拜访 */
+  visitor: {
+    max: 2,
+    arriveChance: 0.45,
+    stayMin: 50,
+    stayMax: 90,
+    speed: 48,
+    yardR: 220,
+    recruitR: 54,
+  },
+  /* 招募(RimWorld 式: 看人下菜, 不买人). 数值全进表 */
+  recruit: {
+    guestBase: 45,
+    traitEasy: 12,
+    traitHard: 15,
+    traitAngry: 10,
+    foodGoodTicks: 3,
+    foodGood: 20,
+    foodBad: 30,
+    clinic: 10,
+    jobBldg: 10,
+    raid: 40,
+    chanceMin: 5,
+    chanceMax: 95,
+    askCd: 15,
+    impressStart: 50,
+    impressMin: 0,
+    impressMax: 100,
+    rateSpareBed: 0.40,
+    rateFoodOk: 0.28,
+    rateClinic: 0.18,
+    rateNoBed: 0.12,
+    rateNoFood: 0.55,
+    rateRaid: 1.1,
+    mealCost: 2,
+    mealImpress: 20,
+  },
+  /* 居民短距走位(无寻路、无作息): 家↔岗位, 袭击回家 */
+  walk: {
+    speed: 56,
+    arriveR: 3,
+  },
+  /* 地上物(RimWorld 式): 产出堆在地上, 搬进仓库才入账 */
+  haul: {
+    pickR: 52,           // 有岗时脚边捡
+    seekR: 420,          // 闲人去搬远处
+    grabR: 18,           // 捡起距离
+    dumpR: 36,           // 卸到仓库/发射台
+    stackR: 44,          // 同种叠堆
+    stealR: 28,          // 袭击顺手偷地上
   },
 
   /* 存档 */
@@ -436,9 +561,11 @@ APH.Save = (function(){
         v: CFG.save.VERSION,
         research: 0,
         tech: {},                      // 已购科技 { techId: lv }
-        res: { mineral:0, food:0, leather:0 },
+        res: { mineral:100, food:0, leather:0, med:0 },
         residents: [],
         residentSeq: 0,
+        war: { wins:0, raids:0 },
+        econV2: 1,
         stats: { landings:0, deaths:0, kills:0, scans:0, playSec:0 },
         currentPlanet: null,
       };
@@ -448,10 +575,31 @@ APH.Save = (function(){
       m.tech.forEach(function(k){ if(typeof k==='string') tObj[k]=1; });
       m.tech = tObj;
     }
-    if(!m.res) m.res = { mineral:0, food:0, leather:0 };
+    if(!m.res) m.res = { mineral:0, food:0, leather:0, med:0 };
     if(m.res.leather===undefined) m.res.leather = 0;
+    if(m.res.med===undefined) m.res.med = 0;
     if(!m.residents) m.residents = [];
     if(m.residentSeq===undefined) m.residentSeq = 0;
+    /* 经营 v2: 开局赠矿, 外骨骼 id 迁 te_exosuit, 战争并入 meta */
+    if(!m.tech) m.tech = {};
+    if(m.tech.exo_suit){
+      m.tech.te_exosuit = (m.tech.te_exosuit||0) + m.tech.exo_suit;
+      delete m.tech.exo_suit;
+    }
+    if(!m.war) m.war = { wins:0, raids:0 };
+    try{
+      var w = JSON.parse(rawGet('aphelion_war_v1')||'null');
+      if(w){
+        m.war.wins = Math.max(m.war.wins||0, w.wins||0);
+        m.war.raids = Math.max(m.war.raids||0, w.raids||0);
+        rawDel('aphelion_war_v1');
+      }
+    }catch(e){}
+    if(!m.econV2){
+      var startM = (APH.CFG.economy && APH.CFG.economy.startMineral) || 100;
+      m.res.mineral = Math.max(m.res.mineral||0, startM);
+      m.econV2 = 1;
+    }
     return m;
   }
   function saveMeta(m){ write(CFG.save.KEY_META, m); }
@@ -677,7 +825,58 @@ APH.Planet = (function(){
     return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
   }
 
-  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf };
+  function hasLaw(spec, id){
+    return !!(spec && spec.laws && spec.laws.some(function(l){ return l && l.id===id; }));
+  }
+
+  /* lw_spore_light: 近距排开开路, 中距趋光靠拢。纯函数, 就地改 sp。 */
+  function sporeNudge(sp, px, py, dt){
+    if(!sp) return sp;
+    var L = (APH.CFG && APH.CFG.laws) || {};
+    var near = L.sporePartR || 52;
+    var far = L.sporeAttractR || 200;
+    var spd = L.sporeSpd || 36;
+    var dx = px - sp.x, dy = py - sp.y;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if(d < 0.001){ dx = 1; dy = 0; d = 1; }
+    var nx = dx / d, ny = dy / d;
+    if(d < near){ sp.x -= nx * spd * dt; sp.y -= ny * spd * dt; }
+    else if(d < far){ sp.x += nx * spd * 0.45 * dt; sp.y += ny * spd * 0.45 * dt; }
+    var W = (APH.CFG && APH.CFG.WORLD) || 2200;
+    sp.x = Math.max(20, Math.min(W - 20, sp.x));
+    sp.y = Math.max(20, Math.min(W - 20, sp.y));
+    return sp;
+  }
+
+  /* 殖民地家园 spec.enemies.factions 永久为空(安全区)。
+     袭击刷怪从「上次远征 / fallbackPlanet / 阵营池」取一份克隆, 绝不写回家园 spec。 */
+  function cloneFaction(f){
+    if(!f) return null;
+    var g=f.gene||{};
+    return {
+      id:f.id, name:f.name, behavior:f.behavior,
+      gene:{ hue:g.hue, sides:g.sides, limbs:g.limbs, size:g.size, spikes:g.spikes, eyes:g.eyes },
+      hp:f.hp, speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
+      lore:f.lore,
+    };
+  }
+  function pickFrom(list){
+    if(!list || !list.length) return null;
+    var f=list[Math.floor(Math.random()*list.length)];
+    if(!f || f.hp==null) return null;
+    return cloneFaction(f);
+  }
+  function pickRaidFaction(lastSpec, seed){
+    var picked=pickFrom(lastSpec && lastSpec.enemies && lastSpec.enemies.factions);
+    if(picked) return picked;
+    var fb=fallbackPlanet((seed>>>0)||1);
+    picked=pickFrom(fb.enemies && fb.enemies.factions);
+    if(picked) return picked;
+    return cloneFaction(ENEMY_FACTIONS[0]);
+  }
+
+  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
+           pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge };
 })();
 
 </script>
@@ -904,11 +1103,9 @@ APH.LLM = (function(){
 /* ============================================================
    Aphelion · colony.js — 殖民地场景 (设计支柱: 殖民地优先)
    挂载: window.APH.Colony
-   殖民地 = 家 = 安全区:
-     - 无敌人/无氧气消耗
-     - 发射台: 出发远征的入口
-     - 仓库: 战利品卸货 → 研究点/资源
-     - 建造: 研究点买建筑, 放在殖民地里(Phase4 部分建筑有战斗作用)
+   殖民地 = 家 = 主循环:
+     - 矿材盖建筑, 研究点买科技, 食物喂人
+     - 有人上岗才产; 远征是补给
    ============================================================ */
 window.APH = window.APH || {};
 
@@ -920,40 +1117,44 @@ APH.Colony = (function(){
      dispH: 目标显示内容高px(管线实测内容高→比例缩放, 治"建筑比人物矮")
      cells: 占位格[宽,高]×48px格网(ADR-4), 非全部1x1——大建筑占2x2 */
   var BUILDINGS = {
-    bl_landing_pad: { name:'发射台', cost:0,  size:64, buildTime:0,
+    bl_landing_pad: { name:'发射台', cost:0, costMineral:0, size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
-    bl_warehouse:   { name:'仓库',   cost:30, size:52, max:3, buildTime:12,
+    bl_warehouse:   { name:'仓库',   cost:30, costMineral:20, size:52, max:3, buildTime:12,
       dispH:95, cells:[2,2],
-      desc:'+20 负重上限(永久)。' },
-    bl_mine:        { name:'自动采矿机', cost:45, size:44, max:4, buildTime:20,
+      desc:'+20 负重上限。地上的东西搬过来才算库存。' },
+    bl_mine:        { name:'自动采矿机', cost:45, costMineral:30, size:44, max:4, buildTime:20,
       dispH:100, cells:[1,1],
-      desc:'每30秒产出 2×等级 矿材。',
+      desc:'有矿工时每30秒把矿材堆在机旁。搬进仓库才入账。',
       upg:{ effectPerLv:2, maxLv:3 } },
-    bl_lab:         { name:'研究站', cost:60, size:48, max:2, buildTime:25,
+    bl_lab:         { name:'研究站', cost:60, costMineral:40, size:48, max:2, buildTime:25,
       dispH:113, cells:[2,2],
-      desc:'+1×等级 研究点/分钟。',
+      desc:'有研究员时 +1×等级 研究点/跳。',
       upg:{ effectPerLv:1, maxLv:2 } },
-    bl_barracks:    { name:'兵营', cost:80, size:56, max:2, buildTime:30,
+    bl_barracks:    { name:'兵营', cost:80, costMineral:50, size:56, max:2, buildTime:30,
       dispH:86, cells:[2,2],
-      desc:'训练士兵驻守殖民地。(Phase4)' },
-    bl_turret:      { name:'防御炮塔', cost:70, size:36, max:6, buildTime:25,
+      desc:'训练士兵驻守殖民地。' },
+    bl_turret:      { name:'防御炮塔', cost:70, costMineral:35, size:36, max:6, buildTime:25,
       dispH:68, cells:[1,1],
       desc:'自动攻击来袭敌人, 伤害随等级。',
       upg:{ effectPerLv:8, maxLv:3 } },
-    bl_clinic:      { name:'医疗舱', cost:50, size:40, max:1, buildTime:22,
+    bl_clinic:      { name:'医疗舱', cost:50, costMineral:30, size:40, max:1, buildTime:22,
       dispH:115, cells:[2,2],
-      desc:'远征出发时携带 1 次(+40生命)。住宅容量+1。' },
-    bl_farm:        { name:'水培农场', cost:35, size:52, max:4, buildTime:15,
+      desc:'给殖民者治病。靠近时玩家缓慢回血。有人值守治得更快。远征仍可急救一次。住宅容量+1。' },
+    bl_farm:        { name:'水培农场', cost:35, costMineral:15, size:52, max:4, buildTime:15,
       dispH:115, cells:[2,2],
-      desc:'种植食物。有居民务农时每分钟产粮。' },
-    bl_house:       { name:'居住舱', cost:40, size:46, max:6, buildTime:15,
+      desc:'种植食物。成熟后堆在田边, 搬进仓库才能吃饭。' },
+    bl_house:       { name:'居住舱', cost:40, costMineral:20, size:46, max:6, buildTime:15,
       dispH:128, cells:[2,2],
       desc:'住宅容量 +3。居民是殖民地的心跳。' },
-    bl_pasture:     { name:'畜牧圈', cost:55, size:56, max:2, buildTime:18,
+    bl_pasture:     { name:'畜牧圈', cost:55, costMineral:30, size:56, max:2, buildTime:18,
       dispH:97, cells:[2,2],
-      desc:'饲养星绵羊。羊群自然增长, 定期产肉/皮。',
+      desc:'饲养星绵羊。肉和皮堆在圈边, 搬走才入账。',
       upg:{ maxLv:2, costRes:'leather' } },
+    bl_workshop:    { name:'工坊', cost:40, costMineral:25, size:48, max:2, buildTime:18,
+      dispH:110, cells:[2,2],
+      desc:'有工匠时耗矿材做药品, 成品堆在地上。搬进仓库后医疗舱才用得上。' },
   };
+  var JOB_CYCLE = [null, 'bl_farm', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
   /* ---------- Task3: 建筑等级 ---------- */
   function upgradeCost(def, curLv){
@@ -990,6 +1191,10 @@ APH.Colony = (function(){
     if (!def || def===BUILDINGS.bl_landing_pad) return 0;
     return Math.floor(def.cost/2);
   }
+  function refundMineralOf(def){
+    if (!def || def===BUILDINGS.bl_landing_pad) return 0;
+    return Math.floor((def.costMineral||0)/2);
+  }
 
   /* 仓库负重加成(纯函数): 每 warehouse +20。
      取代曾直接改 CFG.player.carryMax 的做法——那会随重启丢失、拆除不回退。 */
@@ -1018,7 +1223,7 @@ APH.Colony = (function(){
       palette:{ ground1:'#1c2419', ground2:'#27331f', accent:'#ffc857',
                 water:'#14314a', spore:'#ffe9b0' },
       terrain:{ lakeR:90, rockDensity:.35, crystalDensity:.15 },
-      laws:[], beacons:[],
+      laws:climateLaws(seed), beacons:[],
       enemies:{ factions:[], weights:{} },
       rivals:[],
       generatedBy:'colony',
@@ -1050,6 +1255,13 @@ APH.Colony = (function(){
       s.entities.push({id:'bp_'+q.bid+'_'+q.x+'_'+q.y,
         type:T.BLUEPRINT, bid:q.bid, x:q.x, y:q.y,
         progress:q.progress||0, building:false});
+    });
+    (s.colony.ground||[]).forEach(function(g, i){
+      if(!g || !g.itemId || !g.n) return;
+      s.entities.push({
+        id:'dp_g_'+i+'_'+g.itemId, type:T.DROPPED,
+        x:g.x, y:g.y, itemId:g.itemId, n:g.n, bobA:i*0.7, stock:true
+      });
     });
     ensurePad();
   }
@@ -1084,10 +1296,13 @@ APH.Colony = (function(){
     return { w: c[0]*CFG.GRID, h: c[1]*CFG.GRID };
   }
   /* 可否建造: 资源够 + 数量未满 + 位置合法(离核心不太近 + 占位矩形不重叠) */
-  function canPlace(colonyBuildings, research, bid, x, y){
+  function canPlace(colonyBuildings, research, bid, x, y, mineral){
     var def = BUILDINGS[bid];
     if(!def) return { ok:false, why:'未知建筑' };
     if(def.cost > research) return { ok:false, why:'研究点不足 (需 '+def.cost+')' };
+    var needM = def.costMineral||0;
+    var haveM = (mineral==null) ? 1e9 : mineral;
+    if(needM > haveM) return { ok:false, why:'矿材不足 (需 '+needM+')' };
     if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
     if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
@@ -1105,9 +1320,14 @@ APH.Colony = (function(){
   /* ---------- U3 农田生长(纯函数) ----------
      plot {stage:0~3, t:当前阶段累计}
      每30s一跳; 有农民(skills.sk_farm)则加速。 */
-  function farmTick(plot, farmerSkill){
+  function farmTick(plot, farmerSkill, farmMul, eff, lawMul){
     var need=[0,1,2,3][plot.stage];              // 各阶段所需跳数
-    var speed = 1 + (farmerSkill||0)*0.12;       // 种植技能加速
+    /* 无人在岗(null)冻结; 在岗即使技能0也按 1× 生长; 雷达 farmMul 加速; eff=心情饱食病情; lawMul=法则 */
+    var e = (eff==null?1:eff);
+    var law = (lawMul==null?1:lawMul);
+    var speed = (farmerSkill==null)
+      ? 0
+      : (1 + (farmerSkill||0)*0.12) * (1+(farmMul||0)) * e * law;
     var p={stage:plot.stage, t:plot.t + speed};
     if(p.t>=need && p.stage<3){ p.stage++; p.t=0; }
     return p;
@@ -1116,26 +1336,78 @@ APH.Colony = (function(){
     return plot.stage===3 ? 3 : 0;               // 成熟收3粮
   }
 
+  /* 家园气候法则(纯函数, ADR-5): 1~2 条, 只用酸雨/磁暴 id */
+  function climateLaws(seed){
+    var rng=U.makeRng(((seed||7) ^ 0x1A17) >>> 0);
+    var pool=[
+      { id:'lw_night_acid', name:'酸雨季节', fact:'夜间农田生长减半', zone:'home' },
+      { id:'lw_storm', name:'磁暴周期', fact:'磁暴来临时实验室停摆', zone:'home' },
+    ];
+    var a=rng()<0.5?0:1;
+    var n=1+(rng()<0.45?1:0);
+    var out=[{ id:pool[a].id, name:pool[a].name, fact:pool[a].fact, zone:'home', discovered:true }];
+    if(n>1){
+      var b=1-a;
+      out.push({ id:pool[b].id, name:pool[b].name, fact:pool[b].fact, zone:'home', discovered:true });
+    }
+    return out;
+  }
+
+  /* 法则→收成修正(纯函数): 夜间酸雨减农; 磁暴窗停实验室 */
+  function harvestMods(laws, clock, night){
+    var C=CFG.laws||{};
+    var has={};
+    (laws||[]).forEach(function(l){ if(l&&l.id) has[l.id]=true; });
+    var farmMul=1, labMul=1, acid=false, storm=false;
+    if(has.lw_night_acid && night){
+      farmMul=C.acidFarmMul!=null?C.acidFarmMul:0.5;
+      acid=true;
+    }
+    var period=C.stormPeriod!=null?C.stormPeriod:90;
+    var len=C.stormLen!=null?C.stormLen:30;
+    var t=(clock||0)%period;
+    if(has.lw_storm && t<len){
+      labMul=C.stormLabMul!=null?C.stormLabMul:0;
+      storm=true;
+    }
+    return { farmMul:farmMul, labMul:labMul, acid:acid, storm:storm };
+  }
+
   /* ---------- U6 畜牧群增长(纯函数, 每生产跳一调) ----------
      pasture: {herd:牲畜数, lv}   skill:最高畜牧技能
      羊群按概率自然增长(封顶 cap=3+lv*2); 产肉/皮随 herd 增长。
-     rng 可注入(默认 Math.random, ADR-5 表现随机)供测试定值。 */
-  function ranchTick(pasture, skill, res, rng){
+     rng 可注入供测试定值; 实况由 residentsTick 注入 seeded rng。 */
+  function ranchTick(pasture, skill, res, rng, eff){
     var rand = rng || Math.random;
+    var e = (eff==null?1:eff);
     var herd = (pasture && pasture.herd)||0;
     var lv = (pasture && pasture.lv)||1;
     var grew = false;
     var cap = 3 + lv*2;
-    if (skill>0 && herd<cap && rand() < 0.22*(1+skill*0.06)){ herd++; grew=true; }
-    /* 产肉: 有羊即出, 随 herd 增长; 产皮: 3只起出, 等级+1只阈值宽松 */
-    var foodGain = herd>0 ? Math.max(1, Math.round(herd/2)) : 0;
+    if (skill>0 && herd<cap && rand() < 0.22*(1+skill*0.06)*e){ herd++; grew=true; }
+    /* 有牧民才产: 肉随 herd; 皮 3只起, 等级放宽阈值; 再乘效率 */
+    var foodGain = (skill>0 && herd>0) ? Math.max(1, Math.round(herd/2)) : 0;
     var leatherGain = (skill>0 && herd>=3) ? Math.floor((herd + (lv-1))/3) : 0;
-    if (pasture) pasture.herd = herd;
-    if (res){
-      res.food    = (res.food    ||0) + foodGain;
-      res.leather = (res.leather ||0) + leatherGain;
+    if(e!==1){
+      foodGain = Math.round(foodGain * e);
+      leatherGain = Math.round(leatherGain * e);
     }
+    if (pasture) pasture.herd = herd;
     return { herd:herd, cap:cap, grew:grew, foodGain:foodGain, leatherGain:leatherGain };
+  }
+
+  /* 工坊: 有工匠且矿够 → 扣矿产药品 */
+  function workshopTick(worker, res, lv){
+    var C=CFG.workshop||{};
+    var cost=C.mineralCost!=null?C.mineralCost:2;
+    var base=C.medGain!=null?C.medGain:1;
+    if(!worker || !res) return {med:0, spent:0};
+    if((res.mineral||0)<cost) return {med:0, spent:0};
+    var eff=(APH.Res&&APH.Res.efficiency)?APH.Res.efficiency(worker):1;
+    var sk=(worker.skills&&worker.skills.sk_craft)||0;
+    var med=Math.max(1, Math.round(base*(1+sk*0.15)*eff*(lv||1)));
+    res.mineral=(res.mineral||0)-cost;
+    return {med:med, spent:cost};
   }
 
   /* ---------- U5 岗位产出(纯函数) ----------
@@ -1152,30 +1424,233 @@ APH.Colony = (function(){
   }
 
   /* ---------- 生产 tick (每30游戏秒一跳) ---------- */
-  function productionTick(meta, buildings){
-    var out = { mineral:0, research:0 };
-    buildings.forEach(function(b){
-      if(b.id==='bl_mine') out.mineral += mineOutput(b.lv);
-      if(b.id==='bl_lab') out.research += labOutput(b.lv);
+  function productionTick(meta, buildings, residents, mods){
+    var out = { mineral:0, research:0, piles:[] };
+    var labM=(mods&&mods.labMul!=null)?mods.labMul:1;
+    var miners = (residents||[]).filter(function(r){ return r.job==='bl_mine'; });
+    var labs = (residents||[]).filter(function(r){ return r.job==='bl_lab'; });
+    var mi=0, li=0;
+    (buildings||[]).forEach(function(b){
+      if((b.offlineT||0)>0) return;
+      if(b.id==='bl_mine'){
+        var w=miners[mi++];
+        if(!w) return;
+        var craftB=1+((w.skills&&w.skills.sk_craft)||0)*0.1;
+        var eff = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w) : 1;
+        var amt=Math.max(0, Math.round(mineOutput(b.lv)*eff*craftB));
+        out.mineral += amt;
+        if(amt>0) out.piles.push({ x:b.x||0, y:b.y||0, itemId:'it_mineral', n:amt });
+      }
+      if(b.id==='bl_lab'){
+        var w2=labs[li++];
+        if(!w2) return;
+        var eff2 = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w2) : 1;
+        out.research += Math.max(0, Math.round(labOutput(b.lv)*eff2*labM));
+      }
     });
-    meta.res.mineral = (meta.res.mineral||0) + out.mineral;
-    meta.research += out.research;
+    meta.res = meta.res || {};
+    meta.research = (meta.research||0) + out.research;
     return out;
   }
 
+  /* 仓库入库(纯函数): 只处理带 store 的物品 */
+  function stockItem(res, itemId, n){
+    var it=(CFG.items&&CFG.items[itemId])||{};
+    if(!it.store || !n) return { ok:false, stored:0 };
+    res = res || {};
+    var mul=it.storeN||1;
+    res[it.store]=(res[it.store]||0)+n*mul;
+    return { ok:true, stored:n, key:it.store, amount:n*mul };
+  }
 
-  /* ---------- Task2(v2): 建造队列——蓝图需人物到场施工 ----------
-     q项 {bid,x,y,total,progress}
-     只有玩家站在蓝图旁(<90px)进度才增长; builderBonus=建造专长加成。 */
-  function queueTick(queue, dt, playerNearPos, builderBonus){
+  /* 家园捡起: 可入库的进仓, 有研究点价值的变研究点 */
+  function collectHome(meta, itemId, n){
+    meta = meta || {};
+    meta.res = meta.res || {};
+    var it=(CFG.items&&CFG.items[itemId])||{};
+    if(it.store){
+      var st=stockItem(meta.res, itemId, n);
+      return { kind:'stock', label:it.name||itemId, n:n, key:st.key, amount:st.amount };
+    }
+    if(it.v){
+      var gained=(it.v||0)*n;
+      meta.research=(meta.research||0)+gained;
+      return { kind:'research', label:it.name||itemId, n:n, research:gained };
+    }
+    return { kind:'none', label:it.name||itemId, n:0 };
+  }
+
+  function stockpileSpot(buildings){
+    var wh=null, pad=null;
+    (buildings||[]).forEach(function(b){
+      if(!b) return;
+      if(b.id==='bl_warehouse' && !wh) wh=b;
+      if(b.id==='bl_landing_pad') pad=b;
+    });
+    var b=wh||pad;
+    if(b) return { x:b.x, y:(b.y||0)+18 };
+    var H=CFG.HAB||{x:1100,y:1100};
+    return { x:H.x, y:H.y+110 };
+  }
+
+  function serializeGround(entities){
+    var g=[];
+    (entities||[]).forEach(function(e){
+      if(!e || e.dead) return;
+      if(e.type===T.DROPPED && e.itemId)
+        g.push({ itemId:e.itemId, n:e.n||1, x:e.x, y:e.y });
+      if(e.type===T.RESIDENT && e.haulCarry && e.haulCarry.itemId)
+        g.push({ itemId:e.haulCarry.itemId, n:e.haulCarry.n||1, x:e.x, y:e.y });
+    });
+    return g;
+  }
+
+  function pileStoreKey(e){
+    if(!e || e.dead || e.type!==T.DROPPED || !e.itemId) return null;
+    var it=(CFG.items&&CFG.items[e.itemId])||{};
+    return it.store||null;
+  }
+  function pileUnits(e){
+    var it=(CFG.items&&CFG.items[e.itemId])||{};
+    return (e.n||1)*((it.storeN)||1);
+  }
+
+  /* 地上可入库物资合计(不含搬运途中) */
+  function groundCount(entities, key){
+    var n=0;
+    (entities||[]).forEach(function(e){
+      if(pileStoreKey(e)===key) n+=pileUnits(e);
+    });
+    return n;
+  }
+  function groundTally(entities){
+    return {
+      food:groundCount(entities,'food'),
+      mineral:groundCount(entities,'mineral'),
+      med:groundCount(entities,'med'),
+      leather:groundCount(entities,'leather')
+    };
+  }
+  function stockOf(res, entities, key){
+    return ((res&&res[key])||0)+groundCount(entities, key);
+  }
+
+  /* 从地上堆扣 store 单位. 先扣 storeN=1 的堆; 合金整件扣.
+     overshoot: 不够一整件时仍拿走(ensureStock 把多的补进仓). */
+  function takeFromGround(entities, key, n, overshoot){
+    var left=n||0;
+    if(left<=0) return 0;
+    function pass(baseOnly){
+      (entities||[]).forEach(function(e){
+        if(left<=0) return;
+        if(pileStoreKey(e)!==key) return;
+        var it=(CFG.items&&CFG.items[e.itemId])||{};
+        var mul=it.storeN||1;
+        if(baseOnly && mul!==1) return;
+        if(!baseOnly && mul===1) return;
+        if(mul>1){
+          var want=overshoot ? Math.ceil(left/mul) : Math.floor(left/mul);
+          var items=Math.min(e.n||1, want);
+          if(!items) return;
+          e.n-=items; left-=items*mul;
+        }else{
+          var take=Math.min(e.n||1, left);
+          e.n-=take; left-=take;
+        }
+        if((e.n||0)<=0) e.dead=true;
+      });
+    }
+    pass(true); pass(false);
+    return n-left;
+  }
+
+  /* 先仓后堆. 不把地上 magically 搬进仓, 堆会缩小. */
+  function takeStock(res, entities, key, n){
+    res=res||{};
+    var need=n||0;
+    if(need<=0) return { ok:true, taken:0, fromRes:0, fromGround:0 };
+    var fromRes=Math.min(need, res[key]||0);
+    res[key]=(res[key]||0)-fromRes;
+    var left=need-fromRes;
+    var fromG=left?takeFromGround(entities, key, left, false):0;
+    left-=fromG;
+    return { ok:left<=0, taken:need-left, fromRes:fromRes, fromGround:fromG };
+  }
+
+  /* 仓不够时把地上补进仓(工坊/请客等仍走仓扣费的旧函数) */
+  function ensureStock(res, entities, key, n){
+    res=res||{};
+    var have=res[key]||0;
+    if(have>=n) return true;
+    var got=takeFromGround(entities, key, n-have, true);
+    res[key]=have+got;
+    return (res[key]||0)>=n;
+  }
+
+  function stockLabel(res, entities, key){
+    var w=(res&&res[key])||0;
+    var g=groundCount(entities, key);
+    return g>0 ? (w+'+'+g) : String(w);
+  }
+
+  function shortageBrief(meta, buildings, extra){
+    extra=extra||{};
+    var food=((meta.res&&meta.res.food)||0)+(extra.food||0);
+    var mineral=((meta.res&&meta.res.mineral)||0)+(extra.mineral||0);
+    var med=((meta.res&&meta.res.med)||0)+(extra.med||0);
+    var pop=((meta.residents)||[]).length;
+    var idle=((meta.residents)||[]).filter(function(r){ return !r.job; }).length;
+    var days = pop ? Math.floor(food/Math.max(1,pop)) : food;
+    var warnF = (CFG.economy && CFG.economy.foodWarnTicks) || 2;
+    var warnM = (CFG.economy && CFG.economy.mineralWarn) || 15;
+    var sick=((meta.residents)||[]).some(function(r){ return (r.illness||0)>40; });
+    var urgent = food < Math.max(warnF, pop*warnF) || mineral < warnM;
+    var text = '矿材'+mineral+' · 食物还能撑'+days+'跳 · 闲人'+idle;
+    var mission = '此行目标：晶体与遗件';
+    if(food < Math.max(warnF, pop*warnF)){
+      text = '食物将尽 — 该种田或出门找补给';
+      mission = '此行目标：补给食物';
+    }else if(mineral < warnM){
+      text = '矿材不足 — 派人采矿或出门搜刮';
+      mission = '此行目标：矿材';
+    }else if(sick && med<=0){
+      text = '有人在生病 — 工坊把矿做成药';
+    }
+    return { urgent:urgent, text:text, mission:mission, food:food, mineral:mineral, idle:idle, days:days };
+  }
+
+  function cycleJob(resident, buildings){
+    var opts = [null];
+    JOB_CYCLE.forEach(function(id){
+      if(!id) return;
+      if((buildings||[]).some(function(b){ return b.id===id; })) opts.push(id);
+    });
+    var i = opts.indexOf(resident.job);
+    if(i<0) i=0;
+    resident.job = opts[(i+1)%opts.length];
+    resident.jobLocked = true;
+    return resident.job;
+  }
+
+  function isBuilder(r){
+    if(!r||!r.skills) return false;
+    return r.mainSkill==='sk_build' || r.subSkill==='sk_build' || (r.skills.sk_build||0)>=3;
+  }
+
+  /* 蓝图施工: nearPos 为 {x,y} 或坐标数组(玩家+建造岗居民) */
+  function queueTick(queue, dt, nearPos, builderBonus){
     var bonus = 1 + (builderBonus||0);
+    var positions = Array.isArray(nearPos) ? nearPos
+      : (nearPos && nearPos.x!=null ? [nearPos] : []);
     var out = [];
     var done = [];
     queue.forEach(function(item){
       item = Object.assign({}, item);
-      var near = playerNearPos &&
-                 U.dst(playerNearPos.x, playerNearPos.y, item.x, item.y) < 90;
+      var near = positions.some(function(p){
+        return p && U.dst(p.x, p.y, item.x, item.y) < 90;
+      });
       if (near){
+
         item.progress = Math.min(1, (item.progress||0) + dt*bonus/item.total);
         item.building = true;
       }else{
@@ -1202,8 +1677,8 @@ APH.Colony = (function(){
     te_weaponry: { name:'等离子强化', cost:60, max:3,
                    desc:'武器伤害 +30%', effect:{ dmgMul:.30 } },
     te_radar:    { name:'深空雷达', cost:50, max:2,
-                   desc:'罗盘显示所有信标距离', effect:{ radar:true } },
-    exo_suit:    { name:'外骨骼', cost:90, max:2,
+                   desc:'罗盘标晶体与敌基地; 农产 +15%/级', effect:{ radar:true, farmMul:.15 } },
+    te_exosuit:  { name:'外骨骼', cost:90, max:2,
                    desc:'移动速度 +15%', effect:{ spdMul:.15 } },
   };
 
@@ -1230,16 +1705,23 @@ APH.Colony = (function(){
     list:list, get:get,
     TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
     farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
-    ranchTick:ranchTick,
+    ranchTick:ranchTick, climateLaws:climateLaws, harvestMods:harvestMods,
+    workshopTick:workshopTick,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, footprintOf:footprintOf, productionTick:productionTick,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
-    housingCapacity:housingCapacity, refundOf:refundOf,
+    housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf,
     carryBonus:carryBonus, carryMaxOf:carryMaxOf,
-    builderBonusOf:builderBonusOf,
+    builderBonusOf:builderBonusOf, isBuilder:isBuilder,
     upgradeCost:upgradeCost, canUpgrade:canUpgrade,
     mineOutput:mineOutput, labOutput:labOutput,
+    shortageBrief:shortageBrief, cycleJob:cycleJob, JOB_CYCLE:JOB_CYCLE,
+    stockItem:stockItem, collectHome:collectHome, stockpileSpot:stockpileSpot,
+    serializeGround:serializeGround,
+    groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
+    stockLabel:stockLabel, takeFromGround:takeFromGround,
+    takeStock:takeStock, ensureStock:ensureStock,
     ensurePad:ensurePad,
   };
 })();
@@ -1330,14 +1812,14 @@ APH.Rivals = (function(){
    Aphelion · residents.js — 殖民者系统 (P6, 用户方向)
    挂载: window.APH.Res
    愿景: 殖民地是有人生活的家。
-   - U1 居民数据: 六维技能(建造/种植/畜牧/手工/学识/社交) + 心情 + 饱食度
+   - U1 居民数据: 六维技能 + 心情 + 饱食 + 病情
    - 纯函数优先(node 可测), 世界侧接线在 main.js
    ============================================================ */
 window.APH = window.APH || {};
 
 APH.Res = (function(){
   'use strict';
-  var U=APH.U;
+  var U=APH.U, CFG=APH.CFG;
 
   /* ---------- 技能定义 (ADR-9 前缀 sk_) ---------- */
   var SKILLS=['sk_build','sk_farm','sk_ranch','sk_craft','sk_lore','sk_social'];
@@ -1359,6 +1841,7 @@ APH.Res = (function(){
     var rng=U.makeRng(seed);
     function pick(a){ return a[Math.floor(rng()*a.length)]; }
     /* 主副技能不重复 */
+    var origin=pick(ORIGINS);
     var main=SKILLS[Math.floor(rng()*SKILLS.length)];
     var sub=main;
     while(sub===main) sub=SKILLS[Math.floor(rng()*SKILLS.length)];
@@ -1379,36 +1862,126 @@ APH.Res = (function(){
         }
         return nm+'·'+id;                        // 兜底: 附id保证唯一
       })(),
-      origin:pick(ORIGINS),
+      origin:origin,
       skills:skills, mainSkill:main, subSkill:sub,
       mood:70+Math.floor(rng()*25),                          // 70~94
       food:80+Math.floor(rng()*15),                          // 80~94
+      illness:0,                                             // 病情 0~100, 0=健康
       job:null,                                              // 指派岗位 bl_xxx|null
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
     };
   }
 
-  /* ---------- U4: 饱食/心情 tick(纯函数) ----------
-     每30游戏秒一跳: 吃仓库食物; 饿→心情掉; 心情影响效率系数。 */
+  function RS(){ return (CFG.residents)||{}; }
+  function clampNeed(v, lo, hi){
+    return Math.max(lo, Math.min(hi, v));
+  }
+
+  /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
+     每30游戏秒一跳: 掉饱食; 真吃饭在走位里(仓/地上堆). 饿→心情掉且涨病; 不饿死. */
   function needsTick(r, hasFood){
+    var C=RS();
     var out={ ate:false };
-    if(r.food<60 && hasFood){
-      r.food=Math.min(100,r.food+25); out.ate=true;          // 吃一份+25
+    r.illness = r.illness||0;
+    var eatBelow=C.eatBelow!=null?C.eatBelow:60;
+    var eatGain=C.eatGain!=null?C.eatGain:25;
+    var drain=C.foodDrain!=null?C.foodDrain:6;
+    if(r.food<eatBelow && hasFood){
+      r.food=Math.min(100,r.food+eatGain); out.ate=true;
     }else{
-      r.food=Math.max(0,r.food-6);                            // 每跳耗6
+      r.food=Math.max(0,r.food-drain);
     }
-    if(r.food>65 && r.mood<95) r.mood+=2;                     // 吃饱心情缓升
-    else if(r.food<30) r.mood=Math.max(0,r.mood-8);           // 饥饿心情骤降
-    else if(r.food<45) r.mood=Math.max(0,r.mood-3);
+    var sickAt=C.hungerSickAt!=null?C.hungerSickAt:30;
+    var sickAdd=C.hungerSick!=null?C.hungerSick:4;
+    var illMax=C.illnessMax!=null?C.illnessMax:100;
+    if(r.food<sickAt) r.illness=clampNeed(Math.round(r.illness+sickAdd), 0, illMax);
+    var wellF=C.moodWellFood!=null?C.moodWellFood:65;
+    var wellG=C.moodWellGain!=null?C.moodWellGain:2;
+    var cap=C.moodCap!=null?C.moodCap:95;
+    var stAt=C.moodStarveAt!=null?C.moodStarveAt:30;
+    var stN=C.moodStarve!=null?C.moodStarve:8;
+    var hgAt=C.moodHungryAt!=null?C.moodHungryAt:45;
+    var hgN=C.moodHungry!=null?C.moodHungry:3;
+    if(r.food>wellF && r.mood<cap) r.mood+=wellG;
+    else if(r.food<stAt) r.mood=Math.max(0,r.mood-stN);
+    else if(r.food<hgAt) r.mood=Math.max(0,r.mood-hgN);
+    var moodSickAt=C.moodSickAt!=null?C.moodSickAt:40;
+    var moodSick=C.moodSick!=null?C.moodSick:3;
+    if(r.illness>moodSickAt) r.mood=Math.max(0, r.mood-moodSick);
     return out;
   }
 
-  /* 工作效率系数(纯函数): 心情与饱食共同决定 0.4~1.3 */
+  /* 走到粮堆/仓库后吃一口. 生产跳只掉饱食, 不隔空扣地上. */
+  function eatOnce(r){
+    var C=RS();
+    var below=C.eatBelow!=null?C.eatBelow:60;
+    var gain=C.eatGain!=null?C.eatGain:25;
+    if(!r || r.food==null || r.food>=below) return false;
+    r.food=Math.min(100, (r.food||0)+gain);
+    return true;
+  }
+
+  /* 工作效率系数: 心情 × 饱食 × 病情(超阈值打折, 有地板) */
   function efficiency(r){
+    var C=RS();
     var moodF=0.55+(r.mood/100)*0.75;                         // 0.55~1.30
     var foodF=r.food>=50?1:(0.5+r.food/100);                  // <50 开始打折
-    return Math.round(moodF*foodF*100)/100;
+    var ill=r.illness||0;
+    var at=C.effSickAt!=null?C.effSickAt:20;
+    var floor=C.effSickFloor!=null?C.effSickFloor:0.35;
+    var sickF=1;
+    if(ill>at) sickF=Math.max(floor, 1-(ill-at)/100);
+    return Math.round(moodF*foodF*sickF*100)/100;
+  }
+
+  /* 医疗舱治疗(纯函数): 有舱基疗, 有医更快; 无舱且吃饱微愈; 否则少量 ambient 得病 */
+  function clinicTick(r, ctx){
+    ctx = ctx||{};
+    var C=RS();
+    var illMax=C.illnessMax!=null?C.illnessMax:100;
+    r.illness = r.illness||0;
+    var heal=0;
+    if(ctx.hasClinic){
+      heal = C.clinicHeal!=null?C.clinicHeal:6;
+      var sk=ctx.medicSkill||0;
+      if(sk>0)       heal += (C.medicHealPerLv!=null?C.medicHealPerLv:1.2)*sk;
+      r.illness = clampNeed(Math.round(r.illness-heal), 0, illMax);
+      return r;
+    }
+    var well=C.selfHealFood!=null?C.selfHealFood:65;
+    if((r.food||0)>=well){
+      var self=C.selfHeal!=null?C.selfHeal:1;
+      r.illness = clampNeed(Math.round(r.illness-self), 0, illMax);
+      return r;
+    }
+    var rng = ctx.rng || Math.random;
+    var chance=C.ambientSickChance!=null?C.ambientSickChance:0.08;
+    var add=C.ambientSick!=null?C.ambientSick:2;
+    if(rng()<chance) r.illness=clampNeed(Math.round(r.illness+add), 0, illMax);
+    return r;
+  }
+
+  /* 袭击打伤(纯函数): 涨病、掉心情, 不致死 */
+  function hurtResident(r, amount){
+    if(!r) return r;
+    var C=RS();
+    var illMax=C.illnessMax!=null?C.illnessMax:100;
+    var wound=amount!=null?amount:(C.raidWound!=null?C.raidWound:18);
+    var moodHit=C.raidMood!=null?C.raidMood:12;
+    r.illness=clampNeed(Math.round((r.illness||0)+wound), 0, illMax);
+    r.mood=Math.max(0, (r.mood||0)-moodHit);
+    return r;
+  }
+
+  /* 用药(纯函数): 医疗舱给最重病号额外治一截, 不致死也不变远征 */
+  function applyMed(r){
+    if(!r) return r;
+    var C=RS();
+    var illMax=C.illnessMax!=null?C.illnessMax:100;
+    var bonus=C.medHeal!=null?C.medHeal:8;
+    r.illness=clampNeed(Math.round((r.illness||0)-bonus), 0, illMax);
+    return r;
   }
 
   /* ---------- U7: 社交关系(纯函数) ---------- */
@@ -1448,6 +2021,197 @@ APH.Res = (function(){
     };
   }
 
+  /* ---------- 过客招募(RimWorld 式: 看人下菜, 不买人) ----------
+     难民(地球难民船/冷冻舱)有床且现有人口没断粮 → 必成
+     游商后代 → 不招
+     过路客 → 掷骰, 看粮/医疗/岗位/性格/袭击 */
+  var REFUGEE_ORIGINS=['地球难民船','冷冻舱幸存者'];
+  var TRADER_ORIGINS=['游商后代'];
+  var SKILL_JOB={
+    sk_farm:'bl_farm', sk_ranch:'bl_pasture', sk_craft:'bl_mine',
+    sk_lore:'bl_lab', sk_build:'bl_house', sk_social:'bl_clinic',
+  };
+  function joinIntentOf(profile){
+    if(!profile) return 'none';
+    if(TRADER_ORIGINS.indexOf(profile.origin)>=0) return 'trader';
+    if(REFUGEE_ORIGINS.indexOf(profile.origin)>=0) return 'refugee';
+    return 'guest';
+  }
+  function RC(){ return (CFG.recruit)||{}; }
+  function hasBldg(buildings, id){
+    return (buildings||[]).some(function(b){ return b && b.id===id; });
+  }
+  function recruitGate(profile, ctx){
+    ctx = ctx || {};
+    if(!profile) return { ok:false, why:'没有过客', intent:'none', chance:0 };
+    var intent=joinIntentOf(profile);
+    if((ctx.housingCap||0) <= (ctx.residentCount||0))
+      return { ok:false, why:'住宅已满', intent:intent, chance:0 };
+    if(intent==='trader')
+      return { ok:false, why:'只做买卖，不愿留下', intent:intent, chance:0 };
+    if(intent==='refugee' && (ctx.residentCount||0)>0 && (ctx.food||0) < (ctx.residentCount||0))
+      return { ok:false, why:'没粮，难民不敢留下', intent:intent, chance:0 };
+    return { ok:true, intent:intent };
+  }
+  function joinChance(profile, ctx){
+    ctx = ctx || {};
+    var gate=recruitGate(profile, ctx);
+    if(!gate.ok) return { chance:0, intent:gate.intent, why:gate.why, ok:false };
+    if(gate.intent==='refugee') return { chance:100, intent:'refugee', ok:true };
+    var C=RC();
+    var chance=C.guestBase!=null ? C.guestBase : 45;
+    var trait=profile.trait;
+    if(trait==='乐观'||trait==='勤恳') chance += (C.traitEasy!=null?C.traitEasy:12);
+    if(trait==='独行'||trait==='谨慎') chance -= (C.traitHard!=null?C.traitHard:15);
+    if(trait==='暴脾气') chance -= (C.traitAngry!=null?C.traitAngry:10);
+    var pop=(ctx.residentCount||0)+1;
+    var days=pop ? Math.floor((ctx.food||0)/Math.max(1,pop)) : (ctx.food||0);
+    var goodT=C.foodGoodTicks!=null ? C.foodGoodTicks : 3;
+    if(days>=goodT) chance += (C.foodGood!=null?C.foodGood:20);
+    else if(days<1) chance -= (C.foodBad!=null?C.foodBad:30);
+    if(hasBldg(ctx.buildings, 'bl_clinic')) chance += (C.clinic!=null?C.clinic:10);
+    var jobId=SKILL_JOB[profile.mainSkill];
+    var jobOk=jobId && hasBldg(ctx.buildings, jobId);
+    if(profile.mainSkill==='sk_craft' && hasBldg(ctx.buildings, 'bl_workshop')) jobOk=true;
+    if(jobOk) chance += (C.jobBldg!=null?C.jobBldg:10);
+    if(ctx.raidActive) chance -= (C.raid!=null?C.raid:40);
+    if(ctx.impression!=null) chance += Math.round((ctx.impression-50)/2);
+    var lo=C.chanceMin!=null?C.chanceMin:5, hi=C.chanceMax!=null?C.chanceMax:95;
+    chance=Math.max(lo, Math.min(hi, chance));
+    return { chance:chance, intent:'guest', ok:true };
+  }
+  function chanceLabel(n){
+    if(n>=80) return '几乎会留下';
+    if(n>=60) return '大约六成';
+    if(n>=40) return '五五开';
+    if(n>=20) return '不太情愿';
+    return '很难开口';
+  }
+  function canRecruit(profile, residentCount, housingCap, ctx){
+    ctx = Object.assign({
+      residentCount:residentCount, housingCap:housingCap, food:999, buildings:[]
+    }, ctx||{});
+    ctx.residentCount = residentCount;
+    ctx.housingCap = housingCap;
+    var gate=recruitGate(profile, ctx);
+    if(!gate.ok) return gate;
+    var ch=joinChance(profile, ctx);
+    return { ok:true, why:'', intent:ch.intent, chance:ch.chance };
+  }
+  function recruitInto(meta, profile, housingCap, ctx){
+    meta.residents = meta.residents || [];
+    ctx = Object.assign({
+      residentCount: meta.residents.length, housingCap:housingCap,
+      food:999, buildings:[]
+    }, ctx||{});
+    ctx.residentCount = meta.residents.length;
+    ctx.housingCap = housingCap;
+    var gate=recruitGate(profile, ctx);
+    if(!gate.ok) return gate;
+    var r = Object.assign({}, profile, { job:null, jobLocked:false });
+    meta.residents.push(r);
+    return { ok:true, resident:r, intent:gate.intent };
+  }
+  function attemptRecruit(meta, profile, ctx, rng){
+    ctx = ctx || {};
+    var gate=recruitGate(profile, ctx);
+    if(!gate.ok) return gate;
+    var ch=joinChance(profile, ctx);
+    var roll = (rng || Math.random)() * 100;
+    if(ch.chance>=100 || roll < ch.chance)
+      return Object.assign(recruitInto(meta, profile, ctx.housingCap, ctx), { chance:ch.chance, rolled:roll });
+    return { ok:false, why:'还想再看看', chance:ch.chance, intent:ch.intent, rolled:roll };
+  }
+  /* 招待印象: 50 中立; 有空床/余粮/医疗舱涨, 断粮/袭击掉 */
+  function hospitalityRate(ctx){
+    ctx = ctx || {};
+    var C=RC();
+    var d=0;
+    var spare=(ctx.housingCap||0)>(ctx.residentCount||0);
+    if(spare) d += (C.rateSpareBed!=null?C.rateSpareBed:0.4);
+    else d -= (C.rateNoBed!=null?C.rateNoBed:0.12);
+    var pop=Math.max(1,(ctx.residentCount||0)+1);
+    var days=Math.floor((ctx.food||0)/pop);
+    var goodT=C.foodGoodTicks!=null?C.foodGoodTicks:3;
+    if(days>=goodT) d += (C.rateFoodOk!=null?C.rateFoodOk:0.28);
+    else if((ctx.food||0)<1) d -= (C.rateNoFood!=null?C.rateNoFood:0.55);
+    if(hasBldg(ctx.buildings,'bl_clinic')) d += (C.rateClinic!=null?C.rateClinic:0.18);
+    if(ctx.raidActive) d -= (C.rateRaid!=null?C.rateRaid:1.1);
+    return d;
+  }
+  function tickImpression(cur, dt, ctx){
+    var C=RC();
+    var lo=C.impressMin!=null?C.impressMin:0;
+    var hi=C.impressMax!=null?C.impressMax:100;
+    var start=C.impressStart!=null?C.impressStart:50;
+    var v=(cur==null?start:cur) + hospitalityRate(ctx)*(dt||0);
+    return Math.max(lo, Math.min(hi, v));
+  }
+  function offerMeal(meta, visitor, cost){
+    var C=RC();
+    var need=cost!=null?cost:(C.mealCost!=null?C.mealCost:2);
+    var boost=C.mealImpress!=null?C.mealImpress:20;
+    var start=C.impressStart!=null?C.impressStart:50;
+    var hi=C.impressMax!=null?C.impressMax:100;
+    if(!visitor) return { ok:false, why:'没有过客' };
+    if(visitor.fed) return { ok:false, why:'已经请过客吃过了' };
+    meta = meta || {};
+    meta.res = meta.res || { food:0 };
+    if((meta.res.food||0)<need) return { ok:false, why:'食物不够请客' };
+    meta.res.food=(meta.res.food||0)-need;
+    visitor.fed=true;
+    visitor.impression=Math.min(hi, (visitor.impression==null?start:visitor.impression)+boost);
+    return { ok:true, impression:visitor.impression, food:meta.res.food, cost:need };
+  }
+
+  /* 直线走向目标(无寻路): 到达后停下. 坐标不落盘 */
+  function walkToward(e, target, dt, speed){
+    if(!e || !target) return e;
+    var C=CFG.walk||{};
+    var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
+    var arrive=C.arriveR!=null?C.arriveR:3;
+    var dx=target.x-e.x, dy=target.y-e.y;
+    var d=Math.sqrt(dx*dx+dy*dy);
+    if(!(d>arrive)){
+      e.x=target.x; e.y=target.y; e.walking=false;
+      return e;
+    }
+    var step=spd*(dt||0);
+    if(step>=d){
+      e.x=target.x; e.y=target.y; e.walking=false;
+      return e;
+    }
+    e.x+=dx/d*step; e.y+=dy/d*step;
+    e.walking=true;
+    e.face=Math.atan2(dy, dx);
+    return e;
+  }
+
+  /* 过客在家园院子里闲逛(无寻路): 到边界折返 */
+  function wanderStep(e, dt, hab, yardR, rng){
+    var rand = rng || Math.random;
+    var H = hab || CFG.HAB;
+    var R = yardR || ((CFG.visitor && CFG.visitor.yardR) || 220);
+    var spd = (CFG.visitor && CFG.visitor.speed) || 48;
+    e.wanderT = (e.wanderT||0) - dt;
+    if(e.wanderT <= 0){
+      e.wanderA = rand() * Math.PI * 2;
+      e.wanderT = 1.4 + rand() * 3.2;
+    }
+    e.x += Math.cos(e.wanderA||0) * spd * dt;
+    e.y += Math.sin(e.wanderA||0) * spd * dt;
+    var dx = e.x - H.x, dy = e.y - H.y;
+    var d = Math.sqrt(dx*dx + dy*dy) || 1;
+    if(d > R){
+      e.x = H.x + dx / d * R;
+      e.y = H.y + dy / d * R;
+      e.wanderA = Math.atan2(-dy, -dx) + (rand() - 0.5);
+    }
+    e.x = U.clamp(e.x, 40, CFG.WORLD - 40);
+    e.y = U.clamp(e.y, 40, CFG.WORLD - 40);
+    return e;
+  }
+
   /* ---------- V2 程序化小传(降级用, 纯函数) ---------- */
   var BIO_A=['沉默寡言','爱管闲事','手艺精湛','记性极差','运气出奇','胆小如鼠','天生乐观','固执己见'];
   var BIO_B=['曾在废墟里救过人','会修任何漏水的管子','坚持每天写日记','养着一株不肯开花的植物',
@@ -1476,7 +2240,12 @@ APH.Res = (function(){
 
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
-    generate:generate, needsTick:needsTick, efficiency:efficiency,
+    generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
+    hurtResident:hurtResident, applyMed:applyMed,
+    canRecruit:canRecruit, recruitInto:recruitInto, wanderStep:wanderStep, walkToward:walkToward,
+    joinIntentOf:joinIntentOf, joinChance:joinChance, attemptRecruit:attemptRecruit,
+    chanceLabel:chanceLabel, recruitGate:recruitGate,
+    hospitalityRate:hospitalityRate, tickImpression:tickImpression, offerMeal:offerMeal,
     socialTick:socialTick, applyBond:applyBond,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,
@@ -1504,14 +2273,16 @@ APH.Combat = (function(){
      ============================================================ */
   function fsmStep(en, ctx){
     var C = CFG.enemy;
-    var aggroR = C.aggroR * (ctx.night ? C.nightAggroMul : 1);
+    var sight = ctx.sightMul != null ? ctx.sightMul : 1;
+    var aggroR = C.aggroR * (ctx.night ? C.nightAggroMul : 1) * sight;
+    var noiseR = ctx.noiseAggroR != null ? ctx.noiseAggroR : (C.noiseAggroR || 300);
     var s = en.state;
 
     if (ctx.hpPct < C.fleeHpPct) return 'flee';
 
     switch(s){
       case 'idle':
-        if (ctx.dist < aggroR || ctx.heardShot && ctx.dist < C.noiseAggroR) return 'alert';
+        if (ctx.dist < aggroR || ctx.heardShot && ctx.dist < noiseR) return 'alert';
         return s;
       case 'alert':
         if (ctx.dist > aggroR * 1.4 && !ctx.heardShot) return 'idle';
@@ -1580,11 +2351,13 @@ APH.Combat = (function(){
   /* 背包操作(纯函数): 返回 {ok, carry, overflow}
      ADR: 负重超限的部分留在原地(死亡循环的经济核心) */
   function addToCarry(carry, itemId, n, carryMax){
-    var w = CFG.items[itemId].w * n;
+    var def = CFG.items[itemId];
+    if(!def || !n) return { ok:false, carry:carry, overflow:n };
+    var w = def.w * n;
     var cur = carryWeight(carry);
     var space = carryMax - cur;
     if(space <= 0) return { ok:false, carry:carry, overflow:n };
-    var take = Math.min(n, Math.floor(space / CFG.items[itemId].w));
+    var take = Math.min(n, Math.floor(space / def.w));
     if(take <= 0) return { ok:false, carry:carry, overflow:n };
     var c = Object.assign({}, carry);
     c[itemId] = (c[itemId]||0) + take;
@@ -1594,6 +2367,120 @@ APH.Combat = (function(){
     var w = 0;
     for(var k in carry) w += (CFG.items[k]?CFG.items[k].w:0) * carry[k];
     return w;
+  }
+  /* 背包→研究点(纯函数)。缺物品 id 跳过, 永不抛错。 */
+  function settleValue(carry){
+    var gained=0;
+    if(!carry) return 0;
+    for(var k in carry){
+      var it=CFG.items[k];
+      if(!it) continue;
+      gained += (it.v||0) * (carry[k]||0);
+    }
+    return gained;
+  }
+  /* 背包分账: 矿材/合金入仓, 晶体/遗件变研究点 */
+  function settleGoods(carry){
+    var research=0, mineral=0;
+    if(!carry) return { research:0, mineral:0 };
+    for(var k in carry){
+      var n=carry[k]||0;
+      if(!n) continue;
+      if(k==='it_mineral') mineral += n;
+      else if(k==='it_alloy') mineral += n*3;
+      else if(k==='it_crystal_ore' || k==='it_relic'){
+        var it=CFG.items[k];
+        research += (it && it.v ? it.v : 0) * n;
+      }
+    }
+    return { research:research, mineral:mineral };
+  }
+
+  function raidPillage(meta, building){
+    if(!meta||!meta.res) return { food:0, mineral:0, med:0 };
+    var pf=(CFG.economy&&CFG.economy.pillageFood)||3;
+    var pm=(CFG.economy&&CFG.economy.pillageMineral)||2;
+    var pd=(CFG.economy&&CFG.economy.pillageMed)||1;
+    var food=Math.min(pf, meta.res.food||0);
+    var mineral=Math.min(pm, meta.res.mineral||0);
+    var med=Math.min(pd, meta.res.med||0);
+    meta.res.food=(meta.res.food||0)-food;
+    meta.res.mineral=(meta.res.mineral||0)-mineral;
+    meta.res.med=(meta.res.med||0)-med;
+    if(building) building.offlineT=(building.offlineT||0)+90;
+    return { food:food, mineral:mineral, med:med };
+  }
+
+  function pickRaidFocus(en, s){
+    var buildings=(s.colony&&s.colony.buildings)||[];
+    var pri={ bl_warehouse:0, bl_farm:1, bl_workshop:2, bl_house:3, bl_pasture:4 };
+    var best=null, bd=1e9;
+    buildings.forEach(function(b){
+      if(pri[b.id]==null) return;
+      var d=U.dst(en.x,en.y,b.x,b.y)+pri[b.id]*40;
+      if(d<bd){ bd=d; best=b; }
+    });
+    var pd=U.dst(en.x,en.y,s.px,s.py);
+    if(!best || pd<80) return { x:s.px, y:s.py, kind:'player' };
+    var resBest=null, rd=1e9;
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.type!==T.RESIDENT) return;
+      var d=U.dst(en.x,en.y,e.x,e.y);
+      if(d<rd){ rd=d; resBest=e; }
+    });
+    if(resBest && rd<72 && rd < U.dst(en.x,en.y,best.x,best.y)){
+      return { x:resBest.x, y:resBest.y, kind:'resident', e:resBest };
+    }
+    return { x:best.x, y:best.y, kind:'building', b:best };
+  }
+
+  /* 士兵找最近的非友军敌人 */
+  function nearestRaidFoe(en, entities){
+    var best=null, bd=1e9;
+    for(var i=0;i<entities.length;i++){
+      var o=entities[i];
+      if(!o || o===en || o.dead || o.type!==T.ENEMY || o.isSoldier) continue;
+      var d=U.dst(en.x,en.y,o.x,o.y);
+      if(d<bd){ bd=d; best=o; }
+    }
+    return best;
+  }
+  function stepSoldier(en, dt, night){
+    var s=APH.state;
+    var foe=nearestRaidFoe(en, s.entities);
+    en.atkCd=(en.atkCd||0)-dt;
+    en.wanderA=(en.wanderA||0)+(U.rr(-1,1))*dt*2;
+    if(!foe){
+      en.state='idle';
+      var idle=moveIntent(en, { px:en.x, py:en.y, night:!!night });
+      en.x+=idle.vx*dt; en.y+=idle.vy*dt;
+      en.x=U.clamp(en.x,30,CFG.WORLD-30);
+      en.y=U.clamp(en.y,30,CFG.WORLD-30);
+      if(en.hp<=0) en.dead=true;
+      return;
+    }
+    var dist=U.dst(en.x,en.y,foe.x,foe.y);
+    var maxHp=en.maxHp||en.faction.hp||1;
+    var c={
+      dist:dist, night:!!night,
+      hpPct:en.hp/maxHp,
+      heardShot:false,
+      px:foe.x, py:foe.y,
+    };
+    en.state=fsmStep(en, c);
+    if(en.state==='attack' && en.atkCd<=0){
+      en.atkCd=CFG.enemy.attackCd;
+      foe.hp-=(CFG.soldier.dmg||en.faction.dmg||6);
+      foe.hitFlash=0.1;
+      U.emit('enemyHit', foe);
+      if(foe.hp<=0) killEnemy(foe);
+    }
+    var mi=moveIntent(en, c);
+    en.x+=mi.vx*dt; en.y+=mi.vy*dt;
+    en.x=U.clamp(en.x,30,CFG.WORLD-30);
+    en.y=U.clamp(en.y,30,CFG.WORLD-30);
+    en.walkPh=(en.walkPh||0)+dt*(Math.abs(mi.vx)+Math.abs(mi.vy)>1?9:3);
+    if(en.hp<=0) en.dead=true;
   }
 
   /* ============================================================
@@ -1608,36 +2495,80 @@ APH.Combat = (function(){
       if(en.type !== T.ENEMY || en.dead) return;
       alive++;
 
-      /* 感知 */
-      var dist = U.dst(en.x, en.y, s.px, s.py);
+      /* 驻守士兵: 打袭击敌人, 永不打玩家, 不因离玩家过远回收 */
+      if(en.isSoldier){
+        stepSoldier(en, dt, night);
+        return;
+      }
+
+      /* 感知: 家园袭击优先冲仓库/农场/工坊, 玩家靠近则改追人 */
+      var focus = (s.scene==='home') ? pickRaidFocus(en, s) : { x:s.px, y:s.py, kind:'player' };
+      var dist = U.dst(en.x, en.y, focus.x, focus.y);
+      var echo = s.scene==='expedition' && window.APH.Planet && APH.Planet.hasLaw
+        && APH.Planet.hasLaw(s.spec, 'lw_echo');
+      var L = CFG.laws || {};
+      var sightMul = echo ? (L.echoSightMul || 0.45) : 1;
+      var noiseMul = echo ? (L.echoNoiseMul || 1.8) : 1;
+      var noiseR = (CFG.combat.noiseRadius || 300) * noiseMul;
       var c = {
         dist: dist, night: night,
         hpPct: en.hp / en.faction.hp,
-        heardShot: s.noiseT > 0 && dist < CFG.combat.noiseRadius,
-        px: s.px, py: s.py,
+        heardShot: s.noiseT > 0 && U.dst(en.x,en.y,s.px,s.py) < noiseR,
+        px: focus.x, py: focus.y,
+        sightMul: sightMul,
+        noiseAggroR: noiseR,
       };
 
       /* FSM */
       var prev = en.state;
       en.state = fsmStep(en, c);
+      /* 家园袭击: 刷在视口外, 远征脱战半径会 idle/回收; 非逃跑者保持冲锋 */
+      if(s.scene === 'home' && en.state !== 'flee' && en.state !== 'attack') en.state = 'chase';
+      if(s.scene === 'home'){
+        en.stealT=(en.stealT||0)-dt;
+        if(en.stealT<=0 && stealNearbyDrop(en, s)) en.stealT=0.55;
+      }
       if(en.state !== prev) U.emit('enemyState', { en:en, from:prev, to:en.state });
 
       /* 攻击冷却 */
       en.atkCd -= dt;
       en.wanderA += (U.rr(-1,1)) * dt * 2;
 
-      /* spitter 远程 */
-      if(shouldSpit(en, c)){
+      /* spitter 远程(仍瞄准玩家) */
+      if(shouldSpit(en, Object.assign({}, c, { dist:U.dst(en.x,en.y,s.px,s.py), px:s.px, py:s.py }))){
         en.atkCd = 2.2;
         var ddx = s.px-en.x, ddy = s.py-en.y, dd = Math.sqrt(ddx*ddx+ddy*ddy)||1;
         s.entities.push(makeProj(en.x, en.y, ddx/dd*CFG.enemy.projSpeed, ddy/dd*CFG.enemy.projSpeed, 'enemy', en.faction.dmg));
         U.emit('enemySpit', en);
       }
 
-      /* 近战接触 */
+      /* 近战: 士兵 → 玩家 → 居民 → 建筑掠夺 */
       if(en.state === 'attack' && en.atkCd <= 0){
         en.atkCd = CFG.enemy.attackCd;
-        hurtPlayer(en.faction.dmg, en.faction.name);
+        var solHit=null, sd=CFG.enemy.attackR;
+        s.entities.forEach(function(o){
+          if(o.type!==T.ENEMY || !o.isSoldier || o.dead) return;
+          var d=U.dst(en.x,en.y,o.x,o.y);
+          if(d<sd){ sd=d; solHit=o; }
+        });
+        if(solHit){
+          solHit.hp -= en.faction.dmg;
+          solHit.hitFlash=0.1;
+          if(solHit.hp<=0) solHit.dead=true;
+        }else if(U.dst(en.x,en.y,s.px,s.py) < CFG.enemy.attackR){
+          hurtPlayer(en.faction.dmg, en.faction.name);
+        }else if(s.scene==='home' && strikeResident(en, s)){
+          /* 打伤殖民者, 不致死 */
+        }else if(focus.kind==='building' && focus.b){
+          var loot=raidPillage(s.meta, focus.b);
+          if((loot.food||loot.mineral||loot.med) && window.APH.UI && APH.UI.floatText){
+            var bits=[];
+            if(loot.food) bits.push('粮-'+loot.food);
+            if(loot.mineral) bits.push('矿-'+loot.mineral);
+            if(loot.med) bits.push('药-'+loot.med);
+            APH.UI.floatText('⚠ 被抢 '+bits.join(' '),'#ff9a9a');
+          }
+        }
         U.emit('enemyMelee', en);
       }
 
@@ -1648,8 +2579,8 @@ APH.Combat = (function(){
       en.y = U.clamp(en.y, 30, CFG.WORLD-30);
       en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
 
-      /* 太远回收 */
-      if(dist > CFG.enemy.despawnR){ en.dead = true; }
+      /* 太远回收(家园袭击不按离玩家距离清波) */
+      if(U.dst(en.x,en.y,s.px,s.py) > CFG.enemy.despawnR && s.scene !== 'home'){ en.dead = true; }
     });
 
     /* ---- 玩家弹丸 ---- */
@@ -1681,7 +2612,7 @@ APH.Combat = (function(){
             if(en.hp<=0){ raidBaseSuccess(en); }
             break;
           }
-          if(en.type !== T.ENEMY || en.dead) continue;
+          if(en.type !== T.ENEMY || en.dead || en.isSoldier) continue;
           var r = 14 * en.faction.gene.size * (en.isBoss?1.9:1);
           if(segDist(segX0,segY0,p.x,p.y,en.x,en.y) < r){
             p.dead = true;
@@ -1696,6 +2627,17 @@ APH.Combat = (function(){
         if(segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
           p.dead = true;
           hurtPlayer(p.dmg, '酸液');
+        }else{
+          for(var si=0; si<s.entities.length; si++){
+            var sol=s.entities[si];
+            if(!sol.isSoldier || sol.dead) continue;
+            if(segDist(segX0,segY0,p.x,p.y,sol.x,sol.y) < 16){
+              p.dead=true;
+              sol.hp-=p.dmg;
+              if(sol.hp<=0) sol.dead=true;
+              break;
+            }
+          }
         }
       }
     });
@@ -1714,6 +2656,49 @@ APH.Combat = (function(){
   }
   var pid = 0;
 
+  function spawnDrop(x, y, itemId, n, extra){
+    var s = APH.state;
+    if(!s || !s.entities || !itemId || !n) return null;
+    extra = extra || {};
+    var H = CFG.haul || {};
+    var stackR = extra.stackR != null ? extra.stackR : (H.stackR || 44);
+    var jitter = extra.jitter != null ? extra.jitter : 16;
+    var found = null;
+    if(extra.merge !== false){
+      for(var i=0;i<s.entities.length;i++){
+        var e=s.entities[i];
+        if(!e || e.dead || e.type!==T.DROPPED || e.itemId!==itemId) continue;
+        if(U.dst(e.x,e.y,x,y)<stackR){ found=e; break; }
+      }
+    }
+    if(found){ found.n=(found.n||1)+n; return found; }
+    var drop={
+      id:'dp_'+(++pid), type:T.DROPPED,
+      x:x+(Math.random()*2-1)*jitter, y:y+(Math.random()*2-1)*jitter*0.7,
+      itemId:itemId, n:n, bobA:Math.random()*6.28,
+      stock: s.scene==='home' || !!extra.stock
+    };
+    s.entities.push(drop);
+    return drop;
+  }
+
+  function stealNearbyDrop(en, s){
+    var H=CFG.haul||{};
+    var r=H.stealR!=null?H.stealR:28;
+    var best=null, bd=r;
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.type!==T.DROPPED) return;
+      var d=U.dst(en.x,en.y,e.x,e.y);
+      if(d<bd){ bd=d; best=e; }
+    });
+    if(!best) return false;
+    best.dead=true;
+    var it=(CFG.items&&CFG.items[best.itemId])||{};
+    if(window.APH.UI && APH.UI.floatText)
+      APH.UI.floatText('⚠ 地上被抢走 '+(it.name||best.itemId)+'×'+(best.n||1),'#ff9a9a');
+    return true;
+  }
+
   /* ---------- Task4: 炮塔/士兵(纯函数部分) ---------- */
   function turretDamage(lv){ return CFG.turret.dmgBase + CFG.turret.dmgPerLv*((lv||1)-1); }
   function soldierCount(barracks){
@@ -1725,7 +2710,7 @@ APH.Combat = (function(){
     if(turret.cd>0) return false;
     var best=null,bd=CFG.turret.range;
     enemies.forEach(function(en){
-      if(en.dead) return;
+      if(en.dead || en.isSoldier) return;
       var d=U.dst(turret.x,turret.y,en.x,en.y);
       if(d<bd){bd=d;best=en;}
     });
@@ -1753,15 +2738,10 @@ APH.Combat = (function(){
                     life:U.rr(.4,.9), max:.9, hue:en.faction.gene.hue});
     for(var li=0;li<lootCount;li++){
       var loot = rollLoot(rng);
-      s.entities.push({
-        id:'dp_'+(++pid), type:T.DROPPED,
-        x:en.x+U.rr(-26,26), y:en.y+U.rr(-18,18),
-        itemId:loot.id, n:(en.isBoss?loot.n+1:loot.n), bobA:U.rr(0,U.TAU),
-      });
+      spawnDrop(en.x, en.y, loot.id, en.isBoss?loot.n+1:loot.n, {jitter:22, merge:false});
     }
     if(en.isBoss){
-      s.entities.push({ id:'dp_'+(++pid), type:T.DROPPED,
-        x:en.x, y:en.y-10, itemId:'it_relic', n:1, bobA:0 });
+      spawnDrop(en.x, en.y-10, 'it_relic', 1, {jitter:4, merge:false});
     }
     U.emit('enemyKilled', { en:en, loot:loot });
   }
@@ -1771,21 +2751,63 @@ APH.Combat = (function(){
     base.dead=true;
     var s=APH.state;
     s.war.raids++;
-    try{ localStorage.setItem('aphelion_war_v1',
-      JSON.stringify({wins:s.war.wins||0,raids:s.war.raids})); }catch(e){}
+    if(s.meta){
+      s.meta.war = s.meta.war || {wins:0, raids:0};
+      s.meta.war.raids = s.war.raids;
+      s.meta.war.wins = s.war.wins||0;
+      if(window.APH.Save) APH.Save.saveMeta(s.meta);
+    }
     /* 大量战利品撒落 */
     for(var i=0;i<6;i++){
       var loot=rollLoot(U.makeRng((Date.now()+i*77)&0xffff));
-      s.entities.push({ id:'dp_rb'+i, type:T.DROPPED,
-        x:base.x+(Math.random()*120-60), y:base.y+(Math.random()*90-45),
-        itemId:loot.id, n:loot.n, bobA:Math.random()*U.TAU });
+      spawnDrop(base.x, base.y, loot.id, loot.n, {jitter:60, merge:false});
     }
-    /* 高价值保底 */
-    s.entities.push({ id:'dp_relic', type:T.DROPPED,
-      x:base.x, y:base.y, itemId:'it_relic', n:2, bobA:0 });
+    spawnDrop(base.x, base.y, 'it_relic', 2, {jitter:8, merge:false});
     s.shake=1;
     if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
     U.emit('raidSuccess',{ rivalId:base.rivalId });
+  }
+
+  /* ---- 家园医疗舱回血(纯函数): 无舱不回血; 靠近才缓慢回; 氧气始终补 ---- */
+  function homeRegen(hp, o2, dt, clinicDist){
+    var P=CFG.player;
+    var o2n=Math.min(P.o2Max, o2+dt*(P.o2HomeRefill!=null?P.o2HomeRefill:10));
+    var hpn=hp;
+    var r=P.clinicHealR!=null?P.clinicHealR:80;
+    var rate=P.healAtClinic!=null?P.healAtClinic:4;
+    if(clinicDist!=null && clinicDist<r)
+      hpn=Math.min(P.hpMax, hp+dt*rate);
+    return { hp:hpn, o2:o2n };
+  }
+
+  /* 袭击近战打伤最近的殖民者; 无敌帧内跳过; 找不到名册则当没打中 */
+  function strikeResident(en, s){
+    var R=window.APH.Res;
+    if(!R || !R.hurtResident) return false;
+    var C=CFG.residents||{};
+    var iframe=C.raidIFrame!=null?C.raidIFrame:0.8;
+    var wound=C.raidWound!=null?C.raidWound:18;
+    var best=null, bd=CFG.enemy.attackR;
+    (s.entities||[]).forEach(function(o){
+      if(!o || o.dead || o.type!==T.RESIDENT) return;
+      if((o.hurtCd||0)>0) return;
+      var d=U.dst(en.x,en.y,o.x,o.y);
+      if(d<bd){ bd=d; best=o; }
+    });
+    if(!best) return false;
+    var roster=(s.meta&&s.meta.residents)||[];
+    var rec=null;
+    for(var i=0;i<roster.length;i++){
+      if(roster[i].id===best.rid || roster[i].id===best.id){ rec=roster[i]; break; }
+    }
+    if(!rec) return false;
+    R.hurtResident(rec, wound);
+    best.illness=rec.illness; best.mood=rec.mood;
+    best.hurtCd=iframe; best.hitFlash=0.12;
+    if(window.APH.UI && APH.UI.floatText)
+      APH.UI.floatText((rec.name||'居民')+' 受伤','#ff9a9a');
+    U.emit('residentHurt', { id:rec.id, illness:rec.illness });
+    return true;
   }
 
   /* ---- 玩家受伤(含无敌帧) ---- */
@@ -1797,6 +2819,13 @@ APH.Combat = (function(){
     s.shake = Math.min(1, s.shake+.35);
     s.hurtFlash = 0.35;
     U.emit('playerHurt', { dmg:dmg, source:source });
+    if(s.hp <= 0 && (s.clinicKit||0)>0){
+      s.clinicKit--;
+      s.hp = Math.min(CFG.player.hpMax, (CFG.economy&&CFG.economy.clinicHeal)||40);
+      s.iFrameT = 0.8;
+      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✚ 医疗舱急救 +'+s.hp,'#7dffab');
+      return;
+    }
     if(s.hp <= 0){
       s.hp = 0;
       s.mode = 'dead';
@@ -1825,27 +2854,42 @@ APH.Combat = (function(){
     return true;
   }
 
-  /* ---- 掉落物拾取 ---- */
+  /* ---- 掉落物拾取: 远征进背包; 家园进仓库(RimWorld 地上物) ---- */
   function updateDropped(dt){
     var s = APH.state;
     s.entities.forEach(function(e){
       if(e.type !== T.DROPPED || e.dead) return;
       e.bobA += dt*3;
-      if(U.dst(e.x,e.y,s.px,s.py) < 26){
-        var r = addToCarry(s.carry, e.itemId, e.n,
-          APH.Colony.carryMaxOf(s.colony&&s.colony.buildings));
-        if(r.ok){
-          e.dead = true;
-          s.carry = r.carry;
-          s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
-          U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
-          var nm = CFG.items[e.itemId].name;
-          if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
-        }else{
-          if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
+      if(U.dst(e.x,e.y,s.px,s.py) >= 26) return;
+      var it = CFG.items[e.itemId] || { name:e.itemId, w:1 };
+      if(s.scene==='home' && window.APH.Colony && APH.Colony.collectHome){
+        var got=APH.Colony.collectHome(s.meta, e.itemId, e.n||1);
+        e.dead=true;
+        if(got.kind==='stock'){
+          U.emit('lootPicked', { id:e.itemId, n:e.n, home:true });
+          if(window.APH.UI && APH.UI.floatText)
+            APH.UI.floatText('入库 +'+(got.n||e.n)+' '+(got.label||it.name),'#9fe8c8');
+        }else if(got.kind==='research'){
+          U.emit('lootPicked', { id:e.itemId, n:e.n, home:true });
+          if(window.APH.UI && APH.UI.floatText)
+            APH.UI.floatText('研究 +'+got.research+' ('+(got.label||it.name)+')','#ffe28a');
         }
+        return;
+      }
+      var r = addToCarry(s.carry, e.itemId, e.n,
+        APH.Colony.carryMaxOf(s.colony&&s.colony.buildings));
+      if(r.ok){
+        e.dead = true;
+        s.carry = r.carry;
+        s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
+        U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
+        var nm = it.name;
+        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
+      }else{
+        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
       }
     });
+    s.entities = s.entities.filter(function(e){ return e.type!==T.DROPPED || !e.dead; });
   }
 
   return {
@@ -1854,6 +2898,10 @@ APH.Combat = (function(){
     updateCombat:updateCombat, updateDropped:updateDropped,
     firePlasma:firePlasma, makeProj:makeProj,
     turretStep:turretStep, soldierCount:soldierCount, turretDamage:turretDamage,
+    settleValue:settleValue, settleGoods:settleGoods,
+    raidPillage:raidPillage, pickRaidFocus:pickRaidFocus, hurtPlayer:hurtPlayer,
+    homeRegen:homeRegen, strikeResident:strikeResident,
+    spawnDrop:spawnDrop, stealNearbyDrop:stealNearbyDrop,
   };
 })();
 
@@ -2135,29 +3183,50 @@ APH.World = (function(){
     ctx.beginPath(); ctx.arc(H.x-30,H.y-34,3.4,0,U.TAU); ctx.fill();
   }
 
-  /* 边缘罗盘：最近未扫描信标 */
+  /* 边缘罗盘：最近未扫描信标; 雷达科技加晶体/敌基地 */
   function drawCompass(){
-    var s = APH.state, best=null, bd=1e9;
+    var s = APH.state;
+    var marks=[];
+    var best=null, bd=1e9;
     s.entities.forEach(function(e){
       if(e.type!=='beacon'||e.done) return;
       var d=U.dst(e.x,e.y,s.px,s.py);
       if(d<bd){bd=d;best=e;}
     });
-    if(!best) return;
+    if(best) marks.push({e:best, col:'#ffc857', dist:bd});
+    var radar=s.meta && s.meta.tech && s.meta.tech.te_radar;
+    if(radar && s.scene==='expedition'){
+      var cBest=null, cd=1e9, rBest=null, rd=1e9;
+      s.entities.forEach(function(e){
+        if(e.type==='crystal' && !e.taken){
+          var d=U.dst(e.x,e.y,s.px,s.py);
+          if(d<cd){ cd=d; cBest=e; }
+        }
+        if(e.type==='building' && e.bid==='bl_rival_base' && !e.dead){
+          var d2=U.dst(e.x,e.y,s.px,s.py);
+          if(d2<rd){ rd=d2; rBest=e; }
+        }
+      });
+      if(cBest) marks.push({e:cBest, col:'#ff4fd8', dist:cd});
+      if(rBest) marks.push({e:rBest, col:'#ff6d7a', dist:rd});
+    }
     var VW2=innerWidth, VH2=innerHeight;
-    var sx=best.x-s.camX+VW2/2, sy=best.y-s.camY+VH2/2;
-    if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
-    var cx=U.clamp(sx,46,VW2-46), cy=U.clamp(sy,84,VH2-96);
-    var ang=Math.atan2(best.y-s.py,best.x-s.px);
-    ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
-    ctx.fillStyle='rgba(255,200,87,.9)';
-    ctx.shadowColor='#ffc857'; ctx.shadowBlur=8;
-    ctx.beginPath(); ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
-    ctx.closePath(); ctx.fill();
-    ctx.shadowBlur=0; ctx.rotate(-ang);
-    ctx.fillStyle='#ffc857'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(Math.round(bd/10)+'m',0,22);
-    ctx.restore();
+    marks.forEach(function(m, i){
+      var e=m.e;
+      var sx=e.x-s.camX+VW2/2, sy=e.y-s.camY+VH2/2;
+      if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
+      var cx=U.clamp(sx,46+i*18,VW2-46), cy=U.clamp(sy,84,VH2-96);
+      var ang=Math.atan2(e.y-s.py,e.x-s.px);
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+      ctx.fillStyle=m.col;
+      ctx.shadowColor=m.col; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur=0; ctx.rotate(-ang);
+      ctx.fillStyle=m.col; ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(Math.round(m.dist/10)+'m',0,22);
+      ctx.restore();
+    });
   }
 
   return {
@@ -2211,6 +3280,13 @@ APH.Ent = (function(){
   }
   /* 敌人个体: 阵营基因 ±5% 抖动 */
   function makeEnemy(faction, x, y){
+    if(!faction || faction.hp==null){
+      faction = (window.APH.Planet && APH.Planet.pickRaidFaction)
+        ? APH.Planet.pickRaidFaction(APH.state && APH.state.lastExpedition, (APH.state && APH.state.seed) || 1)
+        : { id:'fx_maw', name:'噬光群囊', behavior:'melee_swarm',
+            gene:{hue:285,sides:5,limbs:6,size:1.0,spikes:3,eyes:2},
+            hp:26, speed:96, dmg:8, nightBoost:1.35 };
+    }
     var jit = function(){ return 1 + (Math.random()*.1 - .05); };
     return {
       id:nid('en'), type:T.ENEMY,
@@ -2351,17 +3427,26 @@ APH.Ent = (function(){
     }
   }
 
-  /* 掉落物绘制 */
+  /* 掉落物绘制: RimWorld 式地上堆, 带名称×数量 */
   function drawDropped(e, time){
-    var bob=Math.sin(e.bobA)*2.5;
+    var it=(CFG.items&&CFG.items[e.itemId])||{};
+    var col=it.tint||'#ffdf8f';
+    var bob=Math.sin(e.bobA||0)*2.2;
     ctx.save();
     ctx.translate(e.x, e.y+bob);
-    ctx.fillStyle='rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.ellipse(0,6-bob,8,3.4,0,0,U.TAU); ctx.fill();
-    ctx.shadowColor='#ffe28a'; ctx.shadowBlur=7;
-    ctx.fillStyle='#ffdf8f';
-    ctx.rotate(time*1.4);
-    ctx.fillRect(-3.4,-3.4,6.8,6.8);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,7-bob,9,3.6,0,0,U.TAU); ctx.fill();
+    ctx.shadowColor=col; ctx.shadowBlur=6;
+    ctx.fillStyle=col;
+    ctx.fillRect(-5,-5,10,10);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle='#2a2418'; ctx.lineWidth=1.2;
+    ctx.strokeRect(-5,-5,10,10);
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle='#f7f3df';
+    ctx.font='bold 9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((it.name||'?')+'×'+(e.n||1), e.x, e.y-12+bob);
     ctx.restore();
   }
 
@@ -2499,6 +3584,7 @@ APH.Ent = (function(){
   var BLD_COLORS={
     bl_warehouse:'#b8874a', bl_mine:'#7a8aa0', bl_lab:'#59d9ff',
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
+    bl_farm:'#7a9a4a', bl_pasture:'#c8a882', bl_house:'#b8874a', bl_workshop:'#d4a574',
   };
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
@@ -2727,12 +3813,76 @@ APH.Ent = (function(){
     return APH.state.entities.find(function(e){ return e.type===T.PLAYER; });
   }
 
+  function drawResident(e,time){
+    if(!ctx) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
+    var walking=!!e.walking;
+    var bob=Math.sin((time||0)*(walking?8:2)+(e.x||0))*(walking?2.2:1.2);
+    var ill=e.illness||0;
+    var mood=e.mood!=null?e.mood:70;
+    ctx.fillStyle=ill>=50?'#6a8a62':(ill>=20?'#a8b07a':'#c8a882');
+    ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle=mood<40?'#e8c4b0':'#ffe9c4';
+    ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#6b4a32';
+    ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
+    if(ill>=20){
+      ctx.fillStyle='#ff6d7a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('✚', 11, -22+bob);
+    }
+    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
+    if((e.food||100)<eatBelow){
+      ctx.fillStyle='#c8e89a';
+      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('🍽', -11, -22+bob);
+    }
+    if(e.haulCarry && e.haulCarry.itemId){
+      var hc=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
+      ctx.fillStyle=hc.tint||'#ffdf8f';
+      ctx.fillRect(7,-8+bob,7,7);
+      ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
+      ctx.strokeRect(7,-8+bob,7,7);
+    }
+    ctx.fillStyle='#f7f3df';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'居民', 0, 16);
+    ctx.restore();
+  }
+
+  function drawVisitor(e,time){
+    if(!ctx) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle='rgba(0,0,0,.28)';
+    ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
+    var bob=Math.sin((time||0)*2.4+(e.x||0))*1.6;
+    ctx.fillStyle='#3d6a6e';
+    ctx.beginPath(); ctx.ellipse(0,-8+bob,7,9,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#c4e8e4';
+    ctx.beginPath(); ctx.arc(0,-18+bob,5.5,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#1a3a3e';
+    ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle='#794f27';
+    ctx.beginPath(); ctx.ellipse(8,-6+bob,4,5,0.3,0,U.TAU); ctx.fill();
+    ctx.fillStyle='#8fd4ff';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'过客', 0, 16);
+    ctx.fillStyle='#5d6f96';
+    ctx.font='8px sans-serif';
+    ctx.fillText('过客', 0, 26);
+    ctx.restore();
+  }
+
   /* 建筑绘制(殖民地/远征通用) */
     return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
-    drawBeacon:drawBeacon, drawPlayer:drawPlayer,
+    drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     drawBuilding:drawBuilding,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
@@ -3080,6 +4230,20 @@ APH.UI = (function(){
     }
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
+    var vEco=$('vEco');
+    if(vEco && s.meta && s.meta.res){
+      var C = window.APH.Colony;
+      var gt = (C && C.groundTally) ? C.groundTally(s.entities) : {};
+      var sh = (C && C.shortageBrief)
+        ? C.shortageBrief(s.meta, s.colony&&s.colony.buildings, gt)
+        : null;
+      var lab = (C && C.stockLabel)
+        ? function(k){ return C.stockLabel(s.meta.res, s.entities, k); }
+        : function(k){ return String((s.meta.res[k]||0)); };
+      vEco.textContent = sh
+        ? ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med')+' 闲'+sh.idle)
+        : ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med'));
+    }
     var vig = $('vig');
     vig.style.opacity = s.o2<25 ? (1-s.o2/25)*.85 : 0;
   }
@@ -3138,8 +4302,11 @@ APH.UI = (function(){
     var carryTxt='';
     if(stats.carry && Object.keys(stats.carry).length){
       var parts=[];
-      for(var k in stats.carry)
-        parts.push(CFG.items[k].name+'×'+stats.carry[k]);
+      var items=(APH.CFG && APH.CFG.items) || {};
+      for(var k in stats.carry){
+        var it=items[k];
+        parts.push(((it && it.name) || k)+'×'+stats.carry[k]);
+      }
       carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+
                '（共'+(stats.runLoot||0)+'件战利品）</span>';
     }else if(stats.runLoot>0){
@@ -3247,6 +4414,8 @@ window.APH = window.APH || {};
     s.scene='home';
     APH.Colony.buildColonyWorld(s.seed);
     APH.World.buildTerrain();
+    syncResidentEntities();
+    maybeSpawnVisitor(true);
     /* 远征战利品在出发前就已结算; 回家只做补给 */
     s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
     document.getElementById('planetTitle').textContent =
@@ -3254,10 +4423,12 @@ window.APH = window.APH || {};
     /* 新手引导(meta.tut 阶段标记, 持久化) */
     var tut=APH.state.meta.tut||0;
     var hints=[
-      '殖民地是你的家。先按 [T] 选科技、[B] 建造, 或去发射台',
-      '[E] 从发射台出发远征 · 星球上搜刮战利品',
-      '返回舱按 [E] 回家结算 · 研究点用于科技与建造',
-      '小心: AI 殖民地会袭击你。炮塔与士兵是防御的关键',
+      '这是你的家。过客会来拜访，走近按 [E] 招募。',
+      '按 [G] 盖房、[R] 名册。缺资源再去发射台。',
+      '产出会堆在地上。走近捡起，或让人搬去仓库。饿了会走去仓库或地上的粮。',
+      '[E] 从发射台出门补给 · 矿材卸在发射台地上，晶体变研究点',
+      '袭击会抢仓库和地上的东西。炮塔和士兵守家。',
+      '人会饿、会病。盖医疗舱，工坊把矿做成药。贴身医疗舱才能回血。',
     ];
     APH.UI.setHint(hints[Math.min(tut,hints.length-1)]);
     if(tut<hints.length) {
@@ -3268,7 +4439,10 @@ window.APH = window.APH || {};
   function launchExpedition(){
     var s = APH.state;
     if(s.scene==='expedition') return;
-    /* T9: 超重出发提醒(不阻止, 只提示——玩家的选择权在他手里) */
+    saveColony();
+    var sh=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+    APH.UI.floatText(sh.mission,'#ffc857');
+    /* T9: 超重出发提醒(不阻止) */
     var loadW=APH.Combat.carryWeight(s.carry);
     var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
     if(loadW > capNow*.7){
@@ -3317,6 +4491,11 @@ window.APH = window.APH || {};
         s.spores.push({x:rng()*CFG.WORLD,y:rng()*CFG.WORLD,ph:rng()*U.TAU,s:.5+rng()});
       s.o2=CFG.player.o2Max;                       // 出发时满氧
       s.found=0; s.cry=0; s.carry={};              // 远征状态清零
+      s.runLoot=0;
+      s.settledLoot=0;
+      s.landedAt=s.clock||0;
+      s.clinicKit = s.colony.buildings.some(function(b){ return b.id==='bl_clinic'; }) ? 1 : 0;
+      s.lastExpedition=p;                          // 袭击刷怪用, 不写回家园 spec
       s.spawnT=8;
       /* 着陆点的返回舱(发射台): 靠近按 E 返航 */
       s.entities.push({
@@ -3345,7 +4524,12 @@ window.APH = window.APH || {};
         p.name+' · '+p.paletteName+' (远征)';
     }
     s.scene='expedition';
-    APH.UI.setHint('已着陆 '+s.spec.name+'。目标: 6 座信标 + 战利品。');
+    APH.UI.setHint('已着陆 '+s.spec.name+'。'+sh.mission+' · 返航按 [E]');
+    var lawBits=[];
+    if(APH.Planet.hasLaw(s.spec,'lw_echo')) lawBits.push('声追者：少开枪');
+    if(APH.Planet.hasLaw(s.spec,'lw_spore_light')) lawBits.push('孢子趋光：光会开路');
+    if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
+    if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
     U.emit('launched',{});
   }
 
@@ -3353,24 +4537,36 @@ window.APH = window.APH || {};
   function returnHome(){
     var s=APH.state;
     if(s.scene!=='expedition') return;
-    /* 结算远征收益: 背包→研究点 */
-    var gained=0;
-    for(var k in s.carry) gained += CFG.items[k].v * s.carry[k];
-    s.meta.research += gained;
-    s.meta.res = s.meta.res || {};
+    /* 结算远征收益: 只在返航入账。着陆点不再自动卸货。 */
+    var goods=APH.Combat.settleGoods(s.carry);
+    s.meta.res = s.meta.res || { mineral:0, food:0, leather:0 };
+    s.meta.research += goods.research;
     s.meta.stats.scans = s.meta.stats.scans||0;
+    var gained = goods.research + goods.mineral;
     if(gained>0){
       APH.Save.saveMeta(s.meta);
-      APH.UI.floatText('远征结算 +'+gained+' 研究点','#ffe28a');
+      var bits=[];
+      if(goods.mineral) bits.push('矿材 '+goods.mineral+' 卸在地上');
+      if(goods.research) bits.push('研究点 +'+goods.research);
+      APH.UI.floatText('远征结算 '+bits.join(' / '),'#ffe28a');
+    }else if((s.runLoot||0)>0 || (s.settledLoot||0)>0){
+      /* 战利品已转化入库, 不得谎称空手而归 */
     }else{
       APH.UI.floatText('空手而归','#8fa3cc');
     }
+    if(gained>0) s.settledLoot=(s.settledLoot||0)+gained;
     var foundN=s.found, cryN=s.carry['it_crystal_ore']||0;
     s.carry={};
     enterHome();
-    U.emit('returnedHome',{ research:gained, beacons:foundN });
+    if(goods.mineral>0){
+      var pad=s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
+      var dx=pad?pad.x:CFG.HAB.x, dy=pad?(pad.y+36):(CFG.HAB.y+140);
+      APH.Combat.spawnDrop(dx, dy, 'it_mineral', goods.mineral, {jitter:22, stock:true});
+      saveColony();
+    }
+    U.emit('returnedHome',{ research:goods.research, mineral:goods.mineral, beacons:foundN });
     log('远征归来: 异常 '+foundN+'/'+s.totalBeacons+
-        (gained>0?' · 研究点 +'+gained:''));
+        (gained>0?' · 矿'+goods.mineral+' 研'+goods.research:''));
   }
   function log(t){ console.log('[aphelion]',t); }
 
@@ -3553,20 +4749,24 @@ window.APH = window.APH || {};
     if(dHab < CFG.HAB.r){
       s.o2 = Math.min(CFG.player.o2Max, s.o2 + dt*CFG.player.o2Refill);
       s.hp = Math.min(CFG.player.hpMax, s.hp + dt*CFG.player.healInHab);
-      /* 回舱自动卸货 → 研究点 */
-      var loadW = APH.Combat.carryWeight(s.carry);
-      if(loadW > 0){
-        for(var k in s.carry){
-          s.meta.research += CFG.items[k].v * s.carry[k];
-        }
-        APH.Save.saveMeta(s.meta);
-        s.carry = {};
-        U.emit('cargoSold', {});
-      }
-      APH.UI.setHint('居住舱 · 补给中 (氧气/生命/卸货)');
+      /* 着陆点只补给, 战利品等返航 returnHome 结算 */
+      APH.UI.setHint('返回舱 · 补给中 (氧气/生命)');
     }else{
       s.o2 -= dt*CFG.player.o2Drain;
       if(s.o2<25) APH.UI.setHint('⚠ 氧气 '+Math.max(0,Math.round(s.o2))+'% —— 回舱或采集粉色晶体！');
+    }
+    /* lw_night_acid: 夜间靠近湖岸腐蚀 */
+    var night=APH.World.daylight()<.5;
+    var hasAcid=APH.Planet.hasLaw(s.spec, 'lw_night_acid');
+    if(night && hasAcid){
+      var lakeR=(s.spec.terrain&&s.spec.terrain.lakeR)||CFG.LAKE.r;
+      if(U.dst(s.px,s.py,CFG.LAKE.x,CFG.LAKE.y) < lakeR+24){
+        s.acidT=(s.acidT||0)+dt;
+        if(s.acidT>=1){
+          s.acidT=0;
+          APH.Combat.hurtPlayer(4, '湖水酸化');
+        }
+      }else s.acidT=0;
     }
     if(s.o2<=0){
       s.mode='dead';
@@ -3574,7 +4774,8 @@ window.APH = window.APH || {};
       APH.state.meta.stats.deaths++;
       APH.Save.saveMeta(APH.state.meta);
       APH.UI.showDeath('生命维持系统在荒原上停转了。', {
-        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry});
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry,
+        runLoot:s.runLoot, survived:s.clock-(s.landedAt||0)});
     }
   }
 
@@ -3625,24 +4826,88 @@ window.APH = window.APH || {};
     APH.Ent.updatePlayer(dt);
     updateCamera(dt);
 
-    /* 发射台接近检测 */
+    /* 发射台 / 过客接近检测 */
     var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
     s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
-    if(s.nearPad) APH.UI.setHint('[E] 登船出发远征');
+    s.nearVisitor = nearestVisitor(s);
+    updateVisitors(dt);
+    if(s.nearVisitor){
+      var vp=s.nearVisitor.profile||s.nearVisitor;
+      var skn=APH.Res.SKILL_NAMES[vp.mainSkill]||'';
+      var ctxH=makeRecruitCtx(s.nearVisitor);
+      var intent=APH.Res.joinIntentOf(vp);
+      var tag=intent==='refugee'?'难民':(intent==='trader'?'游商':'过路客');
+      var mealCost=(CFG.recruit&&CFG.recruit.mealCost)||2;
+      var imp=Math.round(s.nearVisitor.impression!=null?s.nearVisitor.impression:50);
+      var mealBit='';
+      if(!s.nearVisitor.fed){
+        mealBit=haveStock('food')>=mealCost
+          ? '  [F] 请客(-'+mealCost+'粮)'
+          : '  [F] 没粮请客';
+      }
+      if((s.nearVisitor.askCd||0)>0){
+        APH.UI.setHint(vp.name+' 还想再看看… · 印象'+imp+mealBit);
+      }else{
+        var ch=APH.Res.joinChance(vp, ctxH);
+        var extra=ch.ok
+          ? (intent==='refugee'?' · 会留下':' · '+APH.Res.chanceLabel(ch.chance))
+          : ' — '+ch.why;
+        APH.UI.setHint((intent==='trader'?'[E] ':'[E] 招募 ')+
+          (vp.name||'过客')+' · '+tag+
+          (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
+          (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit);
+      }
+    }else if(s.nearPad && !s.war.raidActive && !(s.war.raidWarn>0)){
+      var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+      APH.UI.setHint('[E] 登船 · '+shPad.mission);
+    }else if(!s.war.raidActive && !(s.war.raidWarn>0)){
+      var hintEl=document.getElementById('hint');
+      var cur=hintEl&&hintEl.textContent||'';
+      if(cur.indexOf('[E] 登船')===0 || cur.indexOf('[E] 招募')===0)
+        APH.UI.setHint('');
+    }
 
-    /* 殖民地内缓慢回血回氧(安全区) */
-    s.o2=Math.min(CFG.player.o2Max, s.o2+dt*10);
-    s.hp=Math.min(CFG.player.hpMax, s.hp+dt*6);
+    /* 家园: 氧气始终补; 生命只在靠近医疗舱时缓慢回 */
+    var clinicB=null;
+    (s.colony.buildings||[]).forEach(function(b){ if(b.id==='bl_clinic') clinicB=b; });
+    var cDist=clinicB?U.dst(s.px,s.py,clinicB.x,clinicB.y):null;
+    var rg=APH.Combat.homeRegen(s.hp, s.o2, dt, clinicB?cDist:null);
+    s.hp=rg.hp; s.o2=rg.o2;
+    var healR=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
+    if(clinicB && cDist<healR && s.hp<CFG.player.hpMax &&
+       !s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
+      APH.UI.setHint('医疗舱 · 缓慢治疗');
+    }else if(!s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
+      var nightW=APH.World.daylight()<.5;
+      var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW);
+      if(wx.storm && !s._stormOn)
+        APH.UI.floatText('⚡ 磁暴来袭 · 实验室停摆','#c39bff');
+      if(wx.acid && !s._acidOn)
+        APH.UI.floatText('🌧 酸雨 · 农田减半','#7dffab');
+      s._stormOn=!!wx.storm; s._acidOn=!!wx.acid;
+      if(wx.storm) APH.UI.setHint('⚡ 磁暴 · 实验室停摆');
+      else if(wx.acid) APH.UI.setHint('🌧 酸雨 · 农田减半');
+    }
 
     /* 建造入口按钮显隐 */
     var bb=document.getElementById('buildBtn');
     if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
 
-    /* Task2v2: 建造队列——蓝图需玩家到场施工 */
+    /* Task2v2: 建造队列——玩家或建造岗居民走到蓝图旁才施工 */
+    updateResidents(dt);
     if(s.colony.buildQueue && s.colony.buildQueue.length){
       var bb=APH.Colony.builderBonusOf(s.meta.residents||[]);
-      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt,
-        {x:s.px,y:s.py}, bb);
+      var near=[{x:s.px,y:s.py}];
+      var builders={};
+      (s.meta.residents||[]).forEach(function(r){
+        if(!APH.Colony.isBuilder(r)) return;
+        if(r.job && r.job!=='blueprint') return;
+        builders[r.id]=true;
+      });
+      s.entities.forEach(function(en){
+        if(en.type===T.RESIDENT && builders[en.rid||en.id]) near.push({x:en.x,y:en.y});
+      });
+      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt, near, bb);
       s.colony.buildQueue=qr.queue;
       /* 施工粒子: 正在施工的蓝图冒尘 */
       s.colony.buildQueue.forEach(function(q){
@@ -3681,9 +4946,17 @@ window.APH = window.APH || {};
     s.prodT=(s.prodT||0)+dt;
     if(s.prodT>=30){
       s.prodT-=30;
-      var out=APH.Colony.productionTick(s.meta, s.colony.buildings);
+      (s.colony.buildings||[]).forEach(function(b){
+        if(b.offlineT>0) b.offlineT=Math.max(0, b.offlineT-30);
+      });
+      var nightP=APH.World.daylight()<.5;
+      var hmods=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightP);
+      var out=APH.Colony.productionTick(s.meta, s.colony.buildings, s.meta.residents||[], hmods);
+      (out.piles||[]).forEach(function(p){
+        APH.Combat.spawnDrop(p.x+16, p.y+14, p.itemId, p.n, {stock:true});
+      });
       if(out.mineral||out.research)
-        APH.UI.floatText('生产: +'+out.mineral+' 矿材 +'+out.research+' 研究点','#9fe8c8');
+        APH.UI.floatText('生产: '+(out.mineral?'矿材×'+out.mineral+'堆在地上 ':'')+(out.research?'+'+out.research+' 研究点':''),'#9fe8c8');
       /* AI殖民地同步成长(同拍) */
       tickRivals(30/60);
       residentsTick();                            // P6-U2/U4/U7
@@ -3695,9 +4968,12 @@ window.APH = window.APH || {};
       APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
       if(s.war.raidWarn<=0) startRaid();
     }else if(s.war.raidActive){
-      /* Task4: 炮塔开火(对射程内最近敌人) */
+      APH.Combat.updateCombat(dt, false);
+      /* Task4: 炮塔开火(对射程内最近敌人; 士兵是友军) */
       var raidFoes=[];
-      s.entities.forEach(function(e2){if(e2.type===T.ENEMY&&!e2.dead)raidFoes.push(e2);});
+      s.entities.forEach(function(e2){
+        if(e2.type===T.ENEMY&&!e2.dead&&!e2.isSoldier) raidFoes.push(e2);
+      });
       s.colony.buildings.forEach(function(b){
         if(b.id!=='bl_turret') return;
         var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
@@ -3714,10 +4990,12 @@ window.APH = window.APH || {};
       /* 波次刷怪(袭击敌人从地图边缘冲基地) */
       s.war.raidSpawnT=(s.war.raidSpawnT||0)-dt;
       var aliveEnemies=0;
-      s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)aliveEnemies++;});
+      s.entities.forEach(function(e){
+        if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) aliveEnemies++;
+      });
       if(aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
         s.war.raidSpawnT=.7;
-        var f=s.spec.enemies.factions[Math.floor(Math.random()*s.spec.enemies.factions.length)];
+        var f=APH.Planet.pickRaidFaction(s.lastExpedition, s.seed);
         var ang=Math.random()*U.TAU, d=Math.max(vpW(),vpH())*.62;
         var ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40),
             ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
@@ -3728,7 +5006,9 @@ window.APH = window.APH || {};
       }
       if(s.war.spawned>=s.war.wave.count){
         var left=0;
-        s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)left++;});
+        s.entities.forEach(function(e){
+          if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) left++;
+        });
         if(left===0){
           s.war.raidActive=false; s.war.wins++;
           saveWar();
@@ -3736,6 +5016,12 @@ window.APH = window.APH || {};
           U.emit('raidDefended',{});
         }
       }
+    }
+    /* 掉落拾取不绑袭击: 末波击杀当帧清 raid 后地上战利品仍能捡 */
+    APH.Combat.updateDropped(dt);
+    if(!s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
+      var shH=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+      if(shH.urgent) APH.UI.setHint(shH.text);
     }
   }
 
@@ -3770,14 +5056,19 @@ window.APH = window.APH || {};
     /* Task4: 兵营召唤驻守士兵 */
     var n=APH.Combat.soldierCount(s.colony.buildings.filter(function(b){return b.id==='bl_barracks';}));
     for(var i=0;i<n;i++){
-      var sf=s.spec.enemies.factions[0];
+      var sf=APH.Planet.pickRaidFaction(s.lastExpedition, s.seed);
       var sol=APH.Ent.makeEnemy(sf, CFG.HAB.x+U.rr(-80,80), CFG.HAB.y+U.rr(-60,60));
       sol.isSoldier=true;
       sol.hp=CFG.soldier.hp; sol.maxHp=CFG.soldier.hp;
+      sol.faction=Object.assign({}, sf, { speed:CFG.soldier.speed, dmg:CFG.soldier.dmg });
       sol.state='idle';
       s.entities.push(sol);
     }
-    if(n>0) APH.UI.floatText('🛡 '+n+' 名士兵出动','#ffc857');
+    if(n>0){
+      var eat=APH.Colony.takeStock(s.meta.res, s.entities, 'food', n).taken||0;
+      APH.UI.floatText('🛡 '+n+' 名士兵出动'+(eat?' · 口粮 -'+eat:''),'#ffc857');
+      APH.Save.saveMeta(s.meta);
+    }
     s.war.wave=s.war.pendingWave||{count:4};
     s.war.spawned=0; s.war.raidSpawnT=0;
     APH.UI.setHint('');
@@ -3804,13 +5095,18 @@ window.APH = window.APH || {};
   }
   function saveWar(){
     var s=APH.state;
-    try{ localStorage.setItem('aphelion_war_v1',
-      JSON.stringify({wins:s.war.wins,raids:s.war.raids})); }catch(e){}
+    s.meta.war = s.meta.war || {wins:0, raids:0};
+    s.meta.war.wins = s.war.wins||0;
+    s.meta.war.raids = s.war.raids||0;
+    try{ APH.Save.saveMeta(s.meta); }catch(e){}
   }
   function updateExpedition(dt){
     var s=APH.state;
     var night=APH.World.daylight()<.5;
     APH.Ent.updatePlayer(dt);
+    if(APH.Planet.hasLaw(s.spec,'lw_spore_light')){
+      (s.spores||[]).forEach(function(sp){ APH.Planet.sporeNudge(sp, s.px, s.py, dt); });
+    }
     updatePickups(dt);
     updateInteraction(dt);
     updateSpawner(dt, night);
@@ -3855,7 +5151,9 @@ window.APH = window.APH || {};
   function guardTrim(entities, px, py, cap){
     if(entities.length<=cap) return [];
     var expendable=entities.filter(function(e){
-      return e.type===T.DROPPED||e.type===T.ENEMY;
+      if(e.type===T.ENEMY) return true;
+      if(e.type===T.DROPPED && !e.stock) return true;
+      return false;
     });
     expendable.sort(function(a,b){
       return U.dst(b.x,b.y,px,py)-U.dst(a.x,a.y,px,py);
@@ -3866,13 +5164,13 @@ window.APH = window.APH || {};
   }
 
   /* ================= 主循环 ================= */
-  var lastT=performance.now(), tickN=0;
+  var lastT=performance.now(), tickN=0, frameErrors=0;
   function frame(now){
     try{
       _frameBody(now);
     }catch(err){
       /* 帧异常自愈: 记录并继续下一帧(防一条坏帧杀死整个rAF链) */
-      frameErrors=(frameErrors||0)+1;
+      frameErrors++;
       console.error('[frame]',frameErrors,err.message,err.stack&&err.stack.split('\n')[1]);
       if(frameErrors>200){ throw err; }   // 死循环保护
       lastT=now;                          // 重置时钟防dt爆冲
@@ -3881,6 +5179,7 @@ window.APH = window.APH || {};
   function _frameBody(now){
     requestAnimationFrame(frame);
     tickN++;
+    var s=APH.state;
     if(tickN%30===0){
       var dx=Math.round(s.px-s.camX), dy=Math.round(s.py-s.camY);
       document.title='▶帧'+tickN+' Δ('+dx+','+dy+') vw'+innerWidth+
@@ -3889,7 +5188,6 @@ window.APH = window.APH || {};
     perfGuard(now-lastT);
     var dt=Math.min(.05,(now-lastT)/1000); lastT=now;
 
-    var s=APH.state;
     if(s.mode!=='running'){ return; }
 
     /* 实体上限护栏 */
@@ -3999,7 +5297,7 @@ window.APH = window.APH || {};
 
   function drawTutorialArrow(time){
     var s=APH.state;
-    if((s.meta.tut||0)>=4 || s.scene!=='home') return;
+    if((s.meta.tut||0)<2 || (s.meta.tut||0)>=4 || s.scene!=='home') return;
     var pad=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
     if(!pad) return;
     var ctx2=document.getElementById('cv').getContext('2d');
@@ -4027,11 +5325,13 @@ window.APH = window.APH || {};
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){},
-      enemy:function(e,t){},
-      projectile:function(e,t){},
-      dropped:function(e,t){},
+      enemy:function(e,t){ APH.Ent.drawEnemy(e,t); },
+      projectile:function(e,t){ APH.Ent.drawProj(e,t); },
+      dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
       blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      resident:function(e,t){ APH.Ent.drawResident(e,t); },
+      visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -4048,7 +5348,7 @@ window.APH = window.APH || {};
     if(t.effect.dmgMul){ CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*lv)); }
     if(t.effect.spdMul){ P.walkSpeed=Math.round(150*(1+t.effect.spdMul*lv));
                          P.runSpeed=Math.round(235*(1+t.effect.spdMul*lv)); }
-    if(t.effect.radar){ /* Phase3b: 罗盘全显 */ }
+    /* te_radar: 罗盘/农产倍率在绘制与 farmTick 读取 meta.tech, 无需改全局 */
   }
   function applyAllTech(meta){
     Object.keys(APH.Colony.TECHS).forEach(function(id){ applyTech(meta,id); });
@@ -4069,10 +5369,18 @@ window.APH = window.APH || {};
     var occupied=s.colony.buildings.concat((s.colony.buildQueue||[]).map(function(q){
       return {id:q.bid,x:q.x,y:q.y};
     }));
-    var check=APH.Colony.canPlace(occupied, s.meta.research, bid, gx, gy);
+    var check=APH.Colony.canPlace(occupied, s.meta.research, bid, gx, gy, haveStock('mineral'));
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
-    if(s.meta.research<def.cost*mul){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
+    var effMin=Math.max(0, Math.round((def.costMineral||0)*mul));
+    if(s.meta.research<effCost){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
+    s.meta.res = s.meta.res || { mineral:0, food:0, leather:0 };
+    if(effMin>0){
+      if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'mineral', effMin)){
+        APH.UI.floatText('✕ 矿材不足','#ff9a9a'); return;
+      }
+      s.meta.res.mineral=(s.meta.res.mineral||0)-effMin;
+    }
     s.meta.research-=effCost;
     /* Task2: 进入建造队列(工期), 完工后由 updateHome 放置实体 */
     s.colony.buildQueue = s.colony.buildQueue||[];
@@ -4089,6 +5397,9 @@ window.APH = window.APH || {};
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
   }
   function saveColony(){
+    var s=APH.state;
+    if(s.colony && window.APH.Colony && APH.Colony.serializeGround)
+      s.colony.ground=APH.Colony.serializeGround(s.entities);
     try{ localStorage.setItem('aphelion_colony_v1',
       JSON.stringify(APH.state.colony)); }catch(e){}
   }
@@ -4097,11 +5408,12 @@ window.APH = window.APH || {};
       var v=JSON.parse(localStorage.getItem('aphelion_colony_v1')||'null');
       if(v && Array.isArray(v.buildings)){
         v.buildQueue=v.buildQueue||[];
+        v.ground=v.ground||[];
         v.buildings.forEach(function(b){ b.lv=b.lv||1; });
         return v;
       }
     }catch(e){}
-    return { buildings:[], builtAt:Date.now() };
+    return { buildings:[], builtAt:Date.now(), ground:[] };
   }
 
   /* ================= 输入 ================= */
@@ -4113,7 +5425,9 @@ window.APH = window.APH || {};
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
       /* E=发射台交互: 不在发射台时自动走过去(再次按E触发) */
       if(e.code==='KeyE'&&s.mode==='running'){
-        if(s.nearPad){
+        if(s.scene==='home' && s.nearVisitor){
+          tryRecruit(s.nearVisitor);
+        }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
           else if(s.scene==='expedition') returnHome();
         }else{
@@ -4125,19 +5439,37 @@ window.APH = window.APH || {};
           }
         }
       }
+      if(e.code==='KeyF'&&s.mode==='running'&&s.scene==='home'&&s.nearVisitor){
+        tryOfferMeal(s.nearVisitor);
+      }
       /* 调试热键(自动化验证协议, 仅 ?autostart=1 / ?debugkeys=1 通道生效——
          曾与正式键位冲突: 按G开建造面板的同时被传送600px):
          T=传送到最近未扫描信标并启动真实扫描管线
          G=向东传送600px, 触发舱外耗氧路径
          K=在视野边缘生成一只敌人(战斗管线验证) */
-      if(e.code==='KeyJ' && s.mode==='running'){ APH.Combat.firePlasma(); }
+      if(e.code==='KeyJ' && s.mode==='running'){
+        var rp=document.getElementById('resPanel');
+        if(rp && rp.style.display!=='none'){ /* 名册打开时 J 不射击 */ }
+        else APH.Combat.firePlasma();
+      }
+      if(e.code==='KeyP'&&s.mode==='running'&&s.scene==='home'){
+        cycleSelectedJob();
+      }
+      if(s.mode==='running'&&s.scene==='home' && /^Digit[1-9]$/.test(e.code)){
+        var rp2=document.getElementById('resPanel');
+        if(rp2 && rp2.style.display!=='none'){
+          s.resSel=parseInt(e.code.slice(5),10)-1;
+          renderResPanel();
+        }
+      }
       /* B=建造模式(仅殖民地): 循环选择建筑, 点地放置, 右键/Esc取消 */
       if(e.code==='KeyB'&&s.mode==='running'&&s.scene==='home'){
         var ids=Object.keys(APH.Colony.list()).filter(function(id){return id!=='bl_landing_pad';});
         var cur=ids.indexOf(s.buildMode);
         s.buildMode = ids[(cur+1) % (ids.length+1)] || null;
         APH.UI.setHint(s.buildMode
-          ? '建造: '+APH.Colony.get(s.buildMode).name+' · 点击空地放置 ('+APH.Colony.get(s.buildMode).cost+'研究点)'
+          ? '建造: '+APH.Colony.get(s.buildMode).name+' · 点击空地放置 ('+
+            APH.Colony.get(s.buildMode).cost+'研 / '+(APH.Colony.get(s.buildMode).costMineral||0)+'矿)'
           : '建造模式关闭');
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
@@ -4156,11 +5488,13 @@ window.APH = window.APH || {};
         if(!best){ APH.UI.floatText('附近没有可升级的建筑','#8fa3cc'); }
         else{
           var def2=APH.Colony.get(best.id);
-          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research,
-            s.meta.res&&s.meta.res.leather);
+          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research, haveStock('leather'));
           if(r3.ok){
-            if(r3.costRes==='leather') s.meta.res.leather-=r3.cost;
-            else s.meta.research-=r3.cost;
+            if(r3.costRes==='leather'){
+              if(!APH.Colony.takeStock(s.meta.res, s.entities, 'leather', r3.cost).ok){
+                APH.UI.floatText('✕ 皮革不足','#ff9a9a'); return;
+              }
+            }else s.meta.research-=r3.cost;
             best.lv=(best.lv||1)+1;
             /* 同步实体lv: 炮塔伤害/等级徽点读实体, 不同步则升级当场不生效 */
             s.entities.forEach(function(en){
@@ -4187,13 +5521,15 @@ window.APH = window.APH || {};
         else{
           var def3=APH.Colony.get(bestX.b.id);
           var refund=APH.Colony.refundOf(def3);
+          var refundM=APH.Colony.refundMineralOf(def3);
           s.meta.research+=refund;
+          s.meta.res.mineral=(s.meta.res.mineral||0)+refundM;
           s.colony.buildings.splice(bestX.idx,1);
           s.entities=s.entities.filter(function(en){
             return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
           });
           APH.Save.saveMeta(s.meta); saveColony();
-          APH.UI.floatText('🧨 '+def3.name+' 已拆除 (+'+refund+'研究点)','#ffc857');
+          APH.UI.floatText('🧨 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)','#ffc857');
           U.emit('demolished',{id:bestX.b.id});
         }
       }
@@ -4350,6 +5686,8 @@ window.APH = window.APH || {};
       if(meta.residentSeq===undefined) meta.residentSeq=0;
       APH.state.meta=meta;
       applyAllTech(meta);
+      APH.state.war.wins=(meta.war&&meta.war.wins)||0;
+      APH.state.war.raids=(meta.war&&meta.war.raids)||0;
       APH.state.colony=loadColony();          // 殖民地布局持久化
       APH.World.initCanvas();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
@@ -4388,23 +5726,26 @@ window.APH = window.APH || {};
         }
       });
       APH.Sprites.loadAll();
-      /* 常驻诊断角标(左上小字): 相机与玩家屏幕坐标实时可见 */
-      var diag=document.createElement('div');
-      diag.id='camDiag';
-      diag.style.cssText='position:fixed;top:2px;right:4px;z-index:60;color:#4a5b7d;'+
-        'font:9px monospace;text-align:right;line-height:1.3;pointer-events:none;';
-      document.body.appendChild(diag);
-      setInterval(function(){
-        var st=APH.state;
-        var sx=Math.round(st.px-st.camX+vpW()/2),
-            sy=Math.round(st.py-st.camY+vpH()/2);
-        var mineN=0; st.entities.forEach(function(e2){if(e2.bid==='bl_mine')mineN++;});
-        diag.innerHTML='scr '+sx+','+sy+' / 视口 '+vpW()+'x'+vpH()+
-          ' / win '+innerWidth+'x'+innerHeight+
-          '<br>cam '+Math.round(st.camX)+','+Math.round(st.camY)+
-          ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征')+
-          ' 矿'+mineN+(APH.Sprites.isReady('bl_mine')?' spr✓':' spr✗');
-      },250);
+      /* 相机诊断角标: 仅 ?debugmark / ?debugkeys=1, 正式玩不挡画面 */
+      var _bootQ=(typeof location!=='undefined'&&location.search)||'';
+      if(_bootQ.indexOf('debugmark')>=0 || _bootQ.indexOf('debugkeys=1')>=0){
+        var diag=document.createElement('div');
+        diag.id='camDiag';
+        diag.style.cssText='position:fixed;top:2px;right:4px;z-index:60;color:#4a5b7d;'+
+          'font:9px monospace;text-align:right;line-height:1.3;pointer-events:none;';
+        document.body.appendChild(diag);
+        setInterval(function(){
+          var st=APH.state;
+          var sx=Math.round(st.px-st.camX+vpW()/2),
+              sy=Math.round(st.py-st.camY+vpH()/2);
+          var mineN=0; st.entities.forEach(function(e2){if(e2.bid==='bl_mine')mineN++;});
+          diag.innerHTML='scr '+sx+','+sy+' / 视口 '+vpW()+'x'+vpH()+
+            ' / win '+innerWidth+'x'+innerHeight+
+            '<br>cam '+Math.round(st.camX)+','+Math.round(st.camY)+
+            ' p '+Math.round(st.px)+','+Math.round(st.py)+' '+(st.scene==='home'?'家':'远征')+
+            ' 矿'+mineN+(APH.Sprites.isReady('bl_mine')?' spr✓':' spr✗');
+        },250);
+      }
       /* 设计支柱: 永远出生在殖民地 */
       enterHome();
       bindInput();
@@ -4577,6 +5918,10 @@ window.APH = window.APH || {};
   function renderBuildRow(){
     var s=APH.state;
     document.getElementById('brResearch').textContent='研究点 '+s.meta.research;
+    var bm=document.getElementById('brMineral');
+    if(bm) bm.textContent='矿材 '+(APH.Colony.stockLabel
+      ? APH.Colony.stockLabel(s.meta.res, s.entities, 'mineral')
+      : (s.meta.res&&s.meta.res.mineral||0));
     var qEl=document.getElementById('brQueue');
     if(s.colony.buildQueue&&s.colony.buildQueue.length){
       /* 剩余秒=工期×未完成比例(队列项无 remain 字段, 旧代码读 undefined→恒显 NaNs) */
@@ -4596,7 +5941,7 @@ window.APH = window.APH || {};
       var nBuilt=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
       var nQueued=(s.colony.buildQueue||[]).filter(function(q){return q.bid===bid;}).length;
       var n=nBuilt+nQueued;
-      var ok=s.meta.research>=def.cost && n<def.max;
+      var ok=s.meta.research>=def.cost && haveStock('mineral')>=(def.costMineral||0) && n<def.max;
       var card=document.createElement('div');
       card.style.cssText='flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:'+
         (ok?'pointer':'not-allowed')+';opacity:'+(ok?1:.45)+';background:'+colors[i%colors.length]+
@@ -4604,7 +5949,9 @@ window.APH = window.APH || {};
       card.innerHTML='<b style="color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(61,52,40,.35)">'+
         def.name+'</b><span style="float:right;color:#fff;font-size:10px">'+n+'/'+def.max+'</span><br>'+
         '<span style="display:inline-block;background:#f7f3df;color:#794f27;border-radius:50px;'+
-        'padding:1px 9px;font-size:11px;font-weight:700;margin-top:4px">'+def.cost+'点</span>'+
+        'padding:1px 9px;font-size:11px;font-weight:700;margin-top:4px">'+def.cost+'研</span>'+
+        '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;'+
+        'padding:1px 9px;font-size:11px;margin-left:4px">'+(def.costMineral||0)+'矿</span>'+
         '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
         'padding:1px 9px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>'+
         ((def.cells&&def.cells[0]>1)?'<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;'+
@@ -4638,35 +5985,48 @@ window.APH = window.APH || {};
     var col=f>=60?'#7dffab':(f>=35?'#ffc857':'#ff6d7a');
     return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;'+
            'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
-           f+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f);
+           Math.max(0,Math.min(100,f))+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f||0);
+  }
+  function sickBar(f){
+    f=f||0;
+    var col=f>=50?'#ff6d7a':(f>=20?'#ffc857':'#7dffab');
+    return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;'+
+           'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
+           Math.max(0,Math.min(100,f))+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f);
   }
   function renderResPanel(){
     var s=APH.state, m=s.meta;
     var body=document.getElementById('resBody'); if(!body) return;
-    document.getElementById('resFood').textContent=m.res.food||0;
-    document.getElementById('resLeather').textContent=m.res.leather||0;
+    document.getElementById('resFood').textContent=panelStock('food');
+    var rm=document.getElementById('resMineral');
+    if(rm) rm.textContent=panelStock('mineral');
+    document.getElementById('resLeather').textContent=panelStock('leather');
+    var rmd=document.getElementById('resMed');
+    if(rmd) rmd.textContent=panelStock('med');
     document.getElementById('resPop').textContent=m.residents.length+'/'+housingCap();
     if(!m.residents.length){
       body.innerHTML='<div style="color:#39435c;margin-top:40px;text-align:center">'+
-        '殖民地还没有居民。<br>保持空住宅位，旅人会循着灯光而来。</div>';
+        '殖民地还没有居民。<br>过客会来拜访家园，走近他们按 [E] 招募。</div>';
       return;
     }
     var html='';
-    m.residents.forEach(function(r){
-      var skHtml = Res.SKILLS.map(function(sk){
-        var v=r.skills[sk];
+    m.residents.forEach(function(r, idx){
+      var skHtml = APH.Res.SKILLS.map(function(sk){
+        var v=(r.skills&&r.skills[sk])||0;
         var col = sk===r.mainSkill?'#ffc857':(sk===r.subSkill?'#8fd4ff':'#39435c');
-        return '<span style="color:'+col+'">'+Res.SKILL_NAMES[sk]+v+'</span>';
+        return '<span style="color:'+col+'">'+APH.Res.SKILL_NAMES[sk]+v+'</span>';
       }).join(' · ');
-      var jobTxt=r.job?APH.Colony.get(r.job).name:(r.mainSkill==='sk_farm'?'待岗(适合务农)':'闲居');
-      html+='<div style="border:1px solid #1a2334;border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#0c1220">'+
-        '<b style="font-size:13px">'+r.name+'</b>'+
+      var jobTxt=r.job?(APH.Colony.get(r.job)||{}).name||r.job:(r.mainSkill==='sk_farm'?'待岗(适合务农)':'闲居');
+      var sel=(s.resSel||0)===idx;
+      html+='<div style="border:1px solid '+(sel?'#ffc857':'#1a2334')+';border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#0c1220">'+
+        '<b style="font-size:13px">'+(idx+1)+'. '+r.name+'</b>'+
         ' <span style="color:#8fa3cc;font-size:11px">'+moodFace(r.mood)+' '+r.trait+
         ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
          :' · '+jobTxt)+'</span><br>'+
         '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
         (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
         '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
+        '&nbsp;&nbsp;病情 '+sickBar(r.illness||0)+
         '</div>';
     });
     /* 关系摘要 */
@@ -4686,36 +6046,418 @@ window.APH = window.APH || {};
     body.innerHTML=html;
   }
 
+  function cycleSelectedJob(){
+    var s=APH.state, m=s.meta;
+    if(!m.residents||!m.residents.length) return;
+    s.resSel=Math.max(0, Math.min(s.resSel||0, m.residents.length-1));
+    var r=m.residents[s.resSel];
+    var job=APH.Colony.cycleJob(r, s.colony.buildings);
+    var nm=job?(APH.Colony.get(job)||{}).name:'闲居';
+    APH.UI.floatText(r.name+' → '+nm,'#8fd4ff');
+    APH.Save.saveMeta(m);
+    syncResidentEntities();
+    var el=document.getElementById('resPanel');
+    if(el && el.style.display!=='none') renderResPanel();
+  }
+
+  function homeSpot(r, i, buildings){
+    var houses=(buildings||[]).filter(function(b){ return b.id==='bl_house'; });
+    if(houses.length){
+      var h=houses[i%houses.length];
+      return { x:h.x+(i%2)*14-7, y:h.y+24 };
+    }
+    return { x:CFG.HAB.x+(i%5)*14-28, y:CFG.HAB.y+40 };
+  }
+
+  function residentSpot(r, i, buildings){
+    var q=(APH.state.colony.buildQueue)||[];
+    if((!r.job || r.job==='blueprint') && APH.Colony.isBuilder(r) && q.length){
+      var bp=q[i%q.length];
+      return { x:bp.x+12, y:bp.y+18 };
+    }
+    if(r.job){
+      var bs=buildings.filter(function(b){ return b.id===r.job; });
+      if(bs.length){
+        var b=bs[i%bs.length];
+        return { x:b.x+16+(i%3)*10, y:b.y+22 };
+      }
+    }
+    return homeSpot(r, i, buildings);
+  }
+
+  function syncResidentEntities(){
+    var s=APH.state;
+    if(s.scene!=='home') return;
+    var buildings=s.colony.buildings||[];
+    var roster=s.meta.residents||[];
+    var byId={};
+    s.entities.forEach(function(e){
+      if(e && e.type===T.RESIDENT) byId[e.rid||e.id]=e;
+    });
+    var keep={};
+    var raid=!!(s.war&&s.war.raidActive);
+    roster.forEach(function(r,i){
+      var home=homeSpot(r,i,buildings);
+      var job=residentSpot(r,i,buildings);
+      var tgt=raid?home:job;
+      var e=byId[r.id];
+      if(!e){
+        e={
+          id:r.id, type:T.RESIDENT, x:home.x, y:home.y,
+          name:r.name, rid:r.id, job:r.job, mood:r.mood, food:r.food,
+          illness:r.illness||0, walking:false,
+        };
+        s.entities.push(e);
+      }else{
+        e.name=r.name; e.job=r.job; e.mood=r.mood; e.food=r.food; e.illness=r.illness||0;
+      }
+      e.tx=tgt.x; e.ty=tgt.y;
+      keep[r.id]=true;
+    });
+    s.entities=s.entities.filter(function(e){
+      return e.type!==T.RESIDENT || keep[e.rid||e.id];
+    });
+  }
+
+  function dropStore(d){
+    var it=(CFG.items&&d&&CFG.items[d.itemId])||{};
+    return it.store||null;
+  }
+  function nearestDrop(from, r, pred){
+    var s=APH.state, best=null, bd=r;
+    (s.entities||[]).forEach(function(d){
+      if(!d || d.dead || d.type!==T.DROPPED) return;
+      if(pred && !pred(d)) return;
+      var dist=U.dst(from.x,from.y,d.x,d.y);
+      if(dist<bd){ bd=dist; best=d; }
+    });
+    return best;
+  }
+  function nibblePile(drop, n){
+    var take=Math.min(drop.n||1, n||1);
+    drop.n=(drop.n||1)-take;
+    if((drop.n||0)<=0) drop.dead=true;
+    return take;
+  }
+  function residentOf(e){
+    var id=e&&(e.rid||e.id);
+    var list=(APH.state.meta&&APH.state.meta.residents)||[];
+    for(var i=0;i<list.length;i++) if(list[i].id===id) return list[i];
+    return null;
+  }
+  function nearestMeal(e, rMax){
+    var s=APH.state, best=null, bd=rMax;
+    if((s.meta.res&&s.meta.res.food||0)>0){
+      var st=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+      var d=U.dst(e.x,e.y,st.x,st.y);
+      if(d<bd){ bd=d; best={ kind:'stock', x:st.x, y:st.y }; }
+    }
+    (s.entities||[]).forEach(function(p){
+      if(!p || p.dead || p.type!==T.DROPPED) return;
+      if(dropStore(p)!=='food') return;
+      var dist=U.dst(e.x,e.y,p.x,p.y);
+      if(dist<bd){ bd=dist; best={ kind:'pile', drop:p, x:p.x, y:p.y }; }
+    });
+    return best;
+  }
+  function tryEatHere(e, r, grabR, dumpR){
+    if(!r || !APH.Res.eatOnce) return false;
+    if(e.haulCarry && dropStore({itemId:e.haulCarry.itemId})==='food'){
+      if(!APH.Res.eatOnce(r)) return false;
+      e.haulCarry.n=(e.haulCarry.n||1)-1;
+      if((e.haulCarry.n||0)<=0) e.haulCarry=null;
+      APH.UI.floatText((e.name||'居民')+' 吃了手里的食物','#c8e89a');
+      e.food=r.food;
+      return true;
+    }
+    var meal=nearestMeal(e, 1e9);
+    if(!meal) return false;
+    var need=meal.kind==='stock'?dumpR:grabR;
+    if(U.dst(e.x,e.y,meal.x,meal.y)>=need) return false;
+    if(meal.kind==='stock'){
+      if((APH.state.meta.res.food||0)<=0) return false;
+      if(!APH.Res.eatOnce(r)) return false;
+      APH.state.meta.res.food--;
+      APH.UI.floatText((e.name||'居民')+' 在仓库吃了口粮','#c8e89a');
+    }else{
+      if(!meal.drop || meal.drop.dead) return false;
+      if(!APH.Res.eatOnce(r)) return false;
+      nibblePile(meal.drop, 1);
+      APH.UI.floatText((e.name||'居民')+' 吃了地上的食物','#c8e89a');
+    }
+    e.food=r.food;
+    return true;
+  }
+
+  function updateResidents(dt){
+    var s=APH.state;
+    if(s.scene!=='home') return;
+    syncResidentEntities();
+    var spd=(CFG.walk&&CFG.walk.speed)||56;
+    var H=CFG.haul||{};
+    var pickR=H.pickR!=null?H.pickR:52;
+    var seekR=H.seekR!=null?H.seekR:420;
+    var grabR=H.grabR!=null?H.grabR:18;
+    var dumpR=H.dumpR!=null?H.dumpR:36;
+    var raid=!!(s.war&&s.war.raidActive);
+    var stock=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
+    s.entities.forEach(function(e){
+      if(!e || e.type!==T.RESIDENT) return;
+      e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
+      if(e.hitFlash>0) e.hitFlash=Math.max(0,e.hitFlash-dt);
+      var r=residentOf(e);
+      var hungry=r && r.food!=null && r.food<eatBelow;
+      if(!raid && hungry){
+        if(!tryEatHere(e, r, grabR, dumpR) && r.food<eatBelow){
+          var meal=nearestMeal(e, seekR);
+          if(meal){ e.tx=meal.x; e.ty=meal.y; }
+        }
+      }else if(!raid){
+        if(e.haulCarry && e.haulCarry.itemId){
+          e.tx=stock.x; e.ty=stock.y;
+          if(U.dst(e.x,e.y,stock.x,stock.y)<dumpR){
+            APH.Colony.collectHome(s.meta, e.haulCarry.itemId, e.haulCarry.n||1);
+            var it=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
+            APH.UI.floatText((e.name||'居民')+' 入库 '+(it.name||'')+'×'+(e.haulCarry.n||1),'#9fe8c8');
+            e.haulCarry=null;
+          }
+        }else{
+          var reach=e.job?pickR:seekR;
+          var drop=nearestDrop(e, reach);
+          if(drop){
+            e.tx=drop.x; e.ty=drop.y;
+            if(U.dst(e.x,e.y,drop.x,drop.y)<grabR){
+              e.haulCarry={ itemId:drop.itemId, n:drop.n||1 };
+              drop.dead=true;
+            }
+          }
+        }
+      }
+      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd);
+    });
+  }
+
+  function visitorCount(){
+    var n=0;
+    (APH.state.entities||[]).forEach(function(e){
+      if(e && e.type===T.VISITOR && !e.dead) n++;
+    });
+    return n;
+  }
+  function nearestVisitor(s){
+    var r=(CFG.visitor && CFG.visitor.recruitR)||54;
+    var best=null, bd=r;
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.type!==T.VISITOR || e.dead) return;
+      var d=U.dst(s.px,s.py,e.x,e.y);
+      if(d<bd){ bd=d; best=e; }
+    });
+    return best;
+  }
+  function spawnVisitor(at, over){
+    var s=APH.state;
+    s.meta.residentSeq=(s.meta.residentSeq||0)+1;
+    var taken=(s.meta.residents||[]).map(function(x){return x.name;});
+    (s.entities||[]).forEach(function(e){
+      if(e.type===T.VISITOR && e.profile && e.profile.name) taken.push(e.profile.name);
+    });
+    var profile=APH.Res.generate('v'+s.meta.residentSeq+'_'+(Date.now()%10000),
+      ((s.seed||7)*31+s.meta.residentSeq*917)>>>0, taken);
+    if(over) Object.assign(profile, over);
+    profile.arrivedAt=s.clock||0;
+    APH.Res.enrichBio(profile);
+    var ang=Math.random()*U.TAU;
+    var rad=140+Math.random()*50;
+    var x=at&&at.x!=null ? at.x : CFG.HAB.x+Math.cos(ang)*rad;
+    var y=at&&at.y!=null ? at.y : CFG.HAB.y+Math.sin(ang)*rad;
+    y=Math.max(40, y);
+    var stay=(CFG.visitor.stayMin||50)+Math.random()*((CFG.visitor.stayMax||90)-(CFG.visitor.stayMin||50));
+    var ent={
+      id:profile.id, type:T.VISITOR, x:x, y:y,
+      name:profile.name, profile:profile,
+      wanderA:ang+Math.PI, wanderT:0.2, stayT:stay, askCd:0,
+      impression:(CFG.recruit&&CFG.recruit.impressStart)||50, fed:false,
+    };
+    s.entities.push(ent);
+    APH.UI.floatText('过客 '+profile.name+' 来拜访了','#8fd4ff');
+    U.emit('visitorArrived', profile);
+    return ent;
+  }
+  function maybeSpawnVisitor(force){
+    var s=APH.state;
+    if(s.scene!=='home') return null;
+    var max=(CFG.visitor && CFG.visitor.max)||2;
+    if(visitorCount()>=max) return null;
+    if(!force && Math.random()>(CFG.visitor.arriveChance||0.45)) return null;
+    return spawnVisitor();
+  }
+  function makeRecruitCtx(vis){
+    var s=APH.state;
+    var start=(CFG.recruit&&CFG.recruit.impressStart)||50;
+    return {
+      residentCount:(s.meta.residents||[]).length,
+      housingCap:housingCap(),
+      food:haveStock('food'),
+      buildings:(s.colony&&s.colony.buildings)||[],
+      raidActive:!!(s.war&&s.war.raidActive),
+      impression: vis && vis.impression!=null ? vis.impression : start
+    };
+  }
+  function tryOfferMeal(ent){
+    var s=APH.state;
+    if(!ent || ent.dead) return false;
+    if(ent.fed){
+      APH.UI.floatText('✕ 已经请过客吃过了','#ff9a9a');
+      return false;
+    }
+    var need=(CFG.recruit&&CFG.recruit.mealCost)||2;
+    if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'food', need)){
+      APH.UI.floatText('✕ 食物不够请客','#ff9a9a');
+      return false;
+    }
+    var r=APH.Res.offerMeal(s.meta, ent);
+    if(!r.ok){
+      APH.UI.floatText('✕ '+r.why,'#ff9a9a');
+      return false;
+    }
+    saveMetaQuiet();
+    APH.UI.floatText('🍲 请 '+ (ent.name||'过客') +' 吃了一顿 (印象'+Math.round(r.impression)+')','#c8e89a');
+    return true;
+  }
+  function tryRecruit(ent, rng){
+    var s=APH.state;
+    if(!ent || ent.dead) return false;
+    if((ent.askCd||0)>0){
+      APH.UI.floatText((ent.name||'过客')+' 还想再看看','#8fa3cc');
+      return false;
+    }
+    var profile=ent.profile||ent;
+    var ctx=makeRecruitCtx(ent);
+    var r=APH.Res.attemptRecruit(s.meta, profile, ctx, rng);
+    if(!r.ok){
+      if(r.why==='还想再看看'){
+        ent.askCd=(CFG.recruit&&CFG.recruit.askCd)||15;
+        APH.UI.floatText((profile.name||'过客')+' 还想再看看','#8fa3cc');
+      }else{
+        APH.UI.floatText('✕ '+r.why,'#ff9a9a');
+      }
+      return false;
+    }
+    ent.dead=true;
+    var sx=ent.x, sy=ent.y, rid=r.resident.id;
+    s.entities=s.entities.filter(function(e){ return e!==ent; });
+    APH.Res.enrichBio(r.resident);
+    saveMetaQuiet();
+    syncResidentEntities();
+    s.entities.forEach(function(e){
+      if(e.type===T.RESIDENT && (e.rid===rid || e.id===rid)){ e.x=sx; e.y=sy; }
+    });
+    var skName=APH.Res.SKILL_NAMES[r.resident.mainSkill];
+    APH.UI.floatText('🤝 '+r.resident.name+' 加入了殖民地'+(skName?' ('+skName+'专精)':''),'#9fe8c8');
+    var pop=(s.meta.residents||[]).length;
+    var days=pop ? Math.floor(haveStock('food')/Math.max(1,pop)) : 0;
+    if(days<3) APH.UI.floatText('⚠ 招了之后食物大约还能撑'+days+'跳','#ffc857');
+    U.emit('residentJoined', r.resident);
+    return true;
+  }
+  function updateVisitors(dt){
+    var s=APH.state;
+    if(s.scene!=='home') return;
+    var yard=(CFG.visitor && CFG.visitor.yardR)||220;
+    s.entities.forEach(function(e){
+      if(!e || e.type!==T.VISITOR || e.dead) return;
+      e.stayT=(e.stayT||0)-dt;
+      if(e.askCd>0) e.askCd=Math.max(0, e.askCd-dt);
+      if(e.stayT>0){
+        e.impression=APH.Res.tickImpression(e.impression, dt, makeRecruitCtx(e));
+      }
+      if(e.stayT<=0){
+        var dx=e.x-CFG.HAB.x, dy=e.y-CFG.HAB.y;
+        var d=Math.sqrt(dx*dx+dy*dy)||1;
+        e.x+=dx/d*90*dt; e.y+=dy/d*90*dt;
+        if(d>yard+90){
+          e.dead=true;
+          APH.UI.floatText((e.name||'过客')+' 上路了','#5d6f96');
+        }
+        return;
+      }
+      APH.Res.wanderStep(e, dt, CFG.HAB, yard);
+    });
+    s.entities=s.entities.filter(function(e){
+      return !(e.type===T.VISITOR && e.dead);
+    });
+  }
+
   /* ================= P6 居民系统 ================= */
+  function extraRes(){
+    return (APH.Colony.groundTally && APH.Colony.groundTally(APH.state.entities)) || {};
+  }
+  function haveStock(key){
+    if(APH.Colony.stockOf) return APH.Colony.stockOf(APH.state.meta.res, APH.state.entities, key);
+    return (APH.state.meta.res&&APH.state.meta.res[key])||0;
+  }
+  function panelStock(key){
+    var s=APH.state, w=(s.meta.res&&s.meta.res[key])||0;
+    var g=APH.Colony.groundCount ? APH.Colony.groundCount(s.entities, key) : 0;
+    return g>0 ? (w+' · 地'+g) : String(w);
+  }
   function housingCap(){
     return APH.Colony.housingCapacity(APH.state.colony.buildings);
   }
   function residentsTick(){
     var s=APH.state, m=s.meta;
-    /* U4 需求结算: 吃仓库食物 */
-    var hasFood=(m.res.food||0)>0;
+    /* U4 需求结算: 生产跳只掉饱食; 吃饭要走到仓库或粮堆 */
     m.residents.forEach(function(r){
-      var before=r.food;
-      APH.Res.needsTick(r, hasFood);
-      if(r.food>before && (m.res.food||0)>0){ m.res.food--; }
+      APH.Res.needsTick(r, false);
     });
-    /* U5 自动指派(简单版): 农场/牧场有空则派种植/畜牧最高的闲人 */
+    /* U5 自动指派: 农牧优先, 再诊所, 再矿/实验室; 跳过玩家锁岗 */
     autoAssign('bl_farm','sk_farm',2);
     autoAssign('bl_pasture','sk_ranch',2);
+    autoAssign('bl_clinic','sk_social',1);
+    autoAssign('bl_mine','sk_craft',1);
+    autoAssign('bl_workshop','sk_craft',1);
+    autoAssign('bl_lab','sk_lore',1);
+    var hasClinic=(s.colony.buildings||[]).some(function(b){ return b.id==='bl_clinic'; });
+    var medicSkill=0;
+    m.residents.forEach(function(r){
+      if(r.job==='bl_clinic') medicSkill=Math.max(medicSkill, (r.skills&&r.skills.sk_social)||0);
+    });
+    var tickSeed=((s.seed||7)*1009 + Math.floor(s.clock||0)*17 + (m.residentSeq||0)*13)>>>0;
+    var sickRng=U.makeRng(tickSeed);
+    m.residents.forEach(function(r){
+      APH.Res.clinicTick(r, {hasClinic:hasClinic, medicSkill:medicSkill, rng:sickRng});
+    });
+    if(hasClinic && haveStock('med')>0){
+      var sickest=null;
+      m.residents.forEach(function(r){
+        if((r.illness||0)<=0) return;
+        if(!sickest || r.illness>sickest.illness) sickest=r;
+      });
+      if(sickest){
+        APH.Res.applyMed(sickest);
+        APH.Colony.takeStock(m.res, s.entities, 'med', 1);
+        APH.UI.floatText((sickest.name||'居民')+' 用药','#7dffab');
+      }
+    }
 
     /* U3/U5 农场与岗位产出 */
     var farmers=m.residents.filter(function(r){return r.job==='bl_farm';});
     var ranchers=m.residents.filter(function(r){return r.job==='bl_pasture';});
     var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
+    var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
+    var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
     farms.forEach(function(b){
       if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
       var bestFarmer=farmers.reduce(function(acc,r){
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
       },null);
-      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?bestFarmer.skills.sk_farm:0);
+      var farmMul=((s.meta.tech&&s.meta.tech.te_radar)||0)*0.15;
+      var farmEff=bestFarmer?APH.Res.efficiency(bestFarmer):1;
+      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?(bestFarmer.skills.sk_farm||0):null, farmMul, farmEff, lawFarm);
       if(APH.Colony.harvestYield(b.plot)>0){
-        m.res.food=(m.res.food||0)+3;
-        APH.UI.floatText('🌾 农场收获 +3 食物','#c8e89a');
+        APH.Combat.spawnDrop(b.x+14, b.y+18, 'it_food', 3, {stock:true});
+        APH.UI.floatText('🌾 农场收获堆在地上','#c8e89a');
         b.plot={stage:1,t:0};
       }
     });
@@ -4725,13 +6467,36 @@ window.APH = window.APH || {};
       return (acc===null||(r.skills.sk_ranch>(acc.skills.sk_ranch||0)))?r:acc;
     },null);
     var rSk=bestRancher?(bestRancher.skills.sk_ranch||0):0;
+    var ranchEff=bestRancher?APH.Res.efficiency(bestRancher):1;
+    var ranchRng=U.makeRng(((s.seed||7)*2017 + Math.floor(s.clock||0)*31 + pastures.length)>>>0);
     pastures.forEach(function(b){
       if(b.herd===undefined) b.herd=1;           // 新牧场自带1只
-      var out=APH.Colony.ranchTick(b, rSk, m.res);
+      var out=APH.Colony.ranchTick(b, rSk, m.res, ranchRng, ranchEff);
+      if(out.foodGain>0)
+        APH.Combat.spawnDrop(b.x+12, b.y+16, 'it_food', out.foodGain, {stock:true});
       if(out.leatherGain>0)
-        APH.UI.floatText('🐑 畜牧产出 +'+out.foodGain+'肉 +'+out.leatherGain+'皮','#c8e89a');
+        APH.Combat.spawnDrop(b.x-10, b.y+18, 'it_leather', out.leatherGain, {stock:true});
+      if(out.leatherGain>0)
+        APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+'肉 +'+out.leatherGain+'皮','#c8e89a');
       else if(out.foodGain>0)
-        APH.UI.floatText('🐑 畜牧产出 +'+out.foodGain+' 食物','#c8e89a');
+        APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+' 食物','#c8e89a');
+    });
+
+    var shops=s.colony.buildings.filter(function(b){return b.id==='bl_workshop';});
+    var crafters=m.residents.filter(function(r){return r.job==='bl_workshop';});
+    shops.forEach(function(b){
+      var w=crafters.shift();
+      if(!w) return;
+      var cost=(CFG.workshop&&CFG.workshop.mineralCost!=null)?CFG.workshop.mineralCost:2;
+      if(!APH.Colony.ensureStock(m.res, s.entities, 'mineral', cost)) return;
+      var out=APH.Colony.workshopTick(w, m.res, b.lv||1);
+      if(out.med>0){
+        APH.Combat.spawnDrop(b.x+16, b.y+14, 'it_med', out.med, {stock:true});
+        APH.UI.floatText('🔧 工坊药品堆在地上 +'+out.med,'#e0b089');
+      }
+    });
+    s.entities=s.entities.filter(function(e){
+      return !(e.type===T.DROPPED && (e.dead || (e.n||0)<=0));
     });
 
     /* V1 全局专长加成 */
@@ -4742,14 +6507,15 @@ window.APH = window.APH || {};
     if(gb.moodBoost>0){
       m.residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
     }
-    /* V3 随机社交事件(有≥2居民时) */
-    if(m.residents.length>=2 && Math.random()<0.4){
-      var ia=Math.floor(Math.random()*m.residents.length);
-      var ib=(ia+1+Math.floor(Math.random()*(m.residents.length-1)))%m.residents.length;
+    /* V3 随机社交事件(有≥2居民时; seeded, ADR-5) */
+    var socialRng=U.makeRng((tickSeed^0xA5A5A5A5)>>>0);
+    if(m.residents.length>=2 && socialRng()<0.4){
+      var ia=Math.floor(socialRng()*m.residents.length);
+      var ib=(ia+1+Math.floor(socialRng()*(m.residents.length-1)))%m.residents.length;
       var ra=m.residents[ia], rb=m.residents[ib];
-      var positive = Math.random()<0.6;
+      var positive = socialRng()<0.6;
       if(!positive && (ra.trait==='暴脾气'||rb.trait==='暴脾气')) positive=false;
-      else if(ra.mood<35||rb.mood<35) positive=Math.random()<0.3;   // 低心情易冲突
+      else if(ra.mood<35||rb.mood<35) positive=socialRng()<0.3;   // 低心情易冲突
       if(positive){
         m.bonds=APH.Res.applyBond(m.bonds||{},ra.id,rb.id,+4);
         ra.mood=Math.min(100,ra.mood+2); rb.mood=Math.min(100,rb.mood+2);
@@ -4773,23 +6539,9 @@ window.APH = window.APH || {};
       m.bonds=APH.Res.applyBond(m.bonds,d.a,d.b,d.delta);
     });
     saveMetaQuiet();
-    /* U2 到访事件 */
-    var cap=housingCap();
-    if(m.residents.length < cap && Math.random()<0.25){
-      m.residentSeq=(m.residentSeq||0)+1;
-      var taken=m.residents.map(function(x){return x.name;});
-      var r=APH.Res.generate('p'+m.residentSeq+'_'+(Date.now()%10000),
-                             ((s.seed||7)*31+m.residentSeq*917)>>>0, taken);
-      r.arrivedAt=s.clock;
-      APH.Res.enrichBio(r);
-      m.residents.push(r);
-      saveMetaQuiet();
-      var skName=APH.Res.SKILL_NAMES[r.mainSkill];
-      APH.UI.floatText('🧑‍🚀 '+r.name+' 加入了殖民地 ('+skName+'专精)', '#9fe8c8');
-      U.emit('residentJoined', r);
-    }else if(m.residents.length>=cap && Math.random()<0.06){
-      APH.UI.floatText('一名旅人远眺了殖民地，但没有停留…','#5d6f96');
-    }
+    saveColony();
+    /* 过客拜访: 不再自动入籍, 只刷流浪者 */
+    maybeSpawnVisitor(false);
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
   function bindBuildUI(){
@@ -4802,7 +6554,12 @@ window.APH = window.APH || {};
     var slots = s.colony.buildings.filter(function(b){return b.id===buildingId;}).length*perBuilding;
     var onJob = m.residents.filter(function(r){return r.job===buildingId;});
     if(onJob.length>=slots) return;
-    var free=m.residents.filter(function(r){return !r.job;})
+    var hasQ=(s.colony.buildQueue||[]).length>0;
+    var free=m.residents.filter(function(r){
+      if(r.job || r.jobLocked) return false;
+      if(hasQ && APH.Colony.isBuilder(r)) return false;
+      return true;
+    })
       .sort(function(a,b){return (b.skills[skillKey]||0)-(a.skills[skillKey]||0);});
     while(onJob.length<slots && free.length){
       var r=free.shift();
@@ -4833,7 +6590,41 @@ window.APH = window.APH || {};
     renderCodex:renderCodex,
     renderResPanel:renderResPanel,
     residentsTick:residentsTick,
+    syncResidents:syncResidentEntities,
+    updateResidents:updateResidents,
+    cycleSelectedJob:cycleSelectedJob,
     perfGuard:perfGuard,
+    startRaid:startRaid,
+    updateHome:updateHome,
+    updateSurvival:updateSurvival,
+    returnHome:returnHome,
+    spawnVisitor:spawnVisitor,
+    debugSpawnVisitor:function(at, over){
+      var s=APH.state;
+      return spawnVisitor(at||{x:s.px,y:s.py}, over);
+    },
+    debugRecruit:function(){
+      var s=APH.state;
+      var v=s.nearVisitor;
+      if(!v || v.dead || v.type!==T.VISITOR) v=nearestVisitor(s);
+      if(!v){
+        for(var i=0;i<s.entities.length;i++){
+          if(s.entities[i].type===T.VISITOR && !s.entities[i].dead){ v=s.entities[i]; break; }
+        }
+      }
+      return tryRecruit(v, function(){ return 0; });
+    },
+    debugOfferMeal:function(){
+      var s=APH.state;
+      var v=s.nearVisitor;
+      if(!v || v.dead || v.type!==T.VISITOR) v=nearestVisitor(s);
+      if(!v){
+        for(var i=0;i<s.entities.length;i++){
+          if(s.entities[i].type===T.VISITOR && !s.entities[i].dead){ v=s.entities[i]; break; }
+        }
+      }
+      return tryOfferMeal(v);
+    },
     debugState:function(){
       var s=APH.state;
       var enemies=0; s.entities.forEach(function(e){if(e.type===T.ENEMY&&!e.dead)enemies++;});

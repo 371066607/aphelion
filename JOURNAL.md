@@ -314,3 +314,67 @@
   对抗验证还正确驳回3个误报(drawDarkness远征光洞/cryN死变量/兵营idle:2被脚本重置)。
   验证: py_compile通过; 构建3536KB; 101单元+9场景+3perf+2boss全绿; **单跑combat.test.js从1失败→21/0通过**(#3实证)。
   下一步: 若未来启用house/lab/turret多帧动画, 其非空闲帧曾被旧管线裁过, 需从git HEAD原始128格图重跑管线(现有.bak机制+大画布法已防复发)。
+
+- **2026-08-27 02:15 · 班次**: ✅修三个 HIGH 玩法 bug(殖民地袭击/死亡页/返航结算)。
+  ①家园 spec.enemies.factions 保持空安全区; 袭击刷怪走 `Planet.pickRaidFaction`(上次远征 / fallbackPlanet / 阵营池克隆), 空阵营不再 `makeEnemy(undefined)`。raidActive 时跑 `updateCombat`+`updateDropped`, homeDrawers 画敌人/弹丸/掉落。士兵打袭击敌人不打玩家; 炮塔与玩家弹跳过 `isSoldier`; 波次计数不计士兵。
+  ②`showDeath` 改用 `APH.CFG.items` 且缺 id 不抛; 出发写 `landedAt`/`runLoot=0`; 战斗与 O2 死亡都传 `runLoot`+`survived`。
+  ③远征着陆点只回氧回血, 不再自动卸货; 结算只发生在 `returnHome`(settleValue); 已转化战利品不再显示「空手而归」。
+  验证: `python3 build.py` 构建成功 game.html 以 `</html>` 收尾; 单元 105/0; 场景 12/0; perf 3/0; boss 2/0。
+
+- **2026-08-27 02:23 · 班次**: ✅审查补丁——家园袭击不再被远征脱战/回收秒杀。
+  `updateCombat` 在 `scene==='home'` 时：非 flee/attack 袭击者强制 `chase`；`despawnR` 不在家园生效。`updateDropped` 从 `raidActive` 门掠出，末波击杀掉落当帧/下一帧仍可拾。
+  补测: home 800/950px 不回收且保持冲锋; 远征仍 despawn; 玩家弹跳过士兵; 士兵不打玩家; 空手返航「空手而归」; O2 死亡传 runLoot/survived; 袭击结束后掉落可拾; 场景刷怪后再 tick 一拍。
+  未改: 袭击者仍追玩家不追 HAB; 士兵仍无敌伤害(非友伤); 空 else-if 保留; 未扩 clinic/radar/mineral/debug-overlay。
+  验证: `python3 build.py` 构建成功 3540KB; 单元 109/0; 场景 15/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 12:15 · 班次**: ✅经营主循环重构 P0–P5。
+  方向锁死: 家是主游戏, 远征是补给, 战争是砸家。
+  P0: DESIGN 经营优先 / intro「回到家园」/ 教程先盖房等人 / `te_exosuit`(旧档 `exo_suit` 迁移)。
+  P1: 矿材盖建筑、有人上岗才产、`settleGoods` 分账、医疗舱急救、短缺 HUD、开局矿材 100。
+  P2: `resident` 实体站在岗位旁, 不存 xy。
+  P3: 建造岗居民可推进蓝图、R 面板数字键选人+[P]换岗、雷达标晶体/敌基地。
+  P4: 发射台按短缺出任务、教程前两步不推远征、`lw_night_acid` 夜间湖岸腐蚀。
+  P5: 袭击冲仓库/农场并抢粮矿、士兵可受伤可死、战争写入 meta(吞掉 `aphelion_war_v1`)。
+  验证: `python3 build.py` 构建成功 3555KB, game.html 以 `</html>` 收尾; 单元 121/0; 场景 16/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 6+ 居民短距走位 / 工坊 / 法则收成修正(本轮不做)。
+
+- **2026-08-27 12:45 · 班次**: ✅过客拜访+招募。NPC 不再生产跳自动入籍; 家园刷流浪过客(随机六维/性格/出身), 院子内闲逛, 走近 [E] 招募。招募条件未定, 目前只卡住宅空位。过客不存档 xy, 离场上路。
+  验证: `python3 build.py` 构建成功 3562KB; 单元 124/0; 场景 17/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 12:55 · 班次**: ✅过客招募学 RimWorld: 三种意向(难民绿灯/过路客掷骰/游商不招), 一次开口失败进冷却, 不收矿材买人。过路客看粮、医疗舱、对口建筑、性格、袭击调制成功率。
+  验证: `python3 build.py` 构建成功 3568KB; 单元 128/0; 场景 17/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 13:00 · 班次**: ✅招待涨印象 + [F] 请客。印象从 50 起, 空床/余粮/医疗舱缓涨, 满员/断粮/袭击缓掉; 过路客掷骰吃印象。走近过客按 F 扣 2 粮 +20 印象, 每人一顿, 游商可请但不招。HUD 显示印象与请客提示。
+  验证: `python3 build.py` 构建成功 3571KB, game.html 以 `</html>` 收尾; 单元 132/0; 场景 18/0; perf 3/0; boss 2/0。未 commit。
+  下一步: 阶段 6+ 居民短距走位 / 工坊 / 法则收成修正(本轮不做)。
+
+- **2026-08-27 13:50 · 班次**: ✅居民短距走位。不再每帧拆建实体; 新人从居住舱(或招募点)直线走到岗位, 换岗/闲居走回家, 袭击改走回家。施工用实际站位。坐标仍不落盘。无作息大模拟。
+  验证: `python3 build.py` 构建成功 3573KB, game.html 以 `</html>` 收尾; 单元 134/0; 场景 19/0; perf 3/0; boss 2/0。未 commit。
+  下一步: `bl_workshop` 手工把矿材做成远征消耗品。
+
+- **2026-08-27 14:00 · 班次**: 手玩 Chrome headless(?autostart=1)。走位真的会走; 过客/建造栏/名册能开。顺手修手玩踩到的洞: 主循环每30帧 `s` 未声明 + strict 下 `frameErrors` 再炸(标题卡 AUTO:q命中); 发射台上 E 被登船抢走招不到人; 离开发射台提示不消失; 名册缺技能写 undefined; 相机诊断角标改成仅 debug 参数。
+  复玩: 标题 `▶帧120`, pageerror 0, camDiag 关闭。构建 3574KB; 单元 134/0; 场景 19/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 21:40 · 班次**: ✅殖民者生命(食物/心情/病情)。`illness` 0–100; 饿涨病、病砸效率与心情, 不饿死。医疗舱治居民(有社交岗医更快); 玩家 `clinicKit` 远征急救保留。出发不扣仓粮矿。名册三槽, 场上病号打 ✚。工坊/远征消耗品未做。
+  验证: `python3 build.py` 构建成功 3577KB, game.html 以 `</html>` 收尾; 单元 138/0; 场景 19/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 21:55 · 班次**: ✅审 diff 补丁——农牧吃效率、需求魔数进 CFG、ambient 得病 seeded。
+  `farmTick`/`ranchTick` 乘 `Res.efficiency`; `needsTick` 进食/心情阈值进 `CFG.residents`; `clinicTick` 病情取整; `residentsTick` 注入 seeded rng、诊所 autoAssign 提前、吃粮按仓剩余逐人扣。
+  验证: `python3 build.py` 构建成功 3578KB, game.html 以 `</html>` 收尾; 单元 140/0; 场景 19/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 22:05 · 班次**: ✅袭击打伤居民 + 家园回血改走医疗舱。近战士兵→玩家→居民(+18病/-12心情, 不致死, 0.8s 无敌帧)→抢仓。家园氧气仍补; HP 只在距医疗舱 80px 内 4/s。畜牧增长实况改 seeded rng。
+  验证: `python3 build.py` 构建成功 3582KB, game.html 以 `</html>` 收尾; 单元 144/0; 场景 20/0; perf 3/0; boss 2/0。未 commit。
+
+- **2026-08-27 22:15 · 班次**: ✅法则作收成修正。家园 seed 抽 1~2 条气候(`lw_night_acid` 夜间农产×0.5 / `lw_storm` 每90s窗口30s实验室停)。`harvestMods` 纯函数进 farmTick/productionTick; 浮字+提示。远征湖岸酸蚀仍在。工坊未做(产出未定)。
+  验证: `python3 build.py` 构建成功 3584KB, game.html 以 `</html>` 收尾; 单元 150/0; 场景 21/0(含气候法则+上一刀医疗舱回血); perf 3/0; boss 2/0。无头 Chrome `?autostart=1` 标题 `AUTO: q命中`, dump 无 Uncaught。未 commit。
+
+- **2026-08-28 06:50 · 班次**: ✅东西堆地上(RimWorld)。农牧工矿产出与返航矿材先落实体堆, 走近/居民搬进仓库才入账。同种近距叠堆; 地上堆入 `colony.ground` 存档。袭击顺手偷地上。研究点仍抽象。闲人会把脚边的堆搬去仓库。
+  验证: `python3 build.py` 构建成功 3598KB, game.html 以 `</html>` 收尾; 单元 164/0; 场景 25/0(含工坊堆地+闲人搬运入库); perf 3/0; boss 2/0。无头 Chrome `?autostart=1` 标题 `AUTO: q命中`, dump 无 Uncaught。未 commit。
+
+- **2026-08-28 07:00 · 班次**: ✅仓不够也能用地上堆。吃粮/用药/请客/士兵口粮/盖房/工坊先仓后堆(`takeStock`/`ensureStock`); 合金整件折矿。短缺与 HUD 计仓+地(`矿10+3`)。搬运途中不计。
+  验证: `python3 build.py` 构建成功 3603KB, game.html 以 `</html>` 收尾; 单元 167/0; 场景 26/0(含仓空吃地上粮+工坊用地上矿); perf 3/0; boss 2/0。无头 Chrome `?autostart=1` 标题 `AUTO: q命中`, dump 无 Uncaught。未 commit。
+
+- **2026-08-28 07:15 · 班次**: ✅饿了走去吃饭。生产跳只掉饱食, 不隔空扣堆; 人直线走到最近仓库或地上粮再 `eatOnce`。饿优先于搬运; 头上 🍽。用药/工坊/盖房仍可取整张地图的堆。
+  验证: `python3 build.py` 构建成功 3606KB, game.html 以 `</html>` 收尾; 单元 168/0; 场景 27/0(含远处不隔空吃、走到才吃); perf 3/0; boss 2/0。无头 Chrome `?autostart=1` 标题 `AUTO: q命中`, dump 无 Uncaught。未 commit。
+
+

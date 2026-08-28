@@ -39,14 +39,26 @@ test('meta 默认结构与写读一致 (ADR-2)', () => {
   if (m1.v !== 1) throw new Error('默认 meta 应带 v=1, got ' + m1.v);
   if (Array.isArray(m1.tech) || typeof m1.tech !== 'object')
     throw new Error('meta.tech 应为 Object 而非 Array: ' + typeof m1.tech);
-  if (!m1.res || m1.res.leather === undefined)
-    throw new Error('meta.res 应初始化包含 leather');
+  if (!m1.res || m1.res.leather === undefined || m1.res.med === undefined)
+    throw new Error('meta.res 应初始化包含 leather/med');
+  if ((m1.res.mineral||0) < 100)
+    throw new Error('开局应赠矿材, got '+m1.res.mineral);
+  if (!m1.war || m1.war.wins===undefined)
+    throw new Error('meta.war 应初始化');
   m1.research = 42;
   m1.tech.te_weaponry = 2;
   Save.saveMeta(m1);
   const m2 = Save.loadMeta();
   if (m2.research !== 42) throw new Error('research 未持久化');
   if (m2.tech.te_weaponry !== 2) throw new Error('tech 键值对象未持久化');
+});
+test('exo_suit 迁 te_exosuit, 战争并入 meta', () => {
+  Save.saveMeta({ v:1, tech:{ exo_suit:2 }, res:{mineral:3,food:0,leather:0}, stats:{landings:0,deaths:0,kills:0,scans:0,playSec:0} });
+  const m = Save.loadMeta();
+  if (m.tech.te_exosuit !== 2) throw new Error('外骨骼应迁 te_exosuit, got '+JSON.stringify(m.tech));
+  if (m.tech.exo_suit) throw new Error('旧 exo_suit 应删除');
+  if (!m.war) throw new Error('应有 war');
+  if ((m.res.mineral||0) < 100) throw new Error('旧档应补开局矿, got '+m.res.mineral);
 });
 test('planet 缓存读写与按 id 隔离', () => {
   Save.savePlanet('P_AAA', { id: 'P_AAA', laws: [1, 2] });
@@ -101,10 +113,42 @@ test('enemies 契约: 3阵营/基因字段/权重归一', () => {
   const wsum = Object.values(E.weights).reduce((a, b) => a+b, 0);
   if (Math.abs(wsum - 1) > .01) throw new Error('权重和≠1: '+wsum);
 });
+test('pickRaidFaction: 空阵营不抛错且给出真阵营, 不写回 spec', () => {
+  const empty = { enemies: { factions: [], weights: {} } };
+  const f = Planet.pickRaidFaction(empty, 123);
+  if (!f || !(f.hp > 0) || !f.gene) throw new Error('应返回可用阵营');
+  if (!f.id || !String(f.id).startsWith('fx_')) throw new Error('阵营 id 前缀违规: '+(f && f.id));
+  if (empty.enemies.factions.length !== 0) throw new Error('不得把野怪写进传入 spec');
+});
+
+test('pickRaidFaction: 优先使用上次远征阵营', () => {
+  const last = Planet.fallbackPlanet(99);
+  last.enemies.factions = [{ id:'fx_maw', name:'测试种', behavior:'melee_swarm',
+    gene:{hue:1,sides:5,limbs:6,size:1,spikes:1,eyes:2}, hp:33, speed:10, dmg:2, nightBoost:1 }];
+  const f = Planet.pickRaidFaction(last, 1);
+  if (f.name !== '测试种' || f.hp !== 33) throw new Error('应优先上次远征: '+JSON.stringify(f));
+});
+
 test('validate 拒绝残缺 spec、接受合法 spec', () => {
   if (Planet.validate({}).ok) throw new Error('空对象应被拒');
   const good = Planet.validate(Planet.fallbackPlanet(9));
   if (!good.ok) throw new Error('合法 spec 被误拒: ' + good.errors.join(','));
+});
+test('hasLaw: 按 id 判断', () => {
+  if (Planet.hasLaw(null, 'lw_echo')) throw new Error('空 spec 应为假');
+  if (!Planet.hasLaw({ laws:[{id:'lw_echo'}] }, 'lw_echo')) throw new Error('应命中');
+  if (Planet.hasLaw({ laws:[{id:'lw_echo'}] }, 'lw_spore_light')) throw new Error('不应命中');
+});
+test('sporeNudge: 近距排开, 中距趋光', () => {
+  const near={x:100,y:100};
+  Planet.sporeNudge(near, 100, 100, 1);
+  if (near.x===100 && near.y===100) throw new Error('贴身应排开');
+  const mid={x:0,y:0};
+  Planet.sporeNudge(mid, 100, 0, 1);
+  if (!(mid.x>0)) throw new Error('中距应趋光靠近: '+mid.x);
+  const far={x:400,y:400};
+  Planet.sporeNudge(far, 1200, 400, 1);
+  if (far.x!==400 || far.y!==400) throw new Error('远距不应动: '+far.x);
 });
 test('信标间距与禁区(离基地>220 / 离湖>200)', () => {
   const p = Planet.fallbackPlanet(2024);

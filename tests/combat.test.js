@@ -13,6 +13,18 @@ test('FSM: idle 远距保持 idle', () => {
 test('FSM: idle 进入 aggro 半径 → alert', () => {
   if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 150 })) !== 'alert') throw new Error('应转 alert');
 });
+test('FSM: idle 枪声在 noiseAggroR 内 → alert', () => {
+  if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 250, heardShot: true })) !== 'alert')
+    throw new Error('枪声应警觉');
+  if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 500, heardShot: true })) !== 'idle')
+    throw new Error('枪声过远不应警觉');
+});
+test('FSM: echo 弱视 — 中距不看见, 枪声才警', () => {
+  if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 150, sightMul: 0.45 })) !== 'idle')
+    throw new Error('弱视不应看见 150');
+  if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 250, heardShot: true, sightMul: 0.45, noiseAggroR: 540 })) !== 'alert')
+    throw new Error('枪声应警觉');
+});
 test('FSM: 夜间 aggro 半径扩大 (×1.6)', () => {
   // 250px: 白天在半径外, 夜晚在半径内
   if (C.fsmStep(mkEnemy('idle'), ctx({ dist: 250, night: false })) !== 'idle')
@@ -121,10 +133,242 @@ test('turretStep: 冷却期不开火', () => {
   const foe = {type:T_ENEMY2, x:100,y:0, hp:50, dead:false};
   if (C.turretStep(tw,[foe],0.1) !== false) throw new Error('冷却中应返回false');
 });
+test('turretStep: 不攻击 isSoldier', () => {
+  const tw = {x:0,y:0,lv:1,cd:0};
+  const sol = {type:T_ENEMY2, x:50,y:0, hp:40, dead:false, isSoldier:true};
+  const foe = {type:T_ENEMY2, x:80,y:0, hp:40, dead:false};
+  C.turretStep(tw,[sol,foe],0.1);
+  if (sol.hp !== 40) throw new Error('士兵不应被炮塔打');
+  if (foe.hp >= 40) throw new Error('应打袭击敌人');
+});
+
+test('settleValue: 缺物品id不抛错, 只结算已知物', () => {
+  const v = C.settleValue({ it_mineral:2, it_ghost:9 });
+  if (v !== 8) throw new Error('2矿材=8研究点, got '+v);
+});
+test('settleGoods: 矿材入仓, 晶体变研究点', () => {
+  const g = C.settleGoods({ it_mineral:2, it_alloy:1, it_crystal_ore:3, it_relic:1, it_ghost:9 });
+  if (g.mineral !== 5) throw new Error('2矿+1合金×3=5, got '+g.mineral);
+  if (g.research !== 46) throw new Error('3×2晶体+40遗件=46, got '+g.research);
+});
+test('pickRaidFocus: 优先仓库, 玩家靠近则改追人', () => {
+  const en={x:0,y:0};
+  const s={px:900,py:0, colony:{buildings:[
+    {id:'bl_warehouse',x:80,y:0},{id:'bl_farm',x:400,y:0},{id:'bl_house',x:500,y:0}
+  ]}};
+  let f=C.pickRaidFocus(en,s);
+  if(f.kind!=='building'||f.b.id!=='bl_warehouse') throw new Error('应优先仓库: '+(f.b&&f.b.id));
+  s.px=10; s.py=0;
+  f=C.pickRaidFocus(en,s);
+  if(f.kind!=='player') throw new Error('玩家近应追人');
+});
+test('pickRaidFocus: 更近的居民优先于仓库', () => {
+  const en={x:0,y:0};
+  const s={px:900,py:0, colony:{buildings:[{id:'bl_warehouse',x:80,y:0}]},
+    entities:[{type:CFG.entType.RESIDENT, x:20, y:0, id:'rs_a'}]};
+  const f=C.pickRaidFocus(en,s);
+  if(f.kind!=='resident') throw new Error('应追近处居民: '+f.kind);
+});
+test('homeRegen: 无舱不回血, 靠近医疗舱回血, 氧气始终补', () => {
+  const a=C.homeRegen(50, 40, 1, null);
+  if(a.hp!==50) throw new Error('无舱不应回血: '+a.hp);
+  if(a.o2!==50) throw new Error('氧应+10: '+a.o2);
+  const b=C.homeRegen(50, 40, 1, 0);
+  if(b.hp!==54) throw new Error('贴舱应+4: '+b.hp);
+  const c=C.homeRegen(50, 40, 1, 200);
+  if(c.hp!==50) throw new Error('远舱不应回血: '+c.hp);
+});
+test('hurtPlayer: 医疗舱急救一次', () => {
+  const prev=window.APH.state;
+  window.APH.state=combatState({hp:3, clinicKit:1, iFrameT:0});
+  try{
+    C.hurtPlayer(10,'测试');
+    if(window.APH.state.mode==='dead') throw new Error('急救后不应死');
+    if(window.APH.state.clinicKit!==0) throw new Error('应消耗急救');
+    if(window.APH.state.hp!==40) throw new Error('应回血40, got '+window.APH.state.hp);
+  }finally{ window.APH.state=prev; }
+});
+test('raidPillage: 扣粮扣矿并给建筑冷却', () => {
+  const meta={ res:{ food:10, mineral:8 } };
+  const b={ id:'bl_warehouse' };
+  const o=C.raidPillage(meta, b);
+  if(o.food!==3||o.mineral!==2) throw new Error(JSON.stringify(o));
+  if(meta.res.food!==7||meta.res.mineral!==6) throw new Error('未扣仓');
+  if(!b.offlineT) throw new Error('应暂停产出');
+});
+test('raidPillage: 扣药品', () => {
+  const meta={ res:{ food:0, mineral:0, med:4 } };
+  const o=C.raidPillage(meta, { id:'bl_workshop' });
+  if(o.med!==1) throw new Error('应抢1药: '+JSON.stringify(o));
+  if(meta.res.med!==3) throw new Error('药仓未扣: '+meta.res.med);
+});
+test('pickRaidFocus: 工坊可被锁定', () => {
+  const en={x:0,y:0};
+  const s={px:900,py:0, colony:{buildings:[{id:'bl_workshop',x:80,y:0}]}};
+  const f=C.pickRaidFocus(en,s);
+  if(f.kind!=='building'||f.b.id!=='bl_workshop') throw new Error('应追工坊: '+(f.b&&f.b.id));
+});
+
 test('soldierCount: 兵营等级×2', () => {
   if (C.soldierCount([])!==0) throw new Error('无兵营=0');
   if (C.soldierCount([{bid:'bl_barracks',lv:1}])!==2) throw new Error('1级=2');
   if (C.soldierCount([{bid:'bl_barracks',lv:2}])!==4) throw new Error('2级=4');
+});
+
+function combatState(over){
+  return Object.assign({
+    scene:'expedition', entities:[], parts:[], war:{ raids:0, wins:0 },
+    meta:{ stats:{ kills:0, deaths:0 } }, px:200, py:200, shake:0, noiseT:0,
+    colony:{ buildings:[] }, carry:{}, cry:0, found:0, totalBeacons:6,
+    hp:100, iFrameT:0, mode:'running', seed:1, clock:0, landedAt:0, runLoot:0,
+  }, over||{});
+}
+
+test('spawnDrop: 同种近距叠堆', () => {
+  const prev=window.APH.state;
+  window.APH.state=combatState({scene:'home', entities:[]});
+  try{
+    C.spawnDrop(100,100,'it_food',2,{jitter:0,stock:true});
+    C.spawnDrop(105,100,'it_food',1,{jitter:0,stock:true});
+    const drops=window.APH.state.entities.filter(e=>e.type===CFG.entType.DROPPED && !e.dead);
+    if(drops.length!==1) throw new Error('应叠成一堆: '+drops.length);
+    if(drops[0].n!==3) throw new Error('n='+drops[0].n);
+  }finally{ window.APH.state=prev; }
+});
+test('updateDropped: 家园拾取入库不进背包', () => {
+  const prev=window.APH.state;
+  const st=combatState({
+    scene:'home', px:100, py:100, carry:{},
+    meta:{ research:0, res:{mineral:0,food:0,med:0}, stats:{kills:0,deaths:0} },
+    entities:[{id:'dp1', type:CFG.entType.DROPPED, x:100, y:100, itemId:'it_mineral', n:2, bobA:0, stock:true}]
+  });
+  window.APH.state=st;
+  try{
+    C.updateDropped(0.016);
+    if((st.carry.it_mineral||0)!==0) throw new Error('不应进背包');
+    if(st.meta.res.mineral!==2) throw new Error('应入库: '+st.meta.res.mineral);
+    if(st.entities.some(e=>e.type===CFG.entType.DROPPED && !e.dead)) throw new Error('应捡走');
+  }finally{ window.APH.state=prev; }
+});
+const RAID_FACTION = {
+  id:'fx_raid', name:'袭击种', behavior:'melee_swarm',
+  gene:{hue:1,sides:5,limbs:6,size:1,spikes:1,eyes:2},
+  hp:30, speed:80, dmg:5, nightBoost:1,
+};
+function mkRaidEnemy(x, y, extra){
+  return Object.assign({
+    type:T_ENEMY2, x:x, y:y, hp:30, dead:false, isSoldier:false,
+    faction:RAID_FACTION, state:'chase', wanderA:0, atkCd:1, walkPh:0,
+  }, extra||{});
+}
+
+test('updateCombat: home 远距袭击者不脱战不回收', () => {
+  const prevState = window.APH.state;
+  window.APH.state = combatState({ scene:'home' });
+  try {
+    const mid = mkRaidEnemy(1000, 200);          // 800px, 脱战内回收外
+    const far = mkRaidEnemy(1150, 200);          // 950px, 远征会 despawn
+    window.APH.state.entities = [mid, far];
+    C.updateCombat(0.016, false);
+    if (mid.dead) throw new Error('800px 家园袭击者不应回收');
+    if (far.dead) throw new Error('家园不得按远征 despawnR 清波');
+    const closing = { chase:1, alert:1, attack:1 };
+    if (!closing[mid.state]) throw new Error('800px 应保持冲锋, got '+mid.state);
+    if (!closing[far.state]) throw new Error('950px 应保持冲锋, got '+far.state);
+  } finally {
+    window.APH.state = prevState;
+  }
+});
+
+test('updateCombat: 远征仍按 despawnR 回收', () => {
+  const prevState = window.APH.state;
+  window.APH.state = combatState({ scene:'expedition' });
+  try {
+    const far = mkRaidEnemy(1150, 200);
+    window.APH.state.entities = [far];
+    C.updateCombat(0.016, false);
+    if (!far.dead) throw new Error('远征 950px 应回收');
+  } finally {
+    window.APH.state = prevState;
+  }
+});
+
+test('updateCombat: 玩家弹丸跳过 isSoldier', () => {
+  const prevState = window.APH.state;
+  window.APH.state = combatState({ px:0, py:100 });
+  try {
+    const sol = mkRaidEnemy(120, 100, { isSoldier:true, hp:40, state:'idle' });
+    const proj = C.makeProj(100, 100, 400, 0, 'player', 13);
+    window.APH.state.entities = [sol, proj];
+    C.updateCombat(0.05, false);
+    if (sol.hp !== 40 || sol.dead) throw new Error('士兵不应被玩家弹击中');
+  } finally {
+    window.APH.state = prevState;
+  }
+});
+
+test('updateCombat: 士兵不打玩家 / 只打袭击敌人', () => {
+  const prevState = window.APH.state;
+  const s = combatState({ scene:'home', px:200, py:200, hp:100, iFrameT:0 });
+  window.APH.state = s;
+  let hurt = 0;
+  const onHurt = () => { hurt++; };
+  U.on('playerHurt', onHurt);
+  try {
+    const sol = mkRaidEnemy(210, 200, {
+      isSoldier:true, hp:40, maxHp:40, state:'chase', atkCd:0,
+      faction:Object.assign({}, RAID_FACTION, { speed:120, dmg:6 }),
+    });
+    s.entities = [sol];
+    C.updateCombat(0.016, false);
+    if (s.hp !== 100 || hurt !== 0) throw new Error('无敌人时士兵不得打玩家');
+
+    const foe = mkRaidEnemy(220, 200, { hp:40, state:'idle', atkCd:9 });
+    s.entities = [sol, foe];
+    sol.state = 'chase'; sol.atkCd = 0;
+    C.updateCombat(0.02, false);
+    if (s.hp !== 100 || hurt !== 0) throw new Error('有袭击者时士兵仍不得打玩家');
+    if (foe.hp >= 40) throw new Error('士兵应打袭击敌人');
+  } finally {
+    U.off('playerHurt', onHurt);
+    window.APH.state = prevState;
+  }
+});
+
+test('updateCombat: 袭击者近战可打士兵致死', () => {
+  const prevState = window.APH.state;
+  /* 敌人 y 被 clamp ≥30; 与玩家同格则 focus 为玩家且处于 attackR 内 */
+  window.APH.state = combatState({ scene:'home', px:80, py:80, colony:{ buildings:[] } });
+  try {
+    const sol = mkRaidEnemy(80, 80, { isSoldier:true, hp:5, maxHp:40, state:'idle' });
+    const foe = mkRaidEnemy(80, 80, { hp:30, state:'attack', atkCd:0 });
+    window.APH.state.entities = [sol, foe];
+    C.updateCombat(0.02, false);
+    if (!sol.dead && sol.hp>0) throw new Error('士兵应受伤或死亡, hp='+sol.hp);
+  } finally {
+    window.APH.state = prevState;
+  }
+});
+test('updateCombat: 袭击者近战打伤附近居民且当摆不抢仓', () => {
+  const prevState = window.APH.state;
+  const r={id:'rs_a', name:'阿澈', illness:0, mood:80};
+  window.APH.state = combatState({
+    scene:'home', px:800, py:80,
+    colony:{ buildings:[{id:'bl_warehouse',x:80,y:80}] },
+    meta:{ res:{food:10, mineral:8}, residents:[r], stats:{kills:0,deaths:0} },
+  });
+  try {
+    const foe = mkRaidEnemy(80, 80, { hp:30, state:'attack', atkCd:0 });
+    const re = { id:'rs_a', rid:'rs_a', type:CFG.entType.RESIDENT, x:80, y:80, hurtCd:0 };
+    window.APH.state.entities = [foe, re];
+    C.updateCombat(0.02, false);
+    if(r.illness!==18) throw new Error('应+18病: '+r.illness);
+    if(r.mood!==68) throw new Error('心情应-12: '+r.mood);
+    if(window.APH.state.meta.res.food!==10) throw new Error('打人当摆不应抢仓');
+    if(!(re.hurtCd>0)) throw new Error('应进入受伤无敌帧');
+  } finally {
+    window.APH.state = prevState;
+  }
 });
 
 test('raidBaseSuccess: 击毁敌对基地正常掉落战利品与保底遗件(零未定义错误)', () => {

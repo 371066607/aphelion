@@ -68,9 +68,11 @@ APH.Save = (function(){
         v: CFG.save.VERSION,
         research: 0,
         tech: {},                      // 已购科技 { techId: lv }
-        res: { mineral:0, food:0, leather:0 },
+        res: { mineral:100, food:0, leather:0, med:0 },
         residents: [],
         residentSeq: 0,
+        war: { wins:0, raids:0 },
+        econV2: 1,
         stats: { landings:0, deaths:0, kills:0, scans:0, playSec:0 },
         currentPlanet: null,
       };
@@ -80,10 +82,31 @@ APH.Save = (function(){
       m.tech.forEach(function(k){ if(typeof k==='string') tObj[k]=1; });
       m.tech = tObj;
     }
-    if(!m.res) m.res = { mineral:0, food:0, leather:0 };
+    if(!m.res) m.res = { mineral:0, food:0, leather:0, med:0 };
     if(m.res.leather===undefined) m.res.leather = 0;
+    if(m.res.med===undefined) m.res.med = 0;
     if(!m.residents) m.residents = [];
     if(m.residentSeq===undefined) m.residentSeq = 0;
+    /* 经营 v2: 开局赠矿, 外骨骼 id 迁 te_exosuit, 战争并入 meta */
+    if(!m.tech) m.tech = {};
+    if(m.tech.exo_suit){
+      m.tech.te_exosuit = (m.tech.te_exosuit||0) + m.tech.exo_suit;
+      delete m.tech.exo_suit;
+    }
+    if(!m.war) m.war = { wins:0, raids:0 };
+    try{
+      var w = JSON.parse(rawGet('aphelion_war_v1')||'null');
+      if(w){
+        m.war.wins = Math.max(m.war.wins||0, w.wins||0);
+        m.war.raids = Math.max(m.war.raids||0, w.raids||0);
+        rawDel('aphelion_war_v1');
+      }
+    }catch(e){}
+    if(!m.econV2){
+      var startM = (APH.CFG.economy && APH.CFG.economy.startMineral) || 100;
+      m.res.mineral = Math.max(m.res.mineral||0, startM);
+      m.econV2 = 1;
+    }
     return m;
   }
   function saveMeta(m){ write(CFG.save.KEY_META, m); }

@@ -43,6 +43,20 @@ APH.UI = (function(){
     }
     $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
+    var vEco=$('vEco');
+    if(vEco && s.meta && s.meta.res){
+      var C = window.APH.Colony;
+      var gt = (C && C.groundTally) ? C.groundTally(s.entities) : {};
+      var sh = (C && C.shortageBrief)
+        ? C.shortageBrief(s.meta, s.colony&&s.colony.buildings, gt)
+        : null;
+      var lab = (C && C.stockLabel)
+        ? function(k){ return C.stockLabel(s.meta.res, s.entities, k); }
+        : function(k){ return String((s.meta.res[k]||0)); };
+      vEco.textContent = sh
+        ? ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med')+' 闲'+sh.idle)
+        : ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med'));
+    }
     var vig = $('vig');
     vig.style.opacity = s.o2<25 ? (1-s.o2/25)*.85 : 0;
   }
@@ -101,8 +115,11 @@ APH.UI = (function(){
     var carryTxt='';
     if(stats.carry && Object.keys(stats.carry).length){
       var parts=[];
-      for(var k in stats.carry)
-        parts.push(CFG.items[k].name+'×'+stats.carry[k]);
+      var items=(APH.CFG && APH.CFG.items) || {};
+      for(var k in stats.carry){
+        var it=items[k];
+        parts.push(((it && it.name) || k)+'×'+stats.carry[k]);
+      }
       carryTxt='<br><span style="color:#ff9a9a">丢失：'+parts.join('、')+
                '（共'+(stats.runLoot||0)+'件战利品）</span>';
     }else if(stats.runLoot>0){

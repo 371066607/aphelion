@@ -92,6 +92,7 @@
   <div style="display:flex;align-items:center;margin-bottom:10px">
     <b style="color:#794f27;font-size:14px;font-weight:800;letter-spacing:2px">建 造</b>
     <span style="margin-left:10px;color:#19c8b9;font-weight:700;font-size:13px" id="brResearch"></span>
+    <span style="margin-left:8px;color:#794f27;font-weight:700;font-size:13px" id="brMineral"></span>
     <span id="brQueue" style="margin-left:auto;color:#9f927d;font-size:11px"></span>
   </div>
   <div id="brCards" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px"></div>
@@ -100,7 +101,8 @@
 
 <div id="resPanel" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:41;padding:56px 48px;overflow:auto">
   <h2 style="color:#9fe8c8;font-size:18px;letter-spacing:4px;margin:0 0 6px">殖 民 者 名 册</h2>
-  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">食物储备 <b id="resFood" style="color:#c8e89a">0</b> · 皮革 <b id="resLeather" style="color:#e0b089">0</b> · 人口 <b id="resPop" style="color:#cdd9f5">0</b></p>
+  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">食物 <b id="resFood" style="color:#c8e89a">0</b> · 矿材 <b id="resMineral" style="color:#9db1dc">0</b> · 皮革 <b id="resLeather" style="color:#e0b089">0</b> · 药品 <b id="resMed" style="color:#7dffab">0</b> · 人口 <b id="resPop" style="color:#cdd9f5">0</b></p>
+  <p style="color:#39435c;font-size:11px;margin:0 0 12px">数字键选人 · [P] 换岗 · [R] 关闭</p>
   <div id="resBody" style="max-width:720px;font-size:12px;line-height:1.8;color:#cdd9f5"></div>
   <p style="margin-top:26px;color:#39435c;font-size:11px">按 [R] 关闭</p>
 </div>
@@ -118,6 +120,7 @@
   <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
   <div class="row" id="rowWar" style="display:none"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span></div>
+  <div class="row" id="rowEco"><span class="lab">经营</span><span class="val" id="vEco" style="width:auto;flex:1;text-align:left;letter-spacing:0">矿0 粮0</span></div>
 </div>
 
 <div id="hint">跟随金色光柱</div>
@@ -138,13 +141,13 @@
 <div class="screen" id="intro">
   <div class="tag">COLONY FRONTIER · 07</div>
   <h1>远 日 点</h1>
-  <h2>APH-P1 · 未建档行星</h2>
-  <p>你是这颗星球的第一个殖民者。<br>
-     荒原上散布着 <b style="color:#ffc857">6 座先导信标</b>，找到并扫描它们。<br>
-     白天赶路；夜晚的世界只属于带光的人。<br>
-     粉色晶体可以提炼氧气——氧气归零前，回到居住舱。</p>
-  <button class="bigBtn" id="startBtn">踏 上 星 球</button>
-  <div id="ctrlHint">WASD / 方向键 移动 · Shift 疾跑 · 点击地面自动行走<br>触屏设备左下角虚拟摇杆 · 靠近信标出现扫描按钮 · 回车开始</div>
+  <h2>新曙光殖民地 · 家园</h2>
+  <p>这是你的家。先盖农场和住房。<br>
+     过客会来拜访——走近按 E 招募，F 请客吃饭。<br>
+     <b style="color:#ffc857">矿材用来建造</b>，研究点用来升级科技。<br>
+     缺了东西，再从发射台出门补给。</p>
+  <button class="bigBtn" id="startBtn">回 到 家 园</button>
+  <div id="ctrlHint">WASD 移动 · E 招募过客 · F 请客 · G 建造 · R 名册<br>触屏左下角摇杆 · 回车开始</div>
 </div>
 
 <div class="screen" id="end">

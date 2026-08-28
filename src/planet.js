@@ -188,5 +188,56 @@ APH.Planet = (function(){
     return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
   }
 
-  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf };
+  function hasLaw(spec, id){
+    return !!(spec && spec.laws && spec.laws.some(function(l){ return l && l.id===id; }));
+  }
+
+  /* lw_spore_light: 近距排开开路, 中距趋光靠拢。纯函数, 就地改 sp。 */
+  function sporeNudge(sp, px, py, dt){
+    if(!sp) return sp;
+    var L = (APH.CFG && APH.CFG.laws) || {};
+    var near = L.sporePartR || 52;
+    var far = L.sporeAttractR || 200;
+    var spd = L.sporeSpd || 36;
+    var dx = px - sp.x, dy = py - sp.y;
+    var d = Math.sqrt(dx*dx + dy*dy);
+    if(d < 0.001){ dx = 1; dy = 0; d = 1; }
+    var nx = dx / d, ny = dy / d;
+    if(d < near){ sp.x -= nx * spd * dt; sp.y -= ny * spd * dt; }
+    else if(d < far){ sp.x += nx * spd * 0.45 * dt; sp.y += ny * spd * 0.45 * dt; }
+    var W = (APH.CFG && APH.CFG.WORLD) || 2200;
+    sp.x = Math.max(20, Math.min(W - 20, sp.x));
+    sp.y = Math.max(20, Math.min(W - 20, sp.y));
+    return sp;
+  }
+
+  /* 殖民地家园 spec.enemies.factions 永久为空(安全区)。
+     袭击刷怪从「上次远征 / fallbackPlanet / 阵营池」取一份克隆, 绝不写回家园 spec。 */
+  function cloneFaction(f){
+    if(!f) return null;
+    var g=f.gene||{};
+    return {
+      id:f.id, name:f.name, behavior:f.behavior,
+      gene:{ hue:g.hue, sides:g.sides, limbs:g.limbs, size:g.size, spikes:g.spikes, eyes:g.eyes },
+      hp:f.hp, speed:f.speed, dmg:f.dmg, nightBoost:f.nightBoost,
+      lore:f.lore,
+    };
+  }
+  function pickFrom(list){
+    if(!list || !list.length) return null;
+    var f=list[Math.floor(Math.random()*list.length)];
+    if(!f || f.hp==null) return null;
+    return cloneFaction(f);
+  }
+  function pickRaidFaction(lastSpec, seed){
+    var picked=pickFrom(lastSpec && lastSpec.enemies && lastSpec.enemies.factions);
+    if(picked) return picked;
+    var fb=fallbackPlanet((seed>>>0)||1);
+    picked=pickFrom(fb.enemies && fb.enemies.factions);
+    if(picked) return picked;
+    return cloneFaction(ENEMY_FACTIONS[0]);
+  }
+
+  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
+           pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge };
 })();

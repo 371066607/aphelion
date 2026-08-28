@@ -25,19 +25,35 @@ test('canPlace: 离核心太近 / 建筑重叠 拒绝', () => {
   r = Colony.canPlace([{id:'bl_mine',x:600,y:600}], 999, 'bl_lab', 615, 608);
   if(r.ok) throw new Error('重叠应拒绝');
 });
-test('productionTick: 采矿机+2矿/实验室+1研究', () => {
+test('canPlace: 矿材不足拒绝', () => {
+  const r = Colony.canPlace([], 999, 'bl_warehouse', 600, 600, 0);
+  if(r.ok) throw new Error('矿材0 < 20 应拒绝');
+  if(r.why.indexOf('矿材')<0) throw new Error('原因应提矿材: '+r.why);
+});
+test('productionTick: 无人不上岗则不产', () => {
   const meta={ research:0, res:{mineral:0} };
   const out = Colony.productionTick(meta, [
     {id:'bl_mine'},{id:'bl_mine'},{id:'bl_lab'},
-  ]);
+  ], []);
+  if(out.mineral!==0||out.research!==0) throw new Error('无人应0: '+JSON.stringify(out));
+});
+test('productionTick: 采矿机+2矿/实验室+1研究(有人)', () => {
+  const meta={ research:0, res:{mineral:0} };
+  const mk=()=>({job:'bl_mine', skills:{sk_craft:0}, mood:60, food:50});
+  const lb=()=>({job:'bl_lab', skills:{}, mood:60, food:50});
+  const out = Colony.productionTick(meta, [
+    {id:'bl_mine'},{id:'bl_mine'},{id:'bl_lab'},
+  ], [mk(), mk(), lb()]);
   if(out.mineral!==4||out.research!==1) throw new Error('产出错误 '+JSON.stringify(out));
-  if(meta.res.mineral!==4||meta.research!==1) throw new Error('未入账');
+  if(meta.research!==1) throw new Error('研究应入账');
+  if((meta.res.mineral||0)!==0) throw new Error('矿应堆地上不入仓: '+meta.res.mineral);
+  if(!out.piles || out.piles.length!==2) throw new Error('应两堆矿: '+JSON.stringify(out.piles));
 });
 
-test('科技树: te_前缀/exo例外检查 + canBuy 边界', () => {
+test('科技树: te_前缀 + canBuy 边界', () => {
   const T = Colony.TECHS;
   for(const id in T){
-    if(!(id.startsWith('te_')||id.startsWith('exo_'))) throw new Error('id规范: '+id);
+    if(!id.startsWith('te_')) throw new Error('id规范: '+id);
     if(T[id].cost<=0) throw new Error('成本非法');
   }
   const meta={research:30};
@@ -96,8 +112,11 @@ test('mineOutput/labOutput: 随等级线性', () => {
 });
 test('productionTick: 消费建筑等级', () => {
   const meta={research:0,res:{mineral:0}};
-  Colony.productionTick(meta,[{id:'bl_mine',lv:3},{id:'bl_lab'}]);
-  if(meta.res.mineral!==6||meta.research!==1) throw new Error('等级产出未生效');
+  const w={job:'bl_mine', skills:{sk_craft:0}, mood:60, food:50};
+  const l={job:'bl_lab', skills:{}, mood:60, food:50};
+  const out=Colony.productionTick(meta,[{id:'bl_mine',lv:3},{id:'bl_lab'}], [w,l]);
+  if(out.mineral!==6||meta.research!==1) throw new Error('等级产出未生效: '+JSON.stringify(out));
+  if((meta.res.mineral||0)!==0) throw new Error('矿应堆地上');
 });
 
 test('housingCapacity: 基础2+房3×lv+医疗1', () => {
@@ -168,7 +187,7 @@ test('canPlace: 占位矩形碰撞——贴邻拒绝/隔空可放/1x1与2x2混�
 });
 test('建筑目录: 大建筑2x2/小建筑1x1 且带dispH', () => {
   const L=Colony.list();
-  ['bl_warehouse','bl_barracks','bl_lab','bl_farm','bl_pasture','bl_house','bl_clinic'].forEach(id=>{
+  ['bl_warehouse','bl_barracks','bl_lab','bl_farm','bl_pasture','bl_house','bl_clinic','bl_workshop'].forEach(id=>{
     if(!L[id].cells || L[id].cells[0]!==2) throw new Error(id+' 应2x2');
     if(!L[id].dispH) throw new Error(id+' 缺dispH');
   });
@@ -178,12 +197,12 @@ test('建筑目录: 大建筑2x2/小建筑1x1 且带dispH', () => {
 });
 
 /* ---- U6 畜牧群增长(2026-08-26): herd自然增长+产肉/皮 ---- */
-test('ranchTick: 无牧民不增长不出皮, 有羊仍出肉', () => {
+test('ranchTick: 无牧民不增长不产肉不出皮', () => {
   const p={herd:2, lv:1}, res={};
   const o=Colony.ranchTick(p, 0, res, ()=>0.01);   // 必中增长窗
   if(o.grew) throw new Error('无牧民(skill=0)不应增长');
-  if(o.foodGain!==1) throw new Error('herd=2应产1肉: '+o.foodGain);
-  if(res.food!==1) throw new Error('res.food未入账');
+  if(o.foodGain!==0) throw new Error('无牧民不应产肉: '+o.foodGain);
+  if(res.food) throw new Error('res.food不应入账');
   if(o.leatherGain!==0||res.leather) throw new Error('skill=0不应产皮');
 });
 test('ranchTick: 增长概率受技能调制且封顶cap=3+lv*2', () => {
@@ -195,15 +214,14 @@ test('ranchTick: 增长概率受技能调制且封顶cap=3+lv*2', () => {
   if(!o2.grew||p2.herd!==7) throw new Error('低概率窗内rand<prob应增长');
 });
 test('ranchTick: 皮革阈值3只起, 随herd/等级线性', () => {
-  const res={};
-  Colony.ranchTick({herd:2, lv:1}, 3, res, ()=>0.99); // herd=2<3 无皮
-  if(res.leather) throw new Error('herd<3不应产皮');
-  Colony.ranchTick({herd:3, lv:1}, 3, res, ()=>0.99); // floor(3/3)=1皮
-  if(res.leather!==1) throw new Error('herd=3应+1皮: '+res.leather);
-  Colony.ranchTick({herd:6, lv:1}, 3, res, ()=>0.99); // floor(6/3)=2皮
-  if(res.leather!==3) throw new Error('herd=6应再+2皮: '+res.leather);
-  Colony.ranchTick({herd:4, lv:2}, 3, res, ()=>0.99); // floor((4+1)/3)=1皮(lv放宽)
-  if(res.leather!==4) throw new Error('lv2 her=4应+1皮: '+res.leather);
+  const a=Colony.ranchTick({herd:2, lv:1}, 3, {}, ()=>0.99); // herd=2<3 无皮
+  if(a.leatherGain) throw new Error('herd<3不应产皮');
+  const b=Colony.ranchTick({herd:3, lv:1}, 3, {}, ()=>0.99); // floor(3/3)=1皮
+  if(b.leatherGain!==1) throw new Error('herd=3应+1皮: '+b.leatherGain);
+  const c=Colony.ranchTick({herd:6, lv:1}, 3, {}, ()=>0.99); // floor(6/3)=2皮
+  if(c.leatherGain!==2) throw new Error('herd=6应+2皮: '+c.leatherGain);
+  const d=Colony.ranchTick({herd:4, lv:2}, 3, {}, ()=>0.99); // floor((4+1)/3)=1皮
+  if(d.leatherGain!==1) throw new Error('lv2 her=4应+1皮: '+d.leatherGain);
 });
 test('畜牧圈升级: 皮革专属货币, 研究点不可替代', () => {
   const def=Colony.get('bl_pasture');
@@ -216,4 +234,155 @@ test('畜牧圈升级: 皮革专属货币, 研究点不可替代', () => {
   if(!r.ok||r.costRes!=='leather'||r.cost!==88) throw new Error('皮革够88应可升');
   r=Colony.canUpgrade({lv:2}, def, 9999, 999);
   if(r.ok) throw new Error('maxLv=2已达顶');
+});
+test('ranchTick: 效率打折减产', () => {
+  const o1=Colony.ranchTick({herd:6, lv:1}, 3, {}, ()=>0.99, 1);
+  const o2=Colony.ranchTick({herd:6, lv:1}, 3, {}, ()=>0.99, 0.4);
+  if(!(o2.foodGain < o1.foodGain)) throw new Error('病牧应少肉: '+o2.foodGain+' vs '+o1.foodGain);
+  if(!(o2.leatherGain < o1.leatherGain)) throw new Error('病牧应少皮: '+o2.leatherGain+' vs '+o1.leatherGain);
+});
+
+test('queueTick: 居民坐标数组可施工, 远离冻结', () => {
+  let q=[{bid:'bl_mine',x:600,y:600,total:20,progress:0.5}];
+  let r=Colony.queueTick(q, 5, [{x:2000,y:2000},{x:605,y:605}], 0);
+  if(r.queue[0].progress<=0.5) throw new Error('工人在旁应推进');
+  const progressed=r.queue[0].progress;
+  r=Colony.queueTick(r.queue, 5, [{x:2000,y:2000}], 0);
+  if(r.queue[0].progress!==progressed) throw new Error('无人应冻结');
+});
+test('shortageBrief: 缺矿/缺粮紧急', () => {
+  const a=Colony.shortageBrief({res:{mineral:0,food:0},residents:[{}]}, []);
+  if(!a.urgent || a.mission.indexOf('食物')<0) throw new Error('无粮应催补给: '+JSON.stringify(a));
+  const b=Colony.shortageBrief({res:{mineral:5,food:99},residents:[]}, []);
+  if(!b.urgent || b.mission.indexOf('矿材')<0) throw new Error('缺矿应催矿: '+JSON.stringify(b));
+});
+test('shortageBrief: 有病人无药时提示工坊', () => {
+  const a=Colony.shortageBrief({
+    res:{mineral:40,food:99,med:0},
+    residents:[{illness:55,job:'bl_farm'}]
+  }, []);
+  if(a.urgent) throw new Error('粮矿足不应紧急: '+JSON.stringify(a));
+  if(a.text.indexOf('生病')<0) throw new Error('应提生病: '+a.text);
+});
+test('cycleJob: 在已有建筑间轮转并锁岗', () => {
+  const r={job:null};
+  Colony.cycleJob(r, [{id:'bl_farm'},{id:'bl_mine'}]);
+  if(r.job!=='bl_farm' || !r.jobLocked) throw new Error('应转到农场: '+r.job);
+  Colony.cycleJob(r, [{id:'bl_farm'},{id:'bl_mine'}]);
+  if(r.job!=='bl_mine') throw new Error('下一岗矿机: '+r.job);
+});
+test('cycleJob: 有医疗舱时可转到诊所岗', () => {
+  const r={job:'bl_lab'};
+  Colony.cycleJob(r, [{id:'bl_lab'},{id:'bl_clinic'}]);
+  if(r.job!=='bl_clinic') throw new Error('实验室下一岗应是医疗舱: '+r.job);
+  const no={job:null};
+  Colony.cycleJob(no, [{id:'bl_farm'}]);
+  if(no.job!=='bl_farm') throw new Error('无舱时循环不应出现诊所: '+no.job);
+});
+test('harvestMods: 无法则不修正', () => {
+  const m=Colony.harvestMods([], 0, true);
+  if(m.farmMul!==1||m.labMul!==1||m.acid||m.storm) throw new Error(JSON.stringify(m));
+});
+test('harvestMods: 夜间酸雨减农, 白天不减', () => {
+  const laws=[{id:'lw_night_acid'}];
+  const n=Colony.harvestMods(laws, 0, true);
+  if(n.farmMul!==0.5||!n.acid) throw new Error('夜间应减半: '+JSON.stringify(n));
+  const d=Colony.harvestMods(laws, 0, false);
+  if(d.farmMul!==1||d.acid) throw new Error('白天不应酸雨: '+JSON.stringify(d));
+});
+test('harvestMods: 磁暴窗口停实验室', () => {
+  const laws=[{id:'lw_storm'}];
+  const on=Colony.harvestMods(laws, 10, false);
+  if(on.labMul!==0||!on.storm) throw new Error('窗内应停: '+JSON.stringify(on));
+  const off=Colony.harvestMods(laws, 40, false);
+  if(off.labMul!==1||off.storm) throw new Error('窗外应正常: '+JSON.stringify(off));
+});
+test('productionTick: 磁暴 labMul=0 不产研究', () => {
+  const meta={research:0,res:{mineral:0}};
+  const l={job:'bl_lab', skills:{}, mood:80, food:80};
+  const out=Colony.productionTick(meta,[{id:'bl_lab'}], [l], {labMul:0});
+  if(out.research!==0||meta.research!==0) throw new Error('磁暴应0研究');
+});
+test('climateLaws: 同 seed 确定, 1~2条且仅酸雨/磁暴', () => {
+  const a=Colony.climateLaws(42), b=Colony.climateLaws(42), c=Colony.climateLaws(99);
+  if(JSON.stringify(a)!==JSON.stringify(b)) throw new Error('应确定');
+  [a,c].forEach(ls=>{
+    if(ls.length<1||ls.length>2) throw new Error('应1~2条: '+ls.length);
+    ls.forEach(l=>{
+      if(l.id!=='lw_night_acid'&&l.id!=='lw_storm') throw new Error('非法id '+l.id);
+    });
+  });
+});
+test('refundMineralOf: 半价矿材, 发射台0', () => {
+  if(Colony.refundMineralOf(Colony.get('bl_warehouse'))!==10) throw new Error('20半价=10');
+  if(Colony.refundMineralOf(Colony.get('bl_landing_pad'))!==0) throw new Error('pad矿退0');
+});
+test('workshopTick: 无人不产, 有人扣矿产药, 矿不够停工', () => {
+  const res={mineral:10, med:0};
+  const o0=Colony.workshopTick(null, res, 1);
+  if(o0.med!==0||res.mineral!==10) throw new Error('无人不应动仓');
+  const w={skills:{sk_craft:0}, mood:80, food:90, illness:0};
+  const o=Colony.workshopTick(w, res, 1);
+  if(o.spent!==2||res.mineral!==8) throw new Error('应扣2矿: '+res.mineral);
+  if(!(o.med>=1)||res.med) throw new Error('药应返回但不入仓: '+JSON.stringify(o)+' med='+res.med);
+  const poor={mineral:1, med:0};
+  Colony.workshopTick(w, poor, 1);
+  if(poor.mineral!==1||poor.med) throw new Error('矿不够不应产');
+});
+test('cycleJob: 有工坊可转到手工岗', () => {
+  const r={job:'bl_mine'};
+  Colony.cycleJob(r, [{id:'bl_mine'},{id:'bl_workshop'}]);
+  if(r.job!=='bl_workshop') throw new Error('矿下一岗应是工坊: '+r.job);
+});
+test('collectHome: 矿粮药入仓, 遗件变研究点', () => {
+  const meta={research:0, res:{mineral:0, food:0, med:0}};
+  const a=Colony.collectHome(meta,'it_mineral',2);
+  if(a.kind!=='stock'||meta.res.mineral!==2) throw new Error('矿应入仓');
+  Colony.collectHome(meta,'it_alloy',1);
+  if(meta.res.mineral!==5) throw new Error('合金×3: '+meta.res.mineral);
+  Colony.collectHome(meta,'it_food',3);
+  if(meta.res.food!==3) throw new Error('粮应入仓');
+  const b=Colony.collectHome(meta,'it_relic',1);
+  if(b.kind!=='research'||meta.research!==40) throw new Error('遗件应变研究点');
+});
+test('serializeGround: 地上堆+搬运中的都记下', () => {
+  const T=window.APH.CFG.entType;
+  const g=Colony.serializeGround([
+    {type:T.DROPPED, itemId:'it_food', n:3, x:1, y:2},
+    {type:T.DROPPED, itemId:'it_med', n:1, x:3, y:4, dead:true},
+    {type:T.RESIDENT, haulCarry:{itemId:'it_mineral', n:2}, x:5, y:6},
+  ]);
+  if(g.length!==2) throw new Error('死堆不应入档: '+g.length);
+  if(g[0].itemId!=='it_food'||g[1].itemId!=='it_mineral') throw new Error(JSON.stringify(g));
+});
+test('stockOf/takeStock: 先仓后堆, 搬运途中不计', () => {
+  const T=window.APH.CFG.entType;
+  const pile={type:T.DROPPED, itemId:'it_food', n:5, x:10, y:40};
+  const haul={type:T.RESIDENT, haulCarry:{itemId:'it_food', n:9}, x:0, y:40};
+  const ents=[pile, haul];
+  if(Colony.groundCount(ents,'food')!==5) throw new Error('搬运中不应计入地上');
+  if(Colony.stockOf({food:2}, ents, 'food')!==7) throw new Error('仓+地应合计');
+  const res={food:2};
+  const t=Colony.takeStock(res, ents, 'food', 3);
+  if(!t.ok || t.fromRes!==2 || t.fromGround!==1 || res.food!==0) throw new Error(JSON.stringify(t)+' res='+res.food);
+  if(pile.n!==4) throw new Error('应从地上再扣1: '+pile.n);
+});
+test('ensureStock: 合金整件补仓, takeStock 不拆件', () => {
+  const T=window.APH.CFG.entType;
+  const a={type:T.DROPPED, itemId:'it_alloy', n:1, x:10, y:40};
+  const res={mineral:0};
+  if(!Colony.ensureStock(res, [a], 'mineral', 2) || res.mineral!==3 || !a.dead)
+    throw new Error('合金应整件入仓: '+res.mineral+' dead='+a.dead);
+  const b={type:T.DROPPED, itemId:'it_alloy', n:1, x:10, y:40};
+  const t=Colony.takeStock({mineral:0}, [b], 'mineral', 2);
+  if(t.ok || (b.n||0)!==1) throw new Error('takeStock 不应拆合金: '+JSON.stringify(t)+' n='+b.n);
+});
+test('shortageBrief: 地上粮药计入短缺', () => {
+  const a=Colony.shortageBrief({res:{mineral:40,food:0},residents:[{}]}, [], {food:10});
+  if(a.urgent) throw new Error('地上有粮矿足不应紧急: '+JSON.stringify(a));
+  const b=Colony.shortageBrief({
+    res:{mineral:40,food:99,med:0},
+    residents:[{illness:55}]
+  }, [], {med:1});
+  if(b.text.indexOf('生病')>=0) throw new Error('地上有药不应催工坊: '+b.text);
 });

@@ -274,29 +274,50 @@ APH.World = (function(){
     ctx.beginPath(); ctx.arc(H.x-30,H.y-34,3.4,0,U.TAU); ctx.fill();
   }
 
-  /* 边缘罗盘：最近未扫描信标 */
+  /* 边缘罗盘：最近未扫描信标; 雷达科技加晶体/敌基地 */
   function drawCompass(){
-    var s = APH.state, best=null, bd=1e9;
+    var s = APH.state;
+    var marks=[];
+    var best=null, bd=1e9;
     s.entities.forEach(function(e){
       if(e.type!=='beacon'||e.done) return;
       var d=U.dst(e.x,e.y,s.px,s.py);
       if(d<bd){bd=d;best=e;}
     });
-    if(!best) return;
+    if(best) marks.push({e:best, col:'#ffc857', dist:bd});
+    var radar=s.meta && s.meta.tech && s.meta.tech.te_radar;
+    if(radar && s.scene==='expedition'){
+      var cBest=null, cd=1e9, rBest=null, rd=1e9;
+      s.entities.forEach(function(e){
+        if(e.type==='crystal' && !e.taken){
+          var d=U.dst(e.x,e.y,s.px,s.py);
+          if(d<cd){ cd=d; cBest=e; }
+        }
+        if(e.type==='building' && e.bid==='bl_rival_base' && !e.dead){
+          var d2=U.dst(e.x,e.y,s.px,s.py);
+          if(d2<rd){ rd=d2; rBest=e; }
+        }
+      });
+      if(cBest) marks.push({e:cBest, col:'#ff4fd8', dist:cd});
+      if(rBest) marks.push({e:rBest, col:'#ff6d7a', dist:rd});
+    }
     var VW2=innerWidth, VH2=innerHeight;
-    var sx=best.x-s.camX+VW2/2, sy=best.y-s.camY+VH2/2;
-    if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
-    var cx=U.clamp(sx,46,VW2-46), cy=U.clamp(sy,84,VH2-96);
-    var ang=Math.atan2(best.y-s.py,best.x-s.px);
-    ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
-    ctx.fillStyle='rgba(255,200,87,.9)';
-    ctx.shadowColor='#ffc857'; ctx.shadowBlur=8;
-    ctx.beginPath(); ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
-    ctx.closePath(); ctx.fill();
-    ctx.shadowBlur=0; ctx.rotate(-ang);
-    ctx.fillStyle='#ffc857'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(Math.round(bd/10)+'m',0,22);
-    ctx.restore();
+    marks.forEach(function(m, i){
+      var e=m.e;
+      var sx=e.x-s.camX+VW2/2, sy=e.y-s.camY+VH2/2;
+      if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
+      var cx=U.clamp(sx,46+i*18,VW2-46), cy=U.clamp(sy,84,VH2-96);
+      var ang=Math.atan2(e.y-s.py,e.x-s.px);
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+      ctx.fillStyle=m.col;
+      ctx.shadowColor=m.col; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.moveTo(12,0);ctx.lineTo(-6,-8);ctx.lineTo(-2,0);ctx.lineTo(-6,8);
+      ctx.closePath(); ctx.fill();
+      ctx.shadowBlur=0; ctx.rotate(-ang);
+      ctx.fillStyle=m.col; ctx.font='10px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(Math.round(m.dist/10)+'m',0,22);
+      ctx.restore();
+    });
   }
 
   return {
