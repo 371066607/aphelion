@@ -409,3 +409,7 @@
 - **2026-08-28 15:25 · 班次**: 🔧玩家光环与人物不齐。sprite 路径用左上角画 `player_walk` 再 `translate(-22,-bobbing)`，光环/影子仍锚在实体原点，环在北、人在南。`drawPlayerFrame` 改为脚底中心锚点，去掉横向 -22。
   验证: 构建 + 回归测试；浏览器 `?autostart=1` 看光环是否贴脚。
 
+- **2026-08-28 23:05 · 班次**: ✅#3 玩家 walk 重画（32 帧横排）。Codex exec + identity lock 出四向各 8 帧走循环（棕发/奶油衣/薄荷包；上向背对镜头；无站立帧）。绿幕按「高G低R低B」抠，避免吃掉薄荷包。切帧按内容间隙而非均宽。32 帧统一内容高 240、脚底 y=247。`build_sprites.py` 对 `player_*` 改脚底对齐（质心会让抬腿整帧上下跳）。`player_walk` SPRITE_META baseline=248 contentH=240。
+  验证: `python3 build.py` 构建成功 5470KB 以 `</html>` 收尾；单元 227/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园四向 + `?exp=1` 远征四向均见同一人、无多头多肢、脚贴光圈。
+  下一步: #1 剩余过客/居民 identity 与 idle sheet。
+

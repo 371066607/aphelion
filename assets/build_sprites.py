@@ -107,34 +107,60 @@ def clean_sheet(path):
         im.save(path)
     return total
 
+def foot_y(fr):
+    """内容底边(最后一个 alpha>8 的行)。走循环用它对齐踩地脚, 质心会随抬腿上下跳。"""
+    px = fr.load()
+    w, h = fr.size
+    for y in range(h - 1, -1, -1):
+        for x in range(w):
+            if px[x, y][3] > 8:
+                return y
+    return h - 1
+
+def _shift_frame(fr, dx, dy, margin):
+    cell, H = fr.size
+    big = Image.new('RGBA', (cell + 2 * margin, H + 2 * margin), (0, 0, 0, 0))
+    big.paste(fr, (margin, margin))
+    big = big.transform((cell + 2 * margin, H + 2 * margin),
+                        Image.AFFINE, (1, 0, -dx, 0, 1, -dy))
+    return big.crop((margin, margin, margin + cell, margin + H))
+
 def register_sheet(path):
-    """全部帧质心对齐到帧0。返回移动过的帧数。仅横排方格表。"""
+    """横排方格表配准。建筑走质心; 玩家走循环对齐内容底边(踩地脚), 否则抬腿会把整帧拽上下跳。"""
     im = Image.open(path).convert('RGBA')
     W, H = im.size
     cell = cell_of(W, H)
     if not (W > H and W % cell == 0 and cell == H):
-        return 0                           # 非横排方格表(玩家行走表)跳过
+        return 0                           # 非横排方格表跳过
     frames = W // cell
-    c0 = centroid(im.crop((0, 0, cell, H)))
-    margin = cell // 2          # 平移余量: |漂移|≤margin 时内容不丢像素
+    margin = cell // 2
     moved = 0
-    for i in range(frames):
-        fr = im.crop((i * cell, 0, (i + 1) * cell, H))
-        c = centroid(fr)
-        dx, dy = round(c0[0] - c[0]), round(c0[1] - c[1])
-        if dx or dy:
-            if abs(dx) > margin or abs(dy) > margin:
-                print(f'    ! {os.path.basename(path)} 帧{i} 质心漂移({dx},{dy})超余量, 跳过'
-                      f'(帧内容差异过大, 配准无意义)')
+    use_feet = os.path.basename(path).endswith('_walk_sheet.png')
+    if use_feet:
+        y0 = foot_y(im.crop((0, 0, cell, H)))
+        for i in range(frames):
+            fr = im.crop((i * cell, 0, (i + 1) * cell, H))
+            dy = y0 - foot_y(fr)
+            if not dy:
                 continue
-            # 在带余量的大画布上平移再裁回原尺寸: 内容不因平移出界而被截断
-            big = Image.new('RGBA', (cell + 2*margin, H + 2*margin), (0, 0, 0, 0))
-            big.paste(fr, (margin, margin))
-            big = big.transform((cell + 2*margin, H + 2*margin),
-                                Image.AFFINE, (1, 0, -dx, 0, 1, -dy))
-            fr = big.crop((margin, margin, margin + cell, margin + H))
-            im.paste(fr, (i * cell, 0))
+            if abs(dy) > margin:
+                print(f'    ! {os.path.basename(path)} 帧{i} 脚底漂移{dy}超余量, 跳过')
+                continue
+            im.paste(_shift_frame(fr, 0, dy, margin), (i * cell, 0))
             moved += 1
+    else:
+        c0 = centroid(im.crop((0, 0, cell, H)))
+        for i in range(frames):
+            fr = im.crop((i * cell, 0, (i + 1) * cell, H))
+            c = centroid(fr)
+            dx, dy = round(c0[0] - c[0]), round(c0[1] - c[1])
+            if dx or dy:
+                if abs(dx) > margin or abs(dy) > margin:
+                    print(f'    ! {os.path.basename(path)} 帧{i} 质心漂移({dx},{dy})超余量, 跳过'
+                          f'(帧内容差异过大, 配准无意义)')
+                    continue
+                im.paste(_shift_frame(fr, dx, dy, margin), (i * cell, 0))
+                moved += 1
     if moved:
         backup_once(path)
         im.save(path)
@@ -248,7 +274,7 @@ def main():
 
     print('== 重生成 src/sprite_data.js ==')
     lines = [
-        '/* 自动生成: python3 assets/build_sprites.py (假透明已清除+帧已质心配准, 勿手改) */',
+        '/* 自动生成: python3 assets/build_sprites.py (假透明已清除; 建筑/敌人质心, 走循环脚底, 勿手改) */',
         'window.APH.SPRITE_DATA = window.APH.SPRITE_DATA || {};',
     ]
     for f in sorted(os.listdir(ASSETS)):

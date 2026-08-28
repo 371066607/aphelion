@@ -1687,7 +1687,7 @@ window.APH = window.APH || {};
           /* 32帧横排: 下/左/右/上 各8帧走循环 */
           APH.Sprites.define(name, { src:SD[name], fw:0, fh:0, cols:32, rows:1,
                                      count:32, fps:10, loop:true,
-                                     baseline:247, contentH:214, anchorY:0.96 });
+                                     baseline:248, contentH:240, anchorY:0.96 });
         }else if (name.indexOf('enemy_')===0){
           /* N2: 敌人8帧表(idle×2/move×2/attack×2/hurt/death); 敌人锚点由drawEnemy手工translate, 不用baseline */
           APH.Sprites.define(name, { src:SD[name], fw:128, fh:128, cols:8, rows:1,
