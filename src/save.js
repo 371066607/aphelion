@@ -91,6 +91,7 @@ APH.Save = (function(){
       if(r.isSleeping===undefined) r.isSleeping = false;
       if(r.bedId===undefined) r.bedId = null;
       if(r.sleepDisturbed===undefined) r.sleepDisturbed = 0;
+      if(r.recreation===undefined) r.recreation = 80;
     });
     if(m.residentSeq===undefined) m.residentSeq = 0;
     /* 经营 v2: 开局赠矿, 外骨骼 id 迁 te_exosuit, 战争并入 meta */

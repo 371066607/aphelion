@@ -143,3 +143,41 @@ test('efficiency: 整合 manipulation 机能损耗', function(){
   if (cap.manipulation >= 1.0) throw new Error('感染者 manipulation 应小于 1.0');
 });
 
+test('recreation: 居民生成带默认娱乐值 80', function(){
+  var r = APH.Res.generate('rec1', 12345);
+  if (r.recreation !== 80) throw new Error('recreation 初始值应为 80，实际: ' + r.recreation);
+});
+
+test('recreation: needsTick 自然衰减 5/跳', function(){
+  var r = APH.Res.generate('rec2', 12345);
+  r.recreation = 60;
+  APH.Res.needsTick(r, true);
+  if (r.recreation !== 55) throw new Error('recreation 衰减后应为 55，实际: ' + r.recreation);
+});
+
+test('recreation: 高娱乐提供 +8 身心愉悦，低娱乐惩罚 -5 极度枯燥', function(){
+  var rHigh = APH.Res.generate('rec3', 12345);
+  rHigh.food = 100;
+  rHigh.mood = 70;
+  rHigh.recreation = 85;
+  APH.Res.needsTick(rHigh, true);
+  // 70 + 2(food) + 3(bed) + 8(joy) = 83
+  if (rHigh.mood < 80) throw new Error('高娱乐应获得身心愉悦加成，实际 mood: ' + rHigh.mood);
+
+  var rLow = APH.Res.generate('rec4', 12345);
+  rLow.food = 100;
+  rLow.mood = 70;
+  rLow.recreation = 15;
+  APH.Res.needsTick(rLow, true);
+  // low recreation penalty -5
+  if (rLow.mood > 72) throw new Error('低娱乐应受枯燥惩罚，实际 mood: ' + rLow.mood);
+});
+
+test('recreation: enjoyRecreation 增加娱乐值', function(){
+  var r = APH.Res.generate('rec5', 12345);
+  r.recreation = 40;
+  APH.Res.enjoyRecreation(r, 25);
+  if (r.recreation !== 65) throw new Error('enjoyRecreation 后应为 65，实际: ' + r.recreation);
+});
+
+

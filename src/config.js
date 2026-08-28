@@ -221,6 +221,14 @@ APH.CFG = {
     floorMood: -5,             // 无床打地铺心情惩罚
     disturbedMood: -4,         // 惊醒心情惩罚
     disturbedTicks: 3,         // 惊醒持续跳数
+    /* 深度生存: 娱乐与抗压 (Survival #18) */
+    recreationDrain: 5,        // 生产跳自然娱乐衰减
+    recreationJoyAt: 30,       // 娱乐低于此值渴望休闲
+    recreationGain: 25,        // 每次休闲恢复
+    recreationBuffAt: 80,      // 娱乐高值给 Buff
+    recreationBuffMood: 8,     // 身心愉悦心情增益
+    recreationBoredAt: 20,     // 极度枯燥阈值
+    recreationBoredMood: -5,   // 极度枯燥心情惩罚
     /* 深度生存: 三维机能损毁 (Survival #16) */
     woundMoveCut: 0.005,       // 外伤削弱移动
     woundManipCut: 0.004,      // 外伤削弱操作

@@ -62,6 +62,7 @@ APH.Res = (function(){
       isSleeping:false,                                      // 是否处于睡眠中
       bedId:null,                                            // 绑定的床位 ID (null 为打地铺)
       sleepDisturbed:0,                                      // 惊醒剩余跳数
+      recreation:80,                                         // 深度生存: 娱乐值 (Survival #18)
       job:null,                                              // 指派岗位 bl_xxx|null
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
@@ -132,6 +133,21 @@ APH.Res = (function(){
       if(r.mood < cap) r.mood += bedMood;
     }else if(r.isSleeping){
       r.mood = Math.max(0, r.mood + floorMood);
+    }
+
+    /* 深度生存: 娱乐需求自然衰减与身心愉悦/枯燥心情 (Survival #18) */
+    var recDrain = C.recreationDrain!=null ? C.recreationDrain : 5;
+    var recBuffAt = C.recreationBuffAt!=null ? C.recreationBuffAt : 80;
+    var recBuffMood = C.recreationBuffMood!=null ? C.recreationBuffMood : 8;
+    var recBoredAt = C.recreationBoredAt!=null ? C.recreationBoredAt : 20;
+    var recBoredMood = C.recreationBoredMood!=null ? C.recreationBoredMood : -5;
+
+    r.recreation = r.recreation!=null ? r.recreation : 80;
+    r.recreation = Math.max(0, r.recreation - recDrain);
+    if(r.recreation >= recBuffAt){
+      if(r.mood < cap) r.mood += recBuffMood;
+    }else if(r.recreation < recBoredAt){
+      r.mood = Math.max(0, r.mood + recBoredMood);
     }
 
     if(r.sleepDisturbed > 0) r.sleepDisturbed--;
@@ -840,11 +856,21 @@ APH.Res = (function(){
     };
   }
 
+  /* 休闲娱乐补充(纯函数): 漫步观星/聚会社交补充娱乐值 (Survival #18) */
+  function enjoyRecreation(r, gain){
+    if(!r) return r;
+    var C=RS();
+    var add = gain!=null ? gain : (C.recreationGain!=null ? C.recreationGain : 25);
+    r.recreation = Math.min(100, (r.recreation!=null ? r.recreation : 80) + add);
+    return r;
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
+    enjoyRecreation:enjoyRecreation,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,
