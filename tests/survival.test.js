@@ -180,4 +180,58 @@ test('recreation: enjoyRecreation 增加娱乐值', function(){
   if (r.recreation !== 65) throw new Error('enjoyRecreation 后应为 65，实际: ' + r.recreation);
 });
 
+test('downed: 认知 < 30% 触发击倒与 90s 濒死倒计时', function(){
+  var r = APH.Res.generate('down1', 12345);
+  r.ailments = [{ type: 'plague', sev: 70, age: 0 }];
+  r.illness = 70;
+  var isDown = APH.Res.checkDowned(r);
+  if (!isDown) throw new Error('认知低于 30% 应触发击倒');
+  if (!r.downed) throw new Error('r.downed 应为 true');
+  if (r.bleedOutTimer !== 90) throw new Error('濒死倒计时初始应为 90s，实际: ' + r.bleedOutTimer);
+});
+
+test('downed: 击倒者不参与工作分配', function(){
+  var residents = [
+    { id: 'rs_down', skills: { sk_farm: 9 }, downed: true, job: null },
+    { id: 'rs_work', skills: { sk_farm: 5 }, downed: false, job: null }
+  ];
+  var buildings = [{ id: 'bl_farm', lv: 1 }];
+  var prio = { rs_down: { sk_farm: 1 }, rs_work: { sk_farm: 1 } };
+  var assigned = APH.Colony.assignByPriority(residents, buildings, prio, false);
+  if (assigned.rs_down !== null) throw new Error('击倒者不应上岗');
+  if (assigned.rs_work !== 'bl_farm') throw new Error('健康者应上岗');
+});
+
+test('rescue: rescueTick 推进濒死倒计时与送医止血康复', function(){
+  var r = APH.Res.generate('down2', 12345);
+  r.downed = true;
+  r.bleedOutTimer = 90;
+
+  // 1. 倒计时推进 30s
+  var result1 = APH.Res.rescueTick([r], [{ id: 'bl_clinic', lv: 1 }], 30, false, { inClinic: false });
+  if (r.bleedOutTimer !== 60) throw new Error('倒计时推进 30s 后应为 60s，实际: ' + r.bleedOutTimer);
+  if (result1.dead.length > 0) throw new Error('未超时不应死亡');
+
+  // 2. 送入医疗舱并用药止血
+  var result2 = APH.Res.rescueTick([r], [{ id: 'bl_clinic', lv: 1 }], 10, true, { inClinic: true });
+  if (r.downed) throw new Error('成功送医用药后应脱离 downed 状态');
+  if (r.bleedOutTimer !== null) throw new Error('脱离击倒后 bleedOutTimer 应清空为 null');
+  if (!result2.medUsed) throw new Error('抢救应消耗药品');
+});
+
+test('rescue: 倒计时归零判定死亡并产生悼念心情减益', function(){
+  var r1 = APH.Res.generate('down3', 12345);
+  r1.downed = true;
+  r1.bleedOutTimer = 5;
+
+  var r2 = APH.Res.generate('alive', 12345);
+  r2.mood = 80;
+
+  var result = APH.Res.rescueTick([r1, r2], [], 10, false, { inClinic: false });
+  if (result.dead.indexOf(r1.id) < 0) throw new Error('倒计时归零 r1 应进入死亡名单');
+  // 悼念全员心情 -8
+  if (r2.mood > 72) throw new Error('同伴死亡 r2 应受到悼念心情减益，实际 mood: ' + r2.mood);
+});
+
+
 

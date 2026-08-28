@@ -594,7 +594,7 @@ APH.Colony = (function(){
     });
     (residents||[]).forEach(function(r){
       if(out[r.id]!==undefined) return;
-      if(r.isSleeping){ out[r.id]=null; return; } // 睡眠中缺勤 (Survival #15)
+      if(r.downed || r.isSleeping){ out[r.id]=null; return; } // 击倒/睡眠中缺勤 (Survival #15, #17)
       if(broken(r)){ out[r.id]=null; return; }   // 崩溃者缺勤
       if((r.illness||0)>sickAt){ out[r.id]=null; return; }  // 重病跳过
       if(queueBusy && isBuilder(r) && prioOf(prio,r,'sk_build')>0){

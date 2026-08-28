@@ -63,6 +63,9 @@ APH.Res = (function(){
       bedId:null,                                            // 绑定的床位 ID (null 为打地铺)
       sleepDisturbed:0,                                      // 惊醒剩余跳数
       recreation:80,                                         // 深度生存: 娱乐值 (Survival #18)
+      downed:false,                                          // 深度生存: 击倒状态 (Survival #17)
+      bleedOutTimer:null,                                    // 濒死失血倒计时 (s)
+      rescuedBy:null,                                        // 救援人 ID
       job:null,                                              // 指派岗位 bl_xxx|null
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
@@ -865,12 +868,62 @@ APH.Res = (function(){
     return r;
   }
 
+  /* 击倒判定(纯函数): 认知<30% 或 移动<15% 时触发击倒昏迷 (Survival #17) */
+  function checkDowned(r){
+    if(!r) return false;
+    if(r.downed) return true;
+    var cap = capacitiesOf(r);
+    var C = RS();
+    var conAt = C.downedConAt!=null ? C.downedConAt : 0.30;
+    var moveAt = C.downedMoveAt!=null ? C.downedMoveAt : 0.15;
+    if(cap.consciousness < conAt || cap.moving < moveAt){
+      r.downed = true;
+      r.isSleeping = false;
+      r.job = null;
+      r.bleedOutTimer = r.bleedOutTimer!=null ? r.bleedOutTimer : (C.bleedOutTime!=null ? C.bleedOutTime : 90);
+      return true;
+    }
+    return false;
+  }
+
+  /* 紧急救援与濒死状态机(纯函数): 倒计时衰减、送医用药止血与超时死亡 (Survival #17) */
+  function rescueTick(residents, buildings, dt, hasMed, opts){
+    var C = RS();
+    var dead = [];
+    var medUsed = false;
+    var inClinic = !!(opts && opts.inClinic);
+    (residents||[]).forEach(function(r){
+      if(!r || !r.downed) return;
+      if(inClinic && hasMed){
+        r.downed = false;
+        r.bleedOutTimer = null;
+        r.rescuedBy = null;
+        treatAilment(r, 15, true);
+        medUsed = true;
+        return;
+      }
+      r.bleedOutTimer = (r.bleedOutTimer!=null ? r.bleedOutTimer : (C.bleedOutTime!=null ? C.bleedOutTime : 90)) - dt;
+      if(r.bleedOutTimer <= 0){
+        dead.push(r.id);
+      }
+    });
+    if(dead.length > 0){
+      var grief = Math.abs(C.deathGriefMood!=null ? C.deathGriefMood : 8);
+      (residents||[]).forEach(function(r){
+        if(r && dead.indexOf(r.id) < 0){
+          r.mood = Math.max(0, (r.mood||0) - grief * dead.length);
+        }
+      });
+    }
+    return { dead: dead, medUsed: medUsed };
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
-    enjoyRecreation:enjoyRecreation,
+    enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,

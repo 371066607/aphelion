@@ -229,6 +229,12 @@ APH.CFG = {
     recreationBuffMood: 8,     // 身心愉悦心情增益
     recreationBoredAt: 20,     // 极度枯燥阈值
     recreationBoredMood: -5,   // 极度枯燥心情惩罚
+    /* 深度生存: 击倒与救援 (Survival #17) */
+    downedConAt: 0.30,         // 认知低于此值触发击倒
+    downedMoveAt: 0.15,        // 移动低于此值触发击倒
+    bleedOutTime: 90,          // 濒死倒计时 90 秒
+    deathGriefMood: -8,        // 居民死亡全员悲痛心情
+    deathGriefTicks: 4,        // 悲痛持续跳数
     /* 深度生存: 三维机能损毁 (Survival #16) */
     woundMoveCut: 0.005,       // 外伤削弱移动
     woundManipCut: 0.004,      // 外伤削弱操作
