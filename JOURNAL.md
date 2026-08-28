@@ -429,3 +429,7 @@
   验证: `python3 build.py` 构建成功 8875KB 以 `</html>` 收尾；单元 234/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园居民贴图、无包、与玩家 spriteScale 相同（walk 0.325 / idle 0.3305）；走向岗位 `hum_0_nopack_walk` 四向，站住 `hum_0_nopack_idle` 四向。
   下一步: #6 过客脸 0 有包 walk+idle。
 
+- **2026-08-29 · 班次**: ✅#6 过客脸 0、有包、walk+idle。同一张脸 0 identity 加薄荷旅行包（肩带金扣），四向 walk 32 + 站立脚钉呼吸 idle 16。`drawVisitor` 走 `Humanoid.pose({ role:'visitor', pack:true, faceIdx:0 })`；`wanderStep` 过客走一段后站住（idleMin 4.2s ≥ 一轮呼吸），上路离院推进 `walkPh`。sheet `hum_0_pack_walk/idle` 与玩家/居民同锚 baseline=248、内容高 240/236。
+  验证: `python3 build.py` 构建成功 11528KB 以 `</html>` 收尾；单元 241/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 过客贴图有包、与玩家/居民 spriteScale 相同（walk 0.325 / idle 0.3305）；闲逛 `hum_0_pack_walk` 四向，站住 `hum_0_pack_idle` 四向。
+  下一步: #7 脸 1–3（过客有包 / 居民无包），仍被 #6 解锁后可动手。
+

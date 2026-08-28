@@ -671,16 +671,33 @@ APH.Res = (function(){
     return e;
   }
 
-  /* 过客在家园院子里闲逛(无寻路): 到边界折返 */
+  /* 过客在家园院子里闲逛(无寻路): 走一段、站住喘气、到边界折返 */
   function wanderStep(e, dt, hab, yardR, rng){
     var rand = rng || Math.random;
+    var V = CFG.visitor || {};
     var H = hab || CFG.HAB;
-    var R = yardR || ((CFG.visitor && CFG.visitor.yardR) || 220);
-    var spd = (CFG.visitor && CFG.visitor.speed) || 48;
+    var R = yardR || (V.yardR || 220);
+    var spd = V.speed || 48;
+    var idleChance = V.idleChance != null ? V.idleChance : 0.35;
+    var idleMin = V.idleMin != null ? V.idleMin : 4.2;
+    var idleMax = V.idleMax != null ? V.idleMax : 7.0;
+    var walkMin = V.walkMin != null ? V.walkMin : 1.4;
+    var walkMax = V.walkMax != null ? V.walkMax : 4.6;
+    var visType = (CFG.entType && CFG.entType.VISITOR) || 'visitor';
     e.wanderT = (e.wanderT||0) - dt;
     if(e.wanderT <= 0){
-      e.wanderA = rand() * Math.PI * 2;
-      e.wanderT = 1.4 + rand() * 3.2;
+      if(!e.wanderIdle && e.type===visType && rand() < idleChance){
+        e.wanderIdle = true;
+        e.wanderT = idleMin + rand() * Math.max(0, idleMax - idleMin);
+      } else {
+        e.wanderIdle = false;
+        e.wanderA = rand() * Math.PI * 2;
+        e.wanderT = walkMin + rand() * Math.max(0, walkMax - walkMin);
+      }
+    }
+    if(e.wanderIdle){
+      e.walking = false;
+      return e;
     }
     e.x += Math.cos(e.wanderA||0) * spd * dt;
     e.y += Math.sin(e.wanderA||0) * spd * dt;
@@ -736,6 +753,7 @@ APH.Res = (function(){
     BREAK_NAMES:BREAK_NAMES, breakTypeOf:breakTypeOf, breakTick:breakTick,
     isBroken:isBroken, lowestBondMate:lowestBondMate,
     canRecruit:canRecruit, recruitInto:recruitInto, wanderStep:wanderStep, walkToward:walkToward,
+    bumpWalkPh:bumpWalkPh,
     joinIntentOf:joinIntentOf, joinChance:joinChance, attemptRecruit:attemptRecruit,
     chanceLabel:chanceLabel, recruitGate:recruitGate,
     hospitalityRate:hospitalityRate, tickImpression:tickImpression, offerMeal:offerMeal,

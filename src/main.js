@@ -1685,7 +1685,9 @@ window.APH = window.APH || {};
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
         hum_0_nopack_walk:{baseline:248,h:240},
-        hum_0_nopack_idle:{baseline:248,h:236}
+        hum_0_nopack_idle:{baseline:248,h:236},
+        hum_0_pack_walk:{baseline:248,h:240},
+        hum_0_pack_idle:{baseline:248,h:236}
       };
       Object.keys(SD).forEach(function(name){
         var layout = window.APH.Humanoid && APH.Humanoid.sheetLayout(name);
@@ -2454,6 +2456,7 @@ window.APH = window.APH || {};
       name:profile.name, profile:profile,
       wanderA:ang+Math.PI, wanderT:0.2, stayT:stay, askCd:0,
       impression:(CFG.recruit&&CFG.recruit.impressStart)||50, fed:false,
+      face:ang+Math.PI, walkPh:0, walking:true, wanderIdle:false
     };
     /* C: 游商随身带一份 seeded 货单 */
     if(APH.Res.joinIntentOf(profile)==='trader'){
@@ -2556,6 +2559,9 @@ window.APH = window.APH || {};
         var dx=e.x-CFG.HAB.x, dy=e.y-CFG.HAB.y;
         var d=Math.sqrt(dx*dx+dy*dy)||1;
         e.x+=dx/d*90*dt; e.y+=dy/d*90*dt;
+        e.walking=true; e.wanderIdle=false;
+        e.face=Math.atan2(dy, dx);
+        APH.Res.bumpWalkPh(e, dt);
         if(d>yard+90){
           e.dead=true;
           APH.UI.floatText((e.name||'过客')+' 上路了','#5d6f96');

@@ -307,6 +307,32 @@ test('wanderStep: 游荡时 walking、朝向、walkPh', () => {
   if(e.face==null || isNaN(e.face)) throw new Error('应有朝向, got '+e.face);
   if(!(e.walkPh>0)) throw new Error('游荡应推进 walkPh, got '+e.walkPh);
 });
+test('wanderStep: 站住时 idle，不走不推进 walkPh', () => {
+  const e={x:1100,y:1100,wanderA:0,wanderT:5,wanderIdle:true,walkPh:3,walking:false,face:0};
+  Res.wanderStep(e, 1, {x:1100,y:1100}, 220, ()=>0.5);
+  if(e.walking) throw new Error('站住不应 walking');
+  if(e.x!==1100 || e.y!==1100) throw new Error('站住不应位移: '+e.x+','+e.y);
+  if(e.walkPh!==3) throw new Error('站住不应推进 walkPh, got '+e.walkPh);
+});
+test('wanderStep: 站够后重新开走', () => {
+  const e={x:1100,y:1100,wanderA:0,wanderT:0,wanderIdle:true,walkPh:3};
+  Res.wanderStep(e, 1, {x:1100,y:1100}, 220, ()=>0.5);
+  if(e.wanderIdle) throw new Error('站够应结束 idle');
+  if(!e.walking) throw new Error('站够应开走');
+  if(e.x===1100 && e.y===1100) throw new Error('开走应位移');
+});
+test('wanderStep: 过客走完低骰站住', () => {
+  const e={x:1100,y:1100,wanderA:0,wanderT:0,type:'visitor'};
+  Res.wanderStep(e, 0.01, {x:1100,y:1100}, 220, ()=>0.1);
+  if(!e.wanderIdle) throw new Error('过客低骰应站住');
+  if(e.walking) throw new Error('站住不应 walking');
+});
+test('wanderStep: 居民游荡不进过客站住', () => {
+  const e={x:1100,y:1100,wanderA:0,wanderT:0,type:'resident'};
+  Res.wanderStep(e, 1, {x:1100,y:1100}, 220, ()=>0.1);
+  if(e.wanderIdle) throw new Error('居民崩溃游荡不应走 visitor idle');
+  if(!e.walking) throw new Error('应继续走');
+});
 
 /* ---------- B: 心情崩溃 ---------- */
 test('breakTypeOf: 性格分流四种崩溃', () => {

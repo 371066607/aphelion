@@ -678,10 +678,41 @@ APH.Ent = (function(){
     ctx.restore();
   }
 
+  function drawVisitorMarks(e){
+    ctx.fillStyle='#8fd4ff';
+    ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(e.name||'过客', 0, 16);
+    ctx.fillStyle='#5d6f96';
+    ctx.font='8px sans-serif';
+    ctx.fillText('过客', 0, 26);
+  }
+
   function drawVisitor(e,time){
     if(!ctx) return;
     ctx.save();
     ctx.translate(e.x, e.y);
+    var walking=!!e.walking;
+    var sprWalk='hum_0_pack_walk';
+    var sprOk=window.APH.Sprites && window.APH.Humanoid && APH.Sprites.isReady(sprWalk);
+    if(sprOk){
+      /* #6: 只出脸 0 有包；脸 1–3 是 #7 */
+      var pose=APH.Humanoid.pose({ moving:walking, face:e.face, walkPh:e.walkPh,
+                                   time:time, role:'visitor', pack:true, faceIdx:0 });
+      var sheet=pose.sheet, frame=pose.frame;
+      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
+        sheet=sprWalk;
+        frame=pose.dir*((CFG.humanoid&&CFG.humanoid.walkPerDir)||8);
+      }
+      ctx.fillStyle='rgba(0,0,0,.28)';
+      ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
+      var defS=APH.Sprites.sheetDef(sheet)||APH.Sprites.sheetDef(sprWalk);
+      var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
+      var sc=APH.Humanoid.spriteScale(ch);
+      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
+      drawVisitorMarks(e);
+      ctx.restore();
+      return;
+    }
     ctx.fillStyle='rgba(0,0,0,.28)';
     ctx.beginPath(); ctx.ellipse(0,6,10,5,0,0,U.TAU); ctx.fill();
     var bob=Math.sin((time||0)*2.4+(e.x||0))*1.6;
@@ -693,12 +724,7 @@ APH.Ent = (function(){
     ctx.beginPath(); ctx.arc(0,-20+bob,5.5, Math.PI, 0); ctx.fill();
     ctx.fillStyle='#794f27';
     ctx.beginPath(); ctx.ellipse(8,-6+bob,4,5,0.3,0,U.TAU); ctx.fill();
-    ctx.fillStyle='#8fd4ff';
-    ctx.font='9px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(e.name||'过客', 0, 16);
-    ctx.fillStyle='#5d6f96';
-    ctx.font='8px sans-serif';
-    ctx.fillText('过客', 0, 26);
+    drawVisitorMarks(e);
     ctx.restore();
   }
 

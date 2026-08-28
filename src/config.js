@@ -227,6 +227,11 @@ APH.CFG = {
     speed: 48,
     yardR: 220,
     recruitR: 54,
+    idleChance: 0.35,          // 一段走完后站住喘气的概率
+    idleMin: 4.2,              // ≥ 一轮 idle（idleFps=1 × 4 帧）
+    idleMax: 7.0,
+    walkMin: 1.4,
+    walkMax: 4.6
   },
   /* 招募(RimWorld 式: 看人下菜, 不买人). 数值全进表 */
   recruit: {
