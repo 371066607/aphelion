@@ -57,10 +57,10 @@ test('pose: 向右走第 0 帧是 16，不是 idle', () => {
 });
 
 test('pose: 站住走 idle 出口，不是 walk 第 0 帧', () => {
-  var p = H.pose({ moving:false, face:0, walkPh:99, time:1.25, role:'player' });
+  var p = H.pose({ moving:false, face:0, walkPh:99, time:0.6, role:'player' });
   if (p.cycle !== 'idle') throw new Error('站住应为 idle, got '+p.cycle);
   if (p.sheet !== 'player_idle') throw new Error('sheet 应为 player_idle, got '+p.sheet);
-  /* idleFps=4, time=1.25 → floor(5)%4=1; 右=dir2 → 2*4+1=9 */
+  /* idleFps=2, time=0.6 → floor(1.2)%4=1; 右=dir2 → 2*4+1=9 */
   if (p.frame !== 9) throw new Error('右待机第 1 呼吸帧应为 9, got '+p.frame);
   if (p.sheet === 'player_walk' && p.frame === 16) throw new Error('不可用走循环第 0 帧冒充呼吸');
 });
@@ -74,7 +74,7 @@ test('pose: idle 四向 下0 左4 右8 上12，不吃 walkPh', () => {
     if (p.cycle !== 'idle') throw new Error('应为 idle');
     if (p.frame !== cases[i][1]) throw new Error('face '+cases[i][0]+' idle 帧应为 '+cases[i][1]+', got '+p.frame);
   }
-  p = H.pose({ moving:false, face:Math.PI/2, walkPh:0, time:1.0, role:'player' });
+  p = H.pose({ moving:false, face:Math.PI/2, walkPh:0, time:2.0, role:'player' });
   if (p.frame !== 0) throw new Error('idle 满 4 帧应回到 0, got '+p.frame);
 });
 

@@ -417,3 +417,7 @@
   验证: `python3 build.py` 构建成功 6347KB 以 `</html>` 收尾；单元 229/0；场景 27/0；perf 3/0；boss 7/0。Chrome `?autostart=1` 家园四向站住是 idle（脚并拢呼吸）不是走循环第 0 帧；右走向是 walk 迈步；`?exp=1` 远征同一张 idle。
   下一步: #1 剩余过客/居民 identity 与 walk/idle sheet。
 
+- **2026-08-29 · 班次**: 🔧idle 呼吸太快。`CFG.humanoid.idleFps` 4→2（4 帧一轮从 1s 拉到 2s）。
+  验证: 单元 humanoid 10/0；全量单元 229/0；`python3 build.py` 绿。
+  下一步: 实机看呼吸是否还快；#1 过客/居民 sheet。
+

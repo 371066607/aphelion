@@ -9,7 +9,7 @@ APH.Humanoid = (function(){
   var CFG = APH.CFG;
 
   function hum(){
-    return (CFG && CFG.humanoid) || { walkPerDir:8, idlePerDir:4, idleFps:4, walkFps:10, drawH:78, chibiH:43, sheetBaseline:248, sheetContentH:240 };
+    return (CFG && CFG.humanoid) || { walkPerDir:8, idlePerDir:4, idleFps:2, walkFps:10, drawH:78, chibiH:43, sheetBaseline:248, sheetContentH:240 };
   }
 
   /* 下0 左1 右2 上3 — 与现有玩家朝向分档一致 */
@@ -40,7 +40,7 @@ APH.Humanoid = (function(){
     }
     if (/_idle$/.test(name)) {
       var inn = (H.idlePerDir || 4) * 4;
-      return { cols: inn, count: inn, fps: H.idleFps || 4 };
+      return { cols: inn, count: inn, fps: H.idleFps || 2 };
     }
     return null;
   }
@@ -68,7 +68,7 @@ APH.Humanoid = (function(){
     var H = hum();
     var walkN = H.walkPerDir || 8;
     var idleN = H.idlePerDir || 4;
-    var fps = H.idleFps || 4;
+    var fps = H.idleFps || 2;
     var dir = dirOf(input.face);
     var moving = !!input.moving;
     var role = input.role || 'player';
