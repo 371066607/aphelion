@@ -9,9 +9,9 @@ test('建筑目录: 全部 bl_ 前缀, 发射台免费且唯一', () => {
   if(L.bl_landing_pad.cost !== 0) throw new Error('发射台应免费');
 });
 
-test('canPlace: 资源不足拒绝', () => {
-  const r = Colony.canPlace([], 10, 'bl_warehouse', 600, 600);
-  if(r.ok) throw new Error('研究点10 < 30 应拒绝');
+test('canPlace: 建材不足拒绝', () => {
+  const r = Colony.canPlace([], {}, 'bl_warehouse', 600, 600, { wood:0, iron:0 });
+  if(r.ok) throw new Error('木材0 < 20 应拒绝');
 });
 test('canPlace: 数量上限拒绝', () => {
   const bs=[{id:'bl_warehouse',x:500,y:500},{id:'bl_warehouse',x:800,y:500},{id:'bl_warehouse',x:500,y:900}];

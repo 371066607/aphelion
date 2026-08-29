@@ -109,6 +109,11 @@ APH.CFG = {
 
   /* 物品表 (ADR-9: it_ 前缀; w=负重 v=研究点价值; store=家园入库字段) */
   items: {
+    it_wood:        { name: '木材',   w: 1, v: 0, tint:'#b8874a', store:'wood' },
+    it_stone:       { name: '石料',   w: 2, v: 0, tint:'#8fa3cc', store:'stone' },
+    it_iron:        { name: '铁矿',   w: 2, v: 0, tint:'#7a8ba9', store:'iron' },
+    it_berry:       { name: '野果',   w: 1, v: 0, tint:'#ff6d7a', store:'food' },
+    it_herb:        { name: '草药',   w: 1, v: 0, tint:'#7dffab', store:'herb' },
     it_crystal_ore: { name: '晶体矿', w: 2, v: 2, tint:'#ff9ad0' },
     it_mineral:     { name: '矿材',   w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
     it_alloy:       { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
@@ -132,6 +137,7 @@ APH.CFG = {
     BLUEPRINT: 'blueprint',
     RESIDENT: 'resident',
     VISITOR: 'visitor',
+    FLORA: 'flora',
   },
 
   /* 经营（矿材盖房 / 开局赠矿 / 袭击掠夺） */

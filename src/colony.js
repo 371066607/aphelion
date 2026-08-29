@@ -15,48 +15,49 @@ APH.Colony = (function(){
      dispH: 目标显示内容高px(管线实测内容高→比例缩放, 治"建筑比人物矮")
      cells: 占位格[宽,高]×48px格网(ADR-4), 非全部1x1——大建筑占2x2 */
   var BUILDINGS = {
-    bl_landing_pad: { name:'发射台', cost:0, costMineral:0, size:64, buildTime:0,
+    bl_landing_pad: { name:'发射台', cost:0, costMineral:0, costRes:{}, size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
-    bl_warehouse:   { name:'仓库',   cost:30, costMineral:20, size:52, max:3, buildTime:12,
+    bl_warehouse:   { name:'仓库',   cost:0, costMineral:20, costRes:{ wood:20, iron:15 }, size:52, max:3, buildTime:12,
       dispH:95, cells:[2,2],
-      desc:'+20 负重上限。地上的东西搬过来才算库存。' },
-    bl_mine:        { name:'自动采矿机', cost:45, costMineral:30, size:44, max:4, buildTime:20,
+      desc:'+20 负重上限。存放各种分类原材料。' },
+    bl_mine:        { name:'自动采矿机', cost:0, costMineral:30, reqTech:'te_machining', costRes:{ iron:35, stone:15 }, size:44, max:4, buildTime:20,
       dispH:100, cells:[1,1],
-      desc:'有矿工时每30秒把矿材堆在机旁。搬进仓库才入账。',
-      upg:{ effectPerLv:2, maxLv:3 } },
-    bl_lab:         { name:'研究站', cost:60, costMineral:40, size:48, max:2, buildTime:25,
+      desc:'有矿工时每30秒产出矿料。需先研发机械锻造。',
+      upg:{ effectPerLv:2, maxLv:3, cost:45 } },
+    bl_lab:         { name:'研究站', cost:0, costMineral:40, costRes:{ wood:20, iron:25 }, size:48, max:2, buildTime:25,
       dispH:113, cells:[2,2],
-      desc:'有研究员时 +1×等级 研究点/跳。',
-      upg:{ effectPerLv:1, maxLv:2 } },
-    bl_barracks:    { name:'兵营', cost:80, costMineral:50, size:56, max:2, buildTime:30,
+      desc:'学者在此研发科技树。+1×等级 研究点/跳。',
+      upg:{ effectPerLv:1, maxLv:2, cost:60 } },
+    bl_barracks:    { name:'兵营', cost:0, costMineral:50, reqTech:'te_ballistics', costRes:{ iron:30, stone:20 }, size:56, max:2, buildTime:30,
       dispH:86, cells:[2,2],
-      desc:'训练士兵驻守殖民地。' },
-    bl_turret:      { name:'防御炮塔', cost:70, costMineral:35, size:36, max:6, buildTime:25,
+      desc:'训练士兵驻守殖民地。需研发弹道工程。' },
+    bl_turret:      { name:'防御炮塔', cost:0, costMineral:35, reqTech:'te_turret_tech', costRes:{ iron:35, stone:15 }, size:36, max:6, buildTime:25,
       dispH:68, cells:[1,1],
-      desc:'自动攻击来袭敌人, 伤害随等级。',
-      upg:{ effectPerLv:8, maxLv:3 } },
-    bl_clinic:      { name:'医疗舱', cost:50, costMineral:30, size:40, max:1, buildTime:22,
+      desc:'自动攻击来袭敌人。需研发自动防御炮塔。',
+      upg:{ effectPerLv:8, maxLv:3, cost:70 } },
+    bl_clinic:      { name:'医疗舱', cost:0, costMineral:30, reqTech:'te_medicine', costRes:{ iron:25, wood:15 }, size:40, max:1, buildTime:22,
       dispH:115, cells:[2,2],
-      desc:'给殖民者治病。靠近时玩家缓慢回血。有人值守治得更快。远征仍可急救一次。住宅容量+1。' },
-    bl_farm:        { name:'水培农场', cost:35, costMineral:15, size:52, max:4, buildTime:15,
+      desc:'给殖民者治病。需研发外星临床医学。' },
+    bl_farm:        { name:'水培农场', cost:0, costMineral:15, reqTech:'te_hydroponics', costRes:{ iron:20, stone:10 }, size:52, max:4, buildTime:15,
       dispH:115, cells:[2,2],
-      desc:'种植食物。成熟后堆在田边, 搬进仓库才能吃饭。' },
-    bl_house:       { name:'居住舱', cost:40, costMineral:20, size:46, max:6, buildTime:15,
+      desc:'室内种植食物。需研发温控水培技术。' },
+    bl_house:       { name:'居住舱', cost:0, costMineral:20, costRes:{ wood:25, stone:10 }, size:46, max:6, buildTime:15,
       dispH:128, cells:[2,2],
-      desc:'住宅容量 +3。居民是殖民地的心跳。' },
-    bl_pasture:     { name:'畜牧圈', cost:55, costMineral:30, size:56, max:2, buildTime:18,
+      desc:'住宅容量 +3。提供床位让居民睡眠。' },
+    bl_pasture:     { name:'畜牧圈', cost:0, costMineral:30, costRes:{ wood:30, stone:15 }, size:56, max:2, buildTime:18,
       dispH:97, cells:[2,2],
-      desc:'饲养星绵羊。肉和皮堆在圈边, 搬走才入账。',
-      upg:{ maxLv:2, costRes:'leather' } },
-    bl_workshop:    { name:'工坊', cost:40, costMineral:25, size:48, max:2, buildTime:18,
+      desc:'饲养星绵羊产肉和皮革。',
+      upg:{ maxLv:2, costRes:'leather', cost:55 } },
+    bl_workshop:    { name:'工坊', cost:0, costMineral:25, costRes:{ wood:15, iron:20, stone:10 }, size:48, max:2, buildTime:18,
       dispH:110, cells:[2,2],
-      desc:'有工匠时耗矿材做药品, 成品堆在地上。搬进仓库后医疗舱才用得上。' },
+      desc:'有工匠时将草药提炼成药品。' },
   };
   var JOB_CYCLE = [null, 'bl_farm', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
   /* ---------- Task3: 建筑等级 ---------- */
   function upgradeCost(def, curLv){
-    return Math.round(def.cost * Math.pow(1.6, curLv));
+    var baseCost = def.cost || (def.upg && def.upg.cost) || 40;
+    return Math.round(baseCost * Math.pow(1.6, curLv));
   }
   function canUpgrade(b, def, research, leather){
     if (!def.upg) return {ok:false, why:'不可升级'};
@@ -87,11 +88,12 @@ APH.Colony = (function(){
   function refundOf(def){
     /* BUILDINGS 表的 def 无 id 字段, 用对象同一性比对发射台 */
     if (!def || def===BUILDINGS.bl_landing_pad) return 0;
-    return Math.floor(def.cost/2);
+    var baseCost = def.cost || (def.upg && def.upg.cost) || (def.costMineral ? Math.round(def.costMineral*1.5) : 40);
+    return Math.floor(baseCost/2);
   }
   function refundMineralOf(def){
     if (!def || def===BUILDINGS.bl_landing_pad) return 0;
-    return Math.floor((def.costMineral||0)/2);
+    return Math.floor(((def && def.costMineral)||20)/2);
   }
 
   /* 仓库负重加成(纯函数): 每 warehouse +20。
@@ -161,6 +163,9 @@ APH.Colony = (function(){
         x:g.x, y:g.y, itemId:g.itemId, n:g.n, bobA:i*0.7, stock:true
       });
     });
+    /* 程序化生成自然资源生态实体(树木/矿脉/灌木) */
+    var flora = generateFlora(seed);
+    flora.forEach(function(f){ s.entities.push(f); });
     ensurePad();
   }
 
@@ -193,14 +198,38 @@ APH.Colony = (function(){
     var c = def.cells||[1,1];
     return { w: c[0]*CFG.GRID, h: c[1]*CFG.GRID };
   }
-  /* 可否建造: 资源够 + 数量未满 + 位置合法(离核心不太近 + 占位矩形不重叠) */
-  function canPlace(colonyBuildings, research, bid, x, y, mineral){
+  /* 可否建造: 科技已解锁 + 物理材料充足 + 数量未满 + 位置合法 */
+  function canPlace(colonyBuildings, techOwned, bid, x, y, resStock){
     var def = BUILDINGS[bid];
     if(!def) return { ok:false, why:'未知建筑' };
-    if(def.cost > research) return { ok:false, why:'研究点不足 (需 '+def.cost+')' };
-    var needM = def.costMineral||0;
-    var haveM = (mineral==null) ? 1e9 : mineral;
-    if(needM > haveM) return { ok:false, why:'矿材不足 (需 '+needM+')' };
+
+    // 1. 如果传入数字作为 research (旧测试/旧调用)，且 def.cost > 0
+    if(typeof techOwned === 'number'){
+      if(def.cost > techOwned) return { ok:false, why:'研究点不足 (需 '+def.cost+')' };
+    }else if(def.reqTech){
+      var owned = (techOwned && typeof techOwned==='object') ? techOwned : {};
+      if(!owned[def.reqTech]){
+        var reqName = TECHS[def.reqTech] ? TECHS[def.reqTech].name : def.reqTech;
+        return { ok:false, why:'需先研发科技: ' + reqName };
+      }
+    }
+
+    // 2. 建材校验: 支持纯数字 (矿材) 与 对象字典 (多材料)
+    if(typeof resStock === 'number'){
+      var needM = def.costMineral || 0;
+      if(needM > resStock) return { ok:false, why:'矿材不足 (需 '+needM+')' };
+    }else if(resStock && typeof resStock === 'object'){
+      var costRes = def.costRes || {};
+      for(var k in costRes){
+        var need = costRes[k] || 0;
+        var have = resStock[k] != null ? resStock[k] : (resStock.mineral != null ? resStock.mineral : 0);
+        if(have < need){
+          var itName = (CFG.items[k] && CFG.items[k].name) ? CFG.items[k].name : k;
+          return { ok:false, why: itName + '不足 (需 ' + need + ')' };
+        }
+      }
+    }
+
     if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
     if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
@@ -662,25 +691,65 @@ APH.Colony = (function(){
     },0)*0.15;
   }
 
-  /* ---------- 科技树 v1 (ADR-9: te_ 前缀; 消耗研究点) ----------
-     effect 字段由 applyTech 解释, 永不直接改数值。 */
+  /* ---------- 科技树 (分层前置依赖链: ADR-9 te_ 前缀; 消耗研究点) ---------- */
   var TECHS = {
-    te_o2tank:   { name:'氧气罐扩容', cost:40, max:3,
-                   desc:'氧气上限 +25', effect:{ o2Max:+25 } },
-    te_weaponry: { name:'等离子强化', cost:60, max:3,
-                   desc:'武器伤害 +30%', effect:{ dmgMul:.30 } },
-    te_radar:    { name:'深空雷达', cost:50, max:2,
-                   desc:'罗盘标晶体与敌基地; 农产 +15%/级', effect:{ radar:true, farmMul:.15 } },
-    te_exosuit:  { name:'外骨骼', cost:90, max:2,
-                   desc:'移动速度 +15%', effect:{ spdMul:.15 } },
+    // 农业分支
+    te_basic_farming:   { name:'基础外星农耕', cost:40, max:1, requires:[],
+                          desc:'野生植被采摘速度 +50%' },
+    te_hydroponics:     { name:'温控水培技术', cost:80, max:1, requires:['te_basic_farming'],
+                          desc:'解锁水培农场 bl_farm 蓝图' },
+    te_bio_adaptation:  { name:'外星生态适应', cost:150, max:1, requires:['te_hydroponics'],
+                          desc:'酸雨/毒雾暴露累积降低 50%' },
+
+    // 工业分支
+    te_stonecutting:    { name:'石料切割加工', cost:40, max:1, requires:[],
+                          desc:'解锁精制石料建材与篝火' },
+    te_machining:       { name:'机械锻造合金', cost:90, max:1, requires:['te_stonecutting'],
+                          desc:'解锁自动采矿机 bl_mine 蓝图' },
+    te_deep_drilling:   { name:'深空重型钻探', cost:160, max:1, requires:['te_machining'],
+                          desc:'采矿机产量翻倍' },
+
+    // 医学分支
+    te_herbal_remedies: { name:'草药提炼包扎', cost:50, max:1, requires:[],
+                          desc:'草药可搓制初级药包' },
+    te_medicine:        { name:'外星临床医学', cost:100, max:1, requires:['te_herbal_remedies'],
+                          desc:'解锁医疗舱 bl_clinic 蓝图' },
+    te_bionics:         { name:'仿生机能强化', cost:180, max:1, requires:['te_medicine'],
+                          desc:'全员三维机能底线 +15%' },
+
+    // 安防分支
+    te_ballistics:      { name:'弹道工程防卫', cost:60, max:1, requires:[],
+                          desc:'解锁兵营 bl_barracks，等离子伤害 +30%', effect:{ dmgMul:.30 } },
+    te_weaponry:        { name:'弹道工程防卫', cost:60, max:3, requires:[],
+                          desc:'等离子伤害 +30%', effect:{ dmgMul:.30 } }, // 兼容旧档别名
+    te_turret_tech:     { name:'自动防御炮塔', cost:110, max:1, requires:['te_ballistics'],
+                          desc:'解锁防御炮塔 bl_turret 蓝图' },
+    te_plasma_grid:     { name:'等离子电网重炮', cost:200, max:1, requires:['te_turret_tech'],
+                          desc:'炮塔伤害翻倍' },
+
+    // 探索分支
+    te_o2tank:          { name:'氧气罐扩容', cost:40, max:3, requires:[],
+                          desc:'氧气上限 +25', effect:{ o2Max:+25 } },
+    te_radar:           { name:'深空广域雷达', cost:80, max:2, requires:['te_ballistics'],
+                          desc:'罗盘标晶体与敌基地', effect:{ radar:true } },
+    te_exosuit:         { name:'外骨骼动力装甲', cost:140, max:2, requires:['te_machining'],
+                          desc:'移动速度 +15%', effect:{ spdMul:.15 } },
   };
 
-  /* 可购判定(纯函数) */
+  /* 可购判定(纯函数): 检查研究点与所有 requires 前置科技 */
   function canBuy(meta, techId, owned){
     var t=TECHS[techId];
     if(!t) return { ok:false, why:'未知科技' };
-    if((owned[techId]||0)>=t.max) return { ok:false, why:'已达最高等级' };
-    if(meta.research < t.cost) return { ok:false, why:'研究点不足 (需 '+t.cost+')' };
+    if((owned[techId]||0)>= (t.max||1)) return { ok:false, why:'已达最高等级' };
+    if((meta.research||0) < t.cost) return { ok:false, why:'研究点不足 (需 '+t.cost+')' };
+    var reqs = t.requires || [];
+    for(var i=0; i<reqs.length; i++){
+      var r = reqs[i];
+      if(!owned || !owned[r]){
+        var reqName = TECHS[r] ? TECHS[r].name : r;
+        return { ok:false, why:'需先研发: ' + reqName };
+      }
+    }
     return { ok:true };
   }
 
@@ -692,6 +761,61 @@ APH.Colony = (function(){
     var o = Object.assign({}, owned);
     o[techId]=(o[techId]||0)+1;
     return { ok:true, owned:o };
+  }
+
+  /* ---------- 自然生态生成(纯函数) ---------- */
+  function generateFlora(seed){
+    var rng = U.makeRng((seed ^ 0xF108A) >>> 0 || 17);
+    var out = [];
+    var H = CFG.HAB || { x:1100, y:1100 };
+    for(var i=0; i<12; i++){
+      var ang = rng() * U.TAU, dist = 160 + rng() * 500;
+      out.push({ id:'flora_tree_'+i, type:'flora', kind:'tree',
+                 x:U.clamp(H.x+Math.cos(ang)*dist, 100, CFG.WORLD-100),
+                 y:U.clamp(H.y+Math.sin(ang)*dist, 100, CFG.WORLD-100), hp:30, maxHp:30 });
+    }
+    for(var j=0; j<6; j++){
+      var ang2 = rng() * U.TAU, d2 = 200 + rng() * 450;
+      out.push({ id:'flora_iron_'+j, type:'flora', kind:'rock_iron',
+                 x:U.clamp(H.x+Math.cos(ang2)*d2, 100, CFG.WORLD-100),
+                 y:U.clamp(H.y+Math.sin(ang2)*d2, 100, CFG.WORLD-100), hp:40, maxHp:40 });
+    }
+    for(var k=0; k<8; k++){
+      var ang3 = rng() * U.TAU, d3 = 180 + rng() * 520;
+      out.push({ id:'flora_stone_'+k, type:'flora', kind:'rock_stone',
+                 x:U.clamp(H.x+Math.cos(ang3)*d3, 100, CFG.WORLD-100),
+                 y:U.clamp(H.y+Math.sin(ang3)*d3, 100, CFG.WORLD-100), hp:35, maxHp:35 });
+    }
+    for(var m=0; m<8; m++){
+      var ang4 = rng() * U.TAU, d4 = 150 + rng() * 400;
+      var kind = m%2===0 ? 'bush_berry' : 'bush_herb';
+      out.push({ id:'flora_bush_'+m, type:'flora', kind:kind,
+                 x:U.clamp(H.x+Math.cos(ang4)*d4, 100, CFG.WORLD-100),
+                 y:U.clamp(H.y+Math.sin(ang4)*d4, 100, CFG.WORLD-100),
+                 hp: kind==='bush_berry'?15:20, maxHp: kind==='bush_berry'?15:20 });
+    }
+    return out;
+  }
+
+  /* 居民在自然实体上工作推进(纯函数) */
+  function workOnFlora(target, resident, dt){
+    if(!target || target.hp <= 0) return { done:true, dropItemId:null, dropCount:0 };
+    var eff = (window.APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(resident) : 1;
+    var sk = (resident && resident.skills) ? ((target.kind==='tree'||target.kind.startsWith('bush')) ? (resident.skills.sk_farm||0) : (resident.skills.sk_craft||0)) : 0;
+    var rate = dt * eff * (1 + sk*0.15);
+    target.hp -= rate;
+    if(target.hp <= 0){
+      target.hp = 0;
+      target.dead = true;
+      var dropId = 'it_wood', dropN = 4;
+      if(target.kind === 'tree'){ dropId = 'it_wood'; dropN = 4; }
+      else if(target.kind === 'rock_iron'){ dropId = 'it_iron'; dropN = 3; }
+      else if(target.kind === 'rock_stone'){ dropId = 'it_stone'; dropN = 4; }
+      else if(target.kind === 'bush_berry'){ dropId = 'it_berry'; dropN = 3; }
+      else if(target.kind === 'bush_herb'){ dropId = 'it_herb'; dropN = 2; }
+      return { done:true, dropItemId:dropId, dropCount:dropN };
+    }
+    return { done:false, dropItemId:null, dropCount:0 };
   }
 
   return {
@@ -717,6 +841,6 @@ APH.Colony = (function(){
     itemCount:itemCount, takeDropped:takeDropped,
     stockLabel:stockLabel, takeFromGround:takeFromGround,
     takeStock:takeStock, ensureStock:ensureStock,
-    ensurePad:ensurePad,
+    ensurePad:ensurePad, generateFlora:generateFlora, workOnFlora:workOnFlora,
   };
 })();

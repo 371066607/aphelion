@@ -736,6 +736,58 @@ APH.Ent = (function(){
     ctx.restore();
   }
 
+  /* 自然资源实体绘制(树木/铁矿/岩石/灌木) */
+  function drawFlora(e, time){
+    if(!ctx || !e) return;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.fillStyle='rgba(0,0,0,.22)';
+    ctx.beginPath(); ctx.ellipse(0,4,12,6,0,0,U.TAU); ctx.fill();
+    if(e.kind === 'tree'){
+      ctx.fillStyle='#6d4c41';
+      ctx.fillRect(-3, -12, 6, 14);
+      ctx.fillStyle='#388e3c';
+      ctx.beginPath(); ctx.arc(0, -20, 16, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#4caf50';
+      ctx.beginPath(); ctx.arc(-4, -24, 11, 0, U.TAU); ctx.fill();
+    }else if(e.kind === 'rock_iron'){
+      ctx.fillStyle='#455a64';
+      ctx.beginPath();
+      ctx.moveTo(-10, 4); ctx.lineTo(-6, -10); ctx.lineTo(6, -12); ctx.lineTo(12, 0); ctx.lineTo(6, 6);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#78909c';
+      ctx.beginPath(); ctx.arc(0, -3, 5, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#80d8ff'; ctx.fillRect(-2, -5, 2, 2);
+    }else if(e.kind === 'rock_stone'){
+      ctx.fillStyle='#757575';
+      ctx.beginPath();
+      ctx.moveTo(-8, 5); ctx.lineTo(-10, -6); ctx.lineTo(0, -10); ctx.lineTo(9, -4); ctx.lineTo(7, 6);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#9e9e9e';
+      ctx.beginPath(); ctx.arc(1, -2, 4, 0, U.TAU); ctx.fill();
+    }else if(e.kind === 'bush_berry'){
+      ctx.fillStyle='#2e7d32';
+      ctx.beginPath(); ctx.arc(0, -4, 10, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#e53935';
+      ctx.beginPath(); ctx.arc(-3, -6, 2.5, 0, U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(4, -4, 2.5, 0, U.TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, -1, 2.5, 0, U.TAU); ctx.fill();
+    }else if(e.kind === 'bush_herb'){
+      ctx.fillStyle='#00897b';
+      ctx.beginPath(); ctx.arc(0, -4, 9, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#80cbc4';
+      ctx.beginPath(); ctx.arc(0, -8, 3, 0, U.TAU); ctx.fill();
+    }
+    if(e.hp < (e.maxHp||30)){
+      var pct = Math.max(0, e.hp / (e.maxHp||30));
+      ctx.fillStyle='#1a2334';
+      ctx.fillRect(-10, 8, 20, 3);
+      ctx.fillStyle='#7dffab';
+      ctx.fillRect(-10, 8, 20*pct, 3);
+    }
+    ctx.restore();
+  }
+
   /* 建筑绘制(殖民地/远征通用) */
     return {
     bindCtx:bindCtx,
@@ -743,7 +795,7 @@ APH.Ent = (function(){
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
-    drawBuilding:drawBuilding,
+    drawBuilding:drawBuilding, drawFlora:drawFlora,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();

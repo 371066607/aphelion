@@ -82,9 +82,15 @@ APH.Save = (function(){
       m.tech.forEach(function(k){ if(typeof k==='string') tObj[k]=1; });
       m.tech = tObj;
     }
-    if(!m.res) m.res = { mineral:0, food:0, leather:0, med:0 };
+    if(!m.res) m.res = { wood:50, stone:30, iron:40, food:20, herb:5, med:2, leather:0, mineral:0 };
+    if(m.res.wood===undefined) m.res.wood = 50;
+    if(m.res.stone===undefined) m.res.stone = 30;
+    if(m.res.iron===undefined) m.res.iron = (m.res.mineral!=null?m.res.mineral:40);
+    if(m.res.herb===undefined) m.res.herb = 5;
+    if(m.res.food===undefined) m.res.food = 20;
     if(m.res.leather===undefined) m.res.leather = 0;
-    if(m.res.med===undefined) m.res.med = 0;
+    if(m.res.med===undefined) m.res.med = 2;
+    if(m.res.mineral===undefined) m.res.mineral = m.res.iron;
     if(!m.residents) m.residents = [];
     m.residents.forEach(function(r){
       if(r.rest===undefined) r.rest = 100;

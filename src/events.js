@@ -62,7 +62,13 @@ APH.Events = (function(){
     (buildings||[]).forEach(function(b){
       var def = APH.Colony && APH.Colony.get ? APH.Colony.get(b.id) : null;
       if(!def) return;
-      wBld += ((def.cost||0)+(def.costMineral||0)) * (b.lv||1);
+      var bVal = (def.cost||0);
+      if(def.costRes && Object.keys(def.costRes).length){
+        for(var m in def.costRes) bVal += (def.costRes[m]||0);
+      }else{
+        bVal += (def.costMineral||0);
+      }
+      wBld += (bVal || 50) * (b.lv||1);
     });
     var popW = E.wealthPerPop!=null ? E.wealthPerPop : 40;
     var techW = E.wealthPerTech!=null ? E.wealthPerTech : 40;

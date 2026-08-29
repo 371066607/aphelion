@@ -1259,6 +1259,7 @@ window.APH = window.APH || {};
       blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
       resident:function(e,t){ APH.Ent.drawResident(e,t); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
+      flora:function(e,t){ APH.Ent.drawFlora(e,t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -1267,7 +1268,7 @@ window.APH = window.APH || {};
 
   /* ================= 科技效果应用 ================= */
   function applyTech(meta,techId){
-    var t=APH.Colony.TECHS[techId]; if(!t) return;
+    var t=APH.Colony.TECHS[techId]; if(!t || !t.effect) return;
     var lv=meta.tech[techId]||0;
     var P=CFG.player;
     /* 从基准值重算, 避免叠加误差 */
@@ -1286,41 +1287,37 @@ window.APH = window.APH || {};
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
     var s=APH.state;
-    /* ADR-4 格网吸附: 中心对齐48px格点, 占位格随之对齐 */
     var gx=Math.round(wx/CFG.GRID)*CFG.GRID,
         gy=Math.round(wy/CFG.GRID)*CFG.GRID;
-    /* V1: 建造专长折扣 */
     var mul=APH.Res.globalBonuses(s.meta.residents||[]).buildCostMul;
-    var effCost=Math.max(1,Math.round(APH.Colony.get(bid).cost*mul));
-    /* 占位碰撞把在建蓝图也算上(否则两座2x2可叠放) */
     var occupied=s.colony.buildings.concat((s.colony.buildQueue||[]).map(function(q){
       return {id:q.bid,x:q.x,y:q.y};
     }));
-    var check=APH.Colony.canPlace(occupied, s.meta.research, bid, gx, gy, haveStock('mineral'));
+    var check=APH.Colony.canPlace(occupied, s.meta.tech, bid, gx, gy, s.meta.res);
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
-    var effMin=Math.max(0, Math.round((def.costMineral||0)*mul));
-    if(s.meta.research<effCost){ APH.UI.floatText('✕ 研究点不足','#ff9a9a'); return; }
-    s.meta.res = s.meta.res || { mineral:0, food:0, leather:0 };
-    if(effMin>0){
-      if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'mineral', effMin)){
-        APH.UI.floatText('✕ 矿材不足','#ff9a9a'); return;
+    var costRes=def.costRes||{};
+    s.meta.res = s.meta.res || { mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
+    for(var mat in costRes){
+      var need=Math.max(0, Math.round((costRes[mat]||0)*mul));
+      if(need>0){
+        if(!APH.Colony.ensureStock(s.meta.res, s.entities, mat, need)){
+          var matName=(CFG.items[mat]&&CFG.items[mat].name)?CFG.items[mat].name:mat;
+          APH.UI.floatText('✕ '+matName+'不足','#ff9a9a'); return;
+        }
+        s.meta.res[mat]=Math.max(0, (s.meta.res[mat]||0)-need);
       }
-      s.meta.res.mineral=(s.meta.res.mineral||0)-effMin;
     }
-    s.meta.research-=effCost;
-    /* Task2: 进入建造队列(工期), 完工后由 updateHome 放置实体 */
     s.colony.buildQueue = s.colony.buildQueue||[];
     var qpos={x:gx,y:gy};
     s.colony.buildQueue.push({bid:bid,x:qpos.x,y:qpos.y,
                               total:def.buildTime||5, progress:0});
-    /* 蓝图实体: 没有它施工队列在场景里完全不可见(2026-08-25 QA发现) */
     s.entities.push({id:'bp_'+bid+'_'+s.colony.buildQueue.length,
       type:T.BLUEPRINT, bid:bid, x:qpos.x, y:qpos.y, progress:0, building:false});
     APH.Save.saveMeta(s.meta);
     saveColony();
     U.emit('queued',{id:bid});
-    APH.UI.floatText('🔨 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
+    APH.UI.floatText('🛠 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
   }
   function saveColony(){
@@ -1497,24 +1494,28 @@ window.APH = window.APH || {};
         var ti=tids.indexOf(s.techSel);
         s.techSel=tids[(ti+1)%tids.length];
         var tdef=APH.Colony.TECHS[s.techSel];
-        var lv=s.meta.tech[s.techSel]||0;
-        APH.UI.setHint('[回车购买] '+tdef.name+' Lv'+lv+'/'+tdef.max+
-          ' · '+tdef.desc+' · '+tdef.cost+'研究点 (再按T换, Enter买)');
+        var lv=(s.meta.tech&&s.meta.tech[s.techSel])||0;
+        var reqTxt = (tdef.requires && tdef.requires.length)
+          ? (' [前置: ' + tdef.requires.map(function(k){ return APH.Colony.TECHS[k]?APH.Colony.TECHS[k].name:k; }).join(',') + ']') : '';
+        var canRes = APH.Colony.canBuy(s.meta, s.techSel, s.meta.tech||{});
+        var statusTxt = canRes.ok ? '[回车研发]' : ('[' + canRes.why + ']');
+        APH.UI.setHint(statusTxt + ' ' + tdef.name + ' Lv' + lv + '/' + (tdef.max||1) +
+          reqTxt + ' · ' + tdef.desc + ' · ' + tdef.cost + '研究点 (T换/Enter研)');
       }
       if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'){
         var tpEnt=document.getElementById('tradePanel');
         if(tpEnt && tpEnt.style.display!=='none' && currentTrader()){
           doTradeRow(s.tradeSel||0);
         }else if(s.techSel){
-        var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech);
-        if(r2.ok){
-          s.meta.tech=r2.owned;
-          APH.Save.saveMeta(s.meta);
-          applyTech(s.meta,s.techSel);
-          APH.UI.floatText('✔ 研究完成: '+APH.Colony.TECHS[s.techSel].name,'#59d9ff');
-        }else{
-          APH.UI.floatText('✕ 无法研究','#ff9a9a');
-        }
+          var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
+          if(r2.ok){
+            s.meta.tech=r2.owned;
+            APH.Save.saveMeta(s.meta);
+            applyTech(s.meta,s.techSel);
+            APH.UI.floatText('✔ 研发成功: '+APH.Colony.TECHS[s.techSel].name,'#59d9ff');
+          }else{
+            APH.UI.floatText('✕ '+r2.why,'#ff9a9a');
+          }
         }
       }
       if(e.code==='KeyK'&&s.mode==='running'&&s.debugKeys){
@@ -1916,12 +1917,12 @@ window.APH = window.APH || {};
     var s=APH.state;
     document.getElementById('brResearch').textContent='研究点 '+s.meta.research;
     var bm=document.getElementById('brMineral');
-    if(bm) bm.textContent='矿材 '+(APH.Colony.stockLabel
-      ? APH.Colony.stockLabel(s.meta.res, s.entities, 'mineral')
-      : (s.meta.res&&s.meta.res.mineral||0));
+    if(bm){
+      var r=s.meta.res||{};
+      bm.textContent='木 '+(r.wood||0)+' · 铁 '+(r.iron||r.mineral||0)+' · 石 '+(r.stone||0);
+    }
     var qEl=document.getElementById('brQueue');
     if(s.colony.buildQueue&&s.colony.buildQueue.length){
-      /* 剩余秒=工期×未完成比例(队列项无 remain 字段, 旧代码读 undefined→恒显 NaNs) */
       var q0=s.colony.buildQueue[0];
       var remain=Math.ceil((q0.total||0)*(1-(q0.progress||0)));
       qEl.textContent='施工中 '+s.colony.buildQueue.length+' 项 · '+remain+'s';
@@ -1933,26 +1934,32 @@ window.APH = window.APH || {};
     Object.keys(APH.Colony.list()).forEach(function(bid){
       if(bid==='bl_landing_pad') return;
       var def=APH.Colony.get(bid);
-      /* 数量口径须与 canPlace 一致: 已完工 + 施工中蓝图都占上限,
-         否则卡片显示 n/max 可点、放置时却被"已达数量上限"拒(假可点) */
       var nBuilt=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
       var nQueued=(s.colony.buildQueue||[]).filter(function(q){return q.bid===bid;}).length;
       var n=nBuilt+nQueued;
-      var ok=s.meta.research>=def.cost && haveStock('mineral')>=(def.costMineral||0) && n<def.max;
+      var check=APH.Colony.canPlace(s.colony.buildings, s.meta.tech, bid, s.px, s.py, s.meta.res);
+      var ok=check.ok && n<def.max;
+      var costRes=def.costRes||{};
+      var costPills=Object.keys(costRes).map(function(k){
+        var itName=(CFG.items[k]&&CFG.items[k].name)?CFG.items[k].name:k;
+        return '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;'+
+          'padding:1px 7px;font-size:10px;margin-right:3px">'+costRes[k]+itName+'</span>';
+      }).join('');
+      var reqTag=def.reqTech&&(!s.meta.tech||!s.meta.tech[def.reqTech])
+        ? '<div style="color:#ff6d7a;font-size:10px;margin-top:2px">[需研: '+(APH.Colony.TECHS[def.reqTech]?APH.Colony.TECHS[def.reqTech].name:def.reqTech)+']</div>'
+        : '';
       var card=document.createElement('div');
       card.style.cssText='flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:'+
-        (ok?'pointer':'not-allowed')+';opacity:'+(ok?1:.45)+';background:'+colors[i%colors.length]+
+        (ok?'pointer':'not-allowed')+';opacity:'+(ok?1:.55)+';background:'+colors[i%colors.length]+
         ';border:2px solid #fff;box-shadow:0 3px 8px rgba(61,52,40,.12);transition:transform .25s cubic-bezier(.4,0,.2,1)';
       card.innerHTML='<b style="color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(61,52,40,.35)">'+
         def.name+'</b><span style="float:right;color:#fff;font-size:10px">'+n+'/'+def.max+'</span><br>'+
-        '<span style="display:inline-block;background:#f7f3df;color:#794f27;border-radius:50px;'+
-        'padding:1px 9px;font-size:11px;font-weight:700;margin-top:4px">'+def.cost+'研</span>'+
-        '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;'+
-        'padding:1px 9px;font-size:11px;margin-left:4px">'+(def.costMineral||0)+'矿</span>'+
+        '<div style="margin-top:4px">'+costPills+'</div>'+
+        reqTag+
         '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
-        'padding:1px 9px;font-size:11px;margin-left:4px">'+def.buildTime+'s</span>'+
+        'padding:1px 8px;font-size:10px;margin-top:4px">'+def.buildTime+'s</span>'+
         ((def.cells&&def.cells[0]>1)?'<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;'+
-          'border-radius:50px;padding:1px 8px;font-size:11px;margin-left:4px">'+def.cells[0]+'×'+def.cells[1]+'</span>':'');
+          'border-radius:50px;padding:1px 7px;font-size:10px;margin-left:3px">'+def.cells[0]+'×'+def.cells[1]+'</span>':'');
       if(ok){
         card.addEventListener('click',function(){
           s.buildMode=bid;
