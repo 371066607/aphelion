@@ -104,6 +104,14 @@
 
 - [x] `hum_0_nopack_prone` 16 帧横排（四向各 4），整人预烘焙；不旋转 walk、不运行时换色、不叠五官；缺图回退 `player_prone`
 
+## 居民脸 1 无包俯卧图（Issue #61）
+
+- [x] `hum_1_nopack_prone` 16 帧横排（四向各 4），codex 生成 + chroma_key + build_sprites 管线；同脸同风格；缺图回退 `player_prone`、绝不旋转走循环
+
+## 居民脸 2 无包俯卧图（Issue #62）
+
+- [x] `hum_2_nopack_prone` 16 帧横排（四向各 4），codex 生成 + chroma_key + build_sprites 管线；同脸同风格；缺图回退 `player_prone`、绝不旋转走循环
+
 ## 击倒叠伤痕、睡着不叠（Issue #71）
 
 - [x] 击倒与睡着共用同一张俯卧身子：玩家/居民/过客各自验证 drawPlayer/drawResident/drawVisitor 下 downed 与 isSleeping 都命中同一 prone sheet（`player_prone` / `hum_0_nopack_prone`），不另画 downed sheet、不运行时换色、不叠五官（ADR-0003）

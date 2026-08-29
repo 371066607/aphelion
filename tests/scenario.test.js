@@ -1500,7 +1500,7 @@ test('#71 render: 居民击倒叠伤痕(专用俯卧sheet), 睡着同sheet不叠
   APH.Sprites.draw=function(ctx,name,x,y,idx,sc){ wc.calls.push({kind:'drawImage', sheet:name}); return true; };
   try{
     APH.Ent.bindCtx(wc.spy);
-    const base={id:'rs71', rid:'rs71', type:T.RESIDENT, x:500, y:500, name:'击倒居民',
+    const base={id:'rs_3', rid:'rs_3', type:T.RESIDENT, x:500, y:500, name:'击倒居民',
       mood:70, food:90, illness:0, face:Math.PI/2, walking:false, walkPh:0};
     APH.Ent.drawResident(Object.assign({},base,{downed:true, isSleeping:false}),0);
     A(wc.wounds().length>=4, '居民击倒应叠≥4处伤痕, got '+wc.wounds().length);

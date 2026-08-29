@@ -196,11 +196,25 @@ test('#59 sheetLayout: player_prone 16 帧横排, 建筑仍 null', () => {
   if (H.sheetLayout('bl_house')) throw new Error('建筑不应走人形布局');
 });
 
-test('#59/#60 sheetKey: 脸 0 无包居民用专用俯卧，其余沿用 player_prone', () => {
+test('#59/#60/#61/#62 sheetKey: 脸 0/1/2 无包居民用专用俯卧，其余沿用 player_prone', () => {
   if (H.sheetKey('player', 0, false, 'prone') !== 'player_prone') throw new Error('玩家俯卧: '+H.sheetKey('player',0,false,'prone'));
   if (H.sheetKey('resident', 0, false, 'prone') !== 'hum_0_nopack_prone') throw new Error('脸0无包居民俯卧: '+H.sheetKey('resident',0,false,'prone'));
-  if (H.sheetKey('resident', 2, false, 'prone') !== 'player_prone') throw new Error('未配专用图的居民俯卧: '+H.sheetKey('resident',2,false,'prone'));
+  if (H.sheetKey('resident', 1, false, 'prone') !== 'hum_1_nopack_prone') throw new Error('脸1无包居民俯卧: '+H.sheetKey('resident',1,false,'prone'));
+  if (H.sheetKey('resident', 2, false, 'prone') !== 'hum_2_nopack_prone') throw new Error('脸2无包居民俯卧: '+H.sheetKey('resident',2,false,'prone'));
+  if (H.sheetKey('resident', 3, false, 'prone') !== 'player_prone') throw new Error('脸3未配专用图的居民俯卧: '+H.sheetKey('resident',3,false,'prone'));
   if (H.sheetKey('visitor', 0, true, 'prone') !== 'player_prone') throw new Error('有包过客俯卧: '+H.sheetKey('visitor',0,true,'prone'));
+});
+
+test('#61 sheetLayout: 脸 1 无包居民 prone 为 16 帧四向各 4', () => {
+  var pr = H.sheetLayout('hum_1_nopack_prone');
+  if (!pr || pr.cols !== 16 || pr.count !== 16) throw new Error('居民俯卧应为 16 帧横排, got '+JSON.stringify(pr));
+  if (pr.fps !== 1) throw new Error('居民俯卧应慢呼吸 fps=1, got '+pr.fps);
+});
+
+test('#62 sheetLayout: 脸 2 无包居民 prone 为 16 帧四向各 4', () => {
+  var pr = H.sheetLayout('hum_2_nopack_prone');
+  if (!pr || pr.cols !== 16 || pr.count !== 16) throw new Error('居民俯卧应为 16 帧横排, got '+JSON.stringify(pr));
+  if (pr.fps !== 1) throw new Error('居民俯卧应慢呼吸 fps=1, got '+pr.fps);
 });
 
 test('#60 sheetLayout: 脸 0 无包居民 prone 为 16 帧四向各 4', () => {
@@ -238,11 +252,12 @@ test('#59 pose: 俯卧优先于 moving(躺着不因走而切换)', () => {
 
 test('#59 poseFor: 俯卧共用 sheet, 缺图也不回退走循环', () => {
   var readyAll = function(){ return true; };
-  var p = H.poseFor({ role:'resident', id:'rs_0', lying:true, face:Math.PI/2, time:0, pack:false }, readyAll);
+  /* rs_6 → 脸3(未配专用俯卧图), 应变用通用 player_prone */
+  var p = H.poseFor({ role:'resident', id:'rs_6', lying:true, face:Math.PI/2, time:0, pack:false }, readyAll);
   if (p.sheet !== 'player_prone') throw new Error('俯卧应为 player_prone, got '+p.sheet);
   if (p.cycle !== 'prone' || p.frame !== 0) throw new Error('俯卧帧应为 0, got '+JSON.stringify(p));
   var none = function(){ return false; };
-  var fb = H.poseFor({ role:'resident', id:'rs_0', lying:true, face:Math.PI, time:0, pack:false }, none);
+  var fb = H.poseFor({ role:'resident', id:'rs_6', lying:true, face:Math.PI, time:0, pack:false }, none);
   if (fb.sheet !== 'player_prone') throw new Error('俯卧缺图也应保持 player_prone, 不可换走循环, got '+fb.sheet);
   if (fb.cycle !== 'prone') throw new Error('俯卧缺图 cycle 应仍为 prone, got '+fb.cycle);
   if (fb.sheet === 'player_walk') throw new Error('俯卧绝不回退 player_walk');
@@ -271,8 +286,9 @@ test('#60 poseFor: 专用 prone 未就绪只回退通用 prone，绝不回退 wa
 
 test('#59 poseFor: 未配专用图的身份仍共用 player_prone', () => {
   var readyAll = function(){ return true; };
-  var a = H.poseFor({ role:'resident', id:'rs_0', lying:true, face:Math.PI/2, time:0 }, readyAll);
-  var b = H.poseFor({ role:'visitor', id:'rs_2', lying:true, face:Math.PI/2, time:0 }, readyAll);
+  /* rs_6 → 脸3 (未配专用俯卧图) */
+  var a = H.poseFor({ role:'resident', id:'rs_6', lying:true, face:Math.PI/2, time:0 }, readyAll);
+  var b = H.poseFor({ role:'visitor', id:'rs_6', lying:true, face:Math.PI/2, time:0 }, readyAll);
   if (a.sheet !== 'player_prone' || b.sheet !== 'player_prone') throw new Error('未配专用图的身份应共用 player_prone, got '+a.sheet+' / '+b.sheet);
   if (a.frame !== b.frame) throw new Error('同 face/time 应同帧, got '+a.frame+' / '+b.frame);
 });

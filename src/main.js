@@ -2072,6 +2072,8 @@ window.APH = window.APH || {};
         player_idle:{baseline:248,h:236},
         player_prone:{baseline:253,h:68},   /* #59 通用俯卧占位 */
         hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
+        ,hum_1_nopack_prone:{baseline:248,h:139} /* #61 脸1无包居民俯卧 */
+        ,hum_2_nopack_prone:{baseline:249,h:163} /* #62 脸2无包居民俯卧 */
       };
       (function(){
         var i, k;

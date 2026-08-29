@@ -589,3 +589,10 @@
   - **src 改动仅注释**：drawProneWounds 头部补 [-78,0] 不变式说明（4c），无行为变更。
   验证: `node tests/run.js` 375/0（+1 geometry）；`node tests/scenario.test.js` 65/0（+3 render）；定向 `survival+humanoid+residents+sprites` 164/0；perf 3/0；boss 7/0；`python3 build.py` 构建成功 27934KB 以 `</html>` 收尾（repo 根 build.py，无 aphelion/build.py）。全量 450 项自动化测试 100% 绿灯。无浏览器工具，伤痕区分由渲染测试断言 drawImage sheet + fillStyle 过滤伤痕计数。
   下一步: 实机打开 game.html 敲倒居民/玩家看血泊伤痕、床边睡眠/累塌看干净俯卧身（无血迹）；如需更明显血迹可后续在 `drawProneWounds` 加暗色核心血泊（4b，保持伤口色系、仍是伤痕-only 不换色）。
+
+- **2026-08-30 02:30 · 班次**: ✅#61 脸1无包俯卧图 + ✅#62 脸2无包俯卧图（codex 生成管线）。
+  - **管线沉淀**: 生图输出不透明纯绿背景(#00FF00)，build_sprites 只清"假透明"(中性近白)，故新增 `assets/chroma_key.py`（泛洪连通绿→透明，幂等；薄荷绿柔和绿 R/B 高不误伤）。脸1/2/3 全部经 chroma_key → build_sprites(use_feet 接地线+帧配准) → SPRITE_META → sprite_data.js。
+  - **脸1(`hum_1_nopack_prone`)**: 棕发男孩，16帧四向各4，baseline=248 内容高=139；**脸2(`hum_2_nopack_prone`)**: 丸子头，baseline=249 内容高=163。prompt 强化"每格头必须在左"（脸2 初版帧8 头朝右与 #60/脸1 相反，重生成修正）。
+  - **接线**: humanoid `sheetKey` 加 fi===1→hum_1 / fi===2→hum_2；SPRITE_META 对应注册。**旧测试修正**: #59 poseFor 两测试原用 `rs_0`(fnv→脸1)/`rs_2`(→脸3) 断言 player_prone——脸1 接入后 rs_0 应得 hum_1，改用 `rs_6`(脸3 未配) 断言通用图，语义才正确；#71 render 居民测试 `rs71`→脸2，改用 `rs_3`(真脸0) 断言 hum_0。
+  - 验证: `node tests/run.js` 383/0（sheetKey 脸1/脸2 + sheetLayout #61/#62 + 修正的 poseFor）；scenario 71/0；perf 3/0；boss 7/0；`python3 build.py` 构建成功 29389KB 以 `</html>` 收尾。全量 464 项绿灯。
+  - 下一步: #63 脸3 俯卧（红棕卷发）——codex 整张16帧时帧4/12 割裂/裁切，改分向生成(4张×4帧)再拼 16 格。
