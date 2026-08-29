@@ -596,3 +596,9 @@
   - **接线**: humanoid `sheetKey` 加 fi===1→hum_1 / fi===2→hum_2；SPRITE_META 对应注册。**旧测试修正**: #59 poseFor 两测试原用 `rs_0`(fnv→脸1)/`rs_2`(→脸3) 断言 player_prone——脸1 接入后 rs_0 应得 hum_1，改用 `rs_6`(脸3 未配) 断言通用图，语义才正确；#71 render 居民测试 `rs71`→脸2，改用 `rs_3`(真脸0) 断言 hum_0。
   - 验证: `node tests/run.js` 383/0（sheetKey 脸1/脸2 + sheetLayout #61/#62 + 修正的 poseFor）；scenario 71/0；perf 3/0；boss 7/0；`python3 build.py` 构建成功 29389KB 以 `</html>` 收尾。全量 464 项绿灯。
   - 下一步: #63 脸3 俯卧（红棕卷发）——codex 整张16帧时帧4/12 割裂/裁切，改分向生成(4张×4帧)再拼 16 格。
+
+- **2026-08-30 03:30 · 班次**: ✅#63 脸3无包俯卧图（codex 分向生成）。
+  - **策略变更**: 整张 16 帧一次生成时，脸3 的帧4/12 多次出现割裂/裁切（codex 对多姿态一致性不稳）。改**分向生成**: 4 张各 4 帧的 1024×256 strip（俯卧/左侧躺/右侧躺/仰躺，各向 4 帧只差呼吸），PIL 拼成 4096×256 16 格，再走 chroma_key → build_sprites。**四向帧全部头朝左、完整居中**（prompt 强化 CRITICAL head at LEFT + 完整不裁切）。
+  - **接线**: humanoid `sheetKey` fi===3→hum_3；SPRITE_META `hum_3_nopack_prone:{baseline:198,h:139}`。**测试适配全脸有图现实**: #59 poseFor 两测试改为验证"专用图缺图→回退通用 player_prone 而非走循环"与"过客/玩家共用 player_prone"；sheetKey 测试扩到四脸专用图。
+  - 验证: `node tests/run.js` 384/0（sheetLayout #63 + 适配后 poseFor）；scenario 71/0；perf 3/0；boss 7/0；`python3 build.py` 构建成功 30195KB 以 `</html>` 收尾。全量 465 项绿灯。
+  - 下一步: **#68 居民睡着改俯卧**——四脸俯卧图已全齐（#60-63 关），居民睡着应不再站姿呼吸+Zzz，测试断言睡着为俯卧姿态。

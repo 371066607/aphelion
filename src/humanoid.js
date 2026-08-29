@@ -25,11 +25,12 @@ APH.Humanoid = (function(){
     if (fi < 0) fi = 0;
     if (fi > 3) fi = 3;
     if (cycle === 'prone') {
-      /* #60/#61/#62: 居民专用俯卧图；未配身份继续用 #59 通用图 */
+      /* #60/#61/#62/#63: 居民专用俯卧图；全脸接入后不再回退通用图 */
       if (role === 'resident' && !pack) {
         if (fi === 0) return 'hum_0_nopack_prone';
         if (fi === 1) return 'hum_1_nopack_prone';
         if (fi === 2) return 'hum_2_nopack_prone';
+        if (fi === 3) return 'hum_3_nopack_prone';
       }
       return 'player_prone';
     }

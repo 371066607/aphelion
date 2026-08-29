@@ -2074,6 +2074,7 @@ window.APH = window.APH || {};
         hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
         ,hum_1_nopack_prone:{baseline:248,h:139} /* #61 脸1无包居民俯卧 */
         ,hum_2_nopack_prone:{baseline:249,h:163} /* #62 脸2无包居民俯卧 */
+        ,hum_3_nopack_prone:{baseline:198,h:139} /* #63 脸3无包居民俯卧(分向生成后拼接) */
       };
       (function(){
         var i, k;
