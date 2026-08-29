@@ -207,6 +207,8 @@ APH.CFG = {
   /* 殖民者需求(饱食/心情/病情). 不是玩家 HP/O2, 也不是远征消耗品 */
   residents: {
     illnessMax: 100,
+    sickMarkAt: 20,             // 病情达到此值显示场上病号标记
+    sickMarkFontPx: 14,
     eatBelow: 60,
     eatGain: 25,
     foodDrain: 6,
@@ -361,9 +363,11 @@ APH.CFG = {
     mealCost: 2,
     mealImpress: 20,
   },
-  /* 居民短距走位(无寻路、无作息): 家↔岗位, 袭击回家 */
+  /* 家园走位: 居民短距无寻路; 玩家与居民共用病情减速规则 */
   walk: {
     speed: 56,
+    sickAbove: 20,             // 严格超过此病情才减速
+    sickSpeedMul: 0.6,
     arriveR: 3,
   },
   /* 地上物(RimWorld 式): 产出堆在地上, 搬进仓库才入账 */

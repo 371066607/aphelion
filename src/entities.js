@@ -766,7 +766,10 @@ APH.Ent = (function(){
     var ml=Math.sqrt(mx*mx+my*my);
     if(ml>1){ mx/=ml; my/=ml; }
     var moving = ml>.01;
-    var spd=(s.run?P.runSpeed:P.walkSpeed)*(ml>0?ml:0);
+    var walkCfg=CFG.walk||{};
+    var needs=s.meta&&s.meta.playerNeeds;
+    var sickMul=s.scene==='home' && needs && needs.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
+    var spd=(s.run?P.runSpeed:P.walkSpeed)*sickMul*(ml>0?ml:0);
     if(moving){
       s.face=Math.atan2(my,mx);
       s.vx=U.lerp(s.vx,mx*spd,dt*P.accel);
@@ -798,9 +801,10 @@ APH.Ent = (function(){
 
   function drawResidentMarks(e, bob, iconY, haulY){
     var ill=e.illness||0;
-    if(ill>=20){
+    var sickMarkAt=CFG.residents.sickMarkAt;
+    if(ill>=sickMarkAt){
       ctx.fillStyle='#ff6d7a';
-      ctx.font='9px sans-serif'; ctx.textAlign='center';
+      ctx.font=CFG.residents.sickMarkFontPx+'px sans-serif'; ctx.textAlign='center';
       ctx.fillText('✚', 11, iconY+bob);
     }
     var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;

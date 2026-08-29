@@ -540,3 +540,13 @@
   新增 `assets/hum_0_nopack_prone_sheet.png`（4096×256，16 帧横排，四向各 4；脸 0 无包整人预烘焙，无运行时换色/五官叠层）。`Humanoid.sheetKey/pose/poseFor` 让脸 0 无包居民优先选专用 prone；专用图未就绪只回退 `player_prone`，绝不回退 walk。`main.js` 注册实测锚点 `baseline=248,h=122`；sprite data 重生成至 34 sheets；ADR-0003 与 DESIGN 追加 #60 修订。
   验证: 资产探针 4096×256 / 16 帧非空 / 每向 4 帧各异 / 内联键唯一；`python build.py` 构建成功 27926KB；单元 348/0（新增 #60 选择、布局、四向呼吸及专用→通用回退用例）；场景 38/0；perf 3/0；boss 7/0。
   下一步: 实机打开 `game.html?autostart=1` 查看脸 0 居民睡着/击倒的尺寸与四向观感。
+
+- **2026-08-29 22:14 · 班次**: ✅#64 病中居民统一减速与病号标记放大。
+  `CFG.walk` 新增病情阈值 20、速度倍率 0.6；公共 `updateResidents → walkToward` 调度让病情 >20 的普通移动统一降至 33.6px/s，病情等于阈值仍为 56px/s，不改病情与 walking 动画。病号 `✚` 保持红色与 `>=20` 显示边界，字号由 `CFG.residents.sickMarkFontPx=14` 控制。
+  验证: TDD 红灯为新增场景 2 失败（缺 CFG、仍为 9px），实现后场景 40/0；定向居民/生存 104/0；`python3 build.py` 构建成功 27927KB；全量单元 348/0、场景 40/0、perf 3/0、boss 7/0。
+  下一步: 实机检查放大后的 `✚` 与进食、睡眠、搬运标记是否重叠。
+
+- **2026-08-29 22:45 · 班次**: ✅#64 review 修复：补齐游荡居民与家园玩家病情减速。
+  移动边界拆为 `CFG.walk.sickAbove=20`（严格大于）与 `sickSpeedMul=0.6`，病号显示独立为 `CFG.residents.sickMarkAt=20`（大于等于）。`updateResidents` 在提前返回前计算一次病情倍率并传入 `wanderStep`；玩家仅在 home 场景把同一倍率用于走路和跑步，远征速度不受冻结病情影响。仍使用普通 walk sheet。
+  验证: TDD 红灯场景 4 失败（配置语义、游荡、玩家、标记边界），实现后 `PYTHONIOENCODING=utf-8 python build.py` 成功；单元 348/0、场景 42/0、perf 3/0、boss 7/0、`git diff --check` 通过。
+  下一步: 实机确认家园玩家和崩溃游荡居民的 60% 速度体感。

@@ -413,6 +413,138 @@ test('home: 上岗从居住舱走过去, 不瞬移; 袭击改走回家', () => {
   const dFarm = Math.hypot(e.tx-900, e.ty-1300);
   A(dHome<dFarm, '袭击应改走回家');
 });
+
+test('#64 home: 上岗居民病情超过移动阈值后减速，边界不减速', () => {
+  const oldScene=S.scene;
+  const oldResidents=S.meta.residents;
+  const oldEntities=S.entities;
+  const oldBuildings=S.colony.buildings;
+  const oldQueue=S.colony.buildQueue;
+  const oldWar=S.war;
+  try{
+    A(APH.CFG.walk.sickAbove===20, '病情减速边界应为 20');
+    A(APH.CFG.walk.sickSpeedMul===0.6, '病情减速倍率应为 0.6');
+    S.scene='home';
+    S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_farm', x:1600, y:1100, lv:1}];
+    S.colony.buildQueue=[];
+    S.meta.residents=[
+      {id:'rs_s0', name:'健康', job:'bl_farm', skills:{}, mood:80, food:80, illness:0},
+      {id:'rs_s20', name:'阈值', job:'bl_farm', skills:{}, mood:80, food:80, illness:20},
+      {id:'rs_s21', name:'病人', job:'bl_farm', skills:{}, mood:80, food:80, illness:21},
+    ];
+    S.entities=[];
+    M.syncResidents();
+    const es=S.meta.residents.map(r=>S.entities.find(e=>e.type===T.RESIDENT && (e.rid||e.id)===r.id));
+    es.forEach(e=>{ A(!!e, '应创建居民实体'); e.x=1100; e.y=1100; });
+    M.updateResidents(0.5);
+    const moved=es.map(e=>Math.hypot(e.x-1100,e.y-1100));
+    A(Math.abs(moved[0]-28)<1e-6, '健康居民单帧应移动 28px, got '+moved[0]);
+    A(Math.abs(moved[1]-28)<1e-6, '病情等于边界仍应移动 28px, got '+moved[1]);
+    A(Math.abs(moved[2]-16.8)<1e-6, '病情超过边界应移动 16.8px, got '+moved[2]);
+    A(S.meta.residents.map(r=>r.illness).join(',')==='0,20,21', '移动不应修改名册病情');
+    A(es.every(e=>e.walking===true), '三名居民均应继续使用正常 walking 状态');
+  }finally{
+    S.scene=oldScene;
+    S.meta.residents=oldResidents;
+    S.entities=oldEntities;
+    S.colony.buildings=oldBuildings;
+    S.colony.buildQueue=oldQueue;
+    S.war=oldWar;
+  }
+});
+
+test('#64 home: wanderStep 游荡居民同样只乘一次病情倍率', () => {
+  const oldScene=S.scene;
+  const oldResidents=S.meta.residents;
+  const oldEntities=S.entities;
+  const oldWar=S.war;
+  try{
+    S.scene='home';
+    S.war={raidActive:false};
+    S.meta.residents=[
+      {id:'rs_w0', name:'健康游荡', skills:{}, mood:10, food:80, illness:0, breakType:'wander', breakT:2},
+      {id:'rs_w1', name:'生病游荡', skills:{}, mood:10, food:80, illness:21, breakType:'wander', breakT:2},
+    ];
+    S.entities=[];
+    M.syncResidents();
+    const es=S.meta.residents.map(r=>S.entities.find(e=>e.type===T.RESIDENT && (e.rid||e.id)===r.id));
+    es.forEach(e=>{ e.x=APH.CFG.HAB.x; e.y=APH.CFG.HAB.y; e.wanderA=0; e.wanderT=10; e.wanderIdle=false; });
+    M.updateResidents(0.5);
+    const moved=es.map(e=>e.x-APH.CFG.HAB.x);
+    A(Math.abs(moved[0]-24)<1e-6, '健康游荡居民应按 wander 基础速度移动 24px, got '+moved[0]);
+    A(Math.abs(moved[1]-14.4)<1e-6, '生病游荡居民应移动 14.4px, got '+moved[1]);
+  }finally{
+    S.scene=oldScene;
+    S.meta.residents=oldResidents;
+    S.entities=oldEntities;
+    S.war=oldWar;
+  }
+});
+
+test('#64 player: 仅家园生病时走路与跑步使用同一减速倍率', () => {
+  const old={scene:S.scene, px:S.px, py:S.py, vx:S.vx, vy:S.vy, face:S.face, walkPh:S.walkPh,
+    run:S.run, keys:S.keys, joy:S.joy, target:S.target, parts:S.parts, fireCd:S.fireCd,
+    iFrameT:S.iFrameT, hurtFlash:S.hurtFlash, illness:S.meta.playerNeeds.illness};
+  const pe=APH.Ent.findPlayer();
+  const oldPe={x:pe.x, y:pe.y, face:pe.face, moving:pe.moving, walkPh:pe.walkPh};
+  function moved(scene, illness, running){
+    S.scene=scene; S.meta.playerNeeds.illness=illness;
+    S.px=400; S.py=400; S.vx=0; S.vy=0; S.target=null; S.parts=[];
+    S.keys={KeyD:true, ShiftLeft:running}; S.joy={active:false,id:null,x:0,y:0};
+    pe.x=S.px; pe.y=S.py;
+    APH.Ent.updatePlayer(0.05);
+    return S.px-400;
+  }
+  try{
+    const homeWalk=moved('home',0,false);
+    const sickHomeWalk=moved('home',21,false);
+    const homeRun=moved('home',0,true);
+    const sickHomeRun=moved('home',21,true);
+    const expWalk=moved('expedition',21,false);
+    const expRun=moved('expedition',21,true);
+    A(Math.abs(sickHomeWalk/homeWalk-0.6)<1e-9, '家园走路应按 0.6 减速');
+    A(Math.abs(sickHomeRun/homeRun-0.6)<1e-9, '家园跑步应按 0.6 减速');
+    A(Math.abs(expWalk-homeWalk)<1e-9, '远征走路不应受冻结的家园病情影响');
+    A(Math.abs(expRun-homeRun)<1e-9, '远征跑步不应受冻结的家园病情影响');
+    A(Math.abs(moved('home',20,false)-homeWalk)<1e-9, '病情等于移动边界不应减速');
+  }finally{
+    S.scene=old.scene; S.px=old.px; S.py=old.py; S.vx=old.vx; S.vy=old.vy;
+    S.face=old.face; S.walkPh=old.walkPh; S.run=old.run; S.keys=old.keys; S.joy=old.joy;
+    S.target=old.target; S.parts=old.parts; S.fireCd=old.fireCd; S.iFrameT=old.iFrameT;
+    S.hurtFlash=old.hurtFlash; S.meta.playerNeeds.illness=old.illness;
+    pe.x=oldPe.x; pe.y=oldPe.y; pe.face=oldPe.face; pe.moving=oldPe.moving; pe.walkPh=oldPe.walkPh;
+  }
+});
+
+test('#64 render: 病号标记在显示阈值起为红色 14px 十字', () => {
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const calls=[];
+  const spy={
+    fillStyle:'', font:'', textAlign:'', globalAlpha:1,
+    save(){}, restore(){}, translate(){}, scale(){}, beginPath(){}, ellipse(){}, arc(){}, fill(){},
+    fillRect(){}, strokeRect(){},
+    fillText(text,x,y){ calls.push({text, x, y, font:this.font, fillStyle:this.fillStyle}); },
+  };
+  try{
+    A(APH.CFG.residents.sickMarkAt===20, '病号标记显示阈值应为 20');
+    APH.Ent.bindCtx(spy);
+    const base={id:'rs_mark', rid:'rs_mark', type:T.RESIDENT, x:500, y:500, name:'标记测试',
+      mood:70, food:90, face:0, walking:true, walkPh:0, isSleeping:false, downed:false};
+    APH.Ent.drawResident(Object.assign({},base,{illness:20}),0);
+    const sickMark=calls.find(c=>c.text==='✚');
+    A(!!sickMark, '病情等于显示阈值时应绘制 ✚');
+    A(sickMark.fillStyle==='#ff6d7a', '病号标记应为红色, got '+sickMark.fillStyle);
+    A(sickMark.font==='14px sans-serif', '病号标记应为 14px sans-serif, got '+sickMark.font);
+    calls.length=0;
+    APH.Ent.drawResident(Object.assign({},base,{illness:19}),0);
+    A(!calls.some(c=>c.text==='✚'), '病情低于显示阈值时不应绘制 ✚');
+  }finally{
+    APH.Ent.bindCtx(originalCtx);
+  }
+});
+
 test('home: 无医疗舱不回血, 靠近医疗舱缓慢回血', () => {
   if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
   A(S.scene==='home', '应在殖民地');
