@@ -535,3 +535,8 @@
   `build_sprites.py`: `use_feet` 纳入 `*_prone_sheet.png`(躺体底边=接地线)。`main.js` SPRITE_META 加 `player_prone:{baseline:253,h:68}`(build 实测)。`src/sprite_data.js` 重生成(33 sheets, 勿手改)。
   验证: `python3 build.py` 构建成功 27246KB 以 `</html>` 收尾; 单元 345/0(新增 humanoid prone 7 用例: 布局/sheetKey/pose 四向与呼吸/俯卧盖 moving/poseFor 缺图不回退/共用); 场景 38/0(新增 2 冒烟: 睡倒居民绘制不崩、玩家惰性 flag 绘制不崩); perf 3/0; boss 7/0。另跑 mock draw 探针: 睡/倒居民与玩家俯卧均请求 `player_prone` 正确帧, 永不请求 walk。
   下一步: 实机打开 game.html 看居民睡眠/击倒俯卧身+伤; 玩家累塌/床边 E 睡接入(另票)。
+
+- **2026-08-29 21:35 · 班次**: ✅#60 居民脸 0 无包俯卧图。
+  新增 `assets/hum_0_nopack_prone_sheet.png`（4096×256，16 帧横排，四向各 4；脸 0 无包整人预烘焙，无运行时换色/五官叠层）。`Humanoid.sheetKey/pose/poseFor` 让脸 0 无包居民优先选专用 prone；专用图未就绪只回退 `player_prone`，绝不回退 walk。`main.js` 注册实测锚点 `baseline=248,h=122`；sprite data 重生成至 34 sheets；ADR-0003 与 DESIGN 追加 #60 修订。
+  验证: 资产探针 4096×256 / 16 帧非空 / 每向 4 帧各异 / 内联键唯一；`python build.py` 构建成功 27926KB；单元 348/0（新增 #60 选择、布局、四向呼吸及专用→通用回退用例）；场景 38/0；perf 3/0；boss 7/0。
+  下一步: 实机打开 `game.html?autostart=1` 查看脸 0 居民睡着/击倒的尺寸与四向观感。

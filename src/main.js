@@ -1847,7 +1847,8 @@ window.APH = window.APH || {};
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
-        player_prone:{baseline:253,h:68}   /* #59 俯卧: 躺体(内容高68), 接地线锚点 */
+        player_prone:{baseline:253,h:68},   /* #59 通用俯卧占位 */
+        hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
       };
       (function(){
         var i, k;

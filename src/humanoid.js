@@ -21,11 +21,15 @@ APH.Humanoid = (function(){
   }
 
   function sheetKey(role, faceIdx, pack, cycle){
-    if (cycle === 'prone') return 'player_prone';        // #59: 俯卧共用一张, 不分脸/包
-    if (role === 'player') return cycle === 'idle' ? 'player_idle' : 'player_walk';
     var fi = (faceIdx|0);
     if (fi < 0) fi = 0;
     if (fi > 3) fi = 3;
+    if (cycle === 'prone') {
+      /* #60: 首张居民专用俯卧图；未配身份继续用 #59 通用图 */
+      if (role === 'resident' && fi === 0 && !pack) return 'hum_0_nopack_prone';
+      return 'player_prone';
+    }
+    if (role === 'player') return cycle === 'idle' ? 'player_idle' : 'player_walk';
     var ward = pack ? 'pack' : 'nopack';
     var cyc = cycle === 'idle' ? 'idle' : 'walk';
     return 'hum_' + fi + '_' + ward + '_' + cyc;
@@ -75,17 +79,18 @@ APH.Humanoid = (function(){
     var idleN = H.idlePerDir || 4;
     var fps = H.idleFps || 1;
     var dir = dirOf(input.face);
-    /* #59: 俯卧——独立 cycle, 不吃 walkPh/moving, 慢呼吸同 idle */
-    if (input.lying) {
-      var lt = input.time || 0;
-      var lph = ((Math.floor(lt * fps) % idleN) + idleN) % idleN;
-      return { dir: dir, cycle: 'prone', frame: dir * idleN + lph, sheet: 'player_prone' };
-    }
     var moving = !!input.moving;
     var role = input.role || 'player';
     var pack = !!input.pack;
     var fi = input.faceIdx;
     if (fi == null) fi = 0;
+    /* #59/#60: 俯卧独立 cycle；按身份选预烘焙 sheet，不吃 walkPh/moving */
+    if (input.lying) {
+      var lt = input.time || 0;
+      var lph = ((Math.floor(lt * fps) % idleN) + idleN) % idleN;
+      return { dir: dir, cycle: 'prone', frame: dir * idleN + lph,
+               sheet: sheetKey(role, fi, pack, 'prone') };
+    }
     var cycle = moving ? 'walk' : 'idle';
     var frame;
     if (moving) {
@@ -112,9 +117,12 @@ APH.Humanoid = (function(){
     var ready = typeof isReady === 'function' ? isReady : function(){ return true; };
     var walkKey = sheetKey(role, fi, pack, 'walk');
     if (!ready(walkKey)) fi = 0;
-    /* #59: 俯卧短路——共用 player_prone, 不选脸; 缺图由渲染层回退程序化, 永不换走循环 */
+    /* #59/#60: 俯卧短路；专用图缺失只退通用 prone，由渲染层再做程序化回退 */
     if (input.lying) {
-      return pose({ lying: true, face: input.face, time: input.time });
+      var prone = pose({ lying:true, face:input.face, time:input.time,
+                         role:role, pack:pack, faceIdx:fi });
+      if (!ready(prone.sheet) && prone.sheet !== 'player_prone') prone.sheet = 'player_prone';
+      return prone;
     }
     var p = pose({
       moving: input.moving,
