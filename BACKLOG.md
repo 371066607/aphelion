@@ -104,6 +104,21 @@
 
 - [x] `hum_0_nopack_prone` 16 帧横排（四向各 4），整人预烘焙；不旋转 walk、不运行时换色、不叠五官；缺图回退 `player_prone`
 
+## 玩家床边睡眠与唤醒（Issue #66）
+
+- [x] 靠床 E 入睡用俯卧图：靠近居住舱 `bl_house` 60px 内按 E 睡（`meta.playerNeeds.isSleeping` → 实体每帧同步 → `drawPlayer` 俯卧）；只置 `nearBed` 提示位，绝不自动走向床
+- [x] 唤醒：WASD/方向键（先醒后动）、E 再按、或受伤（伤害真正落地时）；睡着时除 E 外全部按键忽略
+- [x] 睡中精力恢复：床铺 +25 / 地铺 +18 / 跳，回满自动醒；清醒时委托 `homeRestTick`（家园 -7、远征冻结）
+- [x] 纯函数 seam 供 #67 累塌/#70 医疗舱躺复用：`setPlayerSleeping` / `playerWake` / `playerRestTick`（export 于 `APH.Res`，纯测试锁定）
+
+## 玩家精力累塌（Issue #67）
+
+- [x] 家园精力归零（`<=0`）原地强制睡着：`playerRestTick` 清醒跳委托 `homeRestTick` 掉到 0 后触发 `setPlayerSleeping(true,false)`——**打地铺**（`bedId=null`），不绑床、不走向床，即使正在操纵/站在床边
+- [x] 只在家园触发：远征精力冻结不会见底，`scene==='home'` 门防老档/调试 0 值远征误塌（`CFG.player.restCollapseAt:0` 阈值可测）
+- [x] 唤醒与 #66 完全一致：WASD（先醒后动同帧）/ E 再按 / 受伤均走同一 `playerWake`；睡中 `updatePlayer` 同步实体俯卧并清 `moving` 防残留走帧
+- [x] 对齐修复：`playerRestTick` 自动醒也清 `bedId`；`setPlayerSleeping` 增可选床ID参（#70 医疗舱预留，默认保留 `bed_player`）
+- [x] 测试锁定：survival 新增 6 纯例（累塌/地铺恢复/回满清床/远征不塌/床ID默认与覆盖/自动醒清床），scenario 新增 3 冒烟（累塌→实体俯卧+清走位、WASD 唤醒同帧移动、E/受伤唤醒）
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

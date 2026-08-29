@@ -307,6 +307,114 @@ test('survival_integration: 居民生存全属性在名册与实体模型中完�
 });
 
 
+/* #66 玩家床边睡眠/唤醒 (纯函数 seam, #67 累塌/#70 医疗舱可复用) */
+test('playerRestTick: 清醒在家园每跳掉 7 精力', function(){
+  var needs = { rest: 80, isSleeping: false };
+  APH.Res.playerRestTick(needs, 'home', false);
+  if (needs.rest !== 73) throw new Error('清醒家园跳应掉至 73, 实际: ' + needs.rest);
+  if (needs.isSleeping) throw new Error('rest=73 不应入睡');
+});
+
+test('playerRestTick: 睡眠中床上 +25/跳, 地铺 +18/跳', function(){
+  var bed = { rest: 40, isSleeping: true };
+  APH.Res.playerRestTick(bed, 'home', true);
+  if (bed.rest !== 65) throw new Error('床上睡眠应恢复至 65, 实际: ' + bed.rest);
+  var floor = { rest: 40, isSleeping: true };
+  APH.Res.playerRestTick(floor, 'home', false);
+  if (floor.rest !== 58) throw new Error('地铺睡眠应恢复至 58, 实际: ' + floor.rest);
+});
+
+test('playerRestTick: 睡眠回满 100 自动醒', function(){
+  var needs = { rest: 90, isSleeping: true };
+  APH.Res.playerRestTick(needs, 'home', true);
+  if (needs.rest !== 100) throw new Error('应 clamp 到 100, 实际: ' + needs.rest);
+  if (needs.isSleeping) throw new Error('回满应自动醒 (isSleeping=false)');
+});
+
+test('playerRestTick: 清醒在远征精力冻结', function(){
+  var needs = { rest: 40, isSleeping: false };
+  APH.Res.playerRestTick(needs, 'expedition', false);
+  if (needs.rest !== 40) throw new Error('远征清醒跳精力应冻结, 实际: ' + needs.rest);
+});
+
+/* #67 累塌: 家园精力见底(<=0)原地强制睡着(打地铺, bedId=null), 唤醒规则继承 #66 */
+test('playerRestTick: 家园精力见底(<=0)原地累塌(地铺睡, bedId=null)', function(){
+  var needs = { rest: 3, isSleeping: false };
+  APH.Res.playerRestTick(needs, 'home', false);
+  if (needs.rest !== 0) throw new Error('家园清醒跳掉 7 后应钳到 0, 实际: ' + needs.rest);
+  if (!needs.isSleeping) throw new Error('精力归零应原地累塌睡着, 实际仍清醒');
+  if (needs.bedId !== null) throw new Error('累塌为打地铺 bedId 应为 null, 实际: ' + needs.bedId);
+});
+
+test('playerRestTick: 累塌后地铺恢复 +18/跳', function(){
+  var needs = { rest: 0, isSleeping: true, bedId: null };
+  APH.Res.playerRestTick(needs, 'home', false);
+  if (needs.rest !== 18) throw new Error('地铺睡应恢复至 18, 实际: ' + needs.rest);
+  if (!needs.isSleeping) throw new Error('未回满应保持睡着');
+});
+
+test('playerRestTick: 累塌恢复回满自动醒且清 bedId (对齐 playerWake)', function(){
+  var needs = { rest: 90, isSleeping: true, bedId: null };
+  APH.Res.playerRestTick(needs, 'home', false);
+  if (needs.rest !== 100) throw new Error('应 clamp 到 100, 实际: ' + needs.rest);
+  if (needs.isSleeping) throw new Error('回满应自动醒 (isSleeping=false)');
+  if (needs.bedId !== null) throw new Error('自动醒应清 bedId, 实际: ' + needs.bedId);
+});
+
+test('playerRestTick: 远征精力冻结且 0 值不触发累塌', function(){
+  var needs = { rest: 0, isSleeping: false };
+  APH.Res.playerRestTick(needs, 'expedition', false);
+  if (needs.rest !== 0) throw new Error('远征清醒跳精力应冻结在 0, 实际: ' + needs.rest);
+  if (needs.isSleeping) throw new Error('远征精力为 0 不得累塌睡着');
+});
+
+test('playerRestTick: 睡眠回满自动醒同时清 bedId (#67 修复)', function(){
+  var needs = { rest: 90, isSleeping: true, bedId: 'bed_player' };
+  APH.Res.playerRestTick(needs, 'home', true);
+  if (needs.isSleeping) throw new Error('回满应自动醒');
+  if (needs.bedId !== null) throw new Error('自动醒应清 bedId, 实际: ' + needs.bedId);
+});
+
+test('setPlayerSleeping: 可传入自定义床ID (默认保留 bed_player, #70 预留)', function(){
+  var a = { isSleeping: false, bedId: null };
+  APH.Res.setPlayerSleeping(a, true, true, 'bed_med');
+  if (a.bedId !== 'bed_med') throw new Error('自定义床ID应生效, 实际: ' + a.bedId);
+  var b = { isSleeping: false, bedId: null };
+  APH.Res.setPlayerSleeping(b, true, true);
+  if (b.bedId !== 'bed_player') throw new Error('缺省应保留 bed_player, 实际: ' + b.bedId);
+});
+
+test('setPlayerSleeping: 靠床 E 入睡绑床, 无床打地铺, 离床清床', function(){
+  var a = { isSleeping: false, bedId: null };
+  APH.Res.setPlayerSleeping(a, true, true);
+  if (!a.isSleeping) throw new Error('应入睡');
+  if (a.bedId !== 'bed_player') throw new Error('有床应绑定 bed_player, 实际: ' + a.bedId);
+  var b = { isSleeping: false, bedId: null };
+  APH.Res.setPlayerSleeping(b, true, false);
+  if (!b.isSleeping) throw new Error('无床也应能入睡(打地铺)');
+  if (b.bedId !== null) throw new Error('无床 bedId 应为 null, 实际: ' + b.bedId);
+  APH.Res.setPlayerSleeping(b, false, false);
+  if (b.isSleeping) throw new Error('flag=false 应醒来');
+  if (b.bedId !== null) throw new Error('醒来应清床');
+});
+
+test('playerWake: 清睡眠返回 true, 非睡眠/null 返回 false', function(){
+  var a = { isSleeping: true, bedId: 'bed_player' };
+  if (APH.Res.playerWake(a) !== true) throw new Error('睡眠中唤醒应返回 true');
+  if (a.isSleeping) throw new Error('唤醒后 isSleeping 应为 false');
+  if (a.bedId !== null) throw new Error('唤醒后 bedId 应清空');
+  if (APH.Res.playerWake(a) !== false) throw new Error('非睡眠调用应返回 false');
+  if (APH.Res.playerWake(null) !== false) throw new Error('null 调用应返回 false');
+});
+
+test('ensurePlayerNeeds: 缺省 isSleeping=false 且不覆盖已有值', function(){
+  var a = APH.Res.ensurePlayerNeeds({});
+  if (a.playerNeeds.isSleeping !== false) throw new Error('新档 isSleeping 默认应为 false');
+  var b = APH.Res.ensurePlayerNeeds({ playerNeeds:{ isSleeping: true } });
+  if (b.playerNeeds.isSleeping !== true) throw new Error('已有 isSleeping 不得覆盖');
+});
+
+
 
 
 

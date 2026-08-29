@@ -694,6 +694,10 @@ APH.Combat = (function(){
   function hurtPlayer(dmg, source){
     var s = APH.state;
     if(s.iFrameT > 0) return;
+    /* #66 床边睡眠: 受伤即醒(伤害真正落地时) */
+    if(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping){
+      if(window.APH.Res && window.APH.Res.playerWake) window.APH.Res.playerWake(s.meta.playerNeeds);
+    }
     s.iFrameT = 0.5;
     s.hp -= dmg;
     s.shake = Math.min(1, s.shake+.35);
@@ -722,7 +726,9 @@ APH.Combat = (function(){
   /* ---- 玩家射击(由输入层调用) ---- */
   function firePlasma(){
     var s = APH.state;
-    if(s.fireCd > 0 || s.mode !== 'running') return false;
+    /* #66 床边睡眠: 睡着时不能射击 */
+    if(s.fireCd > 0 || s.mode !== 'running' ||
+       (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping)) return false;
     s.fireCd = CFG.combat.fireCd;
     var a = s.face;
     s.entities.push(makeProj(

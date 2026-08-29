@@ -109,7 +109,56 @@ APH.Res = (function(){
     if(meta.playerNeeds.food == null) meta.playerNeeds.food = foodStart;
     if(meta.playerNeeds.rest == null) meta.playerNeeds.rest = restStart;
     if(meta.playerNeeds.illness == null) meta.playerNeeds.illness = illStart;
+    /* #66 床边睡眠: 单点默认(覆盖新档 + 老档加载两条路径) */
+    if(meta.playerNeeds.isSleeping == null) meta.playerNeeds.isSleeping = false;
     return meta;
+  }
+
+  /* ---------- #66 玩家床边睡眠/唤醒 (纯函数, #67 累塌/#70 医疗舱可复用) ---------- */
+  /* 入睡: 置 isSleeping; 有床时绑定床ID(无则打地铺); 返回 needs。 */
+  function setPlayerSleeping(needs, flag, hasBed, bedIdParam){
+    if(!needs) return needs;
+    needs.isSleeping = !!flag;
+    if(needs.isSleeping && hasBed){
+      needs.bedId = bedIdParam || needs.bedId || 'bed_player';   // #70 医疗舱可传床ID; 默认保留 'bed_player'
+    }else{
+      needs.bedId = null;
+    }
+    return needs;
+  }
+  /* 唤醒(通用, 无心情惩罚): 清睡眠+床位, 返回是否真的在睡。 */
+  function playerWake(needs){
+    if(!needs || !needs.isSleeping) return false;
+    needs.isSleeping = false;
+    needs.bedId = null;
+    return true;
+  }
+  /* 玩家精力结算(纯函数): 睡眠中按床/地铺恢复, 回满自动醒;
+     清醒时委托 homeRestTick(家园掉7, 远征冻结)。 */
+  function playerRestTick(needs, scene, hasBed){
+    if(!needs) return null;
+    var start = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
+    var v = needs.rest == null ? start : needs.rest;
+    var C = RS();
+    if(needs.isSleeping){
+      var bedRec  = (CFG.player && CFG.player.bedRecover != null) ? CFG.player.bedRecover : (C.bedRecover!=null?C.bedRecover:25);
+      var flRec   = (CFG.player && CFG.player.floorRecover != null) ? CFG.player.floorRecover : (C.floorRecover!=null?C.floorRecover:18);
+      var wakeAt  = (CFG.player && CFG.player.restWakeAt != null) ? CFG.player.restWakeAt : (C.restWakeAt!=null?C.restWakeAt:100);
+      needs.rest = clampNeed(v + (hasBed ? bedRec : flRec), 0, 100);
+      if(needs.rest >= wakeAt){
+        needs.isSleeping = false;
+        needs.bedId = null;                        // #67 对齐 playerWake: 自动醒也清床位
+      }
+    }else{
+      needs.rest = homeRestTick(v, scene);
+      /* #67 累塌: 家园精力见底(<=0)原地强制睡着(打地铺, bedId=null)。
+         只在家园触发: 远征精力冻结(不会见底), scene 门保证老档/调试的 0 值远征不误塌。 */
+      var collapseAt = (CFG.player && CFG.player.restCollapseAt != null) ? CFG.player.restCollapseAt : 0;
+      if(scene === 'home' && needs.rest <= collapseAt){
+        setPlayerSleeping(needs, true, false);     // 原地地铺睡; bedId=null; 唤醒规则继承 #66
+      }
+    }
+    return needs;
   }
 
   /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
@@ -1113,6 +1162,7 @@ APH.Res = (function(){
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
     homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
+    setPlayerSleeping:setPlayerSleeping, playerWake:playerWake, playerRestTick:playerRestTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,

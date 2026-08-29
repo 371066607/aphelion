@@ -541,6 +541,14 @@
   验证: 资产探针 4096×256 / 16 帧非空 / 每向 4 帧各异 / 内联键唯一；`python build.py` 构建成功 27926KB；单元 348/0（新增 #60 选择、布局、四向呼吸及专用→通用回退用例）；场景 38/0；perf 3/0；boss 7/0。
   下一步: 实机打开 `game.html?autostart=1` 查看脸 0 居民睡着/击倒的尺寸与四向观感。
 
+- **2026-08-29 21:52 · 班次**: ✅#67 玩家精力累塌（家园精力归零原地睡着）。
+  - **累塌触发点**：`residentsTick`（`main.js` 生产跳 `s.prodT>=30` 块内, 两场景都跑）每 30 游戏秒调纯函数 `APH.Res.playerRestTick(needs, scene, hasBed)`。清醒分支委托 `homeRestTick` 掉 7 后若 `rest<=0` 且 `scene==='home'` → `setPlayerSleeping(needs, true, false)` **原地打地铺睡**（`bedId=null`，不绑床、不走向床）。因生产跳与键盘输入无关，即使玩家正在操纵也会累塌。
+  - **scene 门**：只在家园触发（远征精力冻结不会见底）；`CFG.player.restCollapseAt:0` 阈值进配置可测。
+  - **唤醒继承 #66 零新增**：累塌只翻 `isSleeping=true`，WASD（`entities.js` 先醒后动同帧）/ E 再按（`debugPressE`+keydown 优先分支）/ 受伤（`hurtPlayer` 伤害真正落地）均走同一 `playerWake`。
+  - **三条评审修复折入**：① `playerRestTick` 自动醒同时清 `bedId`（对齐 `playerWake`，修全恢复床睡后 `bedId='bed_player'` 残留）；② `setPlayerSleeping` 增可选第 4 参 `bedIdParam`（#70 医疗舱预留，默认保留 `bed_player` 不破坏 #66 断言）；③ `updatePlayer` 睡眠分支 `pe.moving=false`（防俯卧残留走帧）。
+  验证: `python3 build.py` 构建成功 27253KB 以 `</html>` 收尾，script 标签 18/18 平衡；survival 38/0（新增 6 纯例）；场景 46/0（scenario 新增 3 冒烟：累塌→meta+实体俯卧+bedId=null+moving=false+drawPlayer 不崩、WASD 唤醒同帧移动、E/受伤唤醒）；单元全量 358/0；perf 3/0；boss 7/0。全量 414 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `residentsTick`/`updateHome`/`debugPressE`/`hurtPlayer` 断言状态机。
+  下一步: 实机打开 game.html 让家园精力见底看原地俯卧，WASD/E/受伤唤醒；#70 医疗舱躺接入复用此 seam。
+
 - **2026-08-29 22:14 · 班次**: ✅#64 病中居民统一减速与病号标记放大。
   `CFG.walk` 新增病情阈值 20、速度倍率 0.6；公共 `updateResidents → walkToward` 调度让病情 >20 的普通移动统一降至 33.6px/s，病情等于阈值仍为 56px/s，不改病情与 walking 动画。病号 `✚` 保持红色与 `>=20` 显示边界，字号由 `CFG.residents.sickMarkFontPx=14` 控制。
   验证: TDD 红灯为新增场景 2 失败（缺 CFG、仍为 9px），实现后场景 40/0；定向居民/生存 104/0；`python3 build.py` 构建成功 27927KB；全量单元 348/0、场景 40/0、perf 3/0、boss 7/0。
@@ -550,3 +558,11 @@
   移动边界拆为 `CFG.walk.sickAbove=20`（严格大于）与 `sickSpeedMul=0.6`，病号显示独立为 `CFG.residents.sickMarkAt=20`（大于等于）。`updateResidents` 在提前返回前计算一次病情倍率并传入 `wanderStep`；玩家仅在 home 场景把同一倍率用于走路和跑步，远征速度不受冻结病情影响。仍使用普通 walk sheet。
   验证: TDD 红灯场景 4 失败（配置语义、游荡、玩家、标记边界），实现后 `PYTHONIOENCODING=utf-8 python build.py` 成功；单元 348/0、场景 42/0、perf 3/0、boss 7/0、`git diff --check` 通过。
   下一步: 实机确认家园玩家和崩溃游荡居民的 60% 速度体感。
+
+- **2026-08-29 · 班次**: ✅#66 玩家床边睡眠与唤醒。
+  - **靠床 E 入睡**：`updateHome` 检测 60px 内最近居住舱 `bl_house` 实体 → `s.nearBed`（只置提示位，绝不写 `s.target`，无自动寻路）；E 键/`debugPressE` 镜像逻辑靠床时调 `setPlayerSleeping(true, true)`（绑 `bedId='bed_player'`），实体标志每帧由 `updatePlayer` 同步 → `drawPlayer` 走 #59 `player_prone` 俯卧。
+  - **唤醒三通道**：WASD/方向键（`updatePlayer` 先醒后动同一帧，不吞输入）、E 再按（键处理最优先分支）、受伤（`hurtPlayer` 伤害真正落地时，if 帧保护之后）。睡着时除 E 外全部按键忽略；`firePlasma` 睡眠中禁射。
+  - **精力结算**：`residentsTick` 换用纯函数 `APH.Res.playerRestTick(needs, scene, hasBed)`——睡中床 +25/地铺 +18/跳、回满 100 自动醒；清醒委托 `homeRestTick`（家园 -7、远征冻结）。`ensurePlayerNeeds` 补 `isSleeping:false` 默认（新档+老档两条路径），save.js 兜底分支同补。
+  - **纯函数 seam**（#67 累塌/#70 医疗舱躺可复用）：`setPlayerSleeping` / `playerWake` / `playerRestTick` 导出至 `APH.Res`；`CFG.player` 加 `bedSleepRadius/bedRecover/floorRecover/restWakeAt`（读回退 `CFG.residents.*`）。
+  验证: `python3 build.py` 构建成功 27252KB 以 `</html>` 收尾，script 标签 18/18 平衡；单元 352/0（survival.test 新增 7 例：playerRestTick 床/地铺/回满/远征冻结、setPlayerSleeping 绑床/地铺/清床、playerWake 返回值、ensurePlayerNeeds 默认）；场景 43/0（scenario.test 新增 5 例：靠床 nearBed 且 S.target 保持 null 不自动寻路、E 入睡+实体俯卧+drawPlayer 不崩、WASD 唤醒同帧移动、E 再按唤醒、受伤唤醒）；perf 3/0；boss 7/0。全量 405 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `updateHome`/`residentsTick`/`debugPressE` 断言状态机。
+  下一步: 实机打开 game.html 在居住舱旁按 E 睡、WASD/E/受伤唤醒看俯卧；#67 场上累塌、#70 医疗舱躺接入复用此 seam。

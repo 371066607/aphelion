@@ -32,6 +32,7 @@ window.APH = window.APH || {};
     spores:[],
     nearBeacon:null,
     nearPad:false,               // 距离发射台(场景切换交互)
+    nearBed:null,                // #66 床边睡眠: 最近的居住舱实体 | null
     scanning:null, scanT:0,
     spawnT:6,
     buildMode:null,              // 建造模式: 当前选择的建筑id | null
@@ -475,6 +476,16 @@ window.APH = window.APH || {};
   }
 
   /* ================= 场景条件化更新 ================= */
+  /* #66 床边睡眠: meta 真源 → 实体俯卧标志的同步助手(幂等, 每帧可调) */
+  function playerSleeping(){
+    var s=APH.state;
+    return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping);
+  }
+  function syncPlayerSleep(){
+    var s=APH.state;
+    var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
+    if(pe && s.meta && s.meta.playerNeeds) pe.isSleeping = !!s.meta.playerNeeds.isSleeping;
+  }
   function updateHome(dt){
     var s=APH.state;
     APH.Ent.updatePlayer(dt);
@@ -504,6 +515,13 @@ window.APH = window.APH || {};
       return (e.type===T.BUILDING && e.bid==='bl_lab' && U.dst(s.px,s.py,e.x,e.y)<60);
     });
     s.nearLab = nearLab || null;
+    /* #66 床边睡眠: 靠近居住舱即可 E 入睡(只置 nearBed, 绝不 s.target=自动寻路) */
+    var nearBed = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_house' &&
+              U.dst(s.px,s.py,e.x,e.y) < (CFG.player.bedSleepRadius!=null?CFG.player.bedSleepRadius:60));
+    });
+    s.nearBed = nearBed || null;
+    syncPlayerSleep();
     var nearFlora = s.entities.find(function(e){
       return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
     });
@@ -539,6 +557,14 @@ window.APH = window.APH || {};
           (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
           (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit);
       }
+    }else if(s.nearBed){
+      /* #66 床边睡眠: 优先于发射台提示 */
+      var restN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.rest!=null)
+        ? s.meta.playerNeeds.rest : 100;
+      var bedHint = playerSleeping()
+        ? '[E] 起床 (按方向键或受伤也会醒)'
+        : '[E] 上床睡觉 (精力 '+Math.round(restN)+')';
+      APH.UI.setHint(bedHint);
     }else if(s.nearKitchen){
       var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
       var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
@@ -1444,9 +1470,16 @@ window.APH = window.APH || {};
       s.keys[e.code]=true;
       APH.SFX.unlock();
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
+      /* #66 床边睡眠: 睡着时除 E 外全部按键忽略(唤醒只走 WASD/E/受伤) */
+      if(playerSleeping() && s.mode==='running' && e.code!=='KeyE') return;
       /* E=发射台/自然资源交互 */
       if(e.code==='KeyE'&&s.mode==='running'){
-        if(s.scene==='expedition' && s.nearFlora){
+        if(playerSleeping()){
+          /* E 再按 = 唤醒, 跳过其余所有交互分支 */
+          APH.Res.playerWake(s.meta.playerNeeds);
+          syncPlayerSleep();
+          APH.UI.floatText('🌅 醒来','#8fd4ff');
+        }else if(s.scene==='expedition' && s.nearFlora){
           var loadW=APH.Combat.carryWeight(s.carry);
           var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
           var seedIt = s.nearFlora.seedItem || 'specimen_flora_glow';
@@ -1475,6 +1508,11 @@ window.APH = window.APH || {};
           }else{
             tryRecruit(s.nearVisitor);
           }
+        }else if(s.scene==='home' && s.nearBed){
+          /* #66 床边睡眠: 靠床 E 入睡(床铺恢复), 优先于发射台, 绝不落入自动寻路分支 */
+          APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
+          syncPlayerSleep();
+          APH.UI.floatText('🛌 入睡','#8fd4ff');
         }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
           else if(s.scene==='expedition') returnHome();
@@ -3039,8 +3077,9 @@ window.APH = window.APH || {};
     if(APH.Res.homeFoodTick && m.playerNeeds){
       m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);
     }
-    if(APH.Res.homeRestTick && m.playerNeeds){
-      m.playerNeeds.rest = APH.Res.homeRestTick(m.playerNeeds.rest, s.scene);
+    if(APH.Res.playerRestTick && m.playerNeeds){
+      /* #66 床边睡眠: 综合精力结算(睡眠恢复/清醒衰减, 委托 homeRestTick) */
+      APH.Res.playerRestTick(m.playerNeeds, s.scene, !!s.nearBed);
     }
     if(APH.Res.homeIllnessTick && m.playerNeeds){
       m.playerNeeds.illness = APH.Res.homeIllnessTick(m.playerNeeds.illness, s.scene);
@@ -3354,7 +3393,14 @@ window.APH = window.APH || {};
     },
     debugPressE:function(){
       var s=APH.state;
-      if(s.scene==='home'&&s.nearPad) launchExpedition();
+      /* #66 床边睡眠: 镜像真实 E 键逻辑(先醒后睡, 绝不自动寻路) */
+      if(playerSleeping()){
+        APH.Res.playerWake(s.meta.playerNeeds);
+        syncPlayerSleep();
+      }else if(s.scene==='home' && s.nearBed){
+        APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
+        syncPlayerSleep();
+      }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
