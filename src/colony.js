@@ -54,8 +54,14 @@ APH.Colony = (function(){
     bl_crop_plot:   { name:'外星种植圃', cost:0, costMineral:0, costRes:{ wood:10, stone:5 }, size:48, max:12, buildTime:8,
       dispH:48, cells:[1,1],
       desc:'培育外星奇幻作物的轻量田圃。可指派荧蕈、晶藤、露果、星绒草。' },
+    bl_campfire:    { name:'石料篝火', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ wood:10, stone:15 }, size:36, max:4, buildTime:8,
+      dispH:48, cells:[1,1],
+      desc:'温暖夜间照明、驱寒保暖、休闲娱乐与基础烘烤。' },
+    bl_kitchen:     { name:'烹饪灶台', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:20, stone:20, iron:15 }, size:52, max:2, buildTime:20,
+      dispH:110, cells:[2,2],
+      desc:'高级菜肴烹制与厨师岗位。需研发异星烹饪保鲜。' },
   };
-  var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
+  var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_kitchen', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
   /* ---------- Task3: 建筑等级 ---------- */
   function upgradeCost(def, curLv){
@@ -599,9 +605,9 @@ APH.Colony = (function(){
            有施工队列时建造者(sk_build 未禁止)留空去施工;
            按 1→2→3 级逐层填岗, 同级按技能高者优先。
      返回 { rid: bl_xxx|null }。 */
-  var JOB_SKILL={ bl_farm:'sk_farm', bl_pasture:'sk_ranch', bl_clinic:'sk_social',
+  var JOB_SKILL={ bl_farm:'sk_farm', bl_crop_plot:'sk_farm', bl_kitchen:'sk_farm', bl_pasture:'sk_ranch', bl_clinic:'sk_social',
                   bl_mine:'sk_craft', bl_workshop:'sk_craft', bl_lab:'sk_lore' };
-  var JOB_SLOTS={ bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1 };
+  var JOB_SLOTS={ bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1, bl_kitchen:1, bl_crop_plot:1 };
   function prioOf(prio, r, sk){
     var p=prio && prio[r.id];
     return (p && p[sk]!=null) ? p[sk] : 2;
@@ -701,6 +707,8 @@ APH.Colony = (function(){
                           desc:'野生植被采摘速度 +50%' },
     te_hydroponics:     { name:'温控水培技术', cost:80, max:1, requires:['te_basic_farming'],
                           desc:'解锁水培农场 bl_farm 蓝图' },
+    te_alien_culinary:  { name:'异星烹饪保鲜', cost:70, max:1, requires:['te_basic_farming'],
+                          desc:'解锁烹饪灶台 bl_kitchen 与高级食谱' },
     te_bio_adaptation:  { name:'外星生态适应', cost:150, max:1, requires:['te_hydroponics'],
                           desc:'酸雨/毒雾暴露累积降低 50%' },
 
@@ -839,6 +847,85 @@ APH.Colony = (function(){
     };
   }
 
+  /* ---------- 烹饪加工配方表 (Cooking #49) ---------- */
+  var COOK_RECIPES = {
+    it_roasted_meat: { name:'炙烤异星肉排', costRes:{ food:2, wood:1 }, cookTime:8, reqTech:'te_stonecutting', bldgs:['bl_campfire','bl_kitchen'], bldg:['bl_campfire','bl_kitchen'] },
+    it_berry_stew:   { name:'晶核浆果浓汤', costRes:{ it_berry:2, it_crystal_berry:1, wood:1 }, cookTime:10, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
+    it_dew_pudding:  { name:'清甜露果布丁', costRes:{ it_dew_fruit:2, it_berry:1 }, cookTime:10, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
+    it_glow_fondue:  { name:'荧光温热浓汤', costRes:{ it_glow_fluid:2, food:1, wood:1 }, cookTime:12, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
+    it_alien_feast:  { name:'外星珍馐盛宴', costRes:{ food:2, it_crystal_berry:1, it_dew_fruit:1, it_glow_fluid:1 }, cookTime:18, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
+  };
+
+  function checkCookRes(resStock, matKey){
+    if(!resStock) return 0;
+    if(resStock[matKey] != null) return resStock[matKey];
+    if(typeof matKey === 'string' && matKey.startsWith('it_') && resStock[matKey.slice(3)] != null) return resStock[matKey.slice(3)];
+    if(typeof matKey === 'string' && !matKey.startsWith('it_') && resStock['it_' + matKey] != null) return resStock['it_' + matKey];
+    var it = CFG.items && (CFG.items[matKey] || CFG.items['it_' + matKey]);
+    if(it && it.store && resStock[it.store] != null) return resStock[it.store];
+    return (resStock.mineral != null && (matKey === 'mineral' || matKey === 'it_mineral')) ? resStock.mineral : 0;
+  }
+  function deductCookRes(resStock, matKey, amt){
+    if(!resStock || !amt) return;
+    if(resStock[matKey] != null){
+      resStock[matKey] = Math.max(0, resStock[matKey] - amt);
+      return;
+    }
+    if(typeof matKey === 'string' && matKey.startsWith('it_') && resStock[matKey.slice(3)] != null){
+      resStock[matKey.slice(3)] = Math.max(0, resStock[matKey.slice(3)] - amt);
+      return;
+    }
+    if(typeof matKey === 'string' && !matKey.startsWith('it_') && resStock['it_' + matKey] != null){
+      resStock['it_' + matKey] = Math.max(0, resStock['it_' + matKey] - amt);
+      return;
+    }
+    var it = CFG.items && (CFG.items[matKey] || CFG.items['it_' + matKey]);
+    if(it && it.store && resStock[it.store] != null){
+      resStock[it.store] = Math.max(0, resStock[it.store] - amt);
+    }
+  }
+
+  /* 烹饪制作推进(纯函数) (Cooking #49) */
+  function cookingTick(bldg, chefSkill, eff, resStock, techOwned, dt){
+    if(!bldg) return { done:false };
+    var bId = bldg.id || bldg.bid;
+    var recipeKey = bldg.recipe || ((bId === 'bl_campfire') ? 'it_roasted_meat' : 'it_roasted_meat');
+    var rec = COOK_RECIPES[recipeKey];
+    if(!rec) return { done:false, why:'未知配方' };
+
+    var allowed = rec.bldgs || rec.bldg || ['bl_kitchen', 'bl_campfire'];
+    if(allowed && allowed.indexOf(bId) < 0){
+      return { done:false, why:'建筑不支持该配方' };
+    }
+
+    if(rec.reqTech && (!techOwned || !techOwned[rec.reqTech])){
+      return { done:false, why:'未研发前置科技' };
+    }
+
+    var costRes = rec.costRes || {};
+    for(var k in costRes){
+      var need = costRes[k] || 0;
+      var have = checkCookRes(resStock, k);
+      if(have < need){
+        return { done:false, why:'材料不足' };
+      }
+    }
+
+    var e = (eff == null ? 1 : eff);
+    var sk = (chefSkill == null ? 0 : chefSkill);
+    var rate = (dt || 1) * e * (1 + sk * 0.15);
+    bldg.cookProgress = (bldg.cookProgress || 0) + rate;
+
+    if(bldg.cookProgress >= (rec.cookTime || 10)){
+      for(var mat in costRes){
+        deductCookRes(resStock, mat, costRes[mat] || 0);
+      }
+      bldg.cookProgress = 0;
+      return { done:true, producedItemId:recipeKey, count:1 };
+    }
+    return { done:false, progress:bldg.cookProgress, total:rec.cookTime };
+  }
+
   /* ---------- 异星奇幻植物定义表 (ADR-9 crop_ 前缀) ---------- */
   var ALIEN_CROPS = {
     crop_glow_shroom:  { name:'夜光荧蕈', growTicks:3, baseYield:4, dropItem:'it_glow_fluid', glowR:60, desc:'夜间自发光青蓝微光' },
@@ -847,18 +934,27 @@ APH.Colony = (function(){
     crop_star_velvet:  { name:'星绒草', growTicks:5, baseYield:4, dropItem:'it_star_fiber', desc:'外星防酸抗温纤维' },
   };
 
-  /* 派生夜间生物发光源(夜光荧蕈自发光) */
+  /* ---------- 派生夜间生物发光源(夜光荧蕈自发光 + 篝火温暖光晕) ---------- */
   function getGlowSources(buildings){
     var lights = [];
     (buildings||[]).forEach(function(b){
-      if(!b || (b.id!=='bl_crop_plot' && b.id!=='bl_farm')) return;
-      var cropId = b.crop || 'crop_glow_shroom';
-      var def = ALIEN_CROPS[cropId];
-      if(def && def.glowR && b.plot && (b.plot.stage||0) >= 2){
+      if(!b) return;
+      if(b.id==='bl_campfire' || b.bid==='bl_campfire'){
         lights.push({
-          x: b.x, y: b.y, r: def.glowR || 60,
-          col: 'rgba(89,217,255,0.45)'
+          x: b.x, y: b.y, r: 100,
+          col: 'rgba(255,170,60,0.5)'
         });
+        return;
+      }
+      if(b.id==='bl_crop_plot' || b.id==='bl_farm'){
+        var cropId = b.crop || 'crop_glow_shroom';
+        var def = ALIEN_CROPS[cropId];
+        if(def && def.glowR && b.plot && (b.plot.stage||0) >= 2){
+          lights.push({
+            x: b.x, y: b.y, r: def.glowR || 60,
+            col: 'rgba(89,217,255,0.45)'
+          });
+        }
       }
     });
     return lights;
@@ -1017,6 +1113,7 @@ APH.Colony = (function(){
     ALIEN_CROPS:ALIEN_CROPS, getGlowSources:getGlowSources,
     cropPlotTick:cropPlotTick, harvestAlienCrop:harvestAlienCrop,
     CRAFT_RECIPES:CRAFT_RECIPES, workshopCraftTick:workshopCraftTick,
+    COOK_RECIPES:COOK_RECIPES, cookingTick:cookingTick,
     equipGear:equipGear, gearBonusOf:gearBonusOf,
   };
 })();

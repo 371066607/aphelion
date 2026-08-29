@@ -475,6 +475,14 @@ window.APH = window.APH || {};
       return (e.type===T.BUILDING && e.bid==='bl_workshop' && U.dst(s.px,s.py,e.x,e.y)<60);
     });
     s.nearWorkshop = nearShop || null;
+    var nearKitchen = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_kitchen' && U.dst(s.px,s.py,e.x,e.y)<60);
+    });
+    s.nearKitchen = nearKitchen || null;
+    var nearCampfire = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_campfire' && U.dst(s.px,s.py,e.x,e.y)<50);
+    });
+    s.nearCampfire = nearCampfire || null;
     var nearFlora = s.entities.find(function(e){
       return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
     });
@@ -510,6 +518,14 @@ window.APH = window.APH || {};
           (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
           (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit);
       }
+    }else if(s.nearKitchen){
+      var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
+      var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
+      APH.UI.setHint('烹饪灶台 · [F] 切换菜谱 (' + kName + ')');
+    }else if(s.nearCampfire){
+      var cRec = (s.nearCampfire.recipe || 'it_roasted_meat');
+      var cName = (APH.Colony.COOK_RECIPES[cRec] && APH.Colony.COOK_RECIPES[cRec].name) || cRec;
+      APH.UI.setHint('石料篝火 · 取暖保暖 · [F] 切换配方 (' + cName + ')');
     }else if(s.nearPad && !s.war.raidActive && !(s.war.raidWarn>0)){
       var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
       APH.UI.setHint('[E] 登船 · '+shPad.mission);
@@ -1419,7 +1435,7 @@ window.APH = window.APH || {};
           s.nearCropPlot.crop=nextCrop;
           s.nearCropPlot.plot={ stage:0, t:0 };
           var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
-          APH.UI.floatText('🌱 切换为: '+cropName, '#7dffab');
+          APH.UI.floatText('🌿 切换为: '+cropName, '#7dffab');
           saveColony();
         }else if(s.nearWorkshop){
           var recipes=Object.keys(APH.Colony.CRAFT_RECIPES);
@@ -1428,8 +1444,25 @@ window.APH = window.APH || {};
           s.nearWorkshop.recipe=nextRec;
           s.nearWorkshop.craftProgress=0;
           var recName=APH.Colony.CRAFT_RECIPES[nextRec].name;
-          APH.UI.floatText('🛠 工坊生产调整为: '+recName, '#59d9ff');
+          APH.UI.floatText('🔨 工坊生产调整为: '+recName, '#59d9ff');
           saveColony();
+        }else if(s.nearKitchen || s.nearCampfire){
+          var targetBldg=s.nearKitchen || s.nearCampfire;
+          var bId=targetBldg.bid || targetBldg.id;
+          var validRecipes=Object.keys(APH.Colony.COOK_RECIPES).filter(function(k){
+            var r=APH.Colony.COOK_RECIPES[k];
+            var allowed=r.bldgs || r.bldg || ['bl_kitchen', 'bl_campfire'];
+            return allowed.indexOf(bId) >= 0;
+          });
+          if(validRecipes.length > 0){
+            var curKIdx=validRecipes.indexOf(targetBldg.recipe || validRecipes[0]);
+            var nextKRec=validRecipes[(curKIdx + 1) % validRecipes.length];
+            targetBldg.recipe=nextKRec;
+            targetBldg.cookProgress=0;
+            var recKName=APH.Colony.COOK_RECIPES[nextKRec].name;
+            APH.UI.floatText('🍲 烹饪菜谱调整为: ' + recKName, '#ffca28');
+            saveColony();
+          }
         }
       }
       /* 调试热键(自动化验证协议, 仅 ?autostart=1 / ?debugkeys=1 通道生效——
@@ -2422,26 +2455,42 @@ window.APH = window.APH || {};
   }
   function nearestMeal(e, rMax){
     var s=APH.state, best=null, bd=rMax;
+    var bestCooked=null, bestCookedDist=rMax;
+    (s.entities||[]).forEach(function(p){
+      if(!p || p.dead || p.type!==T.DROPPED) return;
+      var it = CFG.items && CFG.items[p.itemId];
+      if(!it || it.store!=='food') return;
+      var dist=U.dst(e.x,e.y,p.x,p.y);
+      if(it.isCooked && dist<bestCookedDist){
+        bestCookedDist=dist;
+        bestCooked={ kind:'pile', drop:p, x:p.x, y:p.y, itemId:p.itemId, isCooked:true };
+      }
+      if(dist<bd){
+        bd=dist;
+        best={ kind:'pile', drop:p, x:p.x, y:p.y, itemId:p.itemId, isCooked:!!it.isCooked };
+      }
+    });
+    if(bestCooked) return bestCooked;
     if((s.meta.res&&s.meta.res.food||0)>0){
       var st=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
       var d=U.dst(e.x,e.y,st.x,st.y);
       if(d<bd){ bd=d; best={ kind:'stock', x:st.x, y:st.y }; }
     }
-    (s.entities||[]).forEach(function(p){
-      if(!p || p.dead || p.type!==T.DROPPED) return;
-      if(dropStore(p)!=='food') return;
-      var dist=U.dst(e.x,e.y,p.x,p.y);
-      if(dist<bd){ bd=dist; best={ kind:'pile', drop:p, x:p.x, y:p.y }; }
-    });
     return best;
   }
   function tryEatHere(e, r, grabR, dumpR){
     if(!r || !APH.Res.eatOnce) return false;
     if(e.haulCarry && dropStore({itemId:e.haulCarry.itemId})==='food'){
-      if(!APH.Res.eatOnce(r)) return false;
+      var itDefC = (CFG.items && CFG.items[e.haulCarry.itemId]) || { name:'食物', foodGain:25 };
+      var eatRes = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefC) : { ate: APH.Res.eatOnce(r, itDefC) };
+      if(!eatRes.ate) return false;
       e.haulCarry.n=(e.haulCarry.n||1)-1;
       if((e.haulCarry.n||0)<=0) e.haulCarry=null;
-      APH.UI.floatText((e.name||'居民')+' 吃了手里的食物','#c8e89a');
+      if(itDefC.isCooked){
+        APH.UI.floatText('😋 '+(e.name||'居民')+' 享用了 '+itDefC.name+' (+'+(itDefC.foodGain||25)+'饱食 +'+(itDefC.moodGain||0)+'心情 +'+(itDefC.recGain||0)+'娱乐)', '#ffd54f');
+      }else{
+        APH.UI.floatText((e.name||'居民')+' 吃了手里的食物','#c8e89a');
+      }
       e.food=r.food;
       return true;
     }
@@ -2453,12 +2502,18 @@ window.APH = window.APH || {};
       if((APH.state.meta.res.food||0)<=0) return false;
       if(!APH.Res.eatOnce(r)) return false;
       APH.state.meta.res.food--;
-      APH.UI.floatText((e.name||'居民')+' 在仓库吃了口粮','#c8e89a');
+      APH.UI.floatText((e.name||'居民')+' 在仓库吃了口粮 (+25饱食)','#c8e89a');
     }else{
       if(!meal.drop || meal.drop.dead) return false;
-      if(!APH.Res.eatOnce(r)) return false;
+      var itDefG = (CFG.items && CFG.items[meal.drop.itemId]) || { name:'食物', foodGain:25 };
+      var eatResG = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefG) : { ate: APH.Res.eatOnce(r, itDefG) };
+      if(!eatResG.ate) return false;
       nibblePile(meal.drop, 1);
-      APH.UI.floatText((e.name||'居民')+' 吃了地上的食物','#c8e89a');
+      if(itDefG.isCooked){
+        APH.UI.floatText('😋 '+(e.name||'居民')+' 享用了 '+itDefG.name+' (+'+(itDefG.foodGain||25)+'饱食 +'+(itDefG.moodGain||0)+'心情 +'+(itDefG.recGain||0)+'娱乐)', '#ffd54f');
+      }else{
+        APH.UI.floatText((e.name||'居民')+' 吃了地上的食物','#c8e89a');
+      }
     }
     e.food=r.food;
     return true;
@@ -2516,6 +2571,15 @@ window.APH = window.APH || {};
             if(U.dst(e.x,e.y,drop.x,drop.y)<grabR){
               e.haulCarry={ itemId:drop.itemId, n:drop.n||1 };
               drop.dead=true;
+            }
+          }else if(!e.job && r && (r.recreation||80)<70){
+            var campfire = (s.colony&&s.colony.buildings||[]).find(function(b){ return b.id==='bl_campfire'; });
+            if(campfire){
+              var cDist = U.dst(e.x, e.y, campfire.x, campfire.y);
+              if(cDist > 30 && cDist < 350){
+                e.tx = campfire.x + Math.sin((s.clock||0)+e.x)*20;
+                e.ty = campfire.y + Math.cos((s.clock||0)+e.y)*20;
+              }
             }
           }
         }
@@ -2602,18 +2666,30 @@ window.APH = window.APH || {};
       APH.UI.floatText('✕ 已经请过客吃过了','#ff9a9a');
       return false;
     }
-    var need=(CFG.recruit&&CFG.recruit.mealCost)||2;
-    if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'food', need)){
-      APH.UI.floatText('✕ 食物不够请客','#ff9a9a');
-      return false;
+    var cookedDrop = (s.entities||[]).find(function(e){
+      return e && !e.dead && e.type===T.DROPPED && CFG.items[e.itemId] && CFG.items[e.itemId].isCooked && (e.n||1)>0;
+    });
+    var isCooked = false;
+    var need = (CFG.recruit&&CFG.recruit.mealCost)||2;
+    if(cookedDrop){
+      isCooked = true;
+      need = 0;
+      nibblePile(cookedDrop, 1);
+    }else{
+      if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'food', need)){
+        APH.UI.floatText('✕ 食物不够请客','#ff9a9a');
+        return false;
+      }
     }
-    var r=APH.Res.offerMeal(s.meta, ent);
+    var r=APH.Res.offerMeal(s.meta, ent, need, isCooked);
     if(!r.ok){
       APH.UI.floatText('✕ '+r.why,'#ff9a9a');
       return false;
     }
     saveMetaQuiet();
-    APH.UI.floatText('🍲 请 '+ (ent.name||'过客') +' 吃了一顿 (印象'+Math.round(r.impression)+')','#c8e89a');
+    var msg = isCooked ? '🍲 用精制熟食款待了 ' + (ent.name||'过客') + ' (印象+35 → ' + Math.round(r.impression) + ')'
+                       : '🍲 请 ' + (ent.name||'过客') + ' 吃了一顿 (印象+' + (r.boost||20) + ' → ' + Math.round(r.impression) + ')';
+    APH.UI.floatText(msg, '#ffca28');
     return true;
   }
   function tryRecruit(ent, rng){
@@ -2879,10 +2955,34 @@ window.APH = window.APH || {};
         var outLegacy=APH.Colony.workshopTick(w, m.res, b.lv||1);
         if(outLegacy.med>0){
           APH.Combat.spawnDrop(b.x+16, b.y+14, 'it_med', outLegacy.med, {stock:true});
-          APH.UI.floatText('🛠 工坊药品堆在地上 +'+outLegacy.med,'#e0b089');
+          APH.UI.floatText('💊 工坊药品堆在地上 +'+outLegacy.med,'#e0b089');
         }
       }
     });
+
+    /* 外星烹饪与餐饮生产流水线 (Cooking #49) */
+    var kitchens=s.colony.buildings.filter(function(b){ return b.id==='bl_kitchen'||b.id==='bl_campfire'; });
+    var chefs=workers.filter(function(r){ return r.job==='bl_kitchen'; });
+    kitchens.forEach(function(b){
+      var w = (b.id==='bl_kitchen') ? chefs.shift() : null;
+      var cSk = w ? ((w.skills&&w.skills.sk_farm)||0) : 0;
+      var cEff = w ? APH.Res.efficiency(w) : 1;
+      var out = APH.Colony.cookingTick(b, cSk, cEff, m.res, m.tech, 1);
+      if(out && out.done && out.producedItemId){
+        APH.Combat.spawnDrop(b.x+14, b.y+16, out.producedItemId, out.count||1, {stock:true});
+        var pName = (CFG.items[out.producedItemId]&&CFG.items[out.producedItemId].name)||out.producedItemId;
+        APH.UI.floatText('🍲 烹饪完成: '+pName, '#ffca28');
+      }
+    });
+
+    /* 篝火身心光环与围炉社交结算 (Cooking #49) */
+    var campfires=s.colony.buildings.filter(function(b){ return b.id==='bl_campfire'; });
+    if(campfires.length > 0 && APH.Res.campfireAuraTick){
+      var fireRes = APH.Res.campfireAuraTick(m.residents, campfires, { meta: m });
+      if(fireRes && fireRes.gatheredCount > 0){
+        APH.UI.floatText('🔥 居民们在篝火旁围炉夜话 (+羁绊 +心情)', '#ffc857');
+      }
+    }
     s.entities=s.entities.filter(function(e){
       return !(e.type===T.DROPPED && (e.dead || (e.n||0)<=0));
     });

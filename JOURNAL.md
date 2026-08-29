@@ -477,6 +477,15 @@
   验证: `python3 build.py` 构建成功 27096KB 以 `</html>` 收尾；新增 `tests/craft.test.js`（5 项制作与装备测试）；单元 303/0；场景 28/0；perf 3/0；boss 7/0（全量 341 项测试 100% 绿灯）。
   下一步: 外星料理与全屏科技树大地图。
 
+- **2026-08-29 · 班次**: ✅外星烹饪与餐饮社交闭环系统（Cooking & Campfire Social）。
+  - **5 大外星熟食**：炙烤异星肉排（`it_roasted_meat`）、晶核浆果浓汤（`it_berry_stew`）、清甜露果布丁（`it_dew_pudding`）、荧光温热浓汤（`it_glow_fondue`）、外星珍馐盛宴（`it_alien_feast`），提供饱食（+30~50）、心情（+4~12）、娱乐（+10~30）与驱寒加成。
+  - **餐饮设施与科技**：新增石料篝火 `bl_campfire`（夜间照明、驱寒、基础烘烤）与烹饪灶台 `bl_kitchen`（高级烹饪、厨师岗）；新增农业科技 `te_alien_culinary`（异星烹饪保鲜）。
+  - **烹饪流水线与围炉社交**：`cookingTick` 推进菜肴烹制与食材扣除；`getGlowSources` 将篝火纳入温暖橙黄色动态发光源（100px）；`campfireAuraTick` 判定 90px 范围内驱寒消退暴露、恢复娱乐并触发“围炉夜话”羁绊与心情提升；`offerMeal` 熟食款待过客好感跃升至 +35。
+  - **就餐寻路与渲染**：`tryEatHere` 优先检索熟食进食并弹出菜品品尝飘字；`drawBuilding` 绘制石砌柴火跳跃火焰与厨房蒸汽微粒。
+  验证: `python3 build.py` 构建成功 27117KB 以 `</html>` 收尾；新增 `tests/cooking.test.js`（8 项烹饪测试）；单元 311/0；场景 28/0；perf 3/0；boss 7/0（全量 349 项测试 100% 绿灯）。
+  下一步: 全屏可视化科技蓝图大地图。
+
+
 
 
 

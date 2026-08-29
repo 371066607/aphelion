@@ -355,6 +355,7 @@ APH.Ent = (function(){
     bl_warehouse:'#b8874a', bl_mine:'#7a8aa0', bl_lab:'#59d9ff',
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
     bl_farm:'#7a9a4a', bl_pasture:'#c8a882', bl_house:'#b8874a', bl_workshop:'#d4a574',
+    bl_crop_plot:'#81c784', bl_campfire:'#ff9800', bl_kitchen:'#cfd8dc',
   };
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
@@ -609,6 +610,108 @@ APH.Ent = (function(){
           ctx.beginPath(); ctx.ellipse(0, -12+bounce, 6, 12, 0, 0, U.TAU); ctx.fill();
         }
       }
+      ctx.restore();
+      return;
+    }
+    /* 石料篝火(bl_campfire): 石块围圈 + 堆叠柴火 + 温暖橙黄光晕 + 多重正弦跳跃火焰与火星 */
+    if(e.bid==='bl_campfire'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      // 阴影
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(0, 4, 20, 10, 0, 0, U.TAU); ctx.fill();
+      // 温暖地面径向光晕
+      var glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 45);
+      glow.addColorStop(0, 'rgba(255, 170, 60, 0.45)');
+      glow.addColorStop(0.5, 'rgba(255, 120, 30, 0.2)');
+      glow.addColorStop(1, 'rgba(255, 100, 20, 0)');
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 45, 0, U.TAU); ctx.fill();
+      // 石块围圈底座
+      for(var i=0; i<8; i++){
+        var ang = i * U.TAU / 8;
+        var sx = Math.cos(ang)*14, sy = Math.sin(ang)*8;
+        ctx.fillStyle = (i%2===0)?'#78909c':'#546e7a';
+        ctx.beginPath(); ctx.ellipse(sx, sy, 4, 3, ang, 0, U.TAU); ctx.fill();
+      }
+      // 柴火堆叠
+      ctx.fillStyle = '#4e342e'; ctx.fillRect(-10, -3, 20, 5);
+      ctx.fillStyle = '#3e2723';
+      ctx.save(); ctx.rotate(0.8); ctx.fillRect(-9, -2.5, 18, 5); ctx.restore();
+      ctx.save(); ctx.rotate(-0.8); ctx.fillRect(-9, -2.5, 18, 5); ctx.restore();
+      // 多重高斯/正弦跳跃火焰动效
+      var fWave1 = Math.sin(time * 8) * 3;
+      var fWave2 = Math.cos(time * 12 + 1) * 2.5;
+      var fWave3 = Math.sin(time * 15 + 2) * 2;
+      // 外焰 (橙红)
+      ctx.fillStyle = '#ff5722';
+      ctx.beginPath();
+      ctx.moveTo(-7, 2);
+      ctx.quadraticCurveTo(-6 + fWave1, -12, 0 + fWave2, -18 + fWave1);
+      ctx.quadraticCurveTo(6 + fWave3, -12, 7, 2);
+      ctx.closePath(); ctx.fill();
+      // 内焰 (暖橙黄)
+      ctx.fillStyle = '#ff9800';
+      ctx.beginPath();
+      ctx.moveTo(-5, 2);
+      ctx.quadraticCurveTo(-3 + fWave2, -8, 0 + fWave1, -14 + fWave3);
+      ctx.quadraticCurveTo(3 + fWave1, -8, 5, 2);
+      ctx.closePath(); ctx.fill();
+      // 焰心 (亮黄白)
+      ctx.fillStyle = '#ffeb3b';
+      ctx.beginPath();
+      ctx.moveTo(-3, 2);
+      ctx.quadraticCurveTo(0, -5, 0, -9 + fWave2);
+      ctx.quadraticCurveTo(0, -5, 3, 2);
+      ctx.closePath(); ctx.fill();
+      // 上升火星微粒
+      for(var s=0; s<3; s++){
+        var sparkY = -12 - ((time * 25 + s * 14) % 24);
+        var sparkX = Math.sin(time * 6 + s * 2) * 6;
+        var sparkAlpha = Math.max(0, 1 - Math.abs(sparkY) / 36);
+        ctx.fillStyle = 'rgba(255, 215, 64, ' + sparkAlpha + ')';
+        ctx.beginPath(); ctx.arc(sparkX, sparkY, 1.5, 0, U.TAU); ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+    /* 烹饪灶台(bl_kitchen): 2x2 外星烹饪台、石砌灶炉、金属案板与热气蒸腾蒸汽动效 */
+    if(e.bid==='bl_kitchen'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      // 阴影
+      ctx.fillStyle='rgba(0,0,0,.35)';
+      ctx.beginPath(); ctx.ellipse(0, 8, 36, 18, 0, 0, U.TAU); ctx.fill();
+      // 灶台主体框架
+      var bgK = ctx.createLinearGradient(0, -25, 0, 15);
+      bgK.addColorStop(0, '#546e7a'); bgK.addColorStop(1, '#263238');
+      ctx.fillStyle = bgK; ctx.fillRect(-28, -20, 56, 32);
+      ctx.strokeStyle = '#78909c'; ctx.lineWidth = 1.5; ctx.strokeRect(-28, -20, 56, 32);
+      // 左侧金属备餐案板
+      ctx.fillStyle = '#90a4ae'; ctx.fillRect(-26, -18, 24, 28);
+      ctx.fillStyle = '#cfd8dc'; ctx.fillRect(-24, -16, 20, 4);
+      // 案板与食材
+      ctx.fillStyle = '#8d6e63'; ctx.fillRect(-22, -8, 14, 12);
+      ctx.fillStyle = '#ff80ab'; ctx.beginPath(); ctx.arc(-16, -2, 2.5, 0, U.TAU); ctx.fill();
+      // 右侧石砌灶炉
+      ctx.fillStyle = '#37474f'; ctx.fillRect(2, -18, 24, 28);
+      ctx.fillStyle = '#212121'; ctx.beginPath(); ctx.arc(14, -4, 9, 0, U.TAU); ctx.fill();
+      // 灶炉炉火光晕
+      var bGlow = 0.5 + 0.3 * Math.sin(time * 6);
+      ctx.fillStyle = 'rgba(255, 110, 64, ' + bGlow + ')';
+      ctx.beginPath(); ctx.arc(14, -4, 7, 0, U.TAU); ctx.fill();
+      // 烹饪汤锅
+      ctx.fillStyle = '#455a64'; ctx.beginPath(); ctx.ellipse(14, -6, 7, 4, 0, 0, U.TAU); ctx.fill();
+      ctx.fillStyle = '#00e5ff'; ctx.beginPath(); ctx.ellipse(14, -7, 5, 2.5, 0, 0, U.TAU); ctx.fill();
+      // 热气蒸腾蒸汽粒子
+      for(var st=0; st<3; st++){
+        var stY = -12 - ((time * 18 + st * 10) % 22);
+        var stX = 14 + Math.sin(time * 4 + st * 2) * 4;
+        var stA = Math.max(0, 0.45 - Math.abs(stY + 12) / 25);
+        var stR = 2.5 + (Math.abs(stY + 12) / 22) * 3;
+        ctx.fillStyle = 'rgba(255, 255, 255, ' + stA + ')';
+        ctx.beginPath(); ctx.arc(stX, stY, stR, 0, U.TAU); ctx.fill();
+      }
+      // 后置排烟管
+      ctx.fillStyle = '#424242'; ctx.fillRect(8, -32, 6, 14);
+      ctx.fillStyle = '#616161'; ctx.fillRect(7, -34, 8, 3);
       ctx.restore();
       return;
     }

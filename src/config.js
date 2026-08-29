@@ -136,6 +136,12 @@ APH.CFG = {
     it_suit_cryo:     { name: '极地防寒羽绒', w: 3, v: 15, tint:'#b2ebf2', slot:'suit', cryoResist:0.80 },
     it_goggles_night: { name: '荧光夜视镜', w: 1, v: 12, tint:'#00e5ff', slot:'head', sightBoost:80 },
     it_medkit_adv:    { name: '复合急救包', w: 1, v: 10, tint:'#ff80ab', store:'med', healBonus:25 },
+    /* 5 大外星熟食菜肴 (Cooking #49) */
+    it_roasted_meat:  { name: '炙烤异星肉排', w: 1, v: 6, tint:'#d97d64', store:'food', isCooked:true, foodGain:40, moodGain:4, recGain:10, desc:'炭火炙烤的外星嫩肉排，外焦里嫩' },
+    it_berry_stew:    { name: '晶核浆果浓汤', w: 1, v: 8, tint:'#ff80ab', store:'food', isCooked:true, foodGain:35, moodGain:6, recGain:15, desc:'晶核果与野果熬制的甜汤，滋润心神' },
+    it_dew_pudding:   { name: '清甜露果布丁', w: 1, v: 8, tint:'#80cbc4', store:'food', isCooked:true, foodGain:30, moodGain:8, recGain:20, desc:'露珠膨果凝炼而成的清甜点心，极度愉悦' },
+    it_glow_fondue:   { name: '荧光温热浓汤', w: 1, v: 10, tint:'#4dd0e1', store:'food', isCooked:true, foodGain:35, moodGain:5, recGain:12, warmBonus:20, desc:'微光发热的暖胃汤，驱散严寒' },
+    it_alien_feast:   { name: '外星珍馐盛宴', w: 2, v: 20, tint:'#ffd54f', store:'food', isCooked:true, foodGain:50, moodGain:12, recGain:30, desc:'聚合多种外星奇珍的丰盛大餐，极大提升身心机能' },
     it_crystal_ore:   { name: '晶体矿',   w: 2, v: 2, tint:'#ff9ad0' },
     it_mineral:       { name: '矿材',     w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
     it_alloy:         { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
@@ -279,6 +285,14 @@ APH.CFG = {
     painConCut: 0.003,         // 疼痛削弱认知
     tiredConCut: 0.2,          // 极度疲倦削弱认知
     coldMoveCut: 0.003,        // 严寒暴露削弱移动
+    /* 外星烹饪与篝火餐饮社交 (Cooking #49) */
+    campfireSocialR: 90,       // 社交与取暖辐射半径
+    campfireRecGain: 10,       // 围炉娱乐增益
+    campfireWarmR: 90,         // 驱寒保暖半径
+    campfireExposureRelief: 15,// 围炉暴露消退
+    campfireBondGain: 3,       // 围炉夜话羁绊增益
+    campfireMoodGain: 1,       // 围炉夜话心情增益
+    mealImpressCooked: 35,     // 熟食款待过客好感增益
   },
 
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
@@ -361,7 +375,7 @@ APH.CFG = {
 
   /* 岗位席位(建筑数×每座席位 = 可派岗上限) */
   jobs: {
-    slots: { bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1 },
+    slots: { bl_farm:2, bl_pasture:2, bl_clinic:1, bl_mine:1, bl_workshop:1, bl_lab:1, bl_kitchen:1, bl_crop_plot:1 },
   },
 
   /* 事件叙事者 (ADR-12: 事件导演; 单位分钟) */

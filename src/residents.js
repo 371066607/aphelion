@@ -159,13 +159,63 @@ APH.Res = (function(){
   }
 
   /* 走到粮堆/仓库后吃一口. 生产跳只掉饱食, 不隔空扣地上. */
-  function eatOnce(r){
+  function eatOnce(r, itemDef){
     var C=RS();
     var below=C.eatBelow!=null?C.eatBelow:60;
     var gain=C.eatGain!=null?C.eatGain:25;
     if(!r || r.food==null || r.food>=below) return false;
-    r.food=Math.min(100, (r.food||0)+gain);
+    var def = (typeof itemDef === 'string' && CFG.items) ? CFG.items[itemDef] : itemDef;
+    var fGain = (def && def.foodGain != null) ? def.foodGain : gain;
+    var mGain = (def && def.moodGain != null) ? def.moodGain : 0;
+    var rGain = (def && def.recGain != null) ? def.recGain : 0;
+    var wBonus = (def && def.warmBonus != null) ? def.warmBonus : 0;
+
+    r.food = Math.min(100, (r.food||0) + fGain);
+    if(mGain > 0){
+      var cap = C.moodCap != null ? C.moodCap : 95;
+      r.mood = Math.min(cap, (r.mood || 70) + mGain);
+    }
+    if(rGain > 0){
+      r.recreation = Math.min(100, (r.recreation != null ? r.recreation : 80) + rGain);
+    }
+    if(wBonus > 0 && r.exposure != null){
+      r.exposure = Math.max(0, r.exposure - wBonus);
+    }
     return true;
+  }
+
+  /* 享用菜肴纯函数(返回详尽身心增益与数值结算) (Cooking #49) */
+  function eatMeal(r, itemDef){
+    var C=RS();
+    var below=C.eatBelow!=null?C.eatBelow:60;
+    var gain=C.eatGain!=null?C.eatGain:25;
+    if(!r || r.food==null || r.food>=below) return { ate:false };
+    var def = (typeof itemDef === 'string' && CFG.items) ? CFG.items[itemDef] : itemDef;
+    var fGain = (def && def.foodGain != null) ? def.foodGain : gain;
+    var mGain = (def && def.moodGain != null) ? def.moodGain : 0;
+    var rGain = (def && def.recGain != null) ? def.recGain : 0;
+    var wBonus = (def && def.warmBonus != null) ? def.warmBonus : 0;
+
+    r.food = Math.min(100, (r.food||0) + fGain);
+    if(mGain > 0){
+      var cap = C.moodCap != null ? C.moodCap : 95;
+      r.mood = Math.min(cap, (r.mood || 70) + mGain);
+    }
+    if(rGain > 0){
+      r.recreation = Math.min(100, (r.recreation != null ? r.recreation : 80) + rGain);
+    }
+    if(wBonus > 0 && r.exposure != null){
+      r.exposure = Math.max(0, r.exposure - wBonus);
+    }
+    return {
+      ate: true,
+      foodGain: fGain,
+      moodGain: mGain,
+      recGain: rGain,
+      warmBonus: wBonus,
+      isCooked: !!(def && def.isCooked),
+      item: def
+    };
   }
 
   /* 工作效率系数: 心情 × 饱食 × 病情(超阈值打折, 有地板) */
@@ -572,10 +622,11 @@ APH.Res = (function(){
     var v=(cur==null?start:cur) + hospitalityRate(ctx)*(dt||0);
     return Math.max(lo, Math.min(hi, v));
   }
-  function offerMeal(meta, visitor, cost){
+  function offerMeal(meta, visitor, cost, isCooked){
     var C=RC();
-    var need=cost!=null?cost:(C.mealCost!=null?C.mealCost:2);
-    var boost=C.mealImpress!=null?C.mealImpress:20;
+    var cooked = (typeof cost === 'boolean') ? cost : (!!isCooked || (cost && cost.isCooked));
+    var need = (typeof cost === 'number') ? cost : ((cost && cost.cost != null) ? cost.cost : (C.mealCost!=null?C.mealCost:2));
+    var boost = cooked ? ((CFG.residents && CFG.residents.mealImpressCooked) || 35) : (C.mealImpress!=null?C.mealImpress:20);
     var start=C.impressStart!=null?C.impressStart:50;
     var hi=C.impressMax!=null?C.impressMax:100;
     if(!visitor) return { ok:false, why:'没有过客' };
@@ -586,7 +637,7 @@ APH.Res = (function(){
     meta.res.food=(meta.res.food||0)-need;
     visitor.fed=true;
     visitor.impression=Math.min(hi, (visitor.impression==null?start:visitor.impression)+boost);
-    return { ok:true, impression:visitor.impression, food:meta.res.food, cost:need };
+    return { ok:true, impression:visitor.impression, food:meta.res.food, cost:need, isCooked:cooked, boost:boost };
   }
 
   /* D: 默认工作优先级——有现职按岗位对应技能=1, 否则主技能=1, 其余=2 */
@@ -960,13 +1011,77 @@ APH.Res = (function(){
     return r;
   }
 
+  /* 篝火身心与社交光环(纯函数) (Cooking #49) */
+  function campfireAuraTick(residents, campfires, opts){
+    opts = opts || {};
+    var C = RS();
+    var socR = C.campfireSocialR != null ? C.campfireSocialR : 90;
+    var warmR = C.campfireWarmR != null ? C.campfireWarmR : 90;
+    var relief = C.campfireExposureRelief != null ? C.campfireExposureRelief : 15;
+    var recGain = C.campfireRecGain != null ? C.campfireRecGain : 10;
+    var bondGain = C.campfireBondGain != null ? C.campfireBondGain : 3;
+    var moodGain = C.campfireMoodGain != null ? C.campfireMoodGain : 1;
+    var cap = C.moodCap != null ? C.moodCap : 95;
+
+    var resList = residents || [];
+    var fireList = campfires || [];
+    var warmed = [];
+    var gatheredMap = {};
+
+    fireList.forEach(function(fire, fIdx){
+      gatheredMap[fIdx] = [];
+      resList.forEach(function(r){
+        if(!r || r.downed || r.isSleeping) return;
+        var rx = r.x != null ? r.x : (r.px != null ? r.px : (fire.x || 0));
+        var ry = r.y != null ? r.y : (r.py != null ? r.py : (fire.y || 0));
+        var d = U.dst(rx, ry, fire.x || 0, fire.y || 0);
+        if(d <= warmR){
+          r.exposure = Math.max(0, (r.exposure || 0) - relief);
+          enjoyRecreation(r, recGain);
+          if(warmed.indexOf(r.id) < 0) warmed.push(r.id);
+        }
+        if(d <= socR){
+          gatheredMap[fIdx].push(r);
+        }
+      });
+    });
+
+    var bondsUpdated = false;
+    var socialPairs = [];
+    var meta = opts.meta;
+    for(var k in gatheredMap){
+      var group = gatheredMap[k];
+      if(group.length >= 2){
+        for(var i = 0; i < group.length; i++){
+          var ra = group[i];
+          ra.mood = Math.min(cap, (ra.mood || 70) + moodGain);
+          for(var j = i + 1; j < group.length; j++){
+            var rb = group[j];
+            socialPairs.push([ra.id, rb.id]);
+            if(meta){
+              meta.bonds = applyBond(meta.bonds || {}, ra.id, rb.id, bondGain);
+              bondsUpdated = true;
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      warmed: warmed,
+      gatheredCount: socialPairs.length,
+      pairs: socialPairs,
+      bondsUpdated: bondsUpdated
+    };
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
-    generate:generate, needsTick:needsTick, eatOnce:eatOnce, efficiency:efficiency, clinicTick:clinicTick,
+    generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
-    isSheltered:isSheltered, exposureTick:exposureTick,
+    isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,
