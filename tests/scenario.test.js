@@ -1455,5 +1455,113 @@ test('#72: 无居民倒计时归零死亡 (按死亡处理, 不产生 clinicKit)
   S.scene = 'home'; S.mode = 'running';
 });
 
+/* #71 击倒叠伤痕: 睡/倒共用俯卧身, 击倒叠伤痕+血泊、睡着不叠 (渲染级区分测试)
+   ADR-0003: 不另画 downed sheet、不运行时换色、不叠五官。
+   forceProneReady: 手动置 _images 令 isReady(name)=true + 确保 d.fw 非0(否则 draw 画0宽)。
+   woundCtx: 记录红色系 fillStyle 的 ellipse(伤痕) 与 drawImage(证明走贴图路径)。 */
+const WOUND_FILLS = ['rgba(150,28,24,.55)','rgba(120,18,18,.42)','rgba(140,22,24,.8)'];
+function forceProneReady(names){
+  /* 记录原 _images[name]/原 fw, 供 restoreProneReady 还原, 避免泄漏到下个测试(投影 ready) */
+  var saved = {};
+  names.forEach(function(name){
+    var d = APH.Sprites.sheetDef(name) || APH.Sprites.define(name,{src:'x',fw:256,fh:256,cols:16,rows:1,count:16,fps:1,baseline:248,contentH:122});
+    saved[name] = { img: APH.Sprites._images[name], fw: d.fw, fh: d.fh };
+    if(!d.fw) d.fw = d.fh = 256;
+    APH.Sprites._images[name] = { width:d.fw*16, height:d.fh };
+  });
+  return function restoreProneReady(){
+    names.forEach(function(name){
+      var d = APH.Sprites.sheetDef(name);
+      var s = saved[name];
+      if(s && d){ if(s.fw==null) delete d.fw; else d.fw = s.fw; if(s.fh==null) delete d.fh; else d.fh = s.fh; }
+      if(s && s.img==null){ delete APH.Sprites._images[name]; } else { APH.Sprites._images[name] = s.img; }
+    });
+  };
+}
+function woundCtx(){
+  const calls=[];
+  const spy={
+    fillStyle:'', strokeStyle:'', font:'', textAlign:'', globalAlpha:1,
+    save(){}, restore(){}, translate(){}, scale(){}, beginPath(){},
+    ellipse(x,y,rx,ry){ calls.push({kind:'ellipse', fillStyle:this.fillStyle, strokeStyle:this.strokeStyle, rx:rx}); },
+    arc(){}, fill(){}, stroke(){}, fillRect(){}, strokeRect(){}, fillText(){}, drawImage(){},
+  };
+  spy.getContext = function(){ return spy; };
+  return { spy:spy, calls:calls,
+    wounds:function(){ return calls.filter(function(c){ return c.kind==='ellipse' && WOUND_FILLS.indexOf(c.fillStyle)>=0; }); } };
+}
+
+test('#71 render: 居民击倒叠伤痕(专用俯卧sheet), 睡着同sheet不叠', () => {
+  const restoreProneReady=forceProneReady(['player_prone','hum_0_nopack_prone']);
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const wc=woundCtx();
+  const origDraw=APH.Sprites.draw;
+  APH.Sprites.draw=function(ctx,name,x,y,idx,sc){ wc.calls.push({kind:'drawImage', sheet:name}); return true; };
+  try{
+    APH.Ent.bindCtx(wc.spy);
+    const base={id:'rs71', rid:'rs71', type:T.RESIDENT, x:500, y:500, name:'击倒居民',
+      mood:70, food:90, illness:0, face:Math.PI/2, walking:false, walkPh:0};
+    APH.Ent.drawResident(Object.assign({},base,{downed:true, isSleeping:false}),0);
+    A(wc.wounds().length>=4, '居民击倒应叠≥4处伤痕, got '+wc.wounds().length);
+    A(wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet==='hum_0_nopack_prone';}), '居民击倒应走专用 hum_0_nopack_prone');
+    wc.calls.length=0; wc.spy.fillStyle='';
+    APH.Ent.drawResident(Object.assign({},base,{downed:false, isSleeping:true}),0);
+    A(wc.wounds().length===0, '居民睡着应不叠伤痕, got '+wc.wounds().length);
+    A(wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet==='hum_0_nopack_prone';}), '居民睡着同用 hum_0_nopack_prone');
+  }finally{
+    APH.Sprites.draw=origDraw;
+    APH.Ent.bindCtx(originalCtx);
+    restoreProneReady();
+  }
+});
+
+test('#71 render: 过客击倒叠伤痕(通用player_prone), 睡着同sheet不叠', () => {
+  const restoreProneReady=forceProneReady(['player_prone','hum_0_nopack_prone']);
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const wc=woundCtx();
+  const origDraw=APH.Sprites.draw;
+  APH.Sprites.draw=function(ctx,name,x,y,idx,sc){ wc.calls.push({kind:'drawImage', sheet:name}); return true; };
+  try{
+    APH.Ent.bindCtx(wc.spy);
+    const base={id:'vs71', rid:'vs71', type:T.VISITOR, x:600, y:600, name:'过客甲',
+      mood:70, food:90, illness:0, face:0, walking:false, walkPh:0};
+    APH.Ent.drawVisitor(Object.assign({},base,{downed:true, isSleeping:false}),0);
+    A(wc.wounds().length>=4, '过客击倒应叠≥4处伤痕');
+    A(wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet==='player_prone';}), '过客击倒应走通用 player_prone');
+    wc.calls.length=0; wc.spy.fillStyle='';
+    APH.Ent.drawVisitor(Object.assign({},base,{downed:false, isSleeping:true}),0);
+    A(wc.wounds().length===0, '过客睡着应不叠伤痕');
+  }finally{
+    APH.Sprites.draw=origDraw;
+    APH.Ent.bindCtx(originalCtx);
+    restoreProneReady();
+  }
+});
+
+test('#71 render: 玩家击倒叠伤痕(player_prone), 睡着同sheet不叠, 且downed/isSleeping互斥', () => {
+  const restoreProneReady=forceProneReady(['player_prone','hum_0_nopack_prone']);
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const wc=woundCtx();
+  const origDraw=APH.Sprites.draw;
+  APH.Sprites.draw=function(ctx,name,x,y,idx,sc){ wc.calls.push({kind:'drawImage', sheet:name}); return true; };
+  try{
+    APH.Ent.bindCtx(wc.spy);
+    const pe={type:T.PLAYER, x:S.px, y:S.py, moving:false, walkPh:0, downed:true, isSleeping:false};
+    APH.Ent.drawPlayer(pe, 0);
+    A(wc.wounds().length>=4, '玩家击倒应叠≥4处伤痕, got '+wc.wounds().length);
+    A(wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet==='player_prone';}), '玩家击倒应走 player_prone');
+    wc.calls.length=0; wc.spy.fillStyle='';
+    APH.Ent.drawPlayer(Object.assign({},pe,{downed:false, isSleeping:true}), 0);
+    A(wc.wounds().length===0, '玩家睡着应不叠伤痕');
+  }finally{
+    APH.Sprites.draw=origDraw;
+    APH.Ent.bindCtx(originalCtx);
+    restoreProneReady();
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

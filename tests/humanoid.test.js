@@ -276,3 +276,24 @@ test('#59 poseFor: 未配专用图的身份仍共用 player_prone', () => {
   if (a.sheet !== 'player_prone' || b.sheet !== 'player_prone') throw new Error('未配专用图的身份应共用 player_prone, got '+a.sheet+' / '+b.sheet);
   if (a.frame !== b.frame) throw new Error('同 face/time 应同帧, got '+a.frame+' / '+b.frame);
 });
+
+/* ============ #71 击倒叠伤痕: 俯卧 sheet 几何不变式 ============ */
+
+test('#71 geometry: 不同 contentH 的俯卧 sheet 仍映射到同一 [-drawH,0] 身体空间', () => {
+  var drawH = (window.APH.CFG.humanoid && window.APH.CFG.humanoid.drawH) || 78;
+  var sheets = [
+    { name:'player_prone', contentH:68 },        /* main.js SPRITE_META #59 */
+    { name:'hum_0_nopack_prone', contentH:122 }, /* main.js SPRITE_META #60 */
+  ];
+  if (typeof H.spriteScale !== 'function') throw new Error('Humanoid.spriteScale 未导出');
+  var heights = [];
+  for (var i = 0; i < sheets.length; i++) {
+    var s = sheets[i];
+    var want = s.contentH * H.spriteScale(s.contentH);
+    heights.push(want);
+    if (want !== drawH) throw new Error(s.name+' contentH×spriteScale 应为 '+drawH+', got '+want);
+  }
+  /* 两张俯卧表内容高不同(68 vs 122), 但缩放后身体必须同高 —— 伤痕坐标固定即可贴体,
+     绝不能按 contentH 再乘一次缩放(会错位, 如 ×78/122≈0.64)。 */
+  if (heights[0] !== heights[1]) throw new Error('俯卧 sheet 应映射到同一身体高, got '+heights[0]+' / '+heights[1]);
+});

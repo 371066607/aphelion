@@ -888,7 +888,10 @@ APH.Ent = (function(){
   }
 
   function drawProneWounds(ctx){
-    /* #59: 击倒叠伤痕+血泊(ADR-0003: 不换色、不叠五官)。坐标: 俯卧身从原点(接地线)上到 -drawH */
+    /* #59/#71: 击倒叠伤痕+血泊(ADR-0003: 不换色、不叠五官)。坐标: 俯卧身从原点(接地线)上到 -drawH。
+       不变式(见 tests/humanoid.test.js #71 geometry): 每张俯卧 sheet 都满足
+       contentH × spriteScale(contentH) = drawH(78) → 身体内容一律映射到 y∈[-78,0],
+       伤痕固定坐标即贴体; 绝不按 contentH 再乘一次缩放(会错位, 如 ×78/122≈0.64)。 */
     ctx.fillStyle='rgba(150,28,24,.55)';
     ctx.beginPath(); ctx.ellipse(0,-2,16,7,0,0,U.TAU); ctx.fill();      /* 血泊 */
     ctx.fillStyle='rgba(120,18,18,.42)';

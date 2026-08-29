@@ -104,6 +104,13 @@
 
 - [x] `hum_0_nopack_prone` 16 帧横排（四向各 4），整人预烘焙；不旋转 walk、不运行时换色、不叠五官；缺图回退 `player_prone`
 
+## 击倒叠伤痕、睡着不叠（Issue #71）
+
+- [x] 击倒与睡着共用同一张俯卧身子：玩家/居民/过客各自验证 drawPlayer/drawResident/drawVisitor 下 downed 与 isSleeping 都命中同一 prone sheet（`player_prone` / `hum_0_nopack_prone`），不另画 downed sheet、不运行时换色、不叠五官（ADR-0003）
+- [x] 击倒叠伤痕/血迹、睡着不叠：`drawProneWounds` 仅 `lying && e.downed` 触发；渲染测试按 fillStyle 过滤伤痕 ellipse，击倒≥4 处、睡着 0 处；`updatePlayer` downed 分支清 `isSleeping`、`checkDowned` 清 `isSleeping`、`syncPlayerSleep` 双标志镜像 → 互斥成立
+- [x] 几何不变式锁定：任意 contentH 的俯卧 sheet 均满足 `contentH × spriteScale(contentH) = drawH(78)` → 身体一律映射到 y∈[-78,0]，伤痕坐标固定贴体，绝不按 contentH 再乘缩放（防新增俯卧表错位）
+- [x] 测试锁定：scenario 新增 3 渲染冒烟（居民/过客/玩家击倒叠伤痕 vs 睡着不叠 + 同 sheet + drawImage 走贴图路径非程序化回退），humanoid 新增 1 几何不变式；全量 375 单元 + 65 场景 + 3 perf + 7 boss = 450 项绿灯
+
 ## 玩家床边睡眠与唤醒（Issue #66）
 
 - [x] 靠床 E 入睡用俯卧图：靠近居住舱 `bl_house` 60px 内按 E 睡（`meta.playerNeeds.isSleeping` → 实体每帧同步 → `drawPlayer` 俯卧）；只置 `nearBed` 提示位，绝不自动走向床
