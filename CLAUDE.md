@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **多人协作**：认领/冲突/收尾约定见 `COLLABORATION.md`。开工前先 `gh issue edit <n> --add-assignee @me` 占位；当前 da123wda 在做 #64，勿碰生病相关改动。
+
 ## 项目概述
 
 《远日点 Aphelion》：2.5D 俯视外星游戏——殖民地经营(主城) ↔ 星球远征(副本：勘测/战斗/搜刮)。核心循环：探索勘测(氧气管理) → 战斗掉落 → 回殖民地建造/科技 → 战争攻防。LLM 驱动星球差异化，无 API 时静默走程序降级。
