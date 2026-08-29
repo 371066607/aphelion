@@ -327,6 +327,19 @@ APH.Res = (function(){
     };
   }
 
+  /* #65 玩家走到粮边吃: 纯函数只改 playerNeeds.food(玩家需求无 mood/recreation/exposure,
+     绝不复用居民 eatOnce 以免污染)。熟食用 itemDef.foodGain, 生食/口粮用 CFG.player.foodEatGain。 */
+  function playerEatOnce(needs, itemDef){
+    var below=(CFG.player&&CFG.player.foodEatBelow!=null)?CFG.player.foodEatBelow:60;
+    var gain=(CFG.player&&CFG.player.foodEatGain!=null)?CFG.player.foodEatGain:25;
+    if(!needs || needs.food==null || needs.food>=below) return { ate:false, reason:'full' };
+    var def=(typeof itemDef==='string'&&CFG.items)?CFG.items[itemDef]:itemDef;
+    var fGain=(def&&def.foodGain!=null)?def.foodGain:gain;
+    var before=needs.food;
+    needs.food=Math.min(100, needs.food+fGain);
+    return { ate:true, gain:needs.food-before };
+  }
+
   /* 工作效率系数: 心情 × 饱食 × 病情(超阈值打折, 有地板) */
   function efficiency(r){
     var C=RS();
@@ -1187,6 +1200,7 @@ APH.Res = (function(){
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
+    playerEatOnce:playerEatOnce,
     homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
     setPlayerSleeping:setPlayerSleeping, playerWake:playerWake, playerRestTick:playerRestTick,
     playerDownedTick:playerDownedTick,

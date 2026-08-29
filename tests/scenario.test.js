@@ -1166,6 +1166,148 @@ test('#70: 舱内躺卧按床速恢复 (+25/跳, 非地铺 18) 且保持 bed_med
   S.meta.playerNeeds.illness = 0;
 });
 
+/* #65 走到粮边吃: 玩家饥饿时近粮堆/仓库按 E 吃一口(+饱食),
+   只置 s.nearFood, 绝不写 s.target 自动寻路; 满饱食靠粮按 E 不耗粮不寻路
+   驱动通道: updateHome(近判定) / debugPressE(E 交互) / drawPlayer(🍽标记)
+   注意: scenario.test.js 被 run.js EXCLUDE, 无自动清档, 每例手动清残留 */
+test('#65: 靠粮堆判定 nearFood 且不自动寻路 (S.target 保持 null)', () => {
+  S.scene = 'home'; S.mode = 'running';
+  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
+    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
+  S.meta.residents = [];
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 30;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;   // 隔离 #66/#70 残留
+  S.prodT = 0;
+  /* 粮堆放到 40px 处: 避开 updateDropped 26px 自动入库, 但仍在 foodEatRadius(60) 内 */
+  APH.Combat.spawnDrop(S.px+40, S.py, 'it_food', 5, {stock:true});
+  M.updateHome(0.016);
+  A(S.nearFood, '靠粮堆应判定 nearFood');
+  A(S.nearFood.isWarehouse !== true, '近处有粮堆时 nearFood 不应是仓库');
+  A(S.target === null, '靠粮堆不得自动寻路 (S.target 应保持 null)');
+  /* 清理残留 */
+  S.entities = S.entities.filter(e => e.type!==T.DROPPED);
+  S.nearFood = null;
+  S.prodT = 0;
+});
+
+test('#65: 靠仓库判定 nearFood 且不自动寻路', () => {
+  S.scene = 'home'; S.mode = 'running';
+  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
+    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
+  S.meta.residents = [];
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 30;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
+  S.prodT = 0;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food = 10;
+  APH.Colony.placeBuildingEntity('bl_warehouse', S.px, S.py, 1);
+  M.updateHome(0.016);
+  A(S.nearFood, '靠仓库应判定 nearFood');
+  A(S.nearFood.isWarehouse === true, '无近粮堆+仓有粮时 nearFood 应为仓库');
+  A(S.target === null, '靠仓库不得自动寻路 (S.target 应保持 null)');
+  /* 清理残留 */
+  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
+  S.nearFood = null;
+  S.prodT = 0;
+});
+
+test('#65: 近粮堆按 E 吃 → 饱食上升且堆-1', () => {
+  S.scene = 'home'; S.mode = 'running';
+  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
+    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
+  S.meta.residents = [];
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 30;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
+  S.prodT = 0;
+  /* 粮堆放到 40px 处: 避开 updateDropped 26px 自动入库, 但仍在 foodEatRadius(60) 内 */
+  const pile = APH.Combat.spawnDrop(S.px+40, S.py, 'it_food', 5, {stock:true});
+  M.updateHome(0.016);
+  A(S.nearFood, '靠粮堆应判定 nearFood');
+  M.debugPressE();
+  A(S.meta.playerNeeds.food > 30, '近粮堆按 E 应涨饱食, 实际: '+S.meta.playerNeeds.food);
+  A((pile.n||0) === 4, '地上粮堆应 -1, 实际 n='+(pile.n||0));
+  A(S.target === null, '吃粮不得触发自动寻路 (S.target 应保持 null)');
+  /* 清理残留 */
+  S.entities = S.entities.filter(e => e.type!==T.DROPPED);
+  S.nearFood = null;
+  S.prodT = 0;
+});
+
+test('#65: 近仓库按 E 吃 → 饱食上升且扣 1 粮', () => {
+  S.scene = 'home'; S.mode = 'running';
+  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
+    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
+  S.meta.residents = [];
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 30;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
+  S.prodT = 0;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food = 10;
+  APH.Colony.placeBuildingEntity('bl_warehouse', S.px, S.py, 1);
+  M.updateHome(0.016);
+  A(S.nearFood && S.nearFood.isWarehouse, '靠仓库应判定 nearFood 为仓库');
+  M.debugPressE();
+  A(S.meta.playerNeeds.food > 30, '近仓库按 E 应涨饱食, 实际: '+S.meta.playerNeeds.food);
+  A(S.meta.res.food === 9, '仓库应扣 1 粮, 实际: '+S.meta.res.food);
+  A(S.target === null, '吃仓库口粮不得触发自动寻路 (S.target 应保持 null)');
+  /* 清理残留 */
+  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
+  S.nearFood = null;
+  S.prodT = 0;
+});
+
+test('#65: 满饱食靠粮按 E 不耗粮不寻路', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 80;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;   // 隔离 #66/#70 残留
+  S.prodT = 0;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food = 10;
+  S.nearFood = { isWarehouse:true };          // 手置近仓库
+  const food0 = S.meta.playerNeeds.food;
+  M.debugPressE();
+  A(S.meta.playerNeeds.food === food0, '满饱食靠粮按 E 不应涨饱食');
+  A(S.meta.res.food === 10, '满饱食靠粮按 E 不应耗仓粮');
+  A(S.target === null, '满饱食按 E 也不得自动寻路');
+  /* 清理残留 */
+  S.nearFood = null;
+  S.prodT = 0;
+});
+
+test('#65: 饿玩家 drawPlayer 画 🍽 不崩', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 30;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
+  S.prodT = 0;
+  const pe = APH.Ent.findPlayer();
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #65 hungry draw err:', err.message); }
+  A(!threw, '饿玩家(含🍽标记)绘制不应崩');
+  /* 满饱食也不崩(不画标记分支) */
+  S.meta.playerNeeds.food = 80;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #65 full draw err:', err.message); }
+  A(!threw, '满饱食玩家绘制不应崩');
+  S.prodT = 0;
+});
+
 /* #72 家园击倒: 击倒 != 死亡, 昏迷不可动/不可醒, 送医复活/倒计时死亡, 远征死法不变
    驱动通道: hurtPlayer → updateHome(playerDownedTick/carryPlayerToClinic) */
 test('#72: 家园击倒 → meta+实体俯卧, moving=false, drawPlayer 不崩', () => {

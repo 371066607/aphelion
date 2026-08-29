@@ -34,6 +34,7 @@ window.APH = window.APH || {};
     nearBeacon:null,
     nearPad:false,               // 距离发射台(场景切换交互)
     nearBed:null,                // #66 床边睡眠: 最近的居住舱实体 | null
+    nearFood:null,               // #65 走到粮边吃: 近处粮堆/仓库 {entity,itemId,isCooked}|{isWarehouse:true} | null
     scanning:null, scanT:0,
     spawnT:6,
     buildMode:null,              // 建造模式: 当前选择的建筑id | null
@@ -498,6 +499,52 @@ window.APH = window.APH || {};
     var s=APH.state;
     return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness > 0);
   }
+  /* #65 走到粮边吃: 玩家当前饱食(缺省 homeFoodStart) */
+  function playerFood(){
+    var s=APH.state;
+    var start=(CFG.player&&CFG.player.homeFoodStart!=null)?CFG.player.homeFoodStart:80;
+    if(!(s.meta&&s.meta.playerNeeds)) return start;
+    return (s.meta.playerNeeds.food==null)?start:s.meta.playerNeeds.food;
+  }
+  /* #65 走到粮边吃: 饥饿阈值(防老档/降级 CFG 缺字段) */
+  function foodEatBelow(){
+    return (CFG.player&&CFG.player.foodEatBelow!=null)?CFG.player.foodEatBelow:60;
+  }
+  /* #65 走到粮边吃: E 吃一口(bindInput 与 debugPressE 共用, 避免双份逻辑)。
+     只消费 s.nearFood 指向的粮堆/仓库, 绝不写 s.target 自动寻路。 */
+  function tryPlayerEatNearFood(){
+    var s=APH.state;
+    if(!s.nearFood) return false;
+    if(!s.meta.playerNeeds && APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(s.meta);
+    if(playerFood()>=foodEatBelow()){
+      APH.UI.floatText('🍽 不饿，先不吃','#8fd4ff');
+      return false;
+    }
+    var itemId=s.nearFood.itemId||'it_food';
+    var itemDef=(CFG.items&&CFG.items[itemId])||{ name:'食物', foodGain:25 };
+    var taken=0;
+    if(s.nearFood.isWarehouse){
+      /* 仓库: 先验库存再扣(防玩家与居民抢粮吃空后仍加饱食) */
+      if(!(s.meta.res && (s.meta.res.food||0)>=1)) return false;
+      s.meta.res.food--;
+      taken=1;
+    }else{
+      /* 地上粮堆: 优先吃当前近的堆; 被搬走/吃空则兜底从任意粮堆取 */
+      var pile=s.nearFood.entity;
+      if(pile && !pile.dead && (pile.n||0)>=1){
+        pile.n=(pile.n||1)-1;
+        if((pile.n||0)<=0) pile.dead=true;
+        taken=1;
+      }else{
+        taken=APH.Colony.takeFromGround(s.entities,'food',1,false);
+      }
+    }
+    if(taken<=0) return false;
+    var res=APH.Res.playerEatOnce(s.meta.playerNeeds,itemDef);
+    if(!res || !res.ate) return false;   // 双保险(上面已拦满, 理论上到不了)
+    APH.UI.floatText('🍽 进食 +'+res.gain,'#7dffab');
+    return true;
+  }
   function syncPlayerSleep(){
     var s=APH.state;
     var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
@@ -549,6 +596,37 @@ window.APH = window.APH || {};
               U.dst(s.px,s.py,e.x,e.y) < (CFG.player.clinicSleepRadius!=null?CFG.player.clinicSleepRadius:60));
     });
     s.nearClinic = nearClinic || null;
+    /* #65 走到粮边吃: 近处粮堆(熟食优先→最近)或仓库(兜底, 仓有粮才提示)。
+       只置 s.nearFood, 绝不写 s.target 自动寻路(铁律) */
+    var nearFood=null;
+    var eatR65=(CFG.player&&CFG.player.foodEatRadius!=null)?CFG.player.foodEatRadius:60;
+    var bestPile=null, bestCooked=null, bestPileD=eatR65, bestCookedD=eatR65;
+    (s.entities||[]).forEach(function(p){
+      if(!p || p.dead || p.type!==T.DROPPED) return;
+      var it=CFG.items&&CFG.items[p.itemId];
+      if(!it || it.store!=='food') return;
+      var dist=U.dst(s.px,s.py,p.x,p.y);
+      if(it.isCooked && dist<bestCookedD){
+        bestCookedD=dist; bestCooked={ entity:p, itemId:p.itemId, isCooked:true };
+      }
+      if(dist<bestPileD){
+        bestPileD=dist; bestPile={ entity:p, itemId:p.itemId, isCooked:!!it.isCooked };
+      }
+    });
+    if(bestCooked) nearFood=bestCooked;
+    else if(bestPile) nearFood=bestPile;
+    else{
+      /* 仓库兜底: 仅当仓有粮(meta.res.food>0)才提示(空仓不提示) */
+      var wh65=null;
+      (s.entities||[]).forEach(function(b){
+        if(!wh65 && b && b.type===T.BUILDING && b.bid==='bl_warehouse' && !b.dead) wh65=b;
+      });
+      var st65=wh65 ? {x:wh65.x, y:(wh65.y||0)+18} : APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+      if((s.meta.res && s.meta.res.food>0) && U.dst(s.px,s.py,st65.x,st65.y)<eatR65){
+        nearFood={ isWarehouse:true };
+      }
+    }
+    s.nearFood = nearFood || null;
     syncPlayerSleep();
     /* #72 家园击倒: s.downed 运行时镜像(读自 meta 真源, 供 drawPlayer 俯卧) */
     var needs = s.meta && s.meta.playerNeeds;
@@ -604,6 +682,10 @@ window.APH = window.APH || {};
         ? '[E] 起床 (按方向键或受伤也会醒)'
         : '[E] 躺进医疗舱 (病情 '+Math.round(illN)+')';
       APH.UI.setHint(podHint);
+    }else if(s.nearFood && playerFood() < foodEatBelow()){
+      /* #65 走到粮边吃: 饥饿时近粮堆/仓库的 E 提示(插在近医疗舱之后、厨房之前) */
+      var srcName65 = s.nearFood.isWarehouse ? '仓库口粮' : ((CFG.items[s.nearFood.itemId]||{}).name||'食物');
+      APH.UI.setHint('[E] 吃 '+srcName65+' (饱食 '+Math.round(playerFood())+')');
     }else if(s.nearKitchen){
       var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
       var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
@@ -1613,6 +1695,9 @@ window.APH = window.APH || {};
           APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
           syncPlayerSleep();
           APH.UI.floatText('🛌 躺进医疗舱','#8fd4ff');
+        }else if(s.scene==='home' && s.nearFood){
+          /* #65 走到粮边吃: 靠粮按 E 吃一口(内部自拦「不饿/没粮」), 绝不落入兜底自动寻路分支 */
+          tryPlayerEatNearFood();
         }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
           else if(s.scene==='expedition') returnHome();
@@ -3507,6 +3592,9 @@ window.APH = window.APH || {};
         /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(bed_med), 绝不落入自动寻路分支 */
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
         syncPlayerSleep();
+      }else if(s.scene==='home' && s.nearFood){
+        /* #65 走到粮边吃: 靠粮按 E 吃一口(内部自拦「不饿/没粮」) */
+        tryPlayerEatNearFood();
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;

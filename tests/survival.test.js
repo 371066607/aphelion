@@ -493,6 +493,57 @@ test('ensurePlayerNeeds: 缺省 downed=false / downT=null 且不覆盖已有值 
   if (b.playerNeeds.downT !== 30) throw new Error('已有 downT 不得覆盖');
 });
 
+/* #65 玩家走到粮边吃: playerEatOnce 纯函数(只改 food, clamp 0..100,
+   不复用居民 eatOnce 以免向 playerNeeds 写入 mood/recreation 等污染字段) */
+test('playerEatOnce: 生食加 25 饱食', function(){
+  var needs = { food:30 };
+  var res = APH.Res.playerEatOnce(needs, 'it_food');
+  if (!res.ate) throw new Error('生食应 ate=true');
+  if (needs.food !== 55) throw new Error('30+25 应=55, 实际: ' + needs.food);
+  if (res.gain !== 25) throw new Error('gain 应为 25, 实际: ' + res.gain);
+});
+
+test('playerEatOnce: 熟食用 itemDef.foodGain (炙烤异星肉排 +40)', function(){
+  var needs = { food:30 };
+  var res = APH.Res.playerEatOnce(needs, 'it_roasted_meat');
+  if (!res.ate) throw new Error('熟食应 ate=true');
+  if (needs.food !== 70) throw new Error('30+40 应=70, 实际: ' + needs.food);
+  if (res.gain !== 40) throw new Error('gain 应为 40, 实际: ' + res.gain);
+});
+
+test('playerEatOnce: 满饱食不触发 (food>=阈值 ate=false)', function(){
+  var needs = { food:80 };
+  var res = APH.Res.playerEatOnce(needs, 'it_food');
+  if (res.ate) throw new Error('满饱食应 ate=false');
+  if (needs.food !== 80) throw new Error('满饱食不应改 food');
+});
+
+test('playerEatOnce: clamp 到 100 (55+50 alien_feast=105→100)', function(){
+  var needs = { food:55 };
+  var res = APH.Res.playerEatOnce(needs, 'it_alien_feast');
+  if (!res.ate) throw new Error('应 ate=true');
+  if (needs.food !== 100) throw new Error('55+50 应 clamp 到 100, 实际: ' + needs.food);
+  if (res.gain !== 45) throw new Error('clamp 后实际 gain 应为 45, 实际: ' + res.gain);
+});
+
+test('playerEatOnce: food=null 不触发且不污染 mood/recreation', function(){
+  var needs = { food:null, mood:70, recreation:80, exposure:10 };
+  var res = APH.Res.playerEatOnce(needs, 'it_food');
+  if (res.ate) throw new Error('food=null 应 ate=false');
+  if (needs.mood !== 70) throw new Error('不得污染 mood');
+  if (needs.recreation !== 80) throw new Error('不得污染 recreation');
+  if (needs.exposure !== 10) throw new Error('不得污染 exposure');
+});
+
+test('playerEatOnce: 进食后只改 food, 不写 mood/recreation/exposure', function(){
+  var needs = { food:30, mood:70, recreation:80, exposure:10 };
+  var res = APH.Res.playerEatOnce(needs, 'it_food');
+  if (!res.ate) throw new Error('应 ate=true');
+  if (needs.mood !== 70) throw new Error('进食不得写 mood, 实际: ' + needs.mood);
+  if (needs.recreation !== 80) throw new Error('进食不得写 recreation');
+  if (needs.exposure !== 10) throw new Error('进食不得写 exposure');
+});
+
 
 
 

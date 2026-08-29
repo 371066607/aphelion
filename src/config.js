@@ -63,6 +63,10 @@ APH.CFG = {
     restCollapseAt: 0,          // #67 累塌: 家园精力见底阈值 (0=精力归零原地睡着)
     downedTime: 90,             // #72 家园击倒: 击倒倒计时秒数 (镜像 CFG.residents.bleedOutTime)
     downedCarrySpeed: 70,       // #72 家园击倒: 送医拖行速度 px/s (小于 walkSpeed 150, 有被拖感)
+    /* #65 走到粮边吃: 玩家饥饿阈值/近粮半径/每次E吃回饱食(生食兜底; 熟食用 itemDef.foodGain 覆盖) */
+    foodEatBelow: 60,           // 饥饿阈值: 饱食低于此值显示🍽且可E吃 (镜像 CFG.residents.eatBelow)
+    foodEatRadius: 60,          // 近粮判定半径 px (镜像 bedSleepRadius/clinicSleepRadius)
+    foodEatGain: 25,            // 生食/仓库口粮每次E吃回的饱食
   },
 
   /* 相机 */

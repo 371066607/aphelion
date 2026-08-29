@@ -275,6 +275,16 @@ APH.Ent = (function(){
     ctx.fillStyle='#4c5878'; ctx.fillRect(-2.5,-46,2,50);
     ctx.restore();
   }
+  /* #65 走到粮边吃: 饥饿玩家头顶 🍽(sprite/程序化两分支都画, 条件同居民 drawResidentMarks) */
+  function drawPlayerHungerMark(e, y){
+    var s=APH.state;
+    var foodNow=(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.food);
+    if(foodNow==null) return;
+    var eatBelow=(CFG.player&&CFG.player.foodEatBelow!=null)?CFG.player.foodEatBelow:60;
+    if(foodNow>=eatBelow) return;
+    ctx.fillStyle='#c8e89a'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('🍽', -11, y);
+  }
   function drawPlayer(e,time){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
@@ -311,6 +321,8 @@ APH.Ent = (function(){
         if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
         APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
         ctx.globalAlpha=1;
+        /* #65: sprite 分支也要画 🍽(脚底锚原点, 头顶≈baseline*sc 之上) */
+        drawPlayerHungerMark(e, -((defS&&defS.baseline)||248)*sc + 4);
         if(lying && e.downed) drawProneWounds(ctx);
         ctx.restore();
         return;
@@ -342,6 +354,8 @@ APH.Ent = (function(){
     ctx.moveTo(Math.cos(e.face)*7,-11+Math.sin(e.face)*5);
     ctx.lineTo(Math.cos(e.face)*16,-11+Math.sin(e.face)*12);
     ctx.stroke();
+    /* #65: 程序化分支头顶 🍽(translate 已带 -bobbing, 微调半幅抵消) */
+    drawPlayerHungerMark(e, -40+(e.moving?bobbing*0.5:0));
     /* T12 头顶浮动三角 + 实时屏幕坐标(诊断铁证) */
     if(!s.showMarkerOff){
       ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
