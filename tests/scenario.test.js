@@ -902,5 +902,152 @@ test('#67: 累塌后 E / 受伤唤醒 (复用 #66)', () => {
   A(pe2 && pe2.isSleeping === false, '实体标志应同步清醒');
 });
 
+/* #72 家园击倒: 击倒 != 死亡, 昏迷不可动/不可醒, 送医复活/倒计时死亡, 远征死法不变
+   驱动通道: hurtPlayer → updateHome(playerDownedTick/carryPlayerToClinic) */
+test('#72: 家园击倒 → meta+实体俯卧, moving=false, drawPlayer 不崩', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 90;
+  S.hp = 0;
+  S.keys = {};
+  S.target = null;
+  S.meta.residents = [];
+  S.colony.buildings = S.colony.buildings || [];
+  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');   // 无舱无居民: 不触发拖行/复活
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.downed === true, '击倒中实体应同步俯卧标志 (pe.downed)');
+  A(pe && pe.moving === false, '击倒中实体不应残留走位 (moving=false)');
+  A(S.downed === true, 's.downed 运行时镜像应为 true');
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #72 downed draw err:', err.message); }
+  A(!threw, '击倒俯卧玩家绘制不应崩');
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.keys = {};
+});
+
+test('#72: 击倒期间 WASD 不移动且不醒', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 90;
+  S.keys = {};
+  S.meta.residents = [];
+  S.colony.buildings = S.colony.buildings || [];
+  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');   // 无舱无居民: 击倒期间不得被拖行
+  const px0 = S.px, py0 = S.py;
+  S.keys.KeyA = true;   // 向左(水平方向 px 必变若可动)
+  M.updateHome(0.016);
+  A(S.px === px0 && S.py === py0, '击倒中 WASD 不得移动 (px '+px0+'→'+S.px+')');
+  A(S.meta.playerNeeds.downed === true, '击倒中 WASD 不得唤醒 (仍 downed)');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.moving === false, '击倒中实体不得移动');
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.keys = {};
+});
+
+test('#72: hurtPlayer 家园击倒 != 死亡, 远征生命归零仍死亡', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.hp = 3; S.iFrameT = 0; S.clinicKit = 0;
+  const deaths0 = S.meta.stats.deaths;
+  APH.Combat.hurtPlayer(999, '测试');
+  A(S.mode !== 'dead', '家园击倒不应进死亡画面');
+  A(S.meta.playerNeeds.downed === true, '家园应击倒 (downed=true)');
+  A(S.meta.stats.deaths === deaths0, '家园击倒不应记死亡');
+  /* 远征生命归零仍是现有死亡 */
+  S.scene = 'expedition';
+  S.meta.playerNeeds.downed = false;
+  S.hp = 3; S.iFrameT = 0; S.clinicKit = 0;
+  const origDeath = window.APH.UI.showDeath;
+  window.APH.UI.showDeath = function(){};
+  try {
+    APH.Combat.hurtPlayer(999, '测试');
+    A(S.mode === 'dead', '远征生命归零应仍走死亡画面, mode='+S.mode);
+    A(S.meta.stats.deaths === deaths0+1, '远征应记死亡, deaths='+S.meta.stats.deaths);
+  } finally {
+    window.APH.UI.showDeath = origDeath;
+  }
+  S.scene = 'home'; S.mode = 'running';
+});
+
+test('#72: 有居民+医疗舱送医复活 (downed 清, hp 回血, 实体标志清)', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 60;
+  S.hp = 0;
+  S.keys = {};
+  S.colony.buildings = S.colony.buildings || [];
+  S.colony.buildings.push({id:'bl_clinic', x:S.px, y:S.py, lv:1});
+  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
+  S.meta.residents = [{ id:'rs_72', name:'医疗甲', job:null, skills:{}, mood:80, food:80, rest:80, recreation:80, exposure:0, illness:0 }];
+  M.updateHome(0.05);
+  A(S.meta.playerNeeds.downed === false, '有居民+舱内应送医复活 (downed=false)');
+  A(S.meta.playerNeeds.downT === null, '送医复活应清 downT');
+  A(S.hp >= window.APH.CFG.economy.clinicHeal, '复活应回血到 ≥'+window.APH.CFG.economy.clinicHeal+', 实际 hp='+S.hp);
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.downed === false, '复活后实体俯卧标志应清除');
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.meta.residents = [];
+  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');
+});
+
+test('#72: 有居民且医疗舱在远处 → 击倒玩家被拖向医疗舱 (送医拖行)', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 90;
+  S.hp = 0;
+  S.keys = {};
+  S.meta.residents = [{ id:'rs_72b', name:'抬工乙', job:null, skills:{}, mood:80, food:80, rest:80, recreation:80, exposure:0, illness:0 }];
+  // 玩家 (1000,1000), 医疗舱 (1200,1000) 相距 200px > clinicHealR(80): 应被拖过去
+  S.px = 1000; S.py = 1000;
+  S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id!=='bl_clinic');
+  S.colony.buildings.push({id:'bl_clinic', x:1200, y:1000, lv:1});
+  const d0 = U.dst(S.px, S.py, 1200, 1000);
+  M.updateHome(0.5);
+  const d1 = U.dst(S.px, S.py, 1200, 1000);
+  A(d1 < d0 - 1, '有居民时击倒玩家应被拖向医疗舱 (d0='+d0.toFixed(1)+'→d1='+d1.toFixed(1)+')');
+  A(S.meta.playerNeeds.downed === true, '拖行途中仍保持击倒');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.x === S.px && pe.y === S.py, '拖行应同步实体坐标');
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.meta.residents = [];
+  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');
+});
+
+test('#72: 无居民倒计时归零死亡 (按死亡处理, 不产生 clinicKit)', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 0.1;
+  S.hp = 0;
+  S.clinicKit = 0;
+  S.meta.residents = [];
+  S.colony.buildings = S.colony.buildings || [];
+  S.keys = {};
+  const deaths0 = S.meta.stats.deaths;
+  const origDeath = window.APH.UI.showDeath;
+  window.APH.UI.showDeath = function(){};
+  try {
+    M.updateHome(0.2);
+    A(S.mode === 'dead', '倒计时归零应按死亡处理, mode='+S.mode);
+    A(S.meta.stats.deaths === deaths0+1, '倒计时死亡应记死亡');
+    A(S.clinicKit === 0, '击倒死亡不应产生 clinicKit');
+  } finally {
+    window.APH.UI.showDeath = origDeath;
+  }
+  S.scene = 'home'; S.mode = 'running';
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

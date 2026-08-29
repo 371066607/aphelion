@@ -52,6 +52,19 @@ APH.UI = (function(){
         if(vIll) vIll.textContent = Math.round(Math.max(0,ill));
       }
     }
+    /* #72 家园击倒: 家园才显示击倒倒计时条 */
+    var rowDowned=$('rowDowned');
+    if(rowDowned){
+      var showDowned = atHome && !!(needs && needs.downed);
+      rowDowned.style.display = showDowned ? '' : 'none';
+      if(showDowned){
+        var downedMax=(APH.CFG.player && APH.CFG.player.downedTime != null) ? APH.CFG.player.downedTime : 90;
+        var downedT=(needs.downT != null) ? needs.downT : downedMax;
+        var bDown=$('bDown'), vDown=$('vDown');
+        if(bDown) bDown.style.width = U.clamp(downedT/downedMax*100,0,100)+'%';
+        if(vDown) vDown.textContent = Math.ceil(Math.max(0,downedT));
+      }
+    }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);

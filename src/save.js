@@ -133,6 +133,9 @@ APH.Save = (function(){
       }
       /* #66 床边睡眠: 防御性默认(仅当 APH.Res 缺失时走到此分支) */
       if(m.playerNeeds.isSleeping===undefined) m.playerNeeds.isSleeping=false;
+      /* #72 家园击倒: 防御性默认(同上分支; downT 置空不秒死) */
+      if(m.playerNeeds.downed===undefined) m.playerNeeds.downed=false;
+      if(m.playerNeeds.downT===undefined) m.playerNeeds.downT=null;
     }
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');

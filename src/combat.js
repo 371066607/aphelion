@@ -703,6 +703,21 @@ APH.Combat = (function(){
     s.shake = Math.min(1, s.shake+.35);
     s.hurtFlash = 0.35;
     U.emit('playerHurt', { dmg:dmg, source:source });
+    /* #72 家园击倒: hp<=0 且在家园 → 击倒而非死亡(不进死亡画面, 不动 clinicKit/stats.deaths)。
+       必须在远征 clinicKit 复活/死亡分支之前判定, 否则家园带残余 clinicKit===1 会被误消耗。 */
+    if(s.hp <= 0 && s.scene === 'home'){
+      s.hp = 0;
+      var needs = s.meta && s.meta.playerNeeds;
+      if(!needs && APH.Res && APH.Res.ensurePlayerNeeds) needs = APH.Res.ensurePlayerNeeds(s.meta).playerNeeds;
+      if(needs && !needs.downed){
+        needs.downed = true;
+        needs.downT = (CFG.player.downedTime != null ? CFG.player.downedTime : 90);
+        s.downed = true;
+        U.emit('playerDowned', { source:source });
+        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 你被击倒了!','#ff4757');
+      }
+      return;
+    }
     if(s.hp <= 0 && (s.clinicKit||0)>0){
       s.clinicKit--;
       s.hp = Math.min(CFG.player.hpMax, (CFG.economy&&CFG.economy.clinicHeal)||40);
@@ -726,9 +741,9 @@ APH.Combat = (function(){
   /* ---- 玩家射击(由输入层调用) ---- */
   function firePlasma(){
     var s = APH.state;
-    /* #66 床边睡眠: 睡着时不能射击 */
+    /* #66 床边睡眠: 睡着时不能射击 · #72 家园击倒: 击倒昏迷时也不能射击 */
     if(s.fireCd > 0 || s.mode !== 'running' ||
-       (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping)) return false;
+       (s.meta && s.meta.playerNeeds && (s.meta.playerNeeds.isSleeping || s.meta.playerNeeds.downed))) return false;
     s.fireCd = CFG.combat.fireCd;
     var a = s.face;
     s.entities.push(makeProj(

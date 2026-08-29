@@ -115,6 +115,16 @@
 - [x] 对齐修复：`playerRestTick` 自动醒也清 `bedId`；`setPlayerSleeping` 增可选床ID参（#70 医疗舱预留，默认保留 `bed_player`）
 - [x] 测试锁定：survival 新增 6 纯例（累塌/地铺恢复/回满清床/远征不塌/床ID默认与覆盖/自动醒清床），scenario 新增 3 冒烟（累塌→实体俯卧+清走位、WASD 唤醒同帧移动、E/受伤唤醒）
 
+## 玩家家园击倒送医（Issue #72）
+
+- [x] 家园 hp<=0 → 击倒而非死亡：`hurtPlayer` 家园分支先于远征 clinicKit 复活/死亡分支（顺带修复远征残余 clinicKit 在家被误消耗）；不动 `clinicKit`/`stats.deaths`/`showDeath`，不进死亡画面
+- [x] 击倒是与睡眠并行的昏迷态：`meta.playerNeeds.downed/downT` 持久真源 → 运行时 `s.downed` + 实体 `pe.downed`（`drawProneWounds` 叠伤痕）；WASD/E/全部按键忽略，无 E 唤醒，`firePlasma` 禁射
+- [x] 有居民+医疗舱 → 送医拖行：`carryPlayerToClinic` 世界侧 lerp 拖向 `bl_clinic`（`CFG.player.downedCarrySpeed:70`），拖入治疗半径后 `playerDownedTick` 判复活（回血 `CFG.economy.clinicHeal:40`）
+- [x] 无居民 → 倒计时死亡：`playerDownedTick` 纯函数按 `CFG.player.downedTime:90` 递减，归零由 `updateHome` 走死亡收口（`mode='dead'` + `stats.deaths++` + `showDeath`）
+- [x] 远征死法不变：击倒只在家园分支生效，远征 hp<=0 仍走现有 clinicKit 急救/死亡；`playerDownedTick` 远征 no-op（老档保护）；`enterHome` 防御性清 stale downed
+- [x] HUD：家园击倒显示红色倒计时条 `rowDowned`（`downT/downedTime` 百分比 + 剩余秒数），复活/死亡自动隐藏
+- [x] 测试锁定：survival 新增 6 纯例（倒计时递减/送医复活/有舱无居民不解救/归零死亡/远征 no-op/未击倒 no-op + ensurePlayerNeeds 默认），combat 新增 3 例（家园击倒≠死亡/不消耗 clinicKit/远征仍死亡），scenario 新增 6 冒烟（击倒→实体俯卧+绘制不崩、WASD 不移动不醒、hurtPlayer 家园 vs 远征、送医复活、远处拖行、无居民倒计时死亡）
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

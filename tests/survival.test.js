@@ -414,6 +414,62 @@ test('ensurePlayerNeeds: 缺省 isSleeping=false 且不覆盖已有值', functio
   if (b.playerNeeds.isSleeping !== true) throw new Error('已有 isSleeping 不得覆盖');
 });
 
+/* #72 家园击倒: 玩家击倒倒计时/送医复活/远征 no-op(纯函数) */
+test('playerDownedTick: 家园倒计时递减', function(){
+  var needs = { downed: true, downT: 90 };
+  var res = APH.Res.playerDownedTick(needs, 'home', 30, { inClinic:false, hasClinic:true, hasResidents:false });
+  if (res.dead || res.revived) throw new Error('倒计时未归零不应死/复活');
+  if (needs.downT !== 60) throw new Error('家园倒计时应减到 60, 实际: ' + needs.downT);
+});
+
+test('playerDownedTick: 有居民+舱内送医复活', function(){
+  var needs = { downed: true, downT: 30 };
+  var res = APH.Res.playerDownedTick(needs, 'home', 0.016,
+    { inClinic:true, hasClinic:true, hasResidents:true });
+  if (!res.revived) throw new Error('有居民+舱内应复活');
+  if (needs.downed !== false) throw new Error('复活应清 downed');
+  if (needs.downT !== null) throw new Error('复活应清 downT');
+});
+
+test('playerDownedTick: 有舱无居民不解救(继续倒计时)', function(){
+  var needs = { downed: true, downT: 90 };
+  var res = APH.Res.playerDownedTick(needs, 'home', 10,
+    { inClinic:true, hasClinic:true, hasResidents:false });
+  if (res.dead || res.revived) throw new Error('无居民不应复活/死亡');
+  if (needs.downT !== 80) throw new Error('应继续倒计时到 80, 实际: ' + needs.downT);
+});
+
+test('playerDownedTick: 倒计时归零判定死亡', function(){
+  var needs = { downed: true, downT: 5 };
+  var res = APH.Res.playerDownedTick(needs, 'home', 10, { inClinic:false, hasClinic:false, hasResidents:false });
+  if (!res.dead) throw new Error('倒计时归零应判定死亡');
+  if (needs.downed !== false) throw new Error('死亡应清 downed');
+  if (needs.downT !== null) throw new Error('死亡应清 downT');
+});
+
+test('playerDownedTick: 远征 no-op(老档保护)', function(){
+  var needs = { downed: true, downT: 42 };
+  var res = APH.Res.playerDownedTick(needs, 'expedition', 30, { inClinic:false, hasClinic:false, hasResidents:false });
+  if (res.dead || res.revived) throw new Error('远征击倒不应死/复活');
+  if (needs.downT !== 42) throw new Error('远征 downT 不应变化, 实际: ' + needs.downT);
+});
+
+test('playerDownedTick: 未击倒 no-op', function(){
+  var needs = { downed: false, downT: null };
+  var res = APH.Res.playerDownedTick(needs, 'home', 30, { inClinic:false, hasClinic:false, hasResidents:false });
+  if (res.dead || res.revived) throw new Error('未击倒不应有任何结果');
+  if (needs.downed !== false) throw new Error('未击倒状态不应改变');
+});
+
+test('ensurePlayerNeeds: 缺省 downed=false / downT=null 且不覆盖已有值 (#72)', function(){
+  var a = APH.Res.ensurePlayerNeeds({});
+  if (a.playerNeeds.downed !== false) throw new Error('新档 downed 默认应为 false');
+  if (a.playerNeeds.downT !== null) throw new Error('新档 downT 默认应为 null');
+  var b = APH.Res.ensurePlayerNeeds({ playerNeeds:{ downed: true, downT: 30 } });
+  if (b.playerNeeds.downed !== true) throw new Error('已有 downed 不得覆盖');
+  if (b.playerNeeds.downT !== 30) throw new Error('已有 downT 不得覆盖');
+});
+
 
 
 

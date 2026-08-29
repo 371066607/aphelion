@@ -111,6 +111,9 @@ APH.Res = (function(){
     if(meta.playerNeeds.illness == null) meta.playerNeeds.illness = illStart;
     /* #66 床边睡眠: 单点默认(覆盖新档 + 老档加载两条路径) */
     if(meta.playerNeeds.isSleeping == null) meta.playerNeeds.isSleeping = false;
+    /* #72 家园击倒: 默认不击倒; downT 倒计时空(老档保护, 不秒死) */
+    if(meta.playerNeeds.downed == null) meta.playerNeeds.downed = false;
+    if(meta.playerNeeds.downT == null) meta.playerNeeds.downT = null;
     return meta;
   }
 
@@ -159,6 +162,29 @@ APH.Res = (function(){
       }
     }
     return needs;
+  }
+
+  /* 玩家家园击倒结算(纯函数): 击倒=家园专属, 远征 no-op(老档保护)。
+     有居民且已被拖进医疗舱 → 复活(清 downed/downT, 返回 revived);
+     否则倒计时递减, 归零 → 死亡(清 downed/downT, 返回 dead)。
+     不进死亡画面、不动 clinicKit/stats.deaths (由调用方 updateHome 收口)。 */
+  function playerDownedTick(needs, scene, dt, ctx){
+    if(scene !== 'home') return { dead:false, revived:false };   // 远征 no-op + 老档保护
+    if(!needs || !needs.downed) return { dead:false, revived:false };
+    ctx = ctx || {};
+    if(ctx.inClinic && ctx.hasClinic && ctx.hasResidents){
+      needs.downed = false;
+      needs.downT = null;
+      return { dead:false, revived:true };
+    }
+    var maxT = (CFG.player && CFG.player.downedTime != null) ? CFG.player.downedTime : 90;
+    needs.downT = (needs.downT != null ? needs.downT : maxT) - (dt||0);
+    if(needs.downT <= 0){
+      needs.downed = false;
+      needs.downT = null;
+      return { dead:true, revived:false };
+    }
+    return { dead:false, revived:false };
   }
 
   /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
@@ -1163,6 +1189,7 @@ APH.Res = (function(){
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
     homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
     setPlayerSleeping:setPlayerSleeping, playerWake:playerWake, playerRestTick:playerRestTick,
+    playerDownedTick:playerDownedTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,

@@ -60,6 +60,8 @@ APH.CFG = {
     floorRecover: 18,          // #66 床边睡眠: 打地铺恢复 /tick (慢 ~30%)
     restWakeAt: 100,           // #66 床边睡眠: 精力回满自动醒
     restCollapseAt: 0,          // #67 累塌: 家园精力见底阈值 (0=精力归零原地睡着)
+    downedTime: 90,             // #72 家园击倒: 击倒倒计时秒数 (镜像 CFG.residents.bleedOutTime)
+    downedCarrySpeed: 70,       // #72 家园击倒: 送医拖行速度 px/s (小于 walkSpeed 150, 有被拖感)
   },
 
   /* 相机 */

@@ -188,6 +188,42 @@ test('hurtPlayer: 医疗舱急救一次', () => {
     if(window.APH.state.hp!==40) throw new Error('应回血40, got '+window.APH.state.hp);
   }finally{ window.APH.state=prev; }
 });
+/* #72 家园击倒: 家园 hp<=0 → 击倒而非死亡(不动 clinicKit/stats.deaths); 远征仍走现有死亡 */
+test('hurtPlayer: 家园击倒 != 死亡 (不进死亡画面, 不记死亡)', () => {
+  const prev=window.APH.state;
+  window.APH.state=combatState({scene:'home', hp:3, clinicKit:0, iFrameT:0,
+    meta:{ stats:{kills:0,deaths:0}, playerNeeds:{} }});
+  try{
+    C.hurtPlayer(10,'测试');
+    const st=window.APH.state;
+    if(st.mode==='dead') throw new Error('家园击倒不应死亡');
+    if(st.meta.stats.deaths!==0) throw new Error('家园击倒不应记死亡, deaths='+st.meta.stats.deaths);
+    if(!st.meta.playerNeeds.downed) throw new Error('应击倒 (playerNeeds.downed=true)');
+    if(st.meta.playerNeeds.downT!==CFG.player.downedTime) throw new Error('倒计时应为 '+CFG.player.downedTime+', 实际: '+st.meta.playerNeeds.downT);
+    if(st.hp!==0) throw new Error('hp 应钳到 0, 实际: '+st.hp);
+  }finally{ window.APH.state=prev; }
+});
+test('hurtPlayer: 家园击倒不消耗 clinicKit (远征急救仅在远征分支消耗)', () => {
+  const prev=window.APH.state;
+  window.APH.state=combatState({scene:'home', hp:3, clinicKit:1, iFrameT:0,
+    meta:{ stats:{kills:0,deaths:0}, playerNeeds:{} }});
+  try{
+    C.hurtPlayer(10,'测试');
+    const st=window.APH.state;
+    if(!st.meta.playerNeeds.downed) throw new Error('应击倒');
+    if(st.clinicKit!==1) throw new Error('家园击倒不得消耗远征急救, clinicKit='+st.clinicKit);
+  }finally{ window.APH.state=prev; }
+});
+test('hurtPlayer: 远征生命归零仍是死亡 (现状不变, 不抬回殖民地)', () => {
+  const prev=window.APH.state;
+  window.APH.state=combatState({scene:'expedition', hp:3, clinicKit:0, iFrameT:0});
+  try{
+    C.hurtPlayer(10,'测试');
+    const st=window.APH.state;
+    if(st.mode!=='dead') throw new Error('远征应死亡, mode='+st.mode);
+    if(st.meta.stats.deaths!==1) throw new Error('远征应记死亡, deaths='+st.meta.stats.deaths);
+  }finally{ window.APH.state=prev; }
+});
 test('raidPillage: 扣粮扣矿并给建筑冷却', () => {
   const meta={ res:{ food:10, mineral:8 } };
   const b={ id:'bl_warehouse' };

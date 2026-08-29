@@ -750,6 +750,7 @@ APH.Ent = (function(){
     /* #66 床边睡眠: meta 是唯一真源, 实体标志每帧同步(供 drawPlayer 俯卧) */
     var needs = s.meta && s.meta.playerNeeds;
     var sleeping = !!(needs && needs.isSleeping);
+    var downed = !!(needs && needs.downed);
     var pe = findPlayer();
     var ix=0, iy=0;
     if(s.keys.KeyW||s.keys.ArrowUp) iy-=1;
@@ -760,6 +761,15 @@ APH.Ent = (function(){
     s.run = !!(s.keys.ShiftLeft||s.keys.ShiftRight);
     var hasKey=(ix!==0||iy!==0);
     if(hasKey) s.target=null;
+    /* #72 家园击倒: 昏迷无意识 — 不移动、不寻路、WASD 不醒(与睡眠正交) */
+    if(downed){
+      if(pe){ pe.downed = true; pe.isSleeping = false; pe.moving = false; }
+      s.target = null;
+      if(s.fireCd>0) s.fireCd-=dt;
+      if(s.iFrameT>0) s.iFrameT-=dt;
+      if(s.hurtFlash>0) s.hurtFlash-=dt;
+      return;
+    }
     /* WASD/方向键唤醒: 先醒后动同一帧(不吞移动输入) */
     if(sleeping && hasKey){
       if(window.APH.Res && APH.Res.playerWake) APH.Res.playerWake(needs);
@@ -802,7 +812,7 @@ APH.Ent = (function(){
       if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
       if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
     }
-    if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh; pe.isSleeping=false; }
+    if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh; pe.isSleeping=false; pe.downed=false; }
 
     /* 计时器 */
     if(s.fireCd>0) s.fireCd-=dt;

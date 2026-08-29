@@ -21,6 +21,7 @@ window.APH = window.APH || {};
     spec:null,                   // 当前 PlanetSpec (ADR-1)
     px:0, py:0, vx:0, vy:0,
     face:-Math.PI/2, walkPh:0, moving:false, run:false,
+    downed:false,                // #72 家园击倒: 运行时镜像(meta.playerNeeds.downed 真源)
     o2:100, hp:100, cry:0, found:0, totalBeacons:6,
     carry:{},                    // 远征背包 {itemId: n}
     fireCd:0, iFrameT:0, hurtFlash:0, noiseT:0,
@@ -51,6 +52,12 @@ window.APH = window.APH || {};
     maybeSpawnVisitor(true);
     /* 远征战利品在出发前就已结算; 回家只做补给 */
     s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
+    /* #72 家园击倒: 返航/读档防御性清除击倒(hp 已回满, 避免 stale downed 秒死/卡昏迷) */
+    if(s.meta && s.meta.playerNeeds){
+      s.meta.playerNeeds.downed = false;
+      s.meta.playerNeeds.downT = null;
+    }
+    s.downed = false;
     document.getElementById('planetTitle').textContent =
       '新曙光殖民地 · 家园';
     /* 新手引导(meta.tut 阶段标记, 持久化) */
@@ -481,13 +488,23 @@ window.APH = window.APH || {};
     var s=APH.state;
     return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping);
   }
+  /* #72 家园击倒: 玩家击倒昏迷(不可移动/交互, 只等送医或倒计时) */
+  function playerDowned(){
+    var s=APH.state;
+    return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.downed);
+  }
   function syncPlayerSleep(){
     var s=APH.state;
     var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
-    if(pe && s.meta && s.meta.playerNeeds) pe.isSleeping = !!s.meta.playerNeeds.isSleeping;
+    if(pe && s.meta && s.meta.playerNeeds){
+      pe.isSleeping = !!s.meta.playerNeeds.isSleeping;
+      pe.downed = !!s.meta.playerNeeds.downed;   // #72 家园击倒: 实体俯卧标志同步(送医复活后清)
+    }
   }
   function updateHome(dt){
     var s=APH.state;
+    /* #72 家园击倒: 首帧保证 playerNeeds 存在(否则击倒/送医无挂载点) */
+    if(!s.meta.playerNeeds && APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(s.meta);
     APH.Ent.updatePlayer(dt);
     updateCamera(dt);
 
@@ -522,6 +539,9 @@ window.APH = window.APH || {};
     });
     s.nearBed = nearBed || null;
     syncPlayerSleep();
+    /* #72 家园击倒: s.downed 运行时镜像(读自 meta 真源, 供 drawPlayer 俯卧) */
+    var needs = s.meta && s.meta.playerNeeds;
+    s.downed = !!(needs && needs.downed);
     var nearFlora = s.entities.find(function(e){
       return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
     });
@@ -607,6 +627,29 @@ window.APH = window.APH || {};
     var cDist=clinicB?U.dst(s.px,s.py,clinicB.x,clinicB.y):null;
     var rg=APH.Combat.homeRegen(s.hp, s.o2, dt, clinicB?cDist:null);
     s.hp=rg.hp; s.o2=rg.o2;
+    /* #72 家园击倒: 送医拖行(世界侧 lerp) → 每帧结算(送医复活/倒计时死亡)。
+       顺序固定: updatePlayer → carry(拖近) → tick(用拖后位置判 inClinic)。 */
+    carryPlayerToClinic(dt);
+    var healR72=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
+    var hasRes72=(s.meta.residents||[]).length>0;
+    var res72=APH.Res.playerDownedTick(needs, s.scene, dt, {
+      inClinic: !!(clinicB && U.dst(s.px,s.py,clinicB.x,clinicB.y) < healR72),
+      hasClinic: !!clinicB,
+      hasResidents: hasRes72,
+    });
+    if(res72.dead && s.mode==='running'){
+      s.mode='dead'; U.emit('gameOver',{});
+      s.meta.stats.deaths++;
+      APH.Save.saveMeta(s.meta);
+      if(window.APH.UI && APH.UI.showDeath) APH.UI.showDeath('你在殖民地倒下，失血过多。', {
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry, runLoot:s.runLoot,
+        survived:s.clock-(s.landedAt||0),
+      });
+    }else if(res72.revived){
+      s.hp = Math.min(CFG.player.hpMax, (CFG.economy&&CFG.economy.clinicHeal)||40);
+      s.downed=false;
+      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✚ 居民把你抬进医疗舱 · 脱离危险','#7dffab');
+    }
     var healR=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
     if(clinicB && cDist<healR && s.hp<CFG.player.hpMax &&
        !s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
@@ -621,6 +664,11 @@ window.APH = window.APH || {};
       s._stormOn=!!wx.storm; s._acidOn=!!wx.acid;
       if(wx.storm) APH.UI.setHint('⚡ 磁暴 · 实验室停摆');
       else if(wx.acid) APH.UI.setHint('🌧 酸雨 · 农田减半');
+    }
+
+    /* #72 家园击倒: 击倒昏迷提示(盖过一切环境提示; 复活后 needs.downed 为 false 自然失效) */
+    if(needs && needs.downed && s.mode==='running'){
+      APH.UI.setHint('击倒昏迷 · ' + (clinicB && hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危'));
     }
 
     /* 建造入口按钮显隐 */
@@ -1114,6 +1162,32 @@ window.APH = window.APH || {};
     });
     saveRivals();
   }
+  /* #72 家园击倒: 送医拖行(世界侧 lerp, 无新实体类型)。玩家击倒昏迷且有居民在场时,
+     把玩家朝医疗舱拖; 已到治疗半径内则停下(交由 playerDownedTick 判复活)。 */
+  function carryPlayerToClinic(dt){
+    var s=APH.state;
+    var needs=s.meta && s.meta.playerNeeds;
+    if(!needs || !needs.downed) return;
+    var clinicB=null;
+    (s.colony.buildings||[]).forEach(function(b){ if(b.id==='bl_clinic') clinicB=b; });
+    if(!clinicB) return;
+    if(!(s.meta.residents||[]).length) return;             // 无人救援不拖
+    var healR=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
+    var dist=U.dst(s.px,s.py,clinicB.x,clinicB.y);
+    if(dist < healR) return;                               // 已到舱内(送医完成, 等复活)
+    var spd=(CFG.player.downedCarrySpeed!=null)?CFG.player.downedCarrySpeed:70;
+    var step=Math.min(dt*spd, dist);
+    var dx=clinicB.x-s.px, dy=clinicB.y-s.py;
+    var l=Math.sqrt(dx*dx+dy*dy)||1;
+    s.px += (dx/l)*step;
+    s.py += (dy/l)*step;
+    if(s.px<40) s.px=40; if(s.px>CFG.WORLD-40) s.px=CFG.WORLD-40;
+    if(s.py<40) s.py=40; if(s.py>CFG.WORLD-40) s.py=CFG.WORLD-40;
+    s.face=Math.atan2(dy,dx);
+    var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
+    if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; }
+  }
+
   function saveRivals(){
     try{ localStorage.setItem('aphelion_rivals_v1',
       JSON.stringify(APH.state.rivalStates)); }catch(e){}
@@ -1470,6 +1544,8 @@ window.APH = window.APH || {};
       s.keys[e.code]=true;
       APH.SFX.unlock();
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
+      /* #72 家园击倒: 昏迷期间所有按键忽略(含 E — 击倒无 E 唤醒, 只等送医/倒计时) */
+      if(playerDowned() && s.mode==='running') return;
       /* #66 床边睡眠: 睡着时除 E 外全部按键忽略(唤醒只走 WASD/E/受伤) */
       if(playerSleeping() && s.mode==='running' && e.code!=='KeyE') return;
       /* E=发射台/自然资源交互 */
@@ -3389,6 +3465,8 @@ window.APH = window.APH || {};
     },
     debugPressE:function(){
       var s=APH.state;
+      /* #72 家园击倒: 昏迷中调试 E 一律忽略(镜像真实 E, 无 E 唤醒) */
+      if(playerDowned()) return;
       /* #66 床边睡眠: 镜像真实 E 键逻辑(先醒后睡, 绝不自动寻路) */
       if(playerSleeping()){
         APH.Res.playerWake(s.meta.playerNeeds);
