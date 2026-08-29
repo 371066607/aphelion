@@ -493,6 +493,21 @@
   验证: `python3 build.py` 构建成功 27131KB 以 `</html>` 收尾；新增 `tests/science.test.js`（15 项）；单元 326/0；场景 29/0；perf 3/0；boss 7/0（全量 373 项自动化测试 100% 绿灯）。
   下一步: 全屏可视化科技蓝图大地图。
 
+- **2026-08-29 · 班次**: ✅全屏科技树替换 T 循环列表，并接上硅壳化验钥匙。
+  - **T 全屏图**：家园 T 切换四列（农业/工业/医学/安防）节点卡片；方向键选、Enter 即时扣研究点、Esc/T 关；世界不停；打开时收起 G/L/R/交易。`te_weaponry` 不进图。氧气罐挂安防列顶。
+  - **游商**：走近 [E] 开交易（游商本就不能招）；T 不再抢键。
+  - **化验钥匙**：`te_bio_adaptation` 不能花研究点买。无水培化验硅壳只记已化验+尤里卡；水培入账后若已化验则补发。卡片只写真解锁/已接线效果；等离子伤害改读 `plasmaTechLevel`（ballistics 与旧档 weaponry 取大）。
+  - **词汇/决策**：`CONTEXT.md` 科研一组；`docs/adr/0002-dual-track-research.md`。建筑显示名改为科研站。
+  验证: `python3 build.py` 构建成功 27140KB；单元 331/0；场景 30/0；perf 3/0；boss 7/0。无浏览器工具，未实机点开全屏图，交互由场景测试 `tech map` 断言 DOM。
+  下一步: 实机按 T 走一遍四列和硅壳钥匙锁文案。
+
+- **2026-08-29 · 班次**: ✅审查三条修复（出航关图 / 居民跳刷新 / 前置优于研究点）。
+  - 出航与返航 `closeColonyOverlays`；T 在图开着时任意场景可关，debug T 不再抢关。
+  - `residentsTick` 末尾 `refreshTechMapIfOpen`。
+  - `canBuy` 先 `missingRequire` 再扣研究点；`techNodeStatus` 因此把缺前置画成 locked。
+  验证: 构建 27140KB；单元 332/0；场景 32/0；perf 3/0；boss 7/0。
+  下一步: commit。
+
 
 
 

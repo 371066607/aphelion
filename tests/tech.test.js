@@ -74,6 +74,60 @@ test('buildings: 未研发科技时禁止放置高级建筑蓝图', function(){
   if (chkClinic.ok) throw new Error('未解锁医学科技时应拒绝放置医疗舱');
 });
 
+test('tech: 缺前置时优先提示需先研发，不报研究点不足', function(){
+  var meta = { research: 0 };
+  var owned = {};
+  var chk = APH.Colony.canBuy(meta, 'te_hydroponics', owned);
+  if (chk.ok) throw new Error('无前置不应可买');
+  if (!chk.why || chk.why.indexOf('需先研发') < 0) throw new Error('应先报缺前置, 实际: ' + chk.why);
+  if (chk.why.indexOf('研究点') >= 0) throw new Error('前置未满足时不应报研究点: ' + chk.why);
+  var st = APH.Colony.techNodeStatus(meta, 'te_hydroponics', owned);
+  if (st.state !== 'locked') throw new Error('卡片状态应为 locked, 实际: ' + st.state);
+});
+
+test('tech: 化验钥匙节点不能花研究点买', function(){
+  var meta = { research: 500 };
+  var owned = { te_basic_farming: 1, te_hydroponics: 1 };
+  var chk = APH.Colony.canBuy(meta, 'te_bio_adaptation', owned);
+  if (chk.ok) throw new Error('外星生态适应不应用研究点购买');
+  if (!chk.why || chk.why.indexOf('化验') < 0) throw new Error('应提示需化验: ' + chk.why);
+});
+
+test('tech: 先化验硅壳后研发水培则补发化验钥匙', function(){
+  var meta = { research: 200, tech: { te_basic_farming: 1 }, analyzedSpecimens: { specimen_chitin: true } };
+  var r = APH.Colony.buyTech(meta, 'te_hydroponics', meta.tech);
+  if (!r.ok) throw new Error('水培应可买: ' + r.why);
+  if (!r.owned.te_hydroponics) throw new Error('应记下温控水培');
+  if (!r.owned.te_bio_adaptation) throw new Error('水培入账后应补发外星生态适应');
+  if ((r.granted || []).indexOf('te_bio_adaptation') < 0) throw new Error('granted 应含 te_bio_adaptation');
+});
+
+test('tech: 全屏图四列不含旧档别名 te_weaponry', function(){
+  var cols = APH.Colony.TECH_COLUMNS;
+  if (!cols || cols.length !== 4) throw new Error('应为四列, 实际: ' + (cols && cols.length));
+  var names = cols.map(function(c){ return c.name; }).join(',');
+  if (names !== '农业,工业,医学,安防') throw new Error('列名应为 农业|工业|医学|安防, 实际: ' + names);
+  var seen = {};
+  cols.forEach(function(c){
+    c.ids.forEach(function(id){
+      if (seen[id]) throw new Error('重复节点: ' + id);
+      seen[id] = 1;
+      if (id === 'te_weaponry') throw new Error('te_weaponry 不应出现在科技图');
+      if (!APH.Colony.TECHS[id]) throw new Error('列引用未知科技: ' + id);
+    });
+  });
+  if (!seen.te_o2tank) throw new Error('氧气罐应挂在安防列');
+  if (!seen.te_exosuit) throw new Error('外骨骼应挂在工业列');
+  if (!seen.te_radar) throw new Error('雷达应挂在安防列');
+  if (!seen.te_bio_adaptation) throw new Error('化验钥匙叶子应画在树上');
+});
+
+test('tech: 等离子等级取 ballistics 与旧档 weaponry 的较大值', function(){
+  if (APH.Colony.plasmaTechLevel({ te_ballistics: 1 }) !== 1) throw new Error('仅弹道应为 1');
+  if (APH.Colony.plasmaTechLevel({ te_weaponry: 3 }) !== 3) throw new Error('旧档 3 级应保留');
+  if (APH.Colony.plasmaTechLevel({ te_ballistics: 1, te_weaponry: 3 }) !== 3) throw new Error('应取较大值');
+});
+
 test('buildings: 物理建材不足时拒绝放置', function(){
   var buildings = [];
   var techOwned = {};

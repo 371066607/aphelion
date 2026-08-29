@@ -71,6 +71,7 @@ window.APH = window.APH || {};
   function launchExpedition(){
     var s = APH.state;
     if(s.scene==='expedition') return;
+    closeColonyOverlays();
     saveColony();
     var sh=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
     APH.UI.floatText(sh.mission,'#ffc857');
@@ -174,6 +175,7 @@ window.APH = window.APH || {};
   function returnHome(){
     var s=APH.state;
     if(s.scene!=='expedition') return;
+    closeColonyOverlays();
     /* 结算远征收益: 只在返航入账。着陆点不再自动卸货。 */
     var goods=APH.Combat.settleGoods(s.carry);
     s.meta.res = s.meta.res || { mineral:0, food:0, leather:0 };
@@ -524,7 +526,7 @@ window.APH = window.APH || {};
           ? '  [F] 请客(-'+mealCost+'粮)'
           : '  [F] 没粮请客';
       }
-      if(s.nearVisitor.trade) mealBit+='  [T] 交易';
+      if(s.nearVisitor.trade) mealBit+='  [E] 交易';
       if((s.nearVisitor.askCd||0)>0){
         APH.UI.setHint(vp.name+' 还想再看看… · 印象'+imp+mealBit);
       }else{
@@ -651,7 +653,7 @@ window.APH = window.APH || {};
       });
     }
 
-    /* 生产 tick: 每30游戏秒结算一次采矿机/研究站 (ADR-6 固定tick) */
+    /* 生产 tick: 每30游戏秒结算一次采矿机/科研站 (ADR-6 固定tick) */
     s.prodT=(s.prodT||0)+dt;
     if(s.prodT>=30){
       s.prodT-=30;
@@ -949,7 +951,7 @@ window.APH = window.APH || {};
   function playerDefPower(){
     var s=APH.state;
     var turrets=s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length;
-    return 10 + turrets*12 + (s.meta.tech.te_weaponry||0)*5;
+    return 10 + turrets*12 + APH.Colony.plasmaTechLevel(s.meta.tech)*5;
   }
   /* ---- 阶段E: 袭击战术辅助 ---- */
   function setupSiegeCamp(){
@@ -1350,7 +1352,10 @@ window.APH = window.APH || {};
     var P=CFG.player;
     /* 从基准值重算, 避免叠加误差 */
     if(t.effect.o2Max){ P.o2Max = 100 + t.effect.o2Max*lv; S_o2Clamp(); }
-    if(t.effect.dmgMul){ CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*lv)); }
+    if(t.effect.dmgMul){
+      var plv = APH.Colony.plasmaTechLevel(meta.tech);
+      CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*plv));
+    }
     if(t.effect.spdMul){ P.walkSpeed=Math.round(150*(1+t.effect.spdMul*lv));
                          P.runSpeed=Math.round(235*(1+t.effect.spdMul*lv)); }
     /* te_radar: 罗盘/农产倍率在绘制与 farmTick 读取 meta.tech, 无需改全局 */
@@ -1464,7 +1469,12 @@ window.APH = window.APH || {};
             APH.UI.floatText('采收中...', '#8fd4ff');
           }
         }else if(s.scene==='home' && s.nearVisitor){
-          tryRecruit(s.nearVisitor);
+          if(s.nearVisitor.trade){
+            closeColonyOverlays('trade');
+            toggleTradePanel();
+          }else{
+            tryRecruit(s.nearVisitor);
+          }
         }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
           else if(s.scene==='expedition') returnHome();
@@ -1552,7 +1562,11 @@ window.APH = window.APH || {};
          /^Arrow(Up|Down|Left|Right)$/.test(e.code)){
         var tpA=document.getElementById('tradePanel');
         var rpA=document.getElementById('resPanel');
-        if(tpA && tpA.style.display!=='none' && /^Arrow(Up|Down)$/.test(e.code)){
+        if(techMapOpen()){
+          moveTechSel(e.code);
+          s.keys[e.code]=false;
+          if(e.preventDefault) e.preventDefault();
+        }else if(tpA && tpA.style.display!=='none' && /^Arrow(Up|Down)$/.test(e.code)){
           moveTradeSel(e.code);
           s.keys[e.code]=false;
           if(e.preventDefault) e.preventDefault();
@@ -1574,6 +1588,7 @@ window.APH = window.APH || {};
       }
       if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='Escape'){
+        if(techMapOpen()) toggleTechMap(false);
         var tpE=document.getElementById('tradePanel');
         if(tpE && tpE.style.display!=='none') toggleTradePanel(false);
       }
@@ -1645,37 +1660,17 @@ window.APH = window.APH || {};
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
       /* G=建造目录(左侧按钮/底部row) */
       if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){ toggleBuildRow(); }
-      /* T=科技购买(仅殖民地): 循环选择并直接购买; 靠近游商时改开交易面板 */
-      if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'&&
-         s.nearVisitor && s.nearVisitor.trade){
-        toggleTradePanel();
-      }else if(e.code==='KeyT'&&s.mode==='running'&&s.scene==='home'){
-        var tids=Object.keys(APH.Colony.TECHS);
-        var ti=tids.indexOf(s.techSel);
-        s.techSel=tids[(ti+1)%tids.length];
-        var tdef=APH.Colony.TECHS[s.techSel];
-        var lv=(s.meta.tech&&s.meta.tech[s.techSel])||0;
-        var reqTxt = (tdef.requires && tdef.requires.length)
-          ? (' [前置: ' + tdef.requires.map(function(k){ return APH.Colony.TECHS[k]?APH.Colony.TECHS[k].name:k; }).join(',') + ']') : '';
-        var canRes = APH.Colony.canBuy(s.meta, s.techSel, s.meta.tech||{});
-        var statusTxt = canRes.ok ? '[回车研发]' : ('[' + canRes.why + ']');
-        APH.UI.setHint(statusTxt + ' ' + tdef.name + ' Lv' + lv + '/' + (tdef.max||1) +
-          reqTxt + ' · ' + tdef.desc + ' · ' + tdef.cost + '研究点 (T换/Enter研)');
+      /* T=全屏科技图(家园打开; 开着时任意场景可关) */
+      if(e.code==='KeyT'&&s.mode==='running'){
+        if(techMapOpen()) toggleTechMap(false);
+        else if(s.scene==='home') toggleTechMap();
       }
       if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'){
         var tpEnt=document.getElementById('tradePanel');
         if(tpEnt && tpEnt.style.display!=='none' && currentTrader()){
           doTradeRow(s.tradeSel||0);
-        }else if(s.techSel){
-          var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
-          if(r2.ok){
-            s.meta.tech=r2.owned;
-            APH.Save.saveMeta(s.meta);
-            applyTech(s.meta,s.techSel);
-            APH.UI.floatText('✔ 研发成功: '+APH.Colony.TECHS[s.techSel].name,'#59d9ff');
-          }else{
-            APH.UI.floatText('✕ '+r2.why,'#ff9a9a');
-          }
+        }else if(techMapOpen()){
+          tryBuySelectedTech();
         }
       }
       if(e.code==='KeyK'&&s.mode==='running'&&s.debugKeys){
@@ -1683,7 +1678,7 @@ window.APH = window.APH || {};
         s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
         document.title='DBG 已生成 '+f.name;
       }
-      if(e.code==='KeyT'&&s.mode==='running'&&s.debugKeys){
+      if(e.code==='KeyT'&&s.mode==='running'&&s.debugKeys&&s.scene!=='home'&&!techMapOpen()){
         var nb=null,bd=1e9;
         s.entities.forEach(function(en){
           if(en.type!==T.BEACON||en.done) return;
@@ -1825,6 +1820,7 @@ window.APH = window.APH || {};
       if(!meta.residents) meta.residents=[];   // P6 居民名册
       if(meta.residentSeq===undefined) meta.residentSeq=0;
       APH.state.meta=meta;
+      APH.Colony.grantAssayKeyedTechs(meta);
       applyAllTech(meta);
       APH.state.war.wins=(meta.war&&meta.war.wins)||0;
       APH.state.war.raids=(meta.war&&meta.war.raids)||0;
@@ -2023,12 +2019,166 @@ window.APH = window.APH || {};
   requestAnimationFrame(frame);
 
   /* ================= T5 图鉴 ================= */
+  function overlayClosed(el){
+    if(!el) return true;
+    return el.style.display==='none' || el.style.display==null || el.style.display===undefined;
+  }
+  function hideOverlay(id){
+    var el=document.getElementById(id);
+    if(el) el.style.display='none';
+  }
+  function closeColonyOverlays(keep){
+    if(keep!=='techMap') hideOverlay('techMap');
+    if(keep!=='codex') hideOverlay('codex');
+    if(keep!=='resPanel') hideOverlay('resPanel');
+    if(keep!=='buildRow'){
+      var row=document.getElementById('buildRow');
+      if(row) row.style.display='none';
+    }
+    if(keep!=='trade'){
+      var tp=document.getElementById('tradePanel');
+      if(tp && tp.style.display!=='none') toggleTradePanel(false);
+    }
+  }
+  function techMapOpen(){
+    return !overlayClosed(document.getElementById('techMap'));
+  }
   function toggleCodex(){
     var el=document.getElementById('codex');
     if(!el) return;
-    var show = el.style.display==='none';
+    var show = overlayClosed(el);
+    if(show) closeColonyOverlays('codex');
     el.style.display = show ? '' : 'none';
     if(show) renderCodex();
+  }
+  function visibleTechIds(){
+    var cols=APH.Colony.TECH_COLUMNS||[];
+    var ids=[];
+    cols.forEach(function(c){ (c.ids||[]).forEach(function(id){ ids.push(id); }); });
+    return ids;
+  }
+  function ensureTechSel(){
+    var s=APH.state;
+    var ids=visibleTechIds();
+    if(!ids.length) return;
+    if(ids.indexOf(s.techSel)<0) s.techSel=ids[0];
+  }
+  function toggleTechMap(force){
+    var el=document.getElementById('techMap');
+    if(!el) return;
+    var show = (force===true) ? true : (force===false) ? false : overlayClosed(el);
+    if(show) closeColonyOverlays('techMap');
+    el.style.display = show ? '' : 'none';
+    if(show){
+      ensureTechSel();
+      renderTechMap();
+    }
+  }
+  function refreshTechMapIfOpen(){
+    if(techMapOpen()) renderTechMap();
+  }
+  function moveTechSel(code){
+    var s=APH.state;
+    var cols=APH.Colony.TECH_COLUMNS||[];
+    if(!cols.length) return;
+    ensureTechSel();
+    var col=0, row=0, i, j;
+    for(i=0;i<cols.length;i++){
+      j=(cols[i].ids||[]).indexOf(s.techSel);
+      if(j>=0){ col=i; row=j; break; }
+    }
+    if(code==='ArrowLeft') col=(col+cols.length-1)%cols.length;
+    if(code==='ArrowRight') col=(col+1)%cols.length;
+    var ids=cols[col].ids||[];
+    if(!ids.length) return;
+    if(code==='ArrowUp') row=(row+ids.length-1)%ids.length;
+    else if(code==='ArrowDown') row=(row+1)%ids.length;
+    else row=Math.min(row, ids.length-1);
+    s.techSel=ids[row];
+    renderTechMap();
+  }
+  function tryBuySelectedTech(){
+    var s=APH.state;
+    if(!s.techSel) return;
+    var tdef=APH.Colony.TECHS[s.techSel];
+    if(!tdef) return;
+    if(tdef.assayKey){
+      var st=APH.Colony.techNodeStatus(s.meta, s.techSel, s.meta.tech||{});
+      APH.UI.floatText(st.why||'已研发', st.state==='owned'?'#59d9ff':'#ffc857');
+      return;
+    }
+    var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
+    if(r2.ok){
+      s.meta.tech=r2.owned;
+      APH.Save.saveMeta(s.meta);
+      applyTech(s.meta,s.techSel);
+      (r2.granted||[]).forEach(function(id){ applyTech(s.meta,id); });
+      APH.UI.floatText('✔ 研发成功: '+tdef.name,'#59d9ff');
+      if(r2.granted && r2.granted.length){
+        r2.granted.forEach(function(id){
+          var g=APH.Colony.TECHS[id];
+          if(g) APH.UI.floatText('🔑 化验钥匙点亮: '+g.name,'#59d9ff');
+        });
+      }
+      renderTechMap();
+    }else{
+      APH.UI.floatText('✕ '+(r2.why||'无法研发'),'#ff9a9a');
+    }
+  }
+  function renderTechMap(){
+    var s=APH.state;
+    var el=document.getElementById('techMap');
+    var body=document.getElementById('techMapBody');
+    var pts=document.getElementById('techMapPts');
+    if(!el || !body) return;
+    ensureTechSel();
+    if(pts) pts.textContent='研究点 '+(s.meta.research||0);
+    var cols=APH.Colony.TECH_COLUMNS||[];
+    var html='';
+    cols.forEach(function(col){
+      html+='<div class="techCol"><h3>'+esc(col.name)+'</h3>';
+      (col.ids||[]).forEach(function(id){
+        var t=APH.Colony.TECHS[id]; if(!t) return;
+        var st=APH.Colony.techNodeStatus(s.meta, id, s.meta.tech||{});
+        var depth=APH.Colony.techDepth(id);
+        var sel=s.techSel===id;
+        var border=sel?'#ffc857':(st.state==='owned'?'#19c8b9':(st.state==='available'?'#c8e89a':(st.state==='assay'?'#59d9ff':'#3d4a5c')));
+        var bg=st.state==='owned'?'rgba(25,200,185,.16)':(st.state==='available'?'rgba(247,243,223,.12)':'rgba(16,24,40,.55)');
+        var dim=(st.state==='locked'||st.state==='unaffordable')?'opacity:.62;':'';
+        var pips='';
+        if(st.max>1){
+          var i;
+          for(i=0;i<st.max;i++) pips+=(i<st.lv?'●':'○');
+        }
+        var costLine='';
+        if(t.assayKey) costLine='化验钥匙';
+        else if(st.state==='owned') costLine='已研发'+(pips?' '+pips:'');
+        else costLine=t.cost+' 研究点'+(pips?' '+pips:'');
+        var why=st.why && st.state!=='owned' && st.state!=='available' ? '<div class="techWhy">'+esc(st.why)+'</div>' : '';
+        var desc=t.desc ? '<div class="techDesc">'+esc(t.desc)+'</div>' : '';
+        html+='<div class="techNode" data-tech="'+id+'" style="margin-left:'+(depth*16)+'px;border-color:'+border+';background:'+bg+';'+dim+
+          (sel?'box-shadow:0 0 0 1px #ffc857;':'')+'">'+
+          '<b>'+esc(t.name)+'</b>'+
+          '<span class="techCost">'+esc(costLine)+'</span>'+
+          desc+why+'</div>';
+      });
+      html+='</div>';
+    });
+    body.innerHTML=html;
+    if(!el._techClickBound){
+      el._techClickBound=true;
+      el.addEventListener('click', function(ev){
+        var n=ev.target;
+        while(n && n!==el){
+          if(n.getAttribute && n.getAttribute('data-tech')){
+            APH.state.techSel=n.getAttribute('data-tech');
+            renderTechMap();
+            return;
+          }
+          n=n.parentNode;
+        }
+      });
+    }
   }
   function esc(t){ return String(t).replace(/</g,'&lt;'); }
   function renderCodex(){
@@ -2091,7 +2241,8 @@ window.APH = window.APH || {};
     var btn=document.getElementById('buildBtn');
     var row=document.getElementById('buildRow');
     if(!btn||!row) return;
-    var willShow = (force===true) ? true : row.style.display==='none';
+    var willShow = (force===true) ? true : (force===false) ? false : overlayClosed(row);
+    if(willShow) closeColonyOverlays('buildRow');
     row.style.display = willShow?'':'none';
     if(willShow) renderBuildRow();
   }
@@ -2188,8 +2339,9 @@ window.APH = window.APH || {};
   }
   function toggleTradePanel(force){
     var el=ensureTradePanel();
-    var show=(force===undefined) ? el.style.display==='none' : !!force;
+    var show=(force===undefined) ? overlayClosed(el) : !!force;
     if(show && !currentTrader()) show=false;
+    if(show) closeColonyOverlays('trade');
     el.style.display=show?'':'none';
     if(show){ APH.state.tradeSel=0; renderTradePanel(); }
   }
@@ -2234,7 +2386,7 @@ window.APH = window.APH || {};
         '</div>';
       row++;
     });
-    html+='<div style="margin-top:10px;color:#5d6f96">↑↓选 · Enter成交 · 数字键也可 · [T]/[Esc] 关闭</div>';
+    html+='<div style="margin-top:10px;color:#5d6f96">↑↓选 · Enter成交 · 数字键也可 · [Esc] 关闭</div>';
     el.innerHTML=html;
   }
   function doTradeRow(i){
@@ -2261,7 +2413,8 @@ window.APH = window.APH || {};
   function toggleResPanel(){
     var el=document.getElementById('resPanel');
     if(!el) return;
-    var show=el.style.display==='none';
+    var show=overlayClosed(el);
+    if(show) closeColonyOverlays('resPanel');
     el.style.display=show?'':'none';
     if(show) renderResPanel();
   }
@@ -3042,8 +3195,10 @@ window.APH = window.APH || {};
         var bits=[];
         if(yld.unlockCrop && APH.Colony.ALIEN_CROPS[yld.unlockCrop])
           bits.push('解锁 '+APH.Colony.ALIEN_CROPS[yld.unlockCrop].name);
-        if(yld.unlockTech && APH.Colony.TECHS[yld.unlockTech])
-          bits.push('蓝图 '+APH.Colony.TECHS[yld.unlockTech].name);
+        if(yld.unlockTech && APH.Colony.TECHS[yld.unlockTech]){
+          bits.push(APH.Colony.TECHS[yld.unlockTech].name);
+          applyTech(m, yld.unlockTech);
+        }
         if(yld.eureka) bits.push('尤里卡 +'+yld.eureka);
         APH.UI.floatText('🔬 化验突破'+(bits.length?': '+bits.join(' / '):''), '#59d9ff');
       }
@@ -3144,6 +3299,7 @@ window.APH = window.APH || {};
     saveColony();
     /* 过客拜访: 不再自动入籍, 只刷流浪者 */
     maybeSpawnVisitor(false);
+    refreshTechMapIfOpen();
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
   function bindBuildUI(){
@@ -3172,6 +3328,8 @@ window.APH = window.APH || {};
     },
     guardTrim:guardTrim,
     toggleCodex:toggleCodex,
+    toggleTechMap:toggleTechMap,
+    renderTechMap:renderTechMap,
     renderCodex:renderCodex,
     renderResPanel:renderResPanel,
     residentsTick:residentsTick,

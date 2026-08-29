@@ -136,14 +136,22 @@ test('lab_starved: 标本库存为 0 时化验不推进', function(){
   if (lab.analysisProgress) throw new Error('无标本进度不应推进, 实际: ' + lab.analysisProgress);
 });
 
-test('chitin_unlock: 硅壳化验授予 te_bio_adaptation 并注入尤里卡', function(){
+test('chitin_unlock: 无水培时硅壳化验不授予科技，仍记已化验并注入尤里卡', function(){
   var meta = { research: 0, tech: {}, analyzedFlora: {} };
+  var def = APH.Colony.SPECIMEN_ANALYSIS.specimen_chitin;
+  var out = APH.Colony.applySpecimenAnalysis(meta, {}, def, 'specimen_chitin');
+  if (out.unlockTech) throw new Error('无前置不应授予科技: ' + out.unlockTech);
+  if (meta.tech.te_bio_adaptation) throw new Error('无水培时不应写入 te_bio_adaptation');
+  if (meta.research !== 50) throw new Error('应注入 +50 尤里卡, 实际: ' + meta.research);
+  if (!meta.analyzedSpecimens.specimen_chitin) throw new Error('应标记甲壳已化验');
+});
+
+test('chitin_unlock: 已有水培时硅壳化验授予 te_bio_adaptation', function(){
+  var meta = { research: 0, tech: { te_hydroponics: 1 }, analyzedFlora: {} };
   var def = APH.Colony.SPECIMEN_ANALYSIS.specimen_chitin;
   var out = APH.Colony.applySpecimenAnalysis(meta, {}, def, 'specimen_chitin');
   if (out.unlockTech !== 'te_bio_adaptation') throw new Error('应解锁 te_bio_adaptation');
   if (!meta.tech.te_bio_adaptation) throw new Error('meta.tech 应写入 te_bio_adaptation');
-  if (meta.research !== 50) throw new Error('应注入 +50 尤里卡, 实际: ' + meta.research);
-  if (!meta.analyzedSpecimens.specimen_chitin) throw new Error('应标记甲壳已化验');
 });
 
 test('collectHome_seeds: 纯净种荚入库不折算研究点', function(){

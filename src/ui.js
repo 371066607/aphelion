@@ -33,7 +33,7 @@ APH.UI = (function(){
         try{
           (s.rivalStates||[]).forEach(function(r){ if(r.rival.military>topMil) topMil=r.rival.military; });
           def = 10 + (s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length)*12
-                    + ((s.meta.tech&&s.meta.tech.te_weaponry)||0)*5;
+                    + APH.Colony.plasmaTechLevel(s.meta.tech)*5;
         }catch(e){}
         var ws = APH.Rivals.warScore(topMil, def, war.wins, war.raids);
         $('bWAR').style.width = U.clamp(ws,2,100)+'%';

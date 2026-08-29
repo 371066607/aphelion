@@ -24,7 +24,7 @@ APH.Colony = (function(){
       dispH:100, cells:[1,1],
       desc:'有矿工时每30秒产出矿料。需先研发机械锻造。',
       upg:{ effectPerLv:2, maxLv:3, cost:45 } },
-    bl_lab:         { name:'研究站', cost:0, costMineral:40, costRes:{ wood:20, iron:25 }, size:48, max:2, buildTime:25,
+    bl_lab:         { name:'科研站', cost:0, costMineral:40, costRes:{ wood:20, iron:25 }, size:48, max:2, buildTime:25,
       dispH:113, cells:[2,2],
       desc:'学者在此做理论攻坚，并把远征标本上台化验。+1×等级 研究点/跳。',
       upg:{ effectPerLv:1, maxLv:2, cost:60 } },
@@ -718,41 +718,41 @@ APH.Colony = (function(){
   var TECHS = {
     // 农业分支
     te_basic_farming:   { name:'基础外星农耕', cost:40, max:1, requires:[],
-                          desc:'野生植被采摘速度 +50%' },
+                          desc:'' },
     te_hydroponics:     { name:'温控水培技术', cost:80, max:1, requires:['te_basic_farming'],
-                          desc:'解锁水培农场 bl_farm 蓝图' },
+                          desc:'解锁水培农场' },
     te_alien_culinary:  { name:'异星烹饪保鲜', cost:70, max:1, requires:['te_basic_farming'],
-                          desc:'解锁烹饪灶台 bl_kitchen 与高级食谱' },
+                          desc:'解锁烹饪灶台与高级食谱' },
     te_bio_adaptation:  { name:'外星生态适应', cost:150, max:1, requires:['te_hydroponics'],
-                          desc:'酸雨/毒雾暴露累积降低 50%' },
+                          assayKey:'specimen_chitin', assayNeed:'硅壳装甲',
+                          desc:'解锁星绒防酸服与极地防寒羽绒' },
 
     // 工业分支
     te_stonecutting:    { name:'石料切割加工', cost:40, max:1, requires:[],
-                          desc:'解锁精制石料建材与篝火' },
+                          desc:'解锁石料篝火' },
     te_machining:       { name:'机械锻造合金', cost:90, max:1, requires:['te_stonecutting'],
-                          desc:'解锁自动采矿机 bl_mine 蓝图' },
+                          desc:'解锁自动采矿机' },
     te_deep_drilling:   { name:'深空重型钻探', cost:160, max:1, requires:['te_machining'],
-                          desc:'采矿机产量翻倍' },
+                          desc:'' },
 
     // 医学分支
     te_herbal_remedies: { name:'草药提炼包扎', cost:50, max:1, requires:[],
-                          desc:'草药可搓制初级药包' },
+                          desc:'解锁荧光夜视镜与复合急救包' },
     te_medicine:        { name:'外星临床医学', cost:100, max:1, requires:['te_herbal_remedies'],
-                          desc:'解锁医疗舱 bl_clinic 蓝图' },
+                          desc:'解锁医疗舱' },
     te_bionics:         { name:'仿生机能强化', cost:180, max:1, requires:['te_medicine'],
-                          desc:'全员三维机能底线 +15%' },
+                          desc:'' },
 
     // 安防分支
     te_ballistics:      { name:'弹道工程防卫', cost:60, max:1, requires:[],
-                          desc:'解锁兵营 bl_barracks，等离子伤害 +30%', effect:{ dmgMul:.30 } },
+                          desc:'解锁兵营，等离子伤害 +30%', effect:{ dmgMul:.30 } },
     te_weaponry:        { name:'弹道工程防卫', cost:60, max:3, requires:[],
-                          desc:'等离子伤害 +30%', effect:{ dmgMul:.30 } }, // 兼容旧档别名
+                          desc:'等离子伤害 +30%', effect:{ dmgMul:.30 }, hidden:true }, // 旧档别名, 新图不展示
     te_turret_tech:     { name:'自动防御炮塔', cost:110, max:1, requires:['te_ballistics'],
-                          desc:'解锁防御炮塔 bl_turret 蓝图' },
+                          desc:'解锁防御炮塔' },
     te_plasma_grid:     { name:'等离子电网重炮', cost:200, max:1, requires:['te_turret_tech'],
-                          desc:'炮塔伤害翻倍' },
+                          desc:'' },
 
-    // 探索分支
     te_o2tank:          { name:'氧气罐扩容', cost:40, max:3, requires:[],
                           desc:'氧气上限 +25', effect:{ o2Max:+25 } },
     te_radar:           { name:'深空广域雷达', cost:80, max:2, requires:['te_ballistics'],
@@ -761,31 +761,108 @@ APH.Colony = (function(){
                           desc:'移动速度 +15%', effect:{ spdMul:.15 } },
   };
 
+  /* 全屏科技图列: 探索不单列; 雷达/外骨骼挂父节点所在列; 氧气罐挂安防列顶 */
+  var TECH_COLUMNS = [
+    { name:'农业', ids:['te_basic_farming','te_hydroponics','te_bio_adaptation','te_alien_culinary'] },
+    { name:'工业', ids:['te_stonecutting','te_machining','te_deep_drilling','te_exosuit'] },
+    { name:'医学', ids:['te_herbal_remedies','te_medicine','te_bionics'] },
+    { name:'安防', ids:['te_o2tank','te_ballistics','te_turret_tech','te_plasma_grid','te_radar'] },
+  ];
+
+  function techDepth(techId){
+    var n=0, id=techId, seen={};
+    while(id && TECHS[id] && TECHS[id].requires && TECHS[id].requires[0] && !seen[id]){
+      seen[id]=1;
+      id=TECHS[id].requires[0];
+      n++;
+    }
+    return n;
+  }
+
+  function plasmaTechLevel(tech){
+    tech=tech||{};
+    return Math.max(tech.te_ballistics||0, tech.te_weaponry||0);
+  }
+
+  function missingRequire(t, owned){
+    var reqs = t.requires || [];
+    for(var i=0; i<reqs.length; i++){
+      var r = reqs[i];
+      if(!owned || !owned[r]){
+        return TECHS[r] ? TECHS[r].name : r;
+      }
+    }
+    return null;
+  }
+
+  function assayNeedText(t){
+    return '需在科研站化验'+(t.assayNeed || t.assayKey || '标本');
+  }
+
+  /* 化验钥匙: 前置已有且标本已化验则写入 meta.tech, 不花研究点 */
+  function grantAssayKeyedTechs(meta){
+    meta = meta || {};
+    meta.tech = meta.tech || {};
+    var analyzed = meta.analyzedSpecimens || {};
+    var granted = [];
+    Object.keys(TECHS).forEach(function(id){
+      var t = TECHS[id];
+      if(!t || !t.assayKey) return;
+      if((meta.tech[id]||0) >= (t.max||1)) return;
+      if(missingRequire(t, meta.tech)) return;
+      if(!analyzed[t.assayKey]) return;
+      meta.tech[id] = Math.max(meta.tech[id]||0, 1);
+      granted.push(id);
+    });
+    return granted;
+  }
+
   /* 可购判定(纯函数): 检查研究点与所有 requires 前置科技 */
   function canBuy(meta, techId, owned){
     var t=TECHS[techId];
     if(!t) return { ok:false, why:'未知科技' };
     if((owned[techId]||0)>= (t.max||1)) return { ok:false, why:'已达最高等级' };
-    if((meta.research||0) < t.cost) return { ok:false, why:'研究点不足 (需 '+t.cost+')' };
-    var reqs = t.requires || [];
-    for(var i=0; i<reqs.length; i++){
-      var r = reqs[i];
-      if(!owned || !owned[r]){
-        var reqName = TECHS[r] ? TECHS[r].name : r;
-        return { ok:false, why:'需先研发: ' + reqName };
-      }
+    if(t.assayKey){
+      var miss = missingRequire(t, owned);
+      if(miss) return { ok:false, why:'需先研发: ' + miss };
+      return { ok:false, why:assayNeedText(t) };
     }
+    var reqName = missingRequire(t, owned);
+    if(reqName) return { ok:false, why:'需先研发: ' + reqName };
+    if((meta.research||0) < t.cost) return { ok:false, why:'研究点不足 (需 '+t.cost+')' };
     return { ok:true };
   }
 
-  /* 购买并应用效果(世界侧): 返回更新后的 owned */
+  function techNodeStatus(meta, techId, owned){
+    owned = owned || (meta && meta.tech) || {};
+    var t=TECHS[techId];
+    if(!t) return { state:'unknown', why:'未知科技', lv:0 };
+    var lv=owned[techId]||0;
+    var max=t.max||1;
+    if(lv>=max) return { state:'owned', why:'已研发', lv:lv, max:max };
+    if(t.assayKey){
+      var miss=missingRequire(t, owned);
+      if(miss) return { state:'locked', why:'需先研发: '+miss, lv:lv, max:max };
+      var analyzed=(meta && meta.analyzedSpecimens)||{};
+      if(!analyzed[t.assayKey]) return { state:'assay', why:assayNeedText(t), lv:lv, max:max };
+      return { state:'assay', why:assayNeedText(t), lv:lv, max:max };
+    }
+    var chk=canBuy(meta, techId, owned);
+    if(chk.ok) return { state:'available', why:'', lv:lv, max:max };
+    if(chk.why && chk.why.indexOf('研究点')>=0) return { state:'unaffordable', why:chk.why, lv:lv, max:max };
+    return { state:'locked', why:chk.why, lv:lv, max:max };
+  }
+
+  /* 购买并应用效果(世界侧): 返回更新后的 owned; 化验钥匙可能顺带点亮 */
   function buyTech(meta, techId, owned){
     var chk=canBuy(meta, techId, owned);
-    if(!chk.ok) return { ok:false, owned:owned };
+    if(!chk.ok) return { ok:false, owned:owned, why:chk.why };
     meta.research -= TECHS[techId].cost;
     var o = Object.assign({}, owned);
     o[techId]=(o[techId]||0)+1;
-    return { ok:true, owned:o };
+    meta.tech = o;
+    var granted = grantAssayKeyedTechs(meta);
+    return { ok:true, owned:meta.tech, granted:granted };
   }
 
   /* ---------- 7 大异星实物标本化验表 (Science #51) ---------- */
@@ -842,8 +919,8 @@ APH.Colony = (function(){
       meta.analyzedFlora[def.unlockCrop] = true;
       out.unlockCrop = def.unlockCrop;
     }
-    if(def.unlockTech){
-      meta.tech[def.unlockTech] = Math.max(meta.tech[def.unlockTech]||0, 1);
+    var granted = grantAssayKeyedTechs(meta);
+    if(def.unlockTech && granted.indexOf(def.unlockTech)>=0){
       out.unlockTech = def.unlockTech;
     }
     var eureka = def.eurekaResearch || 0;
@@ -1212,7 +1289,9 @@ APH.Colony = (function(){
 
   return {
     list:list, get:get,
-    TECHS:TECHS, canBuy:canBuy, buyTech:buyTech,
+    TECHS:TECHS, TECH_COLUMNS:TECH_COLUMNS, canBuy:canBuy, buyTech:buyTech,
+    techDepth:techDepth, techNodeStatus:techNodeStatus,
+    grantAssayKeyedTechs:grantAssayKeyedTechs, plasmaTechLevel:plasmaTechLevel,
     farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
     ranchTick:ranchTick, climateLaws:climateLaws, harvestMods:harvestMods,
     workshopTick:workshopTick,

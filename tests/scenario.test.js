@@ -603,6 +603,58 @@ test('science: 标本化验解锁作物、吐出种荚并点亮图鉴', () => {
   A(body.innerHTML.includes('科学图鉴'), '图鉴应含科学图鉴栏');
 });
 
+test('tech map: T 全屏四列、隐藏旧档别名、化验钥匙不可买', () => {
+  S.meta.research = 500;
+  S.meta.tech = { te_basic_farming: 1, te_hydroponics: 1 };
+  S.meta.analyzedSpecimens = {};
+  M.toggleTechMap(true);
+  const body = document.getElementById('techMapBody');
+  const html = body.innerHTML || '';
+  A(html.includes('农业') && html.includes('工业') && html.includes('医学') && html.includes('安防'),
+    '科技图应含四列: '+html.slice(0,120));
+  A(html.includes('基础外星农耕'), '应画出基础外星农耕');
+  A(html.includes('外星生态适应'), '化验钥匙叶子应在树上');
+  A(html.includes('化验钥匙'), '生态适应应标化验钥匙');
+  A(!html.includes('data-tech="te_weaponry"'), '旧档别名 te_weaponry 不应出现在科技图');
+  S.techSel = 'te_bio_adaptation';
+  const before = !!S.meta.tech.te_bio_adaptation;
+  // Enter 路径: 化验钥匙不得写入 tech
+  const chk = C.canBuy(S.meta, 'te_bio_adaptation', S.meta.tech);
+  A(!chk.ok && String(chk.why).includes('化验'), '有水培仍不可买化验钥匙: '+chk.why);
+  A(before === !!S.meta.tech.te_bio_adaptation, '试买不得改写科技');
+  M.toggleTechMap(false);
+});
+
+test('tech map: 居民跳后刷新研究点栏', () => {
+  S.scene = 'home';
+  S.meta.research = 10;
+  M.toggleTechMap(true);
+  const pts = document.getElementById('techMapPts');
+  A(String(pts.textContent).indexOf('10') >= 0, '打开时应显示研究点 10, 实际: '+pts.textContent);
+  S.meta.research = 99;
+  M.residentsTick();
+  A(String(pts.textContent).indexOf('99') >= 0, '世界仍在跑时图应跟上研究点, 实际: '+pts.textContent);
+  M.toggleTechMap(false);
+});
+
+test('tech map: 出航收起遮罩，远征上 T 可关', () => {
+  S.scene = 'home';
+  M.toggleTechMap(true);
+  const map = document.getElementById('techMap');
+  A(map.style.display !== 'none', '出航前图应打开');
+  S.nearPad = true;
+  M.debugPressE();
+  A(S.scene === 'expedition', '应出航, got '+S.scene);
+  A(map.style.display === 'none', '出航应变关科技图, display='+map.style.display);
+  M.toggleTechMap(true);
+  A(map.style.display !== 'none', '远征上仍可被打开(测关闭路径)');
+  M.toggleTechMap();
+  A(map.style.display === 'none', '图开着时再切应变关');
+  S.nearPad = true;
+  M.debugPressE();
+  A(S.scene === 'home', '应返航, got '+S.scene);
+});
+
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);
