@@ -63,7 +63,7 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 「殖民地优先」锁的是出生与花费地点；**经营优先**锁的是日常时间花在哪：家是主游戏，远征是补给，战争是砸家。不往「更好打的射击游戏」上堆。
 
 - 矿材盖建筑，研究点买科技，食物喂人，皮革升牧场。
-- 殖民者生命：饱食 + 心情 + 病情（0–100）。饿了会生病、病压效率和心情；不饿死。**吃饭要走到仓库或地上粮堆**（直线、无寻路）；生产跳只掉饱食，不隔空扣堆。医疗舱给居民治病（有医更快）；玩家远征急救仍保留。远征不扣仓库粮矿。农田生长、畜牧产肉/皮与矿/实验室同一套效率系数。进食/心情阈值进 `CFG.residents`；ambient 得病用 seeded RNG。
+- 殖民者生命：饱食 + 心情 + 病情（0–100）。饿了会生病、病压效率和心情；不饿死。**吃饭要走到仓库或地上粮堆**（直线、无寻路）；生产跳只掉饱食，不隔空扣堆。医疗舱给居民治病（有医更快）；玩家远征急救仍保留。远征不扣仓库粮矿。农田生长、畜牧产肉/皮与矿/实验室同一套效率系数。进食/心情阈值进 `CFG.residents`；ambient 得病用 seeded RNG。病情超过 20 时，家园居民（含游荡）和玩家的走/跑速度均降至基础速度的 60%；远征玩家不受冻结的家园病情影响。病号 `✚` 从病情 20 起显示，仍复用普通 walk sheet，不新增生病动画（Issue #64）。
 - 床边睡眠（Issue #66）：玩家靠近居住舱 `bl_house` 60px 内按 E 入睡（俯卧 `player_prone`）；**绝不自动走向床**（`nearBed` 只置提示位，不写 `s.target`）。唤醒：WASD/方向键（先醒后动同一帧）、E 再按、或受伤（伤害真正落地时）。睡着时除 E 外所有按键忽略；睡中每生产跳按床铺/地铺回精力（`bedRecover` 25 / `floorRecover` 18），回满自动醒。精力结算走纯函数 `APH.Res.playerRestTick`（清醒时委托 `homeRestTick`：家园掉 7、远征冻结）；#67 累塌/#70 医疗舱躺复用同一套 `setPlayerSleeping`/`playerWake`/`playerRestTick`。
 - 玩家精力累塌（Issue #67）：家园精力见底（`<=0`，`CFG.player.restCollapseAt:0`）时玩家**原地**强制睡着——即使正在操纵/站在床边——按**打地铺**处理（`bedId=null`，不绑床、不走向床），`playerRestTick` 清醒跳委托 `homeRestTick` 掉到 0 后触发。只在家园触发（远征精力冻结不会见底，scene 门防老档/调试 0 值误塌）。唤醒与 #66 完全一致（WASD/E/受伤走同一 `playerWake`）；睡眠中 `updatePlayer` 同步实体俯卧并清 `moving` 避免残留走帧。
 - 玩家家园击倒（Issue #72）：家园 hp<=0 → **击倒而非死亡**——与 #66/#67 睡眠平行但正交的昏迷态（不睡不醒、无 E 唤醒）：`meta.playerNeeds.downed/downT` 持久真源 → 运行时 `s.downed` + 实体 `pe.downed`（`drawProneWounds` 叠伤痕）。`hurtPlayer` 家园分支先于远征 clinicKit 复活/死亡分支（不动 `clinicKit`/`stats.deaths`/`showDeath`，不进死亡画面）。有居民+医疗舱 → `carryPlayerToClinic` 世界侧 lerp 拖向 `bl_clinic`，拖入治疗半径后纯函数 `APH.Res.playerDownedTick` 判复活（回血 `CFG.economy.clinicHeal`）；无居民 → 按 `CFG.player.downedTime:90` 倒计时，归零由 `updateHome` 走死亡收口。远征 hp<=0 仍走现有死亡（击倒仅家园生效，远征 no-op 保老档）。
@@ -109,7 +109,7 @@ codex exec 生图（动森风 prompt 模板，统一色板：奶油#f7f3df/薄�
 
 - 建筑：8 帧横排 sheet（日常只播 `idleFrames`）
 - 玩家 / 人形：**修订 2026-08-28**（见 `docs/adr/0001-humanoid-sprite-sheets.md`）：走循环 32 帧横排（下/左/右/上各 8），idle 16 帧另张（各 4）。由 `s.face` 换算向。不再使用 2×4。走循环配准=脚底，不走质心。
-- **俯卧（Issue #59，修订 2026-08-29）**：睡/倒共用一张 `player_prone` 16 帧横排（4 向 × 4 呼吸，慢呼吸同 idle），全人形（玩家/居民/过客）共用不另画脸；击倒只叠程序化伤痕+血泊，不换色不叠五官（ADR-0003）。**玩家侧触发已由 #66 床边睡眠接入**（`meta.playerNeeds.isSleeping` → 实体每帧同步 `e.isSleeping` → `drawPlayer` 俯卧；无俯卧图时落程序化站姿，绝不用走循环旋转充数）。
+- **俯卧（Issue #59，修订 2026-08-29）**：睡/倒共用 `prone` 16 帧横排（4 向 × 4 呼吸，慢呼吸同 idle）；#59 的 `player_prone` 是全人形通用回退。**#60 修订**：脸 0 无包居民优先用整人预烘焙 `hum_0_nopack_prone`，其余身份及专用图缺失时仍回退 `player_prone`；运行时不旋转 walk、不换身子颜色、不叠五官。击倒只叠程序化伤痕+血泊（ADR-0003）。**玩家侧触发已由 #66 床边睡眠及 #67 累塌接入**（`meta.playerNeeds.isSleeping` → 实体每帧同步 `e.isSleeping` → `drawPlayer` 俯卧；无俯卧图时落程序化站姿，绝不用走循环旋转充数）。
 - 敌人：8 帧（待机×2/移动×2/攻击×2/受击/死亡）
 
 **ADR-11 修订 2026-08-28**：玩家 walk 重画后，质心配准与「脚在地上、循环不上下跳」冲突；登记规则按 sheet 种类分：建筑/敌人质心，`*_walk_sheet` / `*_idle_sheet` 脚底（idle 呼吸同样会把胸口质心拽高）。**修订 2026-08-29（#59）**：`*_prone_sheet` 同样走脚底对齐——躺体内容底边就是接地线，质心会随呼吸左右跳。

@@ -1961,7 +1961,8 @@ window.APH = window.APH || {};
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
-        player_prone:{baseline:253,h:68}   /* #59 俯卧: 躺体(内容高68), 接地线锚点 */
+        player_prone:{baseline:253,h:68},   /* #59 通用俯卧占位 */
+        hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
       };
       (function(){
         var i, k;
@@ -2898,11 +2899,14 @@ window.APH = window.APH || {};
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
       if(e.hitFlash>0) e.hitFlash=Math.max(0,e.hitFlash-dt);
       var r=residentOf(e);
+      var walkCfg=CFG.walk||{};
+      var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
       if(!raid && r && APH.Res.isBroken(r)){
         e.breaking=r.breakType;
         if(r.breakType==='wander'){
-          APH.Res.wanderStep(e, dt, CFG.HAB, (CFG.visitor&&CFG.visitor.yardR)||220);
+          var wanderSpd=((CFG.visitor&&CFG.visitor.speed)||48)*sickSpeedMul;
+          APH.Res.wanderStep(e, dt, CFG.HAB, (CFG.visitor&&CFG.visitor.yardR)||220, null, wanderSpd);
         }else{
           e.walking=false;
         }
@@ -2945,7 +2949,7 @@ window.APH = window.APH || {};
           }
         }
       }
-      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd);
+      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul);
     });
   }
 

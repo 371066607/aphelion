@@ -196,10 +196,17 @@ test('#59 sheetLayout: player_prone 16 帧横排, 建筑仍 null', () => {
   if (H.sheetLayout('bl_house')) throw new Error('建筑不应走人形布局');
 });
 
-test('#59 sheetKey: 俯卧共用一张 player_prone(不分角色/脸/包)', () => {
+test('#59/#60 sheetKey: 脸 0 无包居民用专用俯卧，其余沿用 player_prone', () => {
   if (H.sheetKey('player', 0, false, 'prone') !== 'player_prone') throw new Error('玩家俯卧: '+H.sheetKey('player',0,false,'prone'));
-  if (H.sheetKey('resident', 2, false, 'prone') !== 'player_prone') throw new Error('居民俯卧: '+H.sheetKey('resident',2,false,'prone'));
-  if (H.sheetKey('visitor', 3, true, 'prone') !== 'player_prone') throw new Error('过客俯卧: '+H.sheetKey('visitor',3,true,'prone'));
+  if (H.sheetKey('resident', 0, false, 'prone') !== 'hum_0_nopack_prone') throw new Error('脸0无包居民俯卧: '+H.sheetKey('resident',0,false,'prone'));
+  if (H.sheetKey('resident', 2, false, 'prone') !== 'player_prone') throw new Error('未配专用图的居民俯卧: '+H.sheetKey('resident',2,false,'prone'));
+  if (H.sheetKey('visitor', 0, true, 'prone') !== 'player_prone') throw new Error('有包过客俯卧: '+H.sheetKey('visitor',0,true,'prone'));
+});
+
+test('#60 sheetLayout: 脸 0 无包居民 prone 为 16 帧四向各 4', () => {
+  var pr = H.sheetLayout('hum_0_nopack_prone');
+  if (!pr || pr.cols !== 16 || pr.count !== 16) throw new Error('居民俯卧应为 16 帧横排, got '+JSON.stringify(pr));
+  if (pr.fps !== 1) throw new Error('居民俯卧应慢呼吸 fps=1, got '+pr.fps);
 });
 
 test('#59 pose: 俯卧四向 下0 左4 右8 上12, 不吃 walkPh', () => {
@@ -241,10 +248,31 @@ test('#59 poseFor: 俯卧共用 sheet, 缺图也不回退走循环', () => {
   if (fb.sheet === 'player_walk') throw new Error('俯卧绝不回退 player_walk');
 });
 
-test('#59 poseFor: 俯卧不选脸, 任何 id 同 sheet', () => {
+test('#60 pose: 脸 0 无包居民俯卧选四向专用 sheet', () => {
+  var p = H.pose({ lying:true, face:0, walkPh:99, time:1.2,
+                   role:'resident', faceIdx:0, pack:false });
+  if (p.cycle !== 'prone' || p.sheet !== 'hum_0_nopack_prone') throw new Error('应为脸0无包俯卧, got '+JSON.stringify(p));
+  if (p.frame !== 9) throw new Error('右俯卧第 1 呼吸帧应为 9, got '+p.frame);
+});
+
+test('#60 poseFor: 专用 prone 未就绪只回退通用 prone，绝不回退 walk', () => {
+  var input = { role:'resident', id:'rs_3', lying:true, face:Math.PI, time:0, pack:false };
+  var readyAll = function(){ return true; };
+  var p = H.poseFor(input, readyAll);
+  if (p.sheet !== 'hum_0_nopack_prone' || p.frame !== 4) throw new Error('脸0居民应选专用左向俯卧, got '+JSON.stringify(p));
+  var genericOnly = function(name){ return name === 'player_prone' || name === 'hum_0_nopack_walk'; };
+  var fb = H.poseFor(input, genericOnly);
+  if (fb.sheet !== 'player_prone' || fb.cycle !== 'prone') throw new Error('专用图缺失应回退 player_prone, got '+JSON.stringify(fb));
+  var none = function(){ return false; };
+  var missing = H.poseFor(input, none);
+  if (missing.sheet !== 'player_prone' || missing.cycle !== 'prone') throw new Error('俯卧图全缺仍保持通用 prone 键, got '+JSON.stringify(missing));
+  if (missing.sheet.indexOf('_walk') >= 0) throw new Error('俯卧绝不回退 walk');
+});
+
+test('#59 poseFor: 未配专用图的身份仍共用 player_prone', () => {
   var readyAll = function(){ return true; };
   var a = H.poseFor({ role:'resident', id:'rs_0', lying:true, face:Math.PI/2, time:0 }, readyAll);
   var b = H.poseFor({ role:'visitor', id:'rs_2', lying:true, face:Math.PI/2, time:0 }, readyAll);
-  if (a.sheet !== 'player_prone' || b.sheet !== 'player_prone') throw new Error('所有脸共用 player_prone, got '+a.sheet+' / '+b.sheet);
+  if (a.sheet !== 'player_prone' || b.sheet !== 'player_prone') throw new Error('未配专用图的身份应共用 player_prone, got '+a.sheet+' / '+b.sheet);
   if (a.frame !== b.frame) throw new Error('同 face/time 应同帧, got '+a.frame+' / '+b.frame);
 });

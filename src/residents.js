@@ -888,12 +888,12 @@ APH.Res = (function(){
   }
 
   /* 过客在家园院子里闲逛(无寻路): 走一段、站住喘气、到边界折返 */
-  function wanderStep(e, dt, hab, yardR, rng){
+  function wanderStep(e, dt, hab, yardR, rng, speed){
     var rand = rng || Math.random;
     var V = CFG.visitor || {};
     var H = hab || CFG.HAB;
     var R = yardR || (V.yardR || 220);
-    var spd = V.speed || 48;
+    var spd = speed != null ? speed : (V.speed || 48);
     var idleChance = V.idleChance != null ? V.idleChance : 0.35;
     var idleMin = V.idleMin != null ? V.idleMin : 4.2;
     var idleMax = V.idleMax != null ? V.idleMax : 7.0;
