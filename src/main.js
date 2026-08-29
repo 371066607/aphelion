@@ -134,6 +134,11 @@ window.APH = window.APH || {};
         id:'be_pad', type:T.BUILDING, bid:'bl_landing_pad',
         x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
       });
+      /* 远征野生异星植物生成 (Flora #36) */
+      if(APH.Planet && APH.Planet.generateExpeditionFlora){
+        var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
+        expFlora.forEach(function(f){ s.entities.push(f); });
+      }
       /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
       if(p.rivals && p.rivals.length){
         var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
@@ -462,6 +467,14 @@ window.APH = window.APH || {};
     var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
     s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
     s.nearVisitor = nearestVisitor(s);
+    var nearPlot = s.entities.find(function(e){
+      return (e.type===T.BUILDING && (e.bid==='bl_crop_plot'||e.bid==='bl_farm') && U.dst(s.px,s.py,e.x,e.y)<60);
+    });
+    s.nearCropPlot = nearPlot || null;
+    var nearFlora = s.entities.find(function(e){
+      return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
+    });
+    s.nearFlora = nearFlora || null;
     updateVisitors(dt);
     /* C: 游商走了/离远了自动收面板 */
     var tpO=document.getElementById('tradePanel');
@@ -1042,7 +1055,14 @@ window.APH = window.APH || {};
     /* 返回舱接近检测(玩家出生点旁) */
     var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
     s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
-    if(s.nearPad && !s.nearBeacon){
+    var nearExpFlora = s.entities.find(function(e){
+      return e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<50;
+    });
+    s.nearFlora = nearExpFlora || null;
+    if(s.nearFlora && !s.nearPad && !s.nearBeacon){
+      var seedName = (CFG.items[s.nearFlora.seedItem]&&CFG.items[s.nearFlora.seedItem].name)||'种子';
+      APH.UI.setHint('[E] 采集异星样本 ('+seedName+')');
+    }else if(s.nearPad && !s.nearBeacon){
       APH.UI.setHint('[E] 返航殖民地 (结算战利品)');
     }
     updateSurvival(dt);
@@ -1347,9 +1367,31 @@ window.APH = window.APH || {};
       s.keys[e.code]=true;
       APH.SFX.unlock();
       if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
-      /* E=发射台交互: 不在发射台时自动走过去(再次按E触发) */
+      /* E=发射台/自然资源交互 */
       if(e.code==='KeyE'&&s.mode==='running'){
-        if(s.scene==='home' && s.nearVisitor){
+        if(s.scene==='expedition' && s.nearFlora){
+          var loadW=APH.Combat.carryWeight(s.carry);
+          var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
+          var seedIt = s.nearFlora.seedItem || 'it_seed_glow';
+          var rPick = APH.Combat.addToCarry(s.carry, seedIt, 1, capNow);
+          if(rPick.ok){
+            s.carry = rPick.carry;
+            s.nearFlora.dead = true;
+            var itName = (CFG.items[seedIt]&&CFG.items[seedIt].name) ? CFG.items[seedIt].name : seedIt;
+            APH.UI.floatText('✔ 获得 '+itName, '#59d9ff');
+          }else{
+            APH.UI.floatText('✕ 背包已满', '#ff9a9a');
+          }
+        }else if(s.scene==='home' && s.nearFlora){
+          var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6} }, 15);
+          if(resW.done && resW.dropItemId){
+            APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
+            var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
+            APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
+          }else{
+            APH.UI.floatText('采收中...', '#8fd4ff');
+          }
+        }else if(s.scene==='home' && s.nearVisitor){
           tryRecruit(s.nearVisitor);
         }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
@@ -1363,8 +1405,19 @@ window.APH = window.APH || {};
           }
         }
       }
-      if(e.code==='KeyF'&&s.mode==='running'&&s.scene==='home'&&s.nearVisitor){
-        tryOfferMeal(s.nearVisitor);
+      if(e.code==='KeyF'&&s.mode==='running'&&s.scene==='home'){
+        if(s.nearVisitor){
+          tryOfferMeal(s.nearVisitor);
+        }else if(s.nearCropPlot){
+          var crops=Object.keys(APH.Colony.ALIEN_CROPS);
+          var curIdx=crops.indexOf(s.nearCropPlot.crop||'crop_glow_shroom');
+          var nextCrop=crops[(curIdx+1)%crops.length];
+          s.nearCropPlot.crop=nextCrop;
+          s.nearCropPlot.plot={ stage:0, t:0 };
+          var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
+          APH.UI.floatText('🌱 切换为: '+cropName, '#7dffab');
+          saveColony();
+        }
       }
       /* 调试热键(自动化验证协议, 仅 ?autostart=1 / ?debugkeys=1 通道生效——
          曾与正式键位冲突: 按G开建造面板的同时被传送600px):
@@ -2736,24 +2789,33 @@ window.APH = window.APH || {};
       }
     }
 
-    /* U3/U5 农场与岗位产出(崩溃者缺勤) */
-    var farmers=workers.filter(function(r){return r.job==='bl_farm';});
+    /* U3/U5 农场/种植槽与岗位产出 (异星奇幻作物) */
+    var farmers=workers.filter(function(r){return r.job==='bl_farm'||r.job==='bl_crop_plot';});
     var ranchers=workers.filter(function(r){return r.job==='bl_pasture';});
-    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm';});
+    var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm'||b.id==='bl_crop_plot';});
     var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
     var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
     farms.forEach(function(b){
-      if(!b.plot) b.plot={stage:1,t:0};          // 新农场自动播种
+      if(!b.plot) b.plot={stage:0,t:0};
+      if(!b.crop) b.crop='crop_glow_shroom';
       var bestFarmer=farmers.reduce(function(acc,r){
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
       },null);
       var farmMul=((s.meta.tech&&s.meta.tech.te_radar)||0)*0.15;
       var farmEff=bestFarmer?APH.Res.efficiency(bestFarmer):1;
-      b.plot=APH.Colony.farmTick(b.plot, bestFarmer?(bestFarmer.skills.sk_farm||0):null, farmMul, farmEff, lawFarm);
-      if(APH.Colony.harvestYield(b.plot)>0){
-        APH.Combat.spawnDrop(b.x+14, b.y+18, 'it_food', 3, {stock:true});
-        APH.UI.floatText('🌾 农场收获堆在地上','#c8e89a');
-        b.plot={stage:1,t:0};
+      var farmSk=bestFarmer?(bestFarmer.skills.sk_farm||0):0;
+      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm, b.crop);
+      if((b.plot.stage||0) >= 3){
+        var h=APH.Colony.harvestAlienCrop(b.crop, farmSk);
+        if(h.dropItemId && h.dropCount>0){
+          APH.Combat.spawnDrop(b.x+14, b.y+18, h.dropItemId, h.dropCount, {stock:true});
+          if(h.extraItemId && h.extraCount>0){
+            APH.Combat.spawnDrop(b.x-10, b.y+18, h.extraItemId, h.extraCount, {stock:true});
+          }
+          var itName=(CFG.items[h.dropItemId]&&CFG.items[h.dropItemId].name)?CFG.items[h.dropItemId].name:h.dropItemId;
+          APH.UI.floatText('🌾 收获 '+itName+' +'+h.dropCount, '#c8e89a');
+        }
+        b.plot={stage:0,t:0};
       }
     });
     /* U6 畜牧: 羊群自然增长, 产肉/皮(纯函数 ranchTick, 每牧场一调) */
