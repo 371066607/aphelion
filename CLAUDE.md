@@ -58,7 +58,7 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 - **ADR-4 坐标**：世界单位=像素；逻辑格网 48px；世界 2200×2200。
 - **ADR-5 双 RNG**：mulberry32 seeded(世界生成/掉落判定) ∥ Math.random(纯表现)。可复现性从第一天起。
 - **ADR-6 时间**：渲染变步长 dt≤50ms；殖民地/AI 发展固定 30s 生产 tick；非 running 态不 update。
-- **ADR-9 ID 前缀永不重命名**：`fx_`阵营 `it_`物品 `bl_`建筑 `bk_`信标 `rv_`敌殖民 `lw_`法则 `ev_`事件（存档引用兼容）。
+- **ADR-9 ID 前缀永不重命名**：`fx_`阵营 `it_`物品 `bl_`建筑 `bk_`信标 `rv_`敌殖民 `lw_`法则 `ev_`事件 `specimen_`实物标本（存档引用兼容）。
 - **ADR-10 数据/逻辑分离**：LLM 只产 schema 内数据；数值全进 CFG 表。LLM 配置存运行时 meta，**代码中永远没有 API key**。
 
 ### 视觉资产管线 (ADR-11)

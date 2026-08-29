@@ -117,6 +117,8 @@ APH.Save = (function(){
     if(!m.events.history) m.events.history = [];
     if(m.events.lastNeg==null) m.events.lastNeg = 0;
     if(!m.workPrio) m.workPrio = {};
+    if(!m.analyzedFlora) m.analyzedFlora = {};
+    if(!m.analyzedSpecimens) m.analyzedSpecimens = {};
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');
       if(w){

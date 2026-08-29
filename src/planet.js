@@ -318,7 +318,7 @@ APH.Planet = (function(){
         kind: kind,
         x: x, y: y,
         hp: 1, maxHp: 1,
-        seedItem: kind==='flora_glow'?'it_seed_glow':(kind==='flora_crystal'?'it_seed_crystal':(kind==='flora_dew'?'it_seed_dew':'it_seed_star'))
+        seedItem: kind==='flora_glow'?'specimen_flora_glow':(kind==='flora_crystal'?'specimen_crystal_vine':(kind==='flora_dew'?'specimen_dew':'specimen_star_velvet'))
       });
     }
     return out;

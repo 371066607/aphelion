@@ -583,6 +583,26 @@ test('home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救
   A(body.innerHTML.includes('机能'), '名册应包含机能卡片');
 });
 
+test('science: 标本化验解锁作物、吐出种荚并点亮图鉴', () => {
+  const C = window.APH.Colony;
+  S.meta.analyzedFlora = {};
+  S.meta.analyzedSpecimens = {};
+  S.meta.research = 10;
+  S.meta.res = { specimen_flora_glow: 1 };
+  const lab = { id:'bl_lab', x:S.px, y:S.py, analysisTarget:'specimen_flora_glow', analysisProgress:0 };
+  const done = C.labAnalysisTick(lab, 8, 1, S.meta.res, 20);
+  A(done.done, '高技能学者应完成化验, got '+JSON.stringify(done));
+  const yld = C.applySpecimenAnalysis(S.meta, S.meta.res, done.def, done.specimenId);
+  A(!!S.meta.analyzedFlora.crop_glow_shroom, '应点亮荧蕈种植权限');
+  A(yld.seeds.it_seed_glow === 3, '应产出 3 纯净种荚, got '+JSON.stringify(yld.seeds));
+  A(S.meta.research === 40, '应注入 +30 尤里卡, got '+S.meta.research);
+  A(!C.canPlantCrop('crop_dew_fruit', S.meta.analyzedFlora), '未化验露果仍不可种');
+  M.renderCodex();
+  const body = document.getElementById('codexBody');
+  A(body.innerHTML.includes('荧蕈'), '图鉴应展示已化验荧蕈标本');
+  A(body.innerHTML.includes('科学图鉴'), '图鉴应含科学图鉴栏');
+});
+
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

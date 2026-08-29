@@ -26,7 +26,7 @@ APH.Colony = (function(){
       upg:{ effectPerLv:2, maxLv:3, cost:45 } },
     bl_lab:         { name:'研究站', cost:0, costMineral:40, costRes:{ wood:20, iron:25 }, size:48, max:2, buildTime:25,
       dispH:113, cells:[2,2],
-      desc:'学者在此研发科技树。+1×等级 研究点/跳。',
+      desc:'学者在此做理论攻坚，并把远征标本上台化验。+1×等级 研究点/跳。',
       upg:{ effectPerLv:1, maxLv:2, cost:60 } },
     bl_barracks:    { name:'兵营', cost:0, costMineral:50, reqTech:'te_ballistics', costRes:{ iron:30, stone:20 }, size:56, max:2, buildTime:30,
       dispH:86, cells:[2,2],
@@ -53,7 +53,7 @@ APH.Colony = (function(){
       desc:'有工匠时将草药提炼成药品。' },
     bl_crop_plot:   { name:'外星种植圃', cost:0, costMineral:0, costRes:{ wood:10, stone:5 }, size:48, max:12, buildTime:8,
       dispH:48, cells:[1,1],
-      desc:'培育外星奇幻作物的轻量田圃。可指派荧蕈、晶藤、露果、星绒草。' },
+      desc:'培育外星奇幻作物的轻量田圃。需先在科研站化验对应活体标本才能种植。' },
     bl_campfire:    { name:'石料篝火', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ wood:10, stone:15 }, size:36, max:4, buildTime:8,
       dispH:48, cells:[1,1],
       desc:'温暖夜间照明、驱寒保暖、休闲娱乐与基础烘烤。' },
@@ -182,10 +182,20 @@ APH.Colony = (function(){
   function placeBuildingEntity(bid, x, y, lv){
     var s = APH.state;
     var def = BUILDINGS[bid];
+    var rec=null;
+    (s.colony.buildings||[]).forEach(function(b){
+      if(b && b.id===bid && Math.abs((b.x||0)-x)<2 && Math.abs((b.y||0)-y)<2) rec=b;
+    });
     s.entities.push({
       id:'be_'+bid+'_'+s.colony.buildings.length,
       type:T.BUILDING, bid:bid, x:x, y:y, def:def, lv:lv||1,
       cd:0,
+      recipe: rec && rec.recipe,
+      crop: rec && rec.crop,
+      plot: rec && rec.plot,
+      analysisTarget: rec && rec.analysisTarget,
+      analysisProgress: rec && rec.analysisProgress,
+      herd: rec && rec.herd,
     });
   }
 
@@ -409,6 +419,10 @@ APH.Colony = (function(){
     meta = meta || {};
     meta.res = meta.res || {};
     var it=(CFG.items&&CFG.items[itemId])||{};
+    if(it.isSpecimen){
+      meta.res[itemId]=(meta.res[itemId]||0)+n;
+      return { kind:'stock', label:it.name||itemId, n:n, key:itemId, amount:n };
+    }
     if(it.store){
       var st=stockItem(meta.res, itemId, n);
       return { kind:'stock', label:it.name||itemId, n:n, key:st.key, amount:st.amount };
@@ -774,6 +788,117 @@ APH.Colony = (function(){
     return { ok:true, owned:o };
   }
 
+  /* ---------- 7 大异星实物标本化验表 (Science #51) ---------- */
+  var SPECIMEN_ANALYSIS = {
+    specimen_flora_glow:    { name:'荧蕈基因测序', craftTime:15, unlockCrop:'crop_glow_shroom', seedOutput:'it_seed_glow', seedCount:3, eurekaResearch:30, desc:'解锁夜光荧蕈田圃种植，产出纯净种荚' },
+    specimen_dew:           { name:'露果多肉化验', craftTime:14, unlockCrop:'crop_dew_fruit', seedOutput:'it_seed_dew', seedCount:3, eurekaResearch:25, desc:'解锁露珠膨果田圃种植' },
+    specimen_crystal_vine:  { name:'晶藤微构逆向', craftTime:18, unlockCrop:'crop_crystal_vine', seedOutput:'it_seed_crystal', seedCount:3, eurekaResearch:40, desc:'解锁晶脉拟态藤种植' },
+    specimen_star_velvet:   { name:'星绒抗性解析', craftTime:18, unlockCrop:'crop_star_velvet', seedOutput:'it_seed_star', seedCount:3, eurekaResearch:45, desc:'解锁星绒草种植' },
+    specimen_chitin:        { name:'硅壳装甲解剖', craftTime:20, unlockTech:'te_bio_adaptation', eurekaResearch:50, desc:'突破外星生态适应与防酸装甲' },
+    specimen_acid_gland:    { name:'强酸生化提炼', craftTime:16, reagentOutput:'it_reagent', reagentCount:2, eurekaResearch:45, desc:'提炼高能催化试剂' },
+    specimen_ancient_chip:  { name:'古代逻辑逆向', craftTime:25, eurekaResearch:120, desc:'古代科学数据全盘注入' },
+  };
+
+  /* 科研站实物标本化验推进(纯函数) (Science #52) */
+  function labAnalysisTick(lab, scholarSkill, eff, stock, dt){
+    if(!lab || scholarSkill == null) return { done:false };
+    var specimenId = lab.analysisTarget || 'specimen_flora_glow';
+    var def = SPECIMEN_ANALYSIS[specimenId];
+    if(!def) return { done:false, why:'未知标本' };
+
+    var have = (stock && stock[specimenId] != null) ? stock[specimenId] : 0;
+    if(have < 1){
+      return { done:false, why:'标本不足' };
+    }
+
+    var e = (eff == null ? 1 : eff);
+    var sci = CFG.science || {};
+    var skillMul = sci.scholarSkillMul != null ? sci.scholarSkillMul : 0.15;
+    var defaultT = sci.defaultCraftTime != null ? sci.defaultCraftTime : 15;
+    var rate = (dt || 1) * e * (1 + scholarSkill * skillMul);
+    lab.analysisProgress = (lab.analysisProgress || 0) + rate;
+
+    if(lab.analysisProgress >= (def.craftTime || defaultT)){
+      if(stock && stock[specimenId] != null){
+        stock[specimenId] = Math.max(0, stock[specimenId] - 1);
+      }
+      lab.analysisProgress = 0;
+      return { done:true, specimenId:specimenId, def:def };
+    }
+    return { done:false, progress:lab.analysisProgress, total:def.craftTime };
+  }
+
+  /* 化验完成三重回报: 点亮种植权限 / 授予蓝图科技 / 尤里卡研究点 (Science #54) */
+  function applySpecimenAnalysis(meta, stock, def, specimenId){
+    meta = meta || {};
+    stock = stock || meta.res || {};
+    meta.analyzedFlora = meta.analyzedFlora || {};
+    meta.analyzedSpecimens = meta.analyzedSpecimens || {};
+    meta.tech = meta.tech || {};
+    var out = { unlockCrop:null, unlockTech:null, eureka:0, seeds:{} };
+    if(!def) return out;
+    if(specimenId) meta.analyzedSpecimens[specimenId] = true;
+    if(def.unlockCrop){
+      meta.analyzedFlora[def.unlockCrop] = true;
+      out.unlockCrop = def.unlockCrop;
+    }
+    if(def.unlockTech){
+      meta.tech[def.unlockTech] = Math.max(meta.tech[def.unlockTech]||0, 1);
+      out.unlockTech = def.unlockTech;
+    }
+    var eureka = def.eurekaResearch || 0;
+    meta.research = (meta.research||0) + eureka;
+    out.eureka = eureka;
+    if(def.seedOutput){
+      out.seeds[def.seedOutput] = def.seedCount || 1;
+    }
+    if(def.reagentOutput){
+      out.seeds[def.reagentOutput] = def.reagentCount || 1;
+    }
+    return out;
+  }
+
+  function canPlantCrop(cropId, analyzedFlora){
+    if(!cropId) return false;
+    return !!(analyzedFlora && analyzedFlora[cropId]);
+  }
+
+  function cycleAnalyzedCrop(current, analyzedFlora){
+    var keys = Object.keys(ALIEN_CROPS).filter(function(k){
+      return analyzedFlora && analyzedFlora[k];
+    });
+    if(!keys.length) return null;
+    var idx = keys.indexOf(current);
+    return keys[(idx + 1) % keys.length];
+  }
+
+  function cycleAnalysisTarget(current){
+    var keys = Object.keys(SPECIMEN_ANALYSIS);
+    if(!keys.length) return current || null;
+    var idx = keys.indexOf(current);
+    return keys[(idx + 1) % keys.length];
+  }
+
+  /* 科学图鉴条目(纯函数): 已化验带解剖档案, 未化验只报待化验 (Science #55) */
+  function specimenCodexEntries(meta){
+    var analyzed = (meta && meta.analyzedSpecimens) || {};
+    var items = CFG.items || {};
+    return Object.keys(SPECIMEN_ANALYSIS).map(function(id){
+      var def = SPECIMEN_ANALYSIS[id] || {};
+      var it = items[id] || {};
+      return {
+        id: id,
+        name: it.name || id,
+        analysisName: def.name || id,
+        desc: def.desc || '',
+        analyzed: !!analyzed[id],
+        unlockCrop: def.unlockCrop || null,
+        unlockTech: def.unlockTech || null,
+        eureka: def.eurekaResearch || 0
+      };
+    });
+  }
+
   /* ---------- 工坊加工配方表 (Craft #46) ---------- */
   var CRAFT_RECIPES = {
     it_pickaxe:       { name:'精工采矿斧', costRes:{ wood:15, iron:10 }, craftTime:12, reqTech:'te_machining' },
@@ -1113,6 +1238,10 @@ APH.Colony = (function(){
     ALIEN_CROPS:ALIEN_CROPS, getGlowSources:getGlowSources,
     cropPlotTick:cropPlotTick, harvestAlienCrop:harvestAlienCrop,
     CRAFT_RECIPES:CRAFT_RECIPES, workshopCraftTick:workshopCraftTick,
+    SPECIMEN_ANALYSIS:SPECIMEN_ANALYSIS, labAnalysisTick:labAnalysisTick,
+    applySpecimenAnalysis:applySpecimenAnalysis, canPlantCrop:canPlantCrop,
+    cycleAnalyzedCrop:cycleAnalyzedCrop, cycleAnalysisTarget:cycleAnalysisTarget,
+    specimenCodexEntries:specimenCodexEntries,
     COOK_RECIPES:COOK_RECIPES, cookingTick:cookingTick,
     equipGear:equipGear, gearBonusOf:gearBonusOf,
   };

@@ -92,6 +92,18 @@ APH.Combat = (function(){
     return { id: LOOT_TABLE[0].id, n: 1 };
   }
 
+  /* 击杀掉落实物标本 (Science #53): 酸吐者腺囊 / 硅壳甲壳 / Boss 古代芯片 */
+  function specimenDropsOf(en){
+    var out=[];
+    if(!en) return out;
+    if(en.isBoss) out.push({ id:'specimen_ancient_chip', n:1 });
+    var fid=(en.faction && en.faction.id) || '';
+    var beh=(en.faction && en.faction.behavior) || '';
+    if(fid==='fx_spit' || beh==='spitter') out.push({ id:'specimen_acid_gland', n:1 });
+    else if(fid==='fx_bulwark' || beh==='tank') out.push({ id:'specimen_chitin', n:1 });
+    return out;
+  }
+
   /* 背包操作(纯函数): 返回 {ok, carry, overflow}
      ADR: 负重超限的部分留在原地(死亡循环的经济核心) */
   function addToCarry(carry, itemId, n, carryMax){
@@ -123,24 +135,27 @@ APH.Combat = (function(){
     }
     return gained;
   }
-  /* 背包分账: 矿材/合金入仓, 晶体/遗件变研究点, 异星种子入库 (Flora #36) */
+  /* 背包分账: 矿材/合金入仓, 晶体/遗件变研究点, 异星种子/实物标本入库 (Flora #36 / Science #53) */
   function settleGoods(carry){
-    var research=0, mineral=0, seeds={};
-    if(!carry) return { research:0, mineral:0, seeds:seeds };
+    var research=0, mineral=0, seeds={}, specimens={};
+    if(!carry) return { research:0, mineral:0, seeds:seeds, specimens:specimens };
     for(var k in carry){
       var n=carry[k]||0;
       if(!n) continue;
+      var it=CFG.items[k];
       if(k==='it_mineral') mineral += n;
       else if(k==='it_alloy') mineral += n*3;
       else if(k.startsWith('it_seed_')){
         seeds[k] = (seeds[k]||0) + n;
       }
+      else if((it && it.isSpecimen) || (k.indexOf('specimen_')===0)){
+        specimens[k] = (specimens[k]||0) + n;
+      }
       else if(k==='it_crystal_ore' || k==='it_relic'){
-        var it=CFG.items[k];
         research += (it && it.v ? it.v : 0) * n;
       }
     }
-    return { research:research, mineral:mineral, seeds:seeds };
+    return { research:research, mineral:mineral, seeds:seeds, specimens:specimens };
   }
 
   function raidPillage(meta, building){
@@ -604,6 +619,10 @@ APH.Combat = (function(){
     if(en.isBoss){
       spawnDrop(en.x, en.y-10, 'it_relic', 1, {jitter:4, merge:false});
     }
+    var specDrops = specimenDropsOf(en);
+    for(var si=0;si<specDrops.length;si++){
+      spawnDrop(en.x, en.y, specDrops[si].id, specDrops[si].n||1, {jitter:16, merge:false});
+    }
     U.emit('enemyKilled', { en:en, loot:loot });
   }
 
@@ -755,7 +774,7 @@ APH.Combat = (function(){
 
   return {
     fsmStep:fsmStep, moveIntent:moveIntent, shouldSpit:shouldSpit,
-    rollLoot:rollLoot, addToCarry:addToCarry, carryWeight:carryWeight,
+    rollLoot:rollLoot, specimenDropsOf:specimenDropsOf, addToCarry:addToCarry, carryWeight:carryWeight,
     updateCombat:updateCombat, updateDropped:updateDropped,
     firePlasma:firePlasma, makeProj:makeProj,
     turretStep:turretStep, soldierCount:soldierCount, turretDamage:turretDamage,

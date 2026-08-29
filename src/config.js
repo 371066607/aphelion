@@ -126,10 +126,10 @@ APH.CFG = {
     it_crystal_berry: { name: '晶核果',   w: 1, v: 3, tint:'#ff9ad0', store:'food' },
     it_dew_fruit:     { name: '清甜露果', w: 1, v: 4, tint:'#80cbc4', store:'food' },
     it_star_fiber:    { name: '星绒纤维', w: 1, v: 6, tint:'#e0e0e0', store:'leather' },
-    it_seed_glow:     { name: '荧蕈孢子', w: 1, v: 10, tint:'#59d9ff' },
-    it_seed_crystal:  { name: '晶藤插条', w: 1, v: 12, tint:'#ff9ad0' },
-    it_seed_dew:      { name: '露果种荚', w: 1, v: 8, tint:'#80cbc4' },
-    it_seed_star:     { name: '星绒绒种', w: 1, v: 15, tint:'#e0e0e0' },
+    it_seed_glow:     { name: '荧蕈孢子', w: 1, v: 10, tint:'#59d9ff', store:'it_seed_glow' },
+    it_seed_crystal:  { name: '晶藤插条', w: 1, v: 12, tint:'#ff9ad0', store:'it_seed_crystal' },
+    it_seed_dew:      { name: '露果种荚', w: 1, v: 8, tint:'#80cbc4', store:'it_seed_dew' },
+    it_seed_star:     { name: '星绒绒种', w: 1, v: 15, tint:'#e0e0e0', store:'it_seed_star' },
     /* 5 大外星特种装备 (Craft #46) */
     it_pickaxe:       { name: '精工采矿斧', w: 2, v: 8, tint:'#cfd8dc', slot:'tool', toolMul:2.0 },
     it_suit_hazard:   { name: '星绒防酸服', w: 3, v: 15, tint:'#7dffab', slot:'suit', acidResist:0.80 },
@@ -142,6 +142,15 @@ APH.CFG = {
     it_dew_pudding:   { name: '清甜露果布丁', w: 1, v: 8, tint:'#80cbc4', store:'food', isCooked:true, foodGain:30, moodGain:8, recGain:20, desc:'露珠膨果凝炼而成的清甜点心，极度愉悦' },
     it_glow_fondue:   { name: '荧光温热浓汤', w: 1, v: 10, tint:'#4dd0e1', store:'food', isCooked:true, foodGain:35, moodGain:5, recGain:12, warmBonus:20, desc:'微光发热的暖胃汤，驱散严寒' },
     it_alien_feast:   { name: '外星珍馐盛宴', w: 2, v: 20, tint:'#ffd54f', store:'food', isCooked:true, foodGain:50, moodGain:12, recGain:30, desc:'聚合多种外星奇珍的丰盛大餐，极大提升身心机能' },
+    /* 7 大异星实物标本 (Science #51) */
+    specimen_flora_glow:    { name: '荧蕈胚囊标本', w: 1, v: 15, tint:'#59d9ff', isSpecimen:true, store:'specimen_flora_glow' },
+    specimen_dew:           { name: '露果组织切片', w: 1, v: 12, tint:'#80cbc4', isSpecimen:true, store:'specimen_dew' },
+    specimen_crystal_vine:  { name: '晶藤胚根标本', w: 1, v: 18, tint:'#ff9ad0', isSpecimen:true, store:'specimen_crystal_vine' },
+    specimen_star_velvet:   { name: '星绒孢子活体', w: 1, v: 20, tint:'#e0e0e0', isSpecimen:true, store:'specimen_star_velvet' },
+    specimen_chitin:        { name: '异质硅壳标本', w: 2, v: 25, tint:'#7a8ba9', isSpecimen:true, store:'specimen_chitin' },
+    specimen_acid_gland:    { name: '强酸活体腺囊', w: 1, v: 22, tint:'#b8e986', isSpecimen:true, store:'specimen_acid_gland' },
+    specimen_ancient_chip:  { name: '未解密古代芯片', w: 1, v: 50, tint:'#ffc857', isSpecimen:true, store:'specimen_ancient_chip' },
+    it_reagent:             { name: '精纯试剂', w: 1, v: 8, tint:'#b8e986', store:'it_reagent', desc:'由强酸腺体提炼的高能催化试剂' },
     it_crystal_ore:   { name: '晶体矿',   w: 2, v: 2, tint:'#ff9ad0' },
     it_mineral:       { name: '矿材',     w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
     it_alloy:         { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
@@ -299,6 +308,12 @@ APH.CFG = {
   workshop: {
     mineralCost: 2,
     medGain: 1,
+  },
+
+  /* 科研站实物化验 (Science #52) */
+  science: {
+    scholarSkillMul: 0.15,
+    defaultCraftTime: 15,
   },
 
   /* 过客拜访 */

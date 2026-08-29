@@ -179,11 +179,16 @@ window.APH = window.APH || {};
     s.meta.res = s.meta.res || { mineral:0, food:0, leather:0 };
     s.meta.research += goods.research;
     s.meta.stats.scans = s.meta.stats.scans||0;
-    var gained = goods.research + goods.mineral;
+    var specN=0, seedN=0, sk;
+    if(goods.specimens){ for(sk in goods.specimens) specN+=goods.specimens[sk]||0; }
+    if(goods.seeds){ for(sk in goods.seeds) seedN+=goods.seeds[sk]||0; }
+    var gained = goods.research + goods.mineral + specN + seedN;
     if(gained>0){
       APH.Save.saveMeta(s.meta);
       var bits=[];
       if(goods.mineral) bits.push('矿材 '+goods.mineral+' 卸在地上');
+      if(specN) bits.push('标本 '+specN+' 卸在地上');
+      if(seedN) bits.push('种荚 '+seedN+' 卸在地上');
       if(goods.research) bits.push('研究点 +'+goods.research);
       APH.UI.floatText('远征结算 '+bits.join(' / '),'#ffe28a');
     }else if((s.runLoot||0)>0 || (s.settledLoot||0)>0){
@@ -195,12 +200,22 @@ window.APH = window.APH || {};
     var foundN=s.found, cryN=s.carry['it_crystal_ore']||0;
     s.carry={};
     enterHome();
+    var padDrop=s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
+    var dx=padDrop?padDrop.x:CFG.HAB.x, dy=padDrop?(padDrop.y+36):(CFG.HAB.y+140);
     if(goods.mineral>0){
-      var pad=s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
-      var dx=pad?pad.x:CFG.HAB.x, dy=pad?(pad.y+36):(CFG.HAB.y+140);
       APH.Combat.spawnDrop(dx, dy, 'it_mineral', goods.mineral, {jitter:22, stock:true});
-      saveColony();
     }
+    if(goods.specimens){
+      Object.keys(goods.specimens).forEach(function(id){
+        if(goods.specimens[id]>0) APH.Combat.spawnDrop(dx, dy, id, goods.specimens[id], {jitter:18, stock:true});
+      });
+    }
+    if(goods.seeds){
+      Object.keys(goods.seeds).forEach(function(id){
+        if(goods.seeds[id]>0) APH.Combat.spawnDrop(dx, dy, id, goods.seeds[id], {jitter:18, stock:true});
+      });
+    }
+    if(goods.mineral>0 || specN>0 || seedN>0) saveColony();
     U.emit('returnedHome',{ research:goods.research, mineral:goods.mineral, beacons:foundN });
     log('远征归来: 异常 '+foundN+'/'+s.totalBeacons+
         (gained>0?' · 矿'+goods.mineral+' 研'+goods.research:''));
@@ -483,6 +498,10 @@ window.APH = window.APH || {};
       return (e.type===T.BUILDING && e.bid==='bl_campfire' && U.dst(s.px,s.py,e.x,e.y)<50);
     });
     s.nearCampfire = nearCampfire || null;
+    var nearLab = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_lab' && U.dst(s.px,s.py,e.x,e.y)<60);
+    });
+    s.nearLab = nearLab || null;
     var nearFlora = s.entities.find(function(e){
       return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
     });
@@ -526,6 +545,24 @@ window.APH = window.APH || {};
       var cRec = (s.nearCampfire.recipe || 'it_roasted_meat');
       var cName = (APH.Colony.COOK_RECIPES[cRec] && APH.Colony.COOK_RECIPES[cRec].name) || cRec;
       APH.UI.setHint('石料篝火 · 取暖保暖 · [F] 切换配方 (' + cName + ')');
+    }else if(s.nearLab){
+      var labRec = buildingRecordOf(s.nearLab);
+      var labT = (labRec && labRec.analysisTarget) || s.nearLab.analysisTarget || 'specimen_flora_glow';
+      var labDef = APH.Colony.SPECIMEN_ANALYSIS[labT];
+      var labNm = (labDef && labDef.name) || labT;
+      var labHave = (s.meta.res && s.meta.res[labT]) || 0;
+      var labProg = (labRec && labRec.analysisProgress != null) ? labRec.analysisProgress
+        : (s.nearLab.analysisProgress || 0);
+      var labPct = labDef ? Math.min(100, Math.floor(100*labProg/(labDef.craftTime||15))) : 0;
+      APH.UI.setHint('科研站 · [F] 切换化验 ('+labNm+' '+labPct+'% · 库存×'+labHave+')');
+    }else if(s.nearCropPlot){
+      var plotCrop = s.nearCropPlot.crop;
+      var plotNm = (plotCrop && APH.Colony.ALIEN_CROPS[plotCrop] && APH.Colony.ALIEN_CROPS[plotCrop].name) || '未选定';
+      APH.UI.setHint('种植圃 · [F] 切换已化验作物 ('+plotNm+')');
+    }else if(s.nearWorkshop){
+      var wRec = s.nearWorkshop.recipe || 'it_pickaxe';
+      var wName = (APH.Colony.CRAFT_RECIPES[wRec] && APH.Colony.CRAFT_RECIPES[wRec].name) || wRec;
+      APH.UI.setHint('工坊 · [F] 切换配方 ('+wName+')');
     }else if(s.nearPad && !s.war.raidActive && !(s.war.raidWarn>0)){
       var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
       APH.UI.setHint('[E] 登船 · '+shPad.mission);
@@ -1360,6 +1397,21 @@ window.APH = window.APH || {};
     APH.UI.floatText('🛠 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
   }
+  function buildingRecordOf(ent){
+    if(!ent) return null;
+    var list=(APH.state.colony && APH.state.colony.buildings) || [];
+    for(var i=0;i<list.length;i++){
+      var b=list[i];
+      if(b && b.id===ent.bid && Math.abs((b.x||0)-(ent.x||0))<2 && Math.abs((b.y||0)-(ent.y||0))<2) return b;
+    }
+    return null;
+  }
+  function setBuildingField(ent, key, val){
+    if(!ent) return;
+    ent[key]=val;
+    var rec=buildingRecordOf(ent);
+    if(rec) rec[key]=val;
+  }
   function saveColony(){
     var s=APH.state;
     if(s.colony && window.APH.Colony && APH.Colony.serializeGround)
@@ -1392,7 +1444,7 @@ window.APH = window.APH || {};
         if(s.scene==='expedition' && s.nearFlora){
           var loadW=APH.Combat.carryWeight(s.carry);
           var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
-          var seedIt = s.nearFlora.seedItem || 'it_seed_glow';
+          var seedIt = s.nearFlora.seedItem || 'specimen_flora_glow';
           var rPick = APH.Combat.addToCarry(s.carry, seedIt, 1, capNow);
           if(rPick.ok){
             s.carry = rPick.carry;
@@ -1428,20 +1480,29 @@ window.APH = window.APH || {};
       if(e.code==='KeyF'&&s.mode==='running'&&s.scene==='home'){
         if(s.nearVisitor){
           tryOfferMeal(s.nearVisitor);
-        }else if(s.nearCropPlot){
-          var crops=Object.keys(APH.Colony.ALIEN_CROPS);
-          var curIdx=crops.indexOf(s.nearCropPlot.crop||'crop_glow_shroom');
-          var nextCrop=crops[(curIdx+1)%crops.length];
-          s.nearCropPlot.crop=nextCrop;
-          s.nearCropPlot.plot={ stage:0, t:0 };
-          var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
-          APH.UI.floatText('🌿 切换为: '+cropName, '#7dffab');
+        }else if(s.nearLab){
+          var nextSpec=APH.Colony.cycleAnalysisTarget(s.nearLab.analysisTarget || 'specimen_flora_glow');
+          setBuildingField(s.nearLab, 'analysisTarget', nextSpec);
+          setBuildingField(s.nearLab, 'analysisProgress', 0);
+          var specDef=APH.Colony.SPECIMEN_ANALYSIS[nextSpec];
+          APH.UI.floatText('🔬 化验队列: '+(specDef && specDef.name || nextSpec), '#59d9ff');
           saveColony();
+        }else if(s.nearCropPlot){
+          var nextCrop=APH.Colony.cycleAnalyzedCrop(s.nearCropPlot.crop, s.meta.analyzedFlora);
+          if(!nextCrop){
+            APH.UI.floatText('🔒 需先在科研站化验异星标本', '#ff9a9a');
+          }else{
+            setBuildingField(s.nearCropPlot, 'crop', nextCrop);
+            setBuildingField(s.nearCropPlot, 'plot', { stage:0, t:0 });
+            var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
+            APH.UI.floatText('🌿 切换为: '+cropName, '#7dffab');
+            saveColony();
+          }
         }else if(s.nearWorkshop){
           var recipes=Object.keys(APH.Colony.CRAFT_RECIPES);
           var curRIdx=recipes.indexOf(s.nearWorkshop.recipe||'it_pickaxe');
           var nextRec=recipes[(curRIdx+1)%recipes.length];
-          s.nearWorkshop.recipe=nextRec;
+          setBuildingField(s.nearWorkshop, 'recipe', nextRec);
           s.nearWorkshop.craftProgress=0;
           var recName=APH.Colony.CRAFT_RECIPES[nextRec].name;
           APH.UI.floatText('🔨 工坊生产调整为: '+recName, '#59d9ff');
@@ -1457,7 +1518,7 @@ window.APH = window.APH || {};
           if(validRecipes.length > 0){
             var curKIdx=validRecipes.indexOf(targetBldg.recipe || validRecipes[0]);
             var nextKRec=validRecipes[(curKIdx + 1) % validRecipes.length];
-            targetBldg.recipe=nextKRec;
+            setBuildingField(targetBldg, 'recipe', nextKRec);
             targetBldg.cookProgress=0;
             var recKName=APH.Colony.COOK_RECIPES[nextKRec].name;
             APH.UI.floatText('🍲 烹饪菜谱调整为: ' + recKName, '#ffca28');
@@ -1579,7 +1640,7 @@ window.APH = window.APH || {};
       /* C=相机锁定: 角色永远钉在屏幕正中(关闭lookAhead平滑) */
       if(e.code==='KeyC'){ s.strictCam=!s.strictCam;
         APH.UI.floatText(s.strictCam?'📷 相机锁定(角色恒居中)':'📷 相机平滑跟随','#59d9ff'); }
-      /* L=图鉴(仅远征场景有内容), R=居民名册(家) */
+      /* L=图鉴(家园科学图鉴 + 远征档案), R=居民名册(家) */
       if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
       if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
       /* G=建造目录(左侧按钮/底部row) */
@@ -1983,6 +2044,21 @@ window.APH = window.APH || {};
     }
     html+='<div style="color:#59d9ff;margin-bottom:4px">'+esc(s.spec.name)+' · '+
           esc(s.spec.paletteName)+' · 难度 '+'★'.repeat(s.spec.tier||1)+'</div>';
+    /* 科学图鉴: 已化验标本解剖档案 (Science #55) */
+    if(APH.Colony.specimenCodexEntries){
+      var specEntries=APH.Colony.specimenCodexEntries(s.meta);
+      var analyzedN=0;
+      specEntries.forEach(function(en){ if(en.analyzed) analyzedN++; });
+      html+='<div style="margin-top:14px;color:#ffc857">科学图鉴 ('+analyzedN+'/'+specEntries.length+')</div>';
+      specEntries.forEach(function(en){
+        if(en.analyzed){
+          html+='<div style="color:#9fe8c8">◈ '+esc(en.name)+' — '+esc(en.analysisName)+
+            '<br><span style="color:#5d6f96">'+esc(en.desc)+'</span></div>';
+        }else{
+          html+='<div style="color:#39435c">◇ 未解析 · 待化验</div>';
+        }
+      });
+    }
     /* 已录入异常 */
     html+='<div style="margin-top:14px;color:#ffc857">已录入异常 ('+s.found+'/'+s.totalBeacons+')</div>';
     s.entities.forEach(function(e){
@@ -2893,7 +2969,11 @@ window.APH = window.APH || {};
     var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
     farms.forEach(function(b){
       if(!b.plot) b.plot={stage:0,t:0};
-      if(!b.crop) b.crop='crop_glow_shroom';
+      if(!b.crop){
+        if(b.id==='bl_crop_plot') return;
+        b.crop='crop_glow_shroom';
+      }
+      if(APH.Colony.ALIEN_CROPS[b.crop] && !APH.Colony.canPlantCrop(b.crop, m.analyzedFlora)) return;
       var bestFarmer=farmers.reduce(function(acc,r){
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
       },null);
@@ -2933,6 +3013,40 @@ window.APH = window.APH || {};
         APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+'肉 +'+out.leatherGain+'皮','#c8e89a');
       else if(out.foodGain>0)
         APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+' 食物','#c8e89a');
+    });
+
+    var labs=s.colony.buildings.filter(function(b){return b.id==='bl_lab';});
+    var scholars=workers.filter(function(r){return r.job==='bl_lab';});
+    labs.forEach(function(b){
+      var w=scholars.shift();
+      if(!w) return;
+      var target=b.analysisTarget || 'specimen_flora_glow';
+      if(APH.Colony.ensureStock) APH.Colony.ensureStock(m.res, s.entities, target, 1);
+      var loreSk=(w.skills&&w.skills.sk_lore)||0;
+      var loreEff=APH.Res.efficiency(w);
+      var labOut=APH.Colony.labAnalysisTick(b, loreSk, loreEff, m.res, 1);
+      s.entities.forEach(function(e){
+        if(e.type===T.BUILDING && e.bid==='bl_lab' &&
+           Math.abs((e.x||0)-(b.x||0))<2 && Math.abs((e.y||0)-(b.y||0))<2){
+          e.analysisTarget=b.analysisTarget;
+          e.analysisProgress=b.analysisProgress;
+        }
+      });
+      if(labOut && labOut.done){
+        var yld=APH.Colony.applySpecimenAnalysis(m, m.res, labOut.def, labOut.specimenId);
+        var seedIds=Object.keys(yld.seeds||{});
+        for(var si=0;si<seedIds.length;si++){
+          var sid=seedIds[si], sn=yld.seeds[sid]||0;
+          if(sn>0) APH.Combat.spawnDrop(b.x+16, b.y+14, sid, sn, {stock:true});
+        }
+        var bits=[];
+        if(yld.unlockCrop && APH.Colony.ALIEN_CROPS[yld.unlockCrop])
+          bits.push('解锁 '+APH.Colony.ALIEN_CROPS[yld.unlockCrop].name);
+        if(yld.unlockTech && APH.Colony.TECHS[yld.unlockTech])
+          bits.push('蓝图 '+APH.Colony.TECHS[yld.unlockTech].name);
+        if(yld.eureka) bits.push('尤里卡 +'+yld.eureka);
+        APH.UI.floatText('🔬 化验突破'+(bits.length?': '+bits.join(' / '):''), '#59d9ff');
+      }
     });
 
     var shops=s.colony.buildings.filter(function(b){return b.id==='bl_workshop';});
