@@ -493,6 +493,11 @@ window.APH = window.APH || {};
     var s=APH.state;
     return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.downed);
   }
+  /* #70 医疗舱躺下: 玩家当前是否生病(病情>0) */
+  function playerSick(){
+    var s=APH.state;
+    return !!(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness > 0);
+  }
   function syncPlayerSleep(){
     var s=APH.state;
     var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
@@ -538,6 +543,12 @@ window.APH = window.APH || {};
               U.dst(s.px,s.py,e.x,e.y) < (CFG.player.bedSleepRadius!=null?CFG.player.bedSleepRadius:60));
     });
     s.nearBed = nearBed || null;
+    /* #70 医疗舱躺下: 靠近医疗舱即可 E 躺下(只置 nearClinic, 绝不 s.target=自动寻路) */
+    var nearClinic = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_clinic' &&
+              U.dst(s.px,s.py,e.x,e.y) < (CFG.player.clinicSleepRadius!=null?CFG.player.clinicSleepRadius:60));
+    });
+    s.nearClinic = nearClinic || null;
     syncPlayerSleep();
     /* #72 家园击倒: s.downed 运行时镜像(读自 meta 真源, 供 drawPlayer 俯卧) */
     var needs = s.meta && s.meta.playerNeeds;
@@ -585,6 +596,14 @@ window.APH = window.APH || {};
         ? '[E] 起床 (按方向键或受伤也会醒)'
         : '[E] 上床睡觉 (精力 '+Math.round(restN)+')';
       APH.UI.setHint(bedHint);
+    }else if(s.nearClinic && (playerSleeping() || playerSick())){
+      /* #70 医疗舱躺下: 靠近医疗舱且生病/躺舱中的 E 提示(早于'医疗舱·缓慢治疗') */
+      var illN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness!=null)
+        ? s.meta.playerNeeds.illness : 0;
+      var podHint = playerSleeping()
+        ? '[E] 起床 (按方向键或受伤也会醒)'
+        : '[E] 躺进医疗舱 (病情 '+Math.round(illN)+')';
+      APH.UI.setHint(podHint);
     }else if(s.nearKitchen){
       var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
       var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
@@ -1589,6 +1608,11 @@ window.APH = window.APH || {};
           APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
           syncPlayerSleep();
           APH.UI.floatText('🛌 入睡','#8fd4ff');
+        }else if(s.scene==='home' && s.nearClinic && playerSick()){
+          /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(医疗舱床位恢复), 绝不落入自动寻路分支 */
+          APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
+          syncPlayerSleep();
+          APH.UI.floatText('🛌 躺进医疗舱','#8fd4ff');
         }else if(s.nearPad){
           if(s.scene==='home') launchExpedition();
           else if(s.scene==='expedition') returnHome();
@@ -3155,7 +3179,8 @@ window.APH = window.APH || {};
     }
     if(APH.Res.playerRestTick && m.playerNeeds){
       /* #66 床边睡眠: 综合精力结算(睡眠恢复/清醒衰减, 委托 homeRestTick) */
-      APH.Res.playerRestTick(m.playerNeeds, s.scene, !!s.nearBed);
+      /* #70 医疗舱躺下: hasBed 含医疗舱 — 舱内躺卧按床速恢复(≠#67 地铺 18) */
+      APH.Res.playerRestTick(m.playerNeeds, s.scene, !!s.nearBed || !!s.nearClinic);
     }
     if(APH.Res.homeIllnessTick && m.playerNeeds){
       m.playerNeeds.illness = APH.Res.homeIllnessTick(m.playerNeeds.illness, s.scene);
@@ -3477,6 +3502,10 @@ window.APH = window.APH || {};
         syncPlayerSleep();
       }else if(s.scene==='home' && s.nearBed){
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
+        syncPlayerSleep();
+      }else if(s.scene==='home' && s.nearClinic && playerSick()){
+        /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(bed_med), 绝不落入自动寻路分支 */
+        APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
         syncPlayerSleep();
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();

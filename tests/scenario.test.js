@@ -1034,6 +1034,138 @@ test('#67: 累塌后 E / 受伤唤醒 (复用 #66)', () => {
   A(pe2 && pe2.isSleeping === false, '实体标志应同步清醒');
 });
 
+/* #70 医疗舱躺下: 玩家病了不自动走向医疗舱, 靠近舱按 E 才躺下(bed_med, 床速恢复)
+   与 #66 床边睡眠同机制(只置 nearClinic, 绝不自动寻路); 与 #72 击倒/#67 累塌互斥
+   驱动通道: updateHome(近判定) / debugPressE(E 交互) / residentsTick(恢复速率) */
+test('#70: 生病近医疗舱不自动躺/不自动寻路 (S.target 保持 null)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.illness = 50;
+  S.meta.playerNeeds.downed = false;
+  S.keys = {};
+  S.target = null;
+  /* 在玩家脚下放一座医疗舱(近判定与真实摆放一致) */
+  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
+  M.updateHome(0.016);
+  A(S.nearClinic, '靠舱应判定 nearClinic');
+  A(S.meta.playerNeeds.isSleeping === false, '生病+靠舱不应自动躺下 (仍清醒)');
+  A(S.target === null, '靠舱不得自动寻路 (S.target 应保持 null)');
+  /* 清理实体, 防泄漏到后续用例 */
+  S.entities = S.entities.filter(e => e.bid !== 'bl_clinic');
+  S.nearClinic = null;
+  S.meta.playerNeeds.illness = 0;
+});
+
+test('#70: 生病+靠舱按 E 躺入 → meta+实体俯卧, bed_med, drawPlayer 不崩', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.illness = 50;
+  S.meta.playerNeeds.downed = false;
+  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
+  S.nearBed = null;                // 隔离 #70: 只测医疗舱分支, 避免 #66 残留床/房实体干扰
+  S.keys = {};
+  S.target = null;
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === true, 'E 靠舱应躺入医疗舱');
+  A(S.meta.playerNeeds.bedId === 'bed_med', '舱内躺卧应绑 bed_med, 实际: ' + S.meta.playerNeeds.bedId);
+  A(S.target === null, 'E 躺入不得触发自动寻路 (S.target 应保持 null)');
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #70 pod sleep draw err:', err.message); }
+  A(!threw, '舱内躺卧玩家绘制不应崩');
+  S.nearClinic = null;
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.bedId = null;
+  S.meta.playerNeeds.illness = 0;
+});
+
+test('#70: 躺舱中再按 E 唤醒', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.meta.playerNeeds.bedId = 'bed_med';
+  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
+  S.nearBed = null;                // 隔离 #70
+  S.keys = {};
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒舱内躺卧');
+  A(S.meta.playerNeeds.bedId === null, '唤醒应清 bedId, 实际: ' + S.meta.playerNeeds.bedId);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
+  S.nearClinic = null;
+  S.meta.playerNeeds.illness = 0;
+});
+
+test('#70: 健康玩家靠舱按 E 不躺 (E 躺入仅生病可触发)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.illness = 0;
+  S.meta.playerNeeds.downed = false;
+  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
+  S.nearBed = null;                // 隔离 #70
+  S.keys = {};
+  S.target = null;
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === false, '健康玩家靠舱按 E 不得躺入 (E 躺入需生病)');
+  A(S.meta.playerNeeds.bedId !== 'bed_med', '健康玩家不得绑 bed_med');
+  A(S.target === null, '健康玩家按 E 也不得自动寻路');
+  S.nearClinic = null;
+});
+
+test('#70: 击倒玩家靠舱按 E 被阻断 (#72 互斥)', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.illness = 50;
+  S.meta.playerNeeds.downed = true;
+  S.meta.playerNeeds.downT = 90;
+  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
+  S.nearBed = null;                // 隔离 #70
+  S.keys = {};
+  M.debugPressE();
+  A(S.meta.playerNeeds.downed === true, '击倒玩家按 E 仍保持击倒 (#72)');
+  A(S.meta.playerNeeds.isSleeping === false, '击倒玩家不得被 E 躺入医疗舱');
+  S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.downT = null;
+  S.nearClinic = null;
+  S.meta.playerNeeds.illness = 0;
+});
+
+test('#70: 舱内躺卧按床速恢复 (+25/跳, 非地铺 18) 且保持 bed_med', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.illness = 50;
+  S.meta.playerNeeds.rest = 40;
+  S.meta.playerNeeds.downed = false;
+  S.keys = {};
+  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
+  S.prodT = 0;                     // 防 prodT≥30 门在 updateHome 内触发 residentsTick 污染恢复算术
+  M.updateHome(0.016);                 // 置 nearClinic
+  A(S.nearClinic, '近判定应置 nearClinic');
+  S.nearBed = null;                // updateHome 会从残留房实体重设 nearBed → 隔离只测医疗舱分支
+  M.debugPressE();                     // 生病+靠舱 E 躺入
+  A(S.meta.playerNeeds.isSleeping === true, 'E 应躺入医疗舱');
+  const pe0 = APH.Ent.findPlayer();
+  A(pe0 && pe0.isSleeping === true, '实体应俯卧');
+  M.residentsTick();                   // 结算恢复: hasBed=nearBed||nearClinic=true → 床速 +25
+  A(S.meta.playerNeeds.rest === 65, '舱内躺卧应按床速恢复 40+25=65, 实际: ' + S.meta.playerNeeds.rest);
+  A(S.meta.playerNeeds.bedId === 'bed_med', '恢复结算后应保持 bed_med, 实际: ' + S.meta.playerNeeds.bedId);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === true, '恢复结算后实体仍应俯卧');
+  /* 清理 */
+  S.entities = S.entities.filter(e => e.bid !== 'bl_clinic');
+  S.nearClinic = null;
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.bedId = null;
+  S.meta.playerNeeds.illness = 0;
+});
+
 /* #72 家园击倒: 击倒 != 死亡, 昏迷不可动/不可醒, 送医复活/倒计时死亡, 远征死法不变
    驱动通道: hurtPlayer → updateHome(playerDownedTick/carryPlayerToClinic) */
 test('#72: 家园击倒 → meta+实体俯卧, moving=false, drawPlayer 不崩', () => {

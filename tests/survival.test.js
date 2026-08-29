@@ -384,6 +384,29 @@ test('setPlayerSleeping: 可传入自定义床ID (默认保留 bed_player, #70 �
   if (b.bedId !== 'bed_player') throw new Error('缺省应保留 bed_player, 实际: ' + b.bedId);
 });
 
+test('playerRestTick: 医疗舱躺卧(bedId=bed_med, hasBed=true) 按床速 +25/跳', function(){
+  var needs = { rest: 40, isSleeping: true, bedId: 'bed_med' };
+  APH.Res.playerRestTick(needs, 'home', true);
+  if (needs.rest !== 65) throw new Error('舱内躺卧应按床速恢复至 65, 实际: ' + needs.rest);
+  if (!needs.isSleeping) throw new Error('未回满应保持舱内躺卧');
+  if (needs.bedId !== 'bed_med') throw new Error('舱内躺卧应保留 bed_med, 实际: ' + needs.bedId);
+});
+
+test('playerRestTick: 舱内回满自动醒并清 bedId=bed_med', function(){
+  var needs = { rest: 90, isSleeping: true, bedId: 'bed_med' };
+  APH.Res.playerRestTick(needs, 'home', true);
+  if (needs.rest !== 100) throw new Error('应 clamp 到 100, 实际: ' + needs.rest);
+  if (needs.isSleeping) throw new Error('回满应自动醒 (isSleeping=false)');
+  if (needs.bedId !== null) throw new Error('自动醒应清 bedId, 实际: ' + needs.bedId);
+});
+
+test('playerWake: 清 bedId=bed_med', function(){
+  var needs = { isSleeping: true, bedId: 'bed_med' };
+  if (APH.Res.playerWake(needs) !== true) throw new Error('舱内躺卧唤醒应返回 true');
+  if (needs.isSleeping) throw new Error('唤醒后 isSleeping 应为 false');
+  if (needs.bedId !== null) throw new Error('唤醒后 bedId 应清空, 实际: ' + needs.bedId);
+});
+
 test('setPlayerSleeping: 靠床 E 入睡绑床, 无床打地铺, 离床清床', function(){
   var a = { isSleeping: false, bedId: null };
   APH.Res.setPlayerSleeping(a, true, true);

@@ -129,6 +129,15 @@
 - [x] HUD：家园击倒显示红色倒计时条 `rowDowned`（`downT/downedTime` 百分比 + 剩余秒数），复活/死亡自动隐藏
 - [x] 测试锁定：survival 新增 6 纯例（倒计时递减/送医复活/有舱无居民不解救/归零死亡/远征 no-op/未击倒 no-op + ensurePlayerNeeds 默认），combat 新增 3 例（家园击倒≠死亡/不消耗 clinicKit/远征仍死亡），scenario 新增 6 冒烟（击倒→实体俯卧+绘制不崩、WASD 不移动不醒、hurtPlayer 家园 vs 远征、送医复活、远处拖行、无居民倒计时死亡）
 
+## 玩家病了躺医疗舱（Issue #70）
+
+- [x] 病了不自动走向医疗舱：`updateHome` 检测 60px 内最近医疗舱 `bl_clinic` 实体 → `s.nearClinic`（只置提示位，绝不写 `s.target`，无自动寻路）
+- [x] 靠近医疗舱按 E 躺下：生病（`illness>0`，`playerSick()` 纯helper）玩家靠舱 E 调 `setPlayerSleeping(needs,true,true,'bed_med')`（绑 `bedId='bed_med'`，复用 #66 seam 第 4 参），实体标志每帧同步 → `drawPlayer` 俯卧；E 再按唤醒
+- [x] 舱内躺卧按床速恢复：`residentsTick` 的 `playerRestTick` 调用 `hasBed=!!nearBed||!!nearClinic` → 舱内躺卧 +25/跳（非地铺 18），回满自动醒并清 `bedId`；健康玩家按 E 不躺（E 躺入仅生病可触发）
+- [x] 与 #72 击倒互斥：击倒玩家靠舱按 E 被 `playerDowned()` 短路阻断（无 E 躺入）；与 #67 累塌不冲突（累塌只从清醒分支触发，不会覆盖舱内躺卧）
+- [x] 配置：`CFG.player.clinicSleepRadius:60`（镜像 `bedSleepRadius`，读时回退 60）
+- [x] 测试锁定：survival 新增 3 纯例（bed_med 床速恢复/回满自动醒清床/playerWake 清 bed_med），scenario 新增 6 冒烟（不自动躺/不自动寻路、生病+靠舱 E 躺入+俯卧+绘制不崩、躺舱中再按 E 唤醒、健康玩家不躺、击倒玩家 E 阻断、舱内按床速 +25 恢复）
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

@@ -573,3 +573,10 @@
   - **远征死法不变**：击倒只在家园分支生效；`playerDownedTick` 远征 no-op；远征 hp<=0 仍走现有 clinicKit 急救→死亡。
   验证: `python3 build.py` 构建成功 27261KB 以 `</html>` 收尾，script 标签 18/18 平衡；单元 368/0（combat.test 新增 3：家园击倒≠死亡/不消耗 clinicKit/远征仍死亡；survival.test 新增 7：playerDownedTick 倒计时递减/送医复活/有舱无居民不解救/归零死亡/远征 no-op/未击倒 no-op/ensurePlayerNeeds 默认）；场景 52/0（scenario 新增 6 冒烟：击倒→实体俯卧+moving=false+drawPlayer 不崩、WASD 不移动不醒、hurtPlayer 家园 vs 远征、有居民+医疗舱送医复活、远处医疗舱拖行、无居民倒计时归零死亡）；perf 3/0；boss 7/0。全量 430 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `updateHome`/`hurtPlayer`/`carryPlayerToClinic` 断言状态机。
   下一步: 实机打开 game.html 在家园吃 spitter/袭击伤害看击倒俯卧+伤痕、拖行入舱复活、无居民倒计时死亡；远征死法确认不变；#70 医疗舱躺接入可复用 #66 seam；居民救援(resident rescue)仍为 orphaned 不做。
+
+- **2026-08-30 00:09 · 班次**: ✅#70 玩家病了躺医疗舱（不自动走向舱、靠近按 E 躺下、舱内按床速恢复）。
+  - **不自动寻路**：`updateHome` 检测 60px 内最近医疗舱 `bl_clinic` 实体 → `s.nearClinic`（只置提示位，绝不写 `s.target`，镜像 #66 床边模式）。新增纯 helper `playerSick()`（读 `meta.playerNeeds.illness>0`）。配置 `CFG.player.clinicSleepRadius:60`（回退 60）。
+  - **E 躺入（复用 #66 seam）**：`bindInput` 与 `debugPressE` 均在 `nearBed` 分支之后新增 `else if(scene==='home' && nearClinic && playerSick())` → `setPlayerSleeping(needs,true,true,'bed_med')`（用 #66 预留的第 4 参 `bedIdParam` 绑医疗舱床位），实体每帧同步俯卧，E 再按唤醒。提示链在 `'医疗舱·缓慢治疗'` 之前插入 `[E] 躺进医疗舱 (病情 N)` / `[E] 起床`。
+  - **舱内按床速恢复（关键接线）**：`residentsTick` 的 `playerRestTick` 调用改为 `hasBed=!!nearBed||!!nearClinic` → 舱内躺卧 +25/跳（非地铺 18），回满自动醒并清 `bedId`。与 #72 击倒互斥（`playerDowned()` 短路阻断 E）；与 #67 累塌不冲突（累塌只从清醒分支触发，不会覆盖舱内躺卧）。本票仅 rest 恢复，病情治愈另票（scope 控制）。
+  验证: TDD 红灯为新增场景 3 失败（#66 残留 `nearBed` 使 E 走床分支 → `bed_player`，测试隔离后修复），实现后 `python3 build.py` 构建成功 27934KB 以 `</html>` 收尾；survival 48/0（新增 3 纯例：bed_med 床速 +25/回满自动醒清床/playerWake 清 bed_med）；场景 62/0（scenario 新增 6 冒烟：不自动躺/不自动寻路 target=null、生病+靠舱 E 躺入+俯卧+drawPlayer 不崩、躺舱中再按 E 唤醒、健康玩家不躺、击倒玩家 E 阻断、舱内按床速 +25 恢复）；单元全量 374/0；perf 3/0；boss 7/0。全量 446 项自动化测试 100% 绿灯（374 单元 + 62 场景 + 3 perf + 7 boss）。无浏览器工具，交互由场景测试经 `updateHome`/`residentsTick`/`debugPressE` 断言状态机。
+  下一步: 实机打开 game.html 让玩家生病（吃到患病）靠近医疗舱按 E 看俯卧 + `[E] 躺进医疗舱 (病情 N)` 提示 + 舱内精力按床速恢复，E 再按醒；#70 病情治愈（舱内掉 illness）作为后续票。

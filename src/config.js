@@ -56,6 +56,7 @@ APH.CFG = {
     homeRestStart: 100,        // 家园需求: 玩家开局精力
     homeIllnessStart: 0,        // 家园需求: 玩家开局病情 (0=HUD 隐藏)
     bedSleepRadius: 60,        // #66 床边睡眠: 与居住舱交互半径 px
+    clinicSleepRadius: 60,     // #70 医疗舱躺下: 与医疗舱交互半径 px (镜像 bedSleepRadius)
     bedRecover: 25,            // #66 床边睡眠: 床上恢复 /tick
     floorRecover: 18,          // #66 床边睡眠: 打地铺恢复 /tick (慢 ~30%)
     restWakeAt: 100,           // #66 床边睡眠: 精力回满自动醒
