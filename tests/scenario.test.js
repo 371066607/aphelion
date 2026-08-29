@@ -765,6 +765,81 @@ test('#59 smoke: 玩家俯卧触发(惰性 flag)不崩、不走循环', () => {
   A(!threw, '玩家(含俯卧flag惰性)绘制不应崩');
 });
 
+/* #66 床边睡眠/唤醒: 靠床 E 睡(俯卧), WASD/E/受伤醒, 绝不自动走向床
+   驱动通道: updateHome / residentsTick / debugPressE (无 __frame 导出) */
+test('#66: 靠床近判定 nearBed 且不触发自动寻路 (S.target 保持 null)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.keys = {};
+  S.target = null;
+  /* 在玩家脚下放一座居住舱(床边判定与真实摆放一致) */
+  APH.Colony.placeBuildingEntity('bl_house', S.px, S.py, 1);
+  M.updateHome(0.016);
+  A(S.nearBed, '靠床应判定 nearBed');
+  A(S.target === null, '靠床不得自动寻路到床 (S.target 应保持 null)');
+});
+
+test('#66: 靠床 E 入睡 → meta+实体俯卧, drawPlayer 不崩', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.nearBed = { id:'be_house_test', type:T.BUILDING, bid:'bl_house', x:S.px, y:S.py };
+  S.keys = {};
+  S.target = null;
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === true, 'E 靠床应入睡');
+  A(S.meta.playerNeeds.bedId === 'bed_player', '有床入睡应绑床, 实际: ' + S.meta.playerNeeds.bedId);
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #66 player sleep draw err:', err.message); }
+  A(!threw, '睡中玩家绘制不应崩');
+});
+
+test('#66: WASD 唤醒并同帧移动 (meta+实体同步, px 变化)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.keys = {};
+  const px0 = S.px;
+  S.keys.KeyA = true;   // 向左(水平方向 px 必变)
+  M.updateHome(0.016);
+  A(S.meta.playerNeeds.isSleeping === false, 'WASD 应唤醒, 实际仍睡');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
+  A(S.px !== px0, '唤醒帧应同帧移动 (px 应从 ' + px0 + ' 变化, 实际 ' + S.px + ')');
+  S.keys = {};
+});
+
+test('#66: 睡中再按 E 唤醒', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.nearBed = { id:'be_house_test', type:T.BUILDING, bid:'bl_house', x:S.px, y:S.py };
+  S.keys = {};
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
+});
+
+test('#66: 受伤唤醒 (伤害真正落地时)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.keys = {};
+  S.iFrameT = 0;
+  const hp0 = S.hp;
+  APH.Combat.hurtPlayer(5, 'test');
+  A(S.meta.playerNeeds.isSleeping === false, '受伤应唤醒');
+  A(S.hp === hp0 - 5, '受伤应掉血, 实际 hp ' + S.hp + '(初始 ' + hp0 + ')');
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
+});
+
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

@@ -535,3 +535,11 @@
   `build_sprites.py`: `use_feet` 纳入 `*_prone_sheet.png`(躺体底边=接地线)。`main.js` SPRITE_META 加 `player_prone:{baseline:253,h:68}`(build 实测)。`src/sprite_data.js` 重生成(33 sheets, 勿手改)。
   验证: `python3 build.py` 构建成功 27246KB 以 `</html>` 收尾; 单元 345/0(新增 humanoid prone 7 用例: 布局/sheetKey/pose 四向与呼吸/俯卧盖 moving/poseFor 缺图不回退/共用); 场景 38/0(新增 2 冒烟: 睡倒居民绘制不崩、玩家惰性 flag 绘制不崩); perf 3/0; boss 7/0。另跑 mock draw 探针: 睡/倒居民与玩家俯卧均请求 `player_prone` 正确帧, 永不请求 walk。
   下一步: 实机打开 game.html 看居民睡眠/击倒俯卧身+伤; 玩家累塌/床边 E 睡接入(另票)。
+
+- **2026-08-29 · 班次**: ✅#66 玩家床边睡眠与唤醒。
+  - **靠床 E 入睡**：`updateHome` 检测 60px 内最近居住舱 `bl_house` 实体 → `s.nearBed`（只置提示位，绝不写 `s.target`，无自动寻路）；E 键/`debugPressE` 镜像逻辑靠床时调 `setPlayerSleeping(true, true)`（绑 `bedId='bed_player'`），实体标志每帧由 `updatePlayer` 同步 → `drawPlayer` 走 #59 `player_prone` 俯卧。
+  - **唤醒三通道**：WASD/方向键（`updatePlayer` 先醒后动同一帧，不吞输入）、E 再按（键处理最优先分支）、受伤（`hurtPlayer` 伤害真正落地时，if 帧保护之后）。睡着时除 E 外全部按键忽略；`firePlasma` 睡眠中禁射。
+  - **精力结算**：`residentsTick` 换用纯函数 `APH.Res.playerRestTick(needs, scene, hasBed)`——睡中床 +25/地铺 +18/跳、回满 100 自动醒；清醒委托 `homeRestTick`（家园 -7、远征冻结）。`ensurePlayerNeeds` 补 `isSleeping:false` 默认（新档+老档两条路径），save.js 兜底分支同补。
+  - **纯函数 seam**（#67 累塌/#70 医疗舱躺可复用）：`setPlayerSleeping` / `playerWake` / `playerRestTick` 导出至 `APH.Res`；`CFG.player` 加 `bedSleepRadius/bedRecover/floorRecover/restWakeAt`（读回退 `CFG.residents.*`）。
+  验证: `python3 build.py` 构建成功 27252KB 以 `</html>` 收尾，script 标签 18/18 平衡；单元 352/0（survival.test 新增 7 例：playerRestTick 床/地铺/回满/远征冻结、setPlayerSleeping 绑床/地铺/清床、playerWake 返回值、ensurePlayerNeeds 默认）；场景 43/0（scenario.test 新增 5 例：靠床 nearBed 且 S.target 保持 null 不自动寻路、E 入睡+实体俯卧+drawPlayer 不崩、WASD 唤醒同帧移动、E 再按唤醒、受伤唤醒）；perf 3/0；boss 7/0。全量 405 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `updateHome`/`residentsTick`/`debugPressE` 断言状态机。
+  下一步: 实机打开 game.html 在居住舱旁按 E 睡、WASD/E/受伤唤醒看俯卧；#67 场上累塌、#70 医疗舱躺接入复用此 seam。

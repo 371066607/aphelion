@@ -100,6 +100,13 @@
 
 - [x] 俯卧一张 `player_prone`(4 向 × 4 呼吸横排 16 帧), 睡/倒共用, 击倒叠程序化伤痕+血泊不换色不叠五官; 全人形共用不另画脸 (ADR-0003); 玩家侧触发 flag 惰性(累塌/床边 E 另票)
 
+## 玩家床边睡眠与唤醒（Issue #66）
+
+- [x] 靠床 E 入睡用俯卧图：靠近居住舱 `bl_house` 60px 内按 E 睡（`meta.playerNeeds.isSleeping` → 实体每帧同步 → `drawPlayer` 俯卧）；只置 `nearBed` 提示位，绝不自动走向床
+- [x] 唤醒：WASD/方向键（先醒后动）、E 再按、或受伤（伤害真正落地时）；睡着时除 E 外全部按键忽略
+- [x] 睡中精力恢复：床铺 +25 / 地铺 +18 / 跳，回满自动醒；清醒时委托 `homeRestTick`（家园 -7、远征冻结）
+- [x] 纯函数 seam 供 #67 累塌/#70 医疗舱躺复用：`setPlayerSleeping` / `playerWake` / `playerRestTick`（export 于 `APH.Res`，纯测试锁定）
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

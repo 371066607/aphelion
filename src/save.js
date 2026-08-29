@@ -131,6 +131,8 @@ APH.Save = (function(){
       if(m.playerNeeds.illness == null){
         m.playerNeeds.illness = (CFG.player && CFG.player.homeIllnessStart != null) ? CFG.player.homeIllnessStart : 0;
       }
+      /* #66 床边睡眠: 防御性默认(仅当 APH.Res 缺失时走到此分支) */
+      if(m.playerNeeds.isSleeping===undefined) m.playerNeeds.isSleeping=false;
     }
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');

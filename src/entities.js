@@ -747,6 +747,10 @@ APH.Ent = (function(){
   /* ================= 玩家逻辑 ================= */
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
+    /* #66 床边睡眠: meta 是唯一真源, 实体标志每帧同步(供 drawPlayer 俯卧) */
+    var needs = s.meta && s.meta.playerNeeds;
+    var sleeping = !!(needs && needs.isSleeping);
+    var pe = findPlayer();
     var ix=0, iy=0;
     if(s.keys.KeyW||s.keys.ArrowUp) iy-=1;
     if(s.keys.KeyS||s.keys.ArrowDown) iy+=1;
@@ -756,6 +760,20 @@ APH.Ent = (function(){
     s.run = !!(s.keys.ShiftLeft||s.keys.ShiftRight);
     var hasKey=(ix!==0||iy!==0);
     if(hasKey) s.target=null;
+    /* WASD/方向键唤醒: 先醒后动同一帧(不吞移动输入) */
+    if(sleeping && hasKey){
+      if(window.APH.Res && APH.Res.playerWake) APH.Res.playerWake(needs);
+      sleeping = false;
+    }
+    if(sleeping){
+      /* 睡眠中: 不移动、不寻路; 实体同步俯卧; 计时器照常衰减 */
+      if(pe) pe.isSleeping = true;
+      s.target = null;
+      if(s.fireCd>0) s.fireCd-=dt;
+      if(s.iFrameT>0) s.iFrameT-=dt;
+      if(s.hurtFlash>0) s.hurtFlash-=dt;
+      return;
+    }
     var mx=0,my=0;
     if(hasKey){
       var il=Math.sqrt(ix*ix+iy*iy)||1; mx=ix/il; my=iy/il;
@@ -784,8 +802,7 @@ APH.Ent = (function(){
       if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
       if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
     }
-    var pe = findPlayer();
-    pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh;
+    if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh; pe.isSleeping=false; }
 
     /* 计时器 */
     if(s.fireCd>0) s.fireCd-=dt;
