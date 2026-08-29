@@ -11,6 +11,54 @@ APH.Planet = (function(){
   'use strict';
   var U = APH.U;
 
+  /* ---------- 4 大异星奇幻生态群系 (ADR-9 biome_ 前缀) ---------- */
+  var BIOMES = {
+    biome_spore_forest: {
+      id: 'biome_spore_forest',
+      name: '荧光菌林星',
+      desc: '充满浮游光孢与自发光真菌的恒夜菌林',
+      lawId: 'lw_bioglow',
+      primaryFlora: 'flora_glow',
+      primaryCrop: 'crop_glow_shroom',
+      palette: { ground1: '#18122b', ground2: '#241a3d', accent: '#59d9ff', water: '#311b4a', spore: '#7dffab' }
+    },
+    biome_crystal_wasteland: {
+      id: 'biome_crystal_wasteland',
+      name: '晶脉硅蚀荒原',
+      desc: '耸立尖锐晶簇与高导电硅砂的共振荒原',
+      lawId: 'lw_crystal_resonance',
+      primaryFlora: 'flora_crystal',
+      primaryCrop: 'crop_crystal_vine',
+      palette: { ground1: '#2b1828', ground2: '#3d2138', accent: '#ff9ad0', water: '#542848', spore: '#ffe9b0' }
+    },
+    biome_acid_marsh: {
+      id: 'biome_acid_marsh',
+      name: '酸蚀巨沼星',
+      desc: '地表弥漫硫磺毒雾与间歇酸泉的剧毒巨沼',
+      lawId: 'lw_acid_mist',
+      primaryFlora: 'flora_dew',
+      primaryCrop: 'crop_dew_fruit',
+      palette: { ground1: '#19281a', ground2: '#233824', accent: '#b8e986', water: '#2e4a1a', spore: '#d4ff7d' }
+    },
+    biome_cryo_tundra: {
+      id: 'biome_cryo_tundra',
+      name: '极地银霜雪原',
+      desc: '暴风雪呼啸、凝结冰霜晶花的极寒银白冰原',
+      lawId: 'lw_cryo_freeze',
+      primaryFlora: 'flora_star',
+      primaryCrop: 'crop_star_velvet',
+      palette: { ground1: '#1a2636', ground2: '#26364a', accent: '#e0f7fa', water: '#3a5575', spore: '#b2ebf2' }
+    }
+  };
+
+  var BIOME_KEYS = ['biome_spore_forest', 'biome_crystal_wasteland', 'biome_acid_marsh', 'biome_cryo_tundra'];
+
+  function biomeOf(seed){
+    var rng = U.makeRng((seed ^ 0xB103E) >>> 0 || 43);
+    var key = BIOME_KEYS[Math.floor(rng() * BIOME_KEYS.length)];
+    return Object.assign({}, BIOMES[key]);
+  }
+
   /* ---------- 调色板池（Phase2 由 LLM 扩充） ---------- */
   var PALETTES = [
     { name:'苔原类地', ground1:'#1f2824', ground2:'#2a3730', accent:'#ffc857', water:'#1c3d54', spore:'#9fe8c8' },
@@ -35,6 +83,10 @@ APH.Planet = (function(){
     { name:'「静默塔」', lore:'它不广播任何信号，但所有罗盘在它周围都指向它自己。' },
   ];
   var LAW_POOL = [
+    { id:'lw_bioglow', name:'生物微光', fact:'荧光植物柔化黑夜暗幕，探索视野开阔', zone:'forest' },
+    { id:'lw_crystal_resonance', name:'晶体共振', fact:'等离子武器在晶簇周围散射强化 +40%', zone:'crystal' },
+    { id:'lw_acid_mist', name:'酸蚀浓雾', fact:'室外弥漫强酸气体，持续累积暴露值', zone:'marsh' },
+    { id:'lw_cryo_freeze', name:'极地寒流', fact:'极寒原野使移动速度-15%并累积寒冷外伤', zone:'tundra' },
     { id:'lw_night_acid', name:'夜间水体酸化', fact:'夜间接触湖水造成腐蚀伤害', zone:'lake' },
     { id:'lw_spore_light', name:'孢子趋光性', fact:'携带光源可吸引孢子开路', zone:'forest' },
     { id:'lw_storm', name:'磁暴周期', fact:'固定周期内磁暴必然造访高地', zone:'ridge' },
@@ -69,7 +121,8 @@ APH.Planet = (function(){
     function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
     function rr(a,b){ return a+rng()*(b-a); }
 
-    var pal = pick(PALETTES);
+    var b = biomeOf(seed);
+    var pal = b.palette || pick(PALETTES);
     var id = 'P' + (seed % 4096).toString(16).toUpperCase();
 
     /* 信标: 6 座, 撒在世界内并避开湖/基地 */
@@ -91,10 +144,15 @@ APH.Planet = (function(){
       });
     }
 
-    /* 法则: 抽 2~3 条 */
-    var laws = [];
-    var lawCount = 2 + Math.floor(rng() * 2);
-    var shuffled = LAW_POOL.slice().sort(function(){ return rng() - .5; });
+    /* 法则: 优先包含群系核心法则 + 抽 1~2 条辅助法则 (Biome #41) */
+    var coreLaw = LAW_POOL.find(function(l){ return l.id === b.lawId; }) || LAW_POOL[0];
+    var laws = [{
+      id: coreLaw.id, name: coreLaw.name,
+      fact: coreLaw.fact, zone: coreLaw.zone,
+      discovered: false
+    }];
+    var shuffled = LAW_POOL.filter(function(l){ return l.id !== b.lawId; }).sort(function(){ return rng() - .5; });
+    var lawCount = 1 + Math.floor(rng() * 2);
     for(var i = 0; i < lawCount; i++){
       laws.push({
         id: shuffled[i].id, name: shuffled[i].name,
@@ -142,7 +200,8 @@ APH.Planet = (function(){
       id: id,
       seed: seed,
       name: 'APH-' + id,
-      paletteName: pal.name,
+      biome: b,
+      paletteName: b.name || pal.name,
       palette: { ground1:pal.ground1, ground2:pal.ground2, accent:pal.accent,
                  water:pal.water, spore:pal.spore },
       terrain: {
@@ -238,15 +297,17 @@ APH.Planet = (function(){
     return cloneFaction(ENEMY_FACTIONS[0]);
   }
 
-  /* 远征星球野生异星植物生成 (Flora #36) */
-  function generateExpeditionFlora(seed, tier){
+  /* 远征星球野生异星植物生成 (Flora #36, Biome #42) */
+  function generateExpeditionFlora(seed, tier, biome){
     var rng = U.makeRng((seed ^ 0xEE7A) >>> 0 || 31);
     var out = [];
-    var count = 6 + Math.floor(rng() * 4);
+    var count = 8 + Math.floor(rng() * 4);
+    var b = biome || biomeOf(seed);
+    var primary = b ? (b.primaryFlora || 'flora_glow') : 'flora_glow';
     var kinds = ['flora_glow', 'flora_crystal', 'flora_dew', 'flora_star'];
     var W = (APH.CFG && APH.CFG.WORLD) || 2200;
     for(var i=0; i<count; i++){
-      var kind = kinds[i % kinds.length];
+      var kind = (rng() < 0.60) ? primary : kinds[Math.floor(rng() * kinds.length)];
       var ang = rng() * U.TAU;
       var dist = 220 + rng() * 650;
       var x = U.clamp(1100 + Math.cos(ang)*dist, 120, W-120);
@@ -263,7 +324,17 @@ APH.Planet = (function(){
     return out;
   }
 
+  /* 群系环境氛围粒子类型派生 (Biome #44) */
+  function particleTypeOf(spec){
+    var bId = (spec && spec.biome && spec.biome.id) || '';
+    if(bId === 'biome_cryo_tundra') return 'snow';
+    if(bId === 'biome_acid_marsh') return 'steam';
+    if(bId === 'biome_crystal_wasteland') return 'spark';
+    return 'spore';
+  }
+
   return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
-           generateExpeditionFlora:generateExpeditionFlora };
+           generateExpeditionFlora:generateExpeditionFlora,
+           BIOMES:BIOMES, biomeOf:biomeOf, particleTypeOf:particleTypeOf };
 })();

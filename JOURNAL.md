@@ -462,6 +462,15 @@
   验证: `python3 build.py` 构建成功 27084KB 以 `</html>` 收尾；新增 `tests/flora.test.js` 与 `tests/agri.test.js`；单元 292/0；场景 28/0；perf 3/0；boss 7/0（全量 330 项自动化测试 100% 绿灯）。
   下一步: 实机体验外星发光农园。
 
+- **2026-08-29 · 班次**: ✅多群系异星生态系统与勘测图鉴（#39~#44 全部闭环）。
+  - **4 大异星生物群系（Biomes）**：荧光菌林星（`biome_spore_forest`）、晶脉硅蚀荒原（`biome_crystal_wasteland`）、酸蚀巨沼星（`biome_acid_marsh`）、极地银霜雪原（`biome_cryo_tundra`）。
+  - **PlanetSpec 确定性派生**：Seed 派生 `spec.biome`，驱动群系专属调色板与核心环境法则（`lw_bioglow`, `lw_crystal_resonance`, `lw_acid_mist`, `lw_cryo_freeze`）。
+  - **专属植被与生物分布**：`generateExpeditionFlora` 按群系主导生成原生异星植物；`particleTypeOf` 派生群系氛围粒子（发光孢子、静电火花、酸性蒸汽、飘雪）。
+  - **生态图鉴（L 键）集成**：展示当前星球群系大卡片、环境法则解析、已录入异常与已知生物档案。
+  验证: `python3 build.py` 构建成功 27091KB 以 `</html>` 收尾；新增 `tests/biome.test.js`（6 项群系测试）；单元 298/0；场景 28/0；perf 3/0；boss 7/0（全量 336 项测试 100% 绿灯）。
+  下一步: 实机探索 4 大异星群系。
+
+
 
 
 

@@ -1928,6 +1928,13 @@ window.APH = window.APH || {};
     var s=APH.state, body=document.getElementById('codexBody');
     if(!body) return;
     var html='';
+    var b=s.spec.biome;
+    if(b){
+      html+='<div style="background:rgba(89,217,255,.12);border:1px solid #59d9ff;border-radius:8px;padding:8px 12px;margin-bottom:12px">'+
+        '<b style="color:#59d9ff;font-size:13px">【生态群系】'+esc(b.name)+'</b>'+
+        '<div style="color:#cdd9f5;font-size:11px;margin-top:2px">'+esc(b.desc)+'</div>'+
+        '</div>';
+    }
     html+='<div style="color:#59d9ff;margin-bottom:4px">'+esc(s.spec.name)+' · '+
           esc(s.spec.paletteName)+' · 难度 '+'★'.repeat(s.spec.tier||1)+'</div>';
     /* 已录入异常 */
