@@ -766,6 +766,79 @@ APH.Colony = (function(){
     return { ok:true, owned:o };
   }
 
+  /* ---------- 工坊加工配方表 (Craft #46) ---------- */
+  var CRAFT_RECIPES = {
+    it_pickaxe:       { name:'精工采矿斧', costRes:{ wood:15, iron:10 }, craftTime:12, reqTech:'te_machining' },
+    it_suit_hazard:   { name:'星绒防酸服', costRes:{ it_star_fiber:8, leather:4, iron:10 }, craftTime:18, reqTech:'te_bio_adaptation' },
+    it_suit_cryo:     { name:'极地防寒羽绒', costRes:{ it_star_fiber:10, leather:6 }, craftTime:18, reqTech:'te_bio_adaptation' },
+    it_goggles_night: { name:'荧光夜视镜', costRes:{ it_glow_fluid:6, iron:12 }, craftTime:15, reqTech:'te_herbal_remedies' },
+    it_medkit_adv:    { name:'复合急救包', costRes:{ herb:4, it_glow_fluid:2 }, craftTime:10, reqTech:'te_herbal_remedies' },
+  };
+
+  /* 工坊制作推进(纯函数) (Craft #47) */
+  function workshopCraftTick(workshop, crafterSkill, eff, resStock, techOwned, dt){
+    if(!workshop || crafterSkill == null) return { done:false };
+    var recipeKey = workshop.recipe || 'it_pickaxe';
+    var rec = CRAFT_RECIPES[recipeKey];
+    if(!rec) return { done:false, why:'未知配方' };
+
+    if(rec.reqTech && (!techOwned || !techOwned[rec.reqTech])){
+      return { done:false, why:'未研发前置科技' };
+    }
+
+    var costRes = rec.costRes || {};
+    for(var k in costRes){
+      var need = costRes[k] || 0;
+      var have = (resStock && resStock[k] != null) ? resStock[k] : (resStock && resStock.mineral != null ? resStock.mineral : 0);
+      if(have < need){
+        return { done:false, why:'材料不足' };
+      }
+    }
+
+    var e = (eff == null ? 1 : eff);
+    var rate = (dt || 1) * e * (1 + crafterSkill * 0.15);
+    workshop.craftProgress = (workshop.craftProgress || 0) + rate;
+
+    if(workshop.craftProgress >= (rec.craftTime || 10)){
+      for(var mat in costRes){
+        var amt = costRes[mat] || 0;
+        if(resStock && resStock[mat] != null){
+          resStock[mat] = Math.max(0, resStock[mat] - amt);
+        }
+      }
+      workshop.craftProgress = 0;
+      return { done:true, producedItemId:recipeKey, count:1 };
+    }
+    return { done:false, progress:workshop.craftProgress, total:rec.craftTime };
+  }
+
+  /* 装备穿戴与被动抗性派生 (Craft #48) */
+  function equipGear(character, itemId){
+    if(!character || !itemId) return character;
+    character.gear = character.gear || { tool:null, suit:null, head:null };
+    var it = (CFG.items && CFG.items[itemId]) || {};
+    var slot = it.slot || (itemId.startsWith('it_suit')?'suit':(itemId.startsWith('it_goggles')?'head':'tool'));
+    if(slot === 'tool') character.gear.tool = itemId;
+    else if(slot === 'suit') character.gear.suit = itemId;
+    else if(slot === 'head') character.gear.head = itemId;
+    return character;
+  }
+
+  function gearBonusOf(character){
+    if(!character || !character.gear) return { toolMul:1.0, acidResist:0.0, cryoResist:0.0, sightBoost:0 };
+    var g = character.gear;
+    var toolItem = g.tool ? (CFG.items && CFG.items[g.tool]) : null;
+    var suitItem = g.suit ? (CFG.items && CFG.items[g.suit]) : null;
+    var headItem = g.head ? (CFG.items && CFG.items[g.head]) : null;
+
+    return {
+      toolMul: (toolItem && toolItem.toolMul) ? toolItem.toolMul : 1.0,
+      acidResist: (suitItem && suitItem.acidResist) ? suitItem.acidResist : 0.0,
+      cryoResist: (suitItem && suitItem.cryoResist) ? suitItem.cryoResist : 0.0,
+      sightBoost: (headItem && headItem.sightBoost) ? headItem.sightBoost : 0,
+    };
+  }
+
   /* ---------- 异星奇幻植物定义表 (ADR-9 crop_ 前缀) ---------- */
   var ALIEN_CROPS = {
     crop_glow_shroom:  { name:'夜光荧蕈', growTicks:3, baseYield:4, dropItem:'it_glow_fluid', glowR:60, desc:'夜间自发光青蓝微光' },
@@ -943,5 +1016,7 @@ APH.Colony = (function(){
     soilFertilityAt:soilFertilityAt, createGrowingZone:createGrowingZone, removeGrowingZone:removeGrowingZone,
     ALIEN_CROPS:ALIEN_CROPS, getGlowSources:getGlowSources,
     cropPlotTick:cropPlotTick, harvestAlienCrop:harvestAlienCrop,
+    CRAFT_RECIPES:CRAFT_RECIPES, workshopCraftTick:workshopCraftTick,
+    equipGear:equipGear, gearBonusOf:gearBonusOf,
   };
 })();

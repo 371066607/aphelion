@@ -471,6 +471,10 @@ window.APH = window.APH || {};
       return (e.type===T.BUILDING && (e.bid==='bl_crop_plot'||e.bid==='bl_farm') && U.dst(s.px,s.py,e.x,e.y)<60);
     });
     s.nearCropPlot = nearPlot || null;
+    var nearShop = s.entities.find(function(e){
+      return (e.type===T.BUILDING && e.bid==='bl_workshop' && U.dst(s.px,s.py,e.x,e.y)<60);
+    });
+    s.nearWorkshop = nearShop || null;
     var nearFlora = s.entities.find(function(e){
       return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
     });
@@ -1416,6 +1420,15 @@ window.APH = window.APH || {};
           s.nearCropPlot.plot={ stage:0, t:0 };
           var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
           APH.UI.floatText('🌱 切换为: '+cropName, '#7dffab');
+          saveColony();
+        }else if(s.nearWorkshop){
+          var recipes=Object.keys(APH.Colony.CRAFT_RECIPES);
+          var curRIdx=recipes.indexOf(s.nearWorkshop.recipe||'it_pickaxe');
+          var nextRec=recipes[(curRIdx+1)%recipes.length];
+          s.nearWorkshop.recipe=nextRec;
+          s.nearWorkshop.craftProgress=0;
+          var recName=APH.Colony.CRAFT_RECIPES[nextRec].name;
+          APH.UI.floatText('🛠 工坊生产调整为: '+recName, '#59d9ff');
           saveColony();
         }
       }
@@ -2851,12 +2864,23 @@ window.APH = window.APH || {};
     shops.forEach(function(b){
       var w=crafters.shift();
       if(!w) return;
-      var cost=(CFG.workshop&&CFG.workshop.mineralCost!=null)?CFG.workshop.mineralCost:2;
-      if(!APH.Colony.ensureStock(m.res, s.entities, 'mineral', cost)) return;
-      var out=APH.Colony.workshopTick(w, m.res, b.lv||1);
-      if(out.med>0){
-        APH.Combat.spawnDrop(b.x+16, b.y+14, 'it_med', out.med, {stock:true});
-        APH.UI.floatText('🔧 工坊药品堆在地上 +'+out.med,'#e0b089');
+      var cEff=APH.Res.efficiency(w);
+      var cSk=(w.skills&&w.skills.sk_craft)||0;
+      if(b.recipe && APH.Colony.CRAFT_RECIPES[b.recipe]){
+        var out=APH.Colony.workshopCraftTick(b, cSk, cEff, m.res, m.tech, 1);
+        if(out.done && out.producedItemId){
+          APH.Combat.spawnDrop(b.x+16, b.y+14, out.producedItemId, out.count||1, {stock:true});
+          var pName=(CFG.items[out.producedItemId]&&CFG.items[out.producedItemId].name)||out.producedItemId;
+          APH.UI.floatText('🛠 工坊制造完成: '+pName, '#7dffab');
+        }
+      }else{
+        var cost=(CFG.workshop&&CFG.workshop.mineralCost!=null)?CFG.workshop.mineralCost:2;
+        if(!APH.Colony.ensureStock(m.res, s.entities, 'mineral', cost)) return;
+        var outLegacy=APH.Colony.workshopTick(w, m.res, b.lv||1);
+        if(outLegacy.med>0){
+          APH.Combat.spawnDrop(b.x+16, b.y+14, 'it_med', outLegacy.med, {stock:true});
+          APH.UI.floatText('🛠 工坊药品堆在地上 +'+outLegacy.med,'#e0b089');
+        }
       }
     });
     s.entities=s.entities.filter(function(e){

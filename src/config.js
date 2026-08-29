@@ -130,6 +130,12 @@ APH.CFG = {
     it_seed_crystal:  { name: '晶藤插条', w: 1, v: 12, tint:'#ff9ad0' },
     it_seed_dew:      { name: '露果种荚', w: 1, v: 8, tint:'#80cbc4' },
     it_seed_star:     { name: '星绒绒种', w: 1, v: 15, tint:'#e0e0e0' },
+    /* 5 大外星特种装备 (Craft #46) */
+    it_pickaxe:       { name: '精工采矿斧', w: 2, v: 8, tint:'#cfd8dc', slot:'tool', toolMul:2.0 },
+    it_suit_hazard:   { name: '星绒防酸服', w: 3, v: 15, tint:'#7dffab', slot:'suit', acidResist:0.80 },
+    it_suit_cryo:     { name: '极地防寒羽绒', w: 3, v: 15, tint:'#b2ebf2', slot:'suit', cryoResist:0.80 },
+    it_goggles_night: { name: '荧光夜视镜', w: 1, v: 12, tint:'#00e5ff', slot:'head', sightBoost:80 },
+    it_medkit_adv:    { name: '复合急救包', w: 1, v: 10, tint:'#ff80ab', store:'med', healBonus:25 },
     it_crystal_ore:   { name: '晶体矿',   w: 2, v: 2, tint:'#ff9ad0' },
     it_mineral:       { name: '矿材',     w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
     it_alloy:         { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
