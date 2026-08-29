@@ -3034,6 +3034,9 @@ window.APH = window.APH || {};
     if(APH.Res.homeFoodTick && m.playerNeeds){
       m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);
     }
+    if(APH.Res.homeRestTick && m.playerNeeds){
+      m.playerNeeds.rest = APH.Res.homeRestTick(m.playerNeeds.rest, s.scene);
+    }
     /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
     m.workPrio=m.workPrio||{};
     m.residents.forEach(function(r){

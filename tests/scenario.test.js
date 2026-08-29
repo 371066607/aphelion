@@ -86,6 +86,30 @@ test('player food: 家园 HUD 显示饱食, 远征隐藏且不掉', () => {
   A(row.style.display === 'none', '远征应隐藏饱食条');
   S.scene = 'home';
 });
+test('player rest: 家园 HUD 显示精力, 远征隐藏且不掉', () => {
+  APH.Res.ensurePlayerNeeds(S.meta);
+  const start = S.meta.playerNeeds.rest;
+  const foodStart = S.meta.playerNeeds.food;
+  A(start != null, '家园应有玩家精力');
+  APH.UI.updHUD();
+  const row = document.getElementById('rowRest');
+  A(row && row.style.display !== 'none', '家园应显示精力条');
+  const v = document.getElementById('vRest');
+  A(v && Number(v.textContent) === Math.round(start), '家园精力数值应显示 '+start+', 实际: '+(v && v.textContent));
+  M.residentsTick();
+  A(S.meta.playerNeeds.rest === 93, '家园生产跳应掉精力 7, 实际: '+S.meta.playerNeeds.rest);
+  APH.UI.updHUD();
+  A(Number(v.textContent) === 93, '家园 HUD 应跟上精力下降, 实际: '+v.textContent);
+  S.scene = 'expedition';
+  const frozen = S.meta.playerNeeds.rest;
+  M.residentsTick();
+  A(S.meta.playerNeeds.rest === frozen, '远征生产跳精力应冻结');
+  APH.UI.updHUD();
+  A(row.style.display === 'none', '远征应隐藏精力条');
+  S.scene = 'home';
+  S.meta.playerNeeds.rest = start;
+  S.meta.playerNeeds.food = foodStart;
+});
 test('殖民地世界: 有发射台, 无敌人, 无信标', () => {
   const pad = S.entities.find(e=>e.type===T.BUILDING && e.pad);
   A(pad, '发射台缺失');

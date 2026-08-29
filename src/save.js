@@ -125,6 +125,9 @@ APH.Save = (function(){
       if(m.playerNeeds.food == null){
         m.playerNeeds.food = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
       }
+      if(m.playerNeeds.rest == null){
+        m.playerNeeds.rest = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
+      }
     }
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');

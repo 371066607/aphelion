@@ -118,6 +118,22 @@ test('ensurePlayerNeeds: 缺省饱食并兼容旧档', () => {
   const b = Res.ensurePlayerNeeds({ playerNeeds:{ food:41 } });
   if (b.playerNeeds.food !== 41) throw new Error('已有饱食不得覆盖');
 });
+test('homeRestTick: 家园掉精力, 远征不掉, 钳到 0', () => {
+  if (typeof Res.homeRestTick !== 'function') throw new Error('缺失 APH.Res.homeRestTick');
+  const next = Res.homeRestTick(50, 'home');
+  if (next !== 43) throw new Error('家园应掉精力 7, 实际: '+next);
+  if (Res.homeRestTick(50, 'expedition') !== 50) throw new Error('远征精力不应下降');
+  if (Res.homeRestTick(2, 'home') !== 0) throw new Error('精力应钳到 0');
+});
+test('ensurePlayerNeeds: 缺省精力并兼容旧档', () => {
+  const a = Res.ensurePlayerNeeds({});
+  if (!a.playerNeeds || a.playerNeeds.rest !== 100) throw new Error('应写入默认精力 100: '+JSON.stringify(a.playerNeeds));
+  const b = Res.ensurePlayerNeeds({ playerNeeds:{ rest:41 } });
+  if (b.playerNeeds.rest !== 41) throw new Error('已有精力不得覆盖');
+  const c = Res.ensurePlayerNeeds({ playerNeeds:{ food:41 } });
+  if (c.playerNeeds.food !== 41) throw new Error('补精力不得覆盖已有饱食');
+  if (c.playerNeeds.rest !== 100) throw new Error('旧档有饱食无精力时应补 100');
+});
 test('needsTick: 饿了有粮就吃, 没粮掉饱食', () => {
   const r={food:50, mood:60};
   const out=Res.needsTick(r,true);

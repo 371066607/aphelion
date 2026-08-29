@@ -53,6 +53,7 @@ APH.CFG = {
     o2Refill: 16,
     carryMax: 40,              // 负重上限
     homeFoodStart: 80,         // 家园需求: 玩家开局饱食
+    homeRestStart: 100,        // 家园需求: 玩家开局精力
   },
 
   /* 相机 */

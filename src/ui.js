@@ -17,16 +17,28 @@ APH.UI = (function(){
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
     $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
     $('vHP').textContent = Math.round(Math.max(0,s.hp));
+    var atHome=s.scene==='home';
+    var needs=s.meta && s.meta.playerNeeds;
     var rowFood=$('rowFood');
     if(rowFood){
-      var atHome=s.scene==='home';
       rowFood.style.display = atHome ? '' : 'none';
       if(atHome){
-        var food=(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.food != null)
-          ? s.meta.playerNeeds.food : ((APH.CFG.player && APH.CFG.player.homeFoodStart) || 80);
+        var food=(needs && needs.food != null)
+          ? needs.food : ((APH.CFG.player && APH.CFG.player.homeFoodStart) || 80);
         var bFood=$('bFood'), vFood=$('vFood');
         if(bFood) bFood.style.width = U.clamp(food,0,100)+'%';
         if(vFood) vFood.textContent = Math.round(Math.max(0,food));
+      }
+    }
+    var rowRest=$('rowRest');
+    if(rowRest){
+      rowRest.style.display = atHome ? '' : 'none';
+      if(atHome){
+        var rest=(needs && needs.rest != null)
+          ? needs.rest : ((APH.CFG.player && APH.CFG.player.homeRestStart) || 100);
+        var bRest=$('bRest'), vRest=$('vRest');
+        if(bRest) bRest.style.width = U.clamp(rest,0,100)+'%';
+        if(vRest) vRest.textContent = Math.round(Math.max(0,rest));
       }
     }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';

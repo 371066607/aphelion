@@ -86,11 +86,21 @@ APH.Res = (function(){
     var drain = RS().foodDrain != null ? RS().foodDrain : 6;
     return clampNeed(v - drain, 0, 100);
   }
+  /* 玩家家园精力: 只在 home 掉; 远征冻结; 钳到 0 (累塌另票) */
+  function homeRestTick(rest, scene){
+    var start = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
+    var v = rest == null ? start : rest;
+    if(scene !== 'home') return clampNeed(v, 0, 100);
+    var drain = RS().restDrain != null ? RS().restDrain : 7;
+    return clampNeed(v - drain, 0, 100);
+  }
   function ensurePlayerNeeds(meta){
     meta = meta || {};
     meta.playerNeeds = meta.playerNeeds || {};
-    var start = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
-    if(meta.playerNeeds.food == null) meta.playerNeeds.food = start;
+    var foodStart = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
+    var restStart = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
+    if(meta.playerNeeds.food == null) meta.playerNeeds.food = foodStart;
+    if(meta.playerNeeds.rest == null) meta.playerNeeds.rest = restStart;
     return meta;
   }
 
@@ -1094,7 +1104,7 @@ APH.Res = (function(){
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
-    homeFoodTick:homeFoodTick, ensurePlayerNeeds:ensurePlayerNeeds,
+    homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, ensurePlayerNeeds:ensurePlayerNeeds,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
