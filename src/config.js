@@ -52,6 +52,7 @@ APH.CFG = {
     o2Drain: 0.72,
     o2Refill: 16,
     carryMax: 40,              // 负重上限
+    homeFoodStart: 80,         // 家园需求: 玩家开局饱食
   },
 
   /* 相机 */

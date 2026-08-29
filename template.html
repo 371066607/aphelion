@@ -82,6 +82,7 @@
   .techCost{display:block;color:#8fa3cc;font-size:10px;letter-spacing:.5px}
   .techDesc{color:#9db1dc;font-size:11px;margin-top:4px}
   .techWhy{color:#ff9a9a;font-size:10px;margin-top:4px}
+  .techAct{color:#ffc857;font-size:11px;margin-top:6px;letter-spacing:1px}
 </style>
 </head>
 <body>
@@ -124,7 +125,8 @@
   <h2 style="color:#59d9ff;font-size:18px;letter-spacing:4px;margin:0 0 6px">科 技 树</h2>
   <p style="color:#5d6f96;font-size:11px;margin:0 0 16px">
     <span id="techMapPts" style="color:#19c8b9;font-weight:700">研究点 0</span>
-    · 方向键选节点 · Enter 研发 · 点击选中 · [T]/[Esc] 关闭
+    · 再点一次或按 Enter 研发 · [T]/[Esc] 关闭
+    <span id="techMapMsg" style="display:block;margin-top:6px;color:#ffc857;min-height:16px"></span>
   </p>
   <div id="techMapBody" style="display:flex;gap:18px;align-items:flex-start;min-width:min-content"></div>
 </div>
@@ -132,6 +134,7 @@
   <h1 id="planetTitle">APH-P1 · 前哨站</h1>
   <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
   <div class="row"><span class="lab">生命</span><div class="track"><div class="fill" id="bHP" style="width:100%;background:#7dffab"></div></div><span class="val" id="vHP">100</span></div>
+  <div class="row" id="rowFood" style="display:none"><span class="lab">饱食</span><div class="track"><div class="fill" id="bFood" style="width:80%;background:#c8e89a"></div></div><span class="val" id="vFood">80</span></div>
   <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
   <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>

@@ -119,6 +119,13 @@ APH.Save = (function(){
     if(!m.workPrio) m.workPrio = {};
     if(!m.analyzedFlora) m.analyzedFlora = {};
     if(!m.analyzedSpecimens) m.analyzedSpecimens = {};
+    if(window.APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(m);
+    else{
+      m.playerNeeds = m.playerNeeds || {};
+      if(m.playerNeeds.food == null){
+        m.playerNeeds.food = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
+      }
+    }
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');
       if(w){

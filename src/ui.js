@@ -17,6 +17,18 @@ APH.UI = (function(){
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
     $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
     $('vHP').textContent = Math.round(Math.max(0,s.hp));
+    var rowFood=$('rowFood');
+    if(rowFood){
+      var atHome=s.scene==='home';
+      rowFood.style.display = atHome ? '' : 'none';
+      if(atHome){
+        var food=(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.food != null)
+          ? s.meta.playerNeeds.food : ((APH.CFG.player && APH.CFG.player.homeFoodStart) || 80);
+        var bFood=$('bFood'), vFood=$('vFood');
+        if(bFood) bFood.style.width = U.clamp(food,0,100)+'%';
+        if(vFood) vFood.textContent = Math.round(Math.max(0,food));
+      }
+    }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);
@@ -73,7 +85,7 @@ APH.UI = (function(){
   function floatText(txt,col){
     if(!ftEl){
       ftEl=document.createElement('div');
-      ftEl.style.cssText='position:fixed;left:50%;bottom:186px;transform:translateX(-50%);z-index:9;'+
+      ftEl.style.cssText='position:fixed;left:50%;bottom:186px;transform:translateX(-50%);z-index:60;'+
         'font-size:14px;letter-spacing:2px;pointer-events:none;transition:all .6s;text-shadow:0 0 10px currentColor';
       document.body.appendChild(ftEl);
     }

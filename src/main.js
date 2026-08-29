@@ -1665,11 +1665,13 @@ window.APH = window.APH || {};
         if(techMapOpen()) toggleTechMap(false);
         else if(s.scene==='home') toggleTechMap();
       }
-      if(e.code==='Enter'&&s.mode==='running'&&s.scene==='home'){
+      if((e.code==='Enter'||e.code==='NumpadEnter'||e.key==='Enter')&&
+         !e.isComposing&&s.mode==='running'&&s.scene==='home'){
         var tpEnt=document.getElementById('tradePanel');
         if(tpEnt && tpEnt.style.display!=='none' && currentTrader()){
           doTradeRow(s.tradeSel||0);
         }else if(techMapOpen()){
+          if(e.preventDefault) e.preventDefault();
           tryBuySelectedTech();
         }
       }
@@ -2097,6 +2099,11 @@ window.APH = window.APH || {};
     s.techSel=ids[row];
     renderTechMap();
   }
+  function setTechMapMsg(txt, col){
+    var el=document.getElementById('techMapMsg');
+    if(el){ el.textContent=txt||''; el.style.color=col||'#ffc857'; }
+    if(txt) APH.UI.floatText(txt, col||'#ffc857');
+  }
   function tryBuySelectedTech(){
     var s=APH.state;
     if(!s.techSel) return;
@@ -2104,7 +2111,7 @@ window.APH = window.APH || {};
     if(!tdef) return;
     if(tdef.assayKey){
       var st=APH.Colony.techNodeStatus(s.meta, s.techSel, s.meta.tech||{});
-      APH.UI.floatText(st.why||'已研发', st.state==='owned'?'#59d9ff':'#ffc857');
+      setTechMapMsg(st.why||'已研发', st.state==='owned'?'#59d9ff':'#ffc857');
       return;
     }
     var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
@@ -2113,16 +2120,17 @@ window.APH = window.APH || {};
       APH.Save.saveMeta(s.meta);
       applyTech(s.meta,s.techSel);
       (r2.granted||[]).forEach(function(id){ applyTech(s.meta,id); });
-      APH.UI.floatText('✔ 研发成功: '+tdef.name,'#59d9ff');
+      var okMsg='✔ 研发成功: '+tdef.name;
       if(r2.granted && r2.granted.length){
         r2.granted.forEach(function(id){
           var g=APH.Colony.TECHS[id];
-          if(g) APH.UI.floatText('🔑 化验钥匙点亮: '+g.name,'#59d9ff');
+          if(g) okMsg+=' · 化验钥匙点亮 '+g.name;
         });
       }
       renderTechMap();
+      setTechMapMsg(okMsg, '#59d9ff');
     }else{
-      APH.UI.floatText('✕ '+(r2.why||'无法研发'),'#ff9a9a');
+      setTechMapMsg('✕ '+(r2.why||'无法研发'), '#ff9a9a');
     }
   }
   function renderTechMap(){
@@ -2156,11 +2164,18 @@ window.APH = window.APH || {};
         else costLine=t.cost+' 研究点'+(pips?' '+pips:'');
         var why=st.why && st.state!=='owned' && st.state!=='available' ? '<div class="techWhy">'+esc(st.why)+'</div>' : '';
         var desc=t.desc ? '<div class="techDesc">'+esc(t.desc)+'</div>' : '';
+        var act='';
+        if(sel){
+          if(st.state==='available') act='<div class="techAct">再点一次或 Enter 研发</div>';
+          else if(st.state==='owned') act='<div class="techAct">已研发</div>';
+          else if(st.state==='unaffordable'||st.state==='locked'||st.state==='assay')
+            act='<div class="techAct">'+esc(st.why||'')+'</div>';
+        }
         html+='<div class="techNode" data-tech="'+id+'" style="margin-left:'+(depth*16)+'px;border-color:'+border+';background:'+bg+';'+dim+
           (sel?'box-shadow:0 0 0 1px #ffc857;':'')+'">'+
           '<b>'+esc(t.name)+'</b>'+
           '<span class="techCost">'+esc(costLine)+'</span>'+
-          desc+why+'</div>';
+          desc+why+act+'</div>';
       });
       html+='</div>';
     });
@@ -2171,7 +2186,9 @@ window.APH = window.APH || {};
         var n=ev.target;
         while(n && n!==el){
           if(n.getAttribute && n.getAttribute('data-tech')){
-            APH.state.techSel=n.getAttribute('data-tech');
+            var id=n.getAttribute('data-tech');
+            if(APH.state.techSel===id){ tryBuySelectedTech(); return; }
+            APH.state.techSel=id;
             renderTechMap();
             return;
           }
@@ -3013,6 +3030,10 @@ window.APH = window.APH || {};
     m.residents.forEach(function(r){
       APH.Res.needsTick(r, false);
     });
+    if(APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(m);
+    if(APH.Res.homeFoodTick && m.playerNeeds){
+      m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);
+    }
     /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
     m.workPrio=m.workPrio||{};
     m.residents.forEach(function(r){
@@ -3330,6 +3351,7 @@ window.APH = window.APH || {};
     toggleCodex:toggleCodex,
     toggleTechMap:toggleTechMap,
     renderTechMap:renderTechMap,
+    tryBuySelectedTech:tryBuySelectedTech,
     renderCodex:renderCodex,
     renderResPanel:renderResPanel,
     residentsTick:residentsTick,

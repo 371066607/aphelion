@@ -102,6 +102,22 @@ test('generate: 同seed同居民(ADR-5), 主≠副', () => {
   if(a.name!==b.name || a.mainSkill!==b.mainSkill) throw new Error('确定性破坏');
   if(a.mainSkill===a.subSkill) throw new Error('主副不应相同');
 });
+test('homeFoodTick: 家园掉饱食, 远征不掉, 不饿死', () => {
+  if (typeof Res.homeFoodTick !== 'function') throw new Error('缺失 APH.Res.homeFoodTick');
+  const drain = (APH.CFG.residents && APH.CFG.residents.foodDrain != null) ? APH.CFG.residents.foodDrain : 6;
+  const next = Res.homeFoodTick(50, 'home');
+  if (next !== 50 - drain) throw new Error('家园应掉饱食 '+drain+', 实际: '+next);
+  if (Res.homeFoodTick(50, 'expedition') !== 50) throw new Error('远征饱食不应下降');
+  if (Res.homeFoodTick(2, 'home') !== 0) throw new Error('饱食应钳到 0, 不饿死');
+});
+test('ensurePlayerNeeds: 缺省饱食并兼容旧档', () => {
+  if (typeof Res.ensurePlayerNeeds !== 'function') throw new Error('缺失 APH.Res.ensurePlayerNeeds');
+  const start = (APH.CFG.player && APH.CFG.player.homeFoodStart != null) ? APH.CFG.player.homeFoodStart : 80;
+  const a = Res.ensurePlayerNeeds({});
+  if (!a.playerNeeds || a.playerNeeds.food !== start) throw new Error('应写入默认饱食 '+start+': '+JSON.stringify(a.playerNeeds));
+  const b = Res.ensurePlayerNeeds({ playerNeeds:{ food:41 } });
+  if (b.playerNeeds.food !== 41) throw new Error('已有饱食不得覆盖');
+});
 test('needsTick: 饿了有粮就吃, 没粮掉饱食', () => {
   const r={food:50, mood:60};
   const out=Res.needsTick(r,true);

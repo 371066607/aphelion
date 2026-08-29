@@ -70,6 +70,22 @@ test('boot 后: 出生在殖民地(home), spec=新曙光殖民地', () => {
   A(S.scene==='home', 'scene 应为 home, got '+S.scene);
   A(S.spec.name==='新曙光殖民地', '应出生在殖民地, got '+S.spec.name);
 });
+test('player food: 家园 HUD 显示饱食, 远征隐藏且不掉', () => {
+  APH.Res.ensurePlayerNeeds(S.meta);
+  const start = S.meta.playerNeeds.food;
+  A(start != null, '家园应有玩家饱食');
+  APH.UI.updHUD();
+  const row = document.getElementById('rowFood');
+  A(row && row.style.display !== 'none', '家园应显示饱食条');
+  const homeNext = APH.Res.homeFoodTick(start, 'home');
+  A(homeNext < start, '家园跳应掉饱食');
+  const expNext = APH.Res.homeFoodTick(start, 'expedition');
+  A(expNext === start, '远征跳饱食应冻结');
+  S.scene = 'expedition';
+  APH.UI.updHUD();
+  A(row.style.display === 'none', '远征应隐藏饱食条');
+  S.scene = 'home';
+});
 test('殖民地世界: 有发射台, 无敌人, 无信标', () => {
   const pad = S.entities.find(e=>e.type===T.BUILDING && e.pad);
   A(pad, '发射台缺失');
@@ -622,6 +638,24 @@ test('tech map: T 全屏四列、隐藏旧档别名、化验钥匙不可买', ()
   const chk = C.canBuy(S.meta, 'te_bio_adaptation', S.meta.tech);
   A(!chk.ok && String(chk.why).includes('化验'), '有水培仍不可买化验钥匙: '+chk.why);
   A(before === !!S.meta.tech.te_bio_adaptation, '试买不得改写科技');
+  M.toggleTechMap(false);
+});
+
+test('tech map: 研发反馈写在图上，失败原因可见', () => {
+  S.scene = 'home';
+  S.meta.research = 0;
+  S.meta.tech = {};
+  M.toggleTechMap(true);
+  S.techSel = 'te_basic_farming';
+  M.tryBuySelectedTech();
+  const msg = document.getElementById('techMapMsg');
+  A(msg && String(msg.textContent).indexOf('研究点') >= 0,
+    '研究点不够时应在图上显示原因, 实际: '+(msg && msg.textContent));
+  S.meta.research = 500;
+  M.tryBuySelectedTech();
+  A(S.meta.tech.te_basic_farming === 1, '研究点够时应研发成功');
+  A(String(msg.textContent).indexOf('研发成功') >= 0,
+    '成功应写在图上, 实际: '+msg.textContent);
   M.toggleTechMap(false);
 });
 

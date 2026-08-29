@@ -78,6 +78,22 @@ APH.Res = (function(){
     return Math.max(lo, Math.min(hi, v));
   }
 
+  /* 玩家家园饱食: 只在 home 掉; 远征冻结; 钳到 0, 不饿死 */
+  function homeFoodTick(food, scene){
+    var start = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
+    var v = food == null ? start : food;
+    if(scene !== 'home') return clampNeed(v, 0, 100);
+    var drain = RS().foodDrain != null ? RS().foodDrain : 6;
+    return clampNeed(v - drain, 0, 100);
+  }
+  function ensurePlayerNeeds(meta){
+    meta = meta || {};
+    meta.playerNeeds = meta.playerNeeds || {};
+    var start = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
+    if(meta.playerNeeds.food == null) meta.playerNeeds.food = start;
+    return meta;
+  }
+
   /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
      每30游戏秒一跳: 掉饱食; 真吃饭在走位里(仓/地上堆). 饿→心情掉且涨病; 不饿死.
      深度生存: 结算精力消耗与睡眠恢复。 */
@@ -1078,6 +1094,7 @@ APH.Res = (function(){
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
+    homeFoodTick:homeFoodTick, ensurePlayerNeeds:ensurePlayerNeeds,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
