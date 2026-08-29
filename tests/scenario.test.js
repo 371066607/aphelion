@@ -523,5 +523,66 @@ test('planet: 孢子近距排开 / hasLaw', () => {
   A(!(sp.x===10 && sp.y===10), '贴身孢子应排开');
 });
 
+test('home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救援、气候暴露与名册UI)', () => {
+  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
+  const Res = window.APH.Res;
+  const pad = {id:'bl_landing_pad', x:1100, y:1340};
+  const house = {id:'bl_house', x:1100, y:1200, lv:1};
+  const clinic = {id:'bl_clinic', x:1000, y:1200, lv:1};
+  S.colony.buildings = [pad, house, clinic];
+
+  S.meta.residents = [
+    {
+      id:'rs_surv_1', name:'探险者甲', job:null, skills:{sk_farm:8},
+      mood:80, food:90, illness:0, rest:15, recreation:85, exposure:0,
+      ailments:[], downed:false, isSleeping:false, bedId:null
+    },
+    {
+      id:'rs_surv_2', name:'探险者乙', job:null, skills:{sk_social:6},
+      mood:75, food:80, illness:70, rest:80, recreation:50, exposure:60,
+      ailments:[{type:'plague', sev:70, age:0}], downed:false, isSleeping:false, bedId:null
+    }
+  ];
+
+  // 1. 运行 residentsTick (床位分配 + 需求结算)
+  M.residentsTick();
+
+  const r1 = S.meta.residents[0];
+  const r2 = S.meta.residents[1];
+
+  A(!!r1.bedId, 'r1 应分配到居住舱床位');
+  A(r1.isSleeping, 'r1 rest<20 应进入睡眠');
+  A(r1.mood >= 80, 'r1 高娱乐+舒适床位应维持高心情');
+
+  // 2. r2 严重疫病机能损毁与击倒判定
+  const cap2 = Res.capacitiesOf(r2);
+  A(cap2.consciousness < 0.4, 'r2 严重疫病认知机能应受损, got '+cap2.consciousness);
+  A(Res.checkDowned(r2), 'r2 严重疫病应触发击倒');
+  A(r2.downed, 'r2 downed 应为 true');
+
+  // 3. 救援调度与送医
+  const rescueRes = Res.rescueTick([r2], S.colony.buildings, 10, true, { inClinic:true });
+  A(!r2.downed, '送入医疗舱用药后应成功抢救');
+  A(rescueRes.medUsed, '抢救应消耗药品');
+
+  // 4. 气候暴露与避难所
+  A(Res.isSheltered({x:1100,y:1200}, S.colony.buildings), '建筑周边应为避难所');
+  Res.exposureTick(r2, true, true, 'lw_night_acid');
+  A(r2.exposure < 60, '避难所内暴露值应消退, got '+r2.exposure);
+
+  // 5. 实体同步
+  M.syncResidents();
+  const ent1 = S.entities.find(e=>e.rid==='rs_surv_1'||e.id==='rs_surv_1');
+  A(!!ent1, '应同步实体');
+  A(ent1.isSleeping, '实体应同步 isSleeping 状态');
+
+  // 6. R 键名册渲染
+  const body = document.getElementById('resBody');
+  M.renderResPanel();
+  A(body.innerHTML.includes('精力'), '名册应包含精力数据');
+  A(body.innerHTML.includes('机能'), '名册应包含机能卡片');
+});
+
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);
