@@ -537,6 +537,81 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* 外星种植圃(bl_crop_plot): 动森风木质田垄 + 4 阶段异星作物渲染 */
+    if(e.bid==='bl_crop_plot'){
+      ctx.save(); ctx.translate(e.x,e.y);
+      // 木质田埂外框
+      ctx.fillStyle='#5d4037';
+      ctx.beginPath(); ctx.rect(-22,-18,44,36); ctx.fill();
+      ctx.fillStyle='#3e2723';
+      ctx.beginPath(); ctx.rect(-19,-15,38,30); ctx.fill();
+      // 沃土层
+      ctx.fillStyle='#271c19';
+      ctx.beginPath(); ctx.rect(-17,-13,34,26); ctx.fill();
+
+      var cropId = e.crop || 'crop_glow_shroom';
+      var stage = (e.plot && e.plot.stage!=null) ? e.plot.stage : 0;
+      var bounce = Math.sin((time||0)*4)*1.5;
+
+      if(stage === 0){
+        // 幼苗芽
+        ctx.fillStyle='#81c784';
+        ctx.beginPath(); ctx.arc(-4, 0, 2, 0, U.TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(4, 0, 2, 0, U.TAU); ctx.fill();
+      } else if(stage === 1){
+        // 拔节抽叶
+        ctx.fillStyle='#4caf50';
+        ctx.beginPath(); ctx.ellipse(0, -2, 6, 9, 0, 0, U.TAU); ctx.fill();
+        ctx.fillStyle='#81c784';
+        ctx.beginPath(); ctx.arc(0, -8, 3, 0, U.TAU); ctx.fill();
+      } else if(stage === 2){
+        // 蕾期
+        ctx.fillStyle='#2e7d32';
+        ctx.beginPath(); ctx.ellipse(0, -4, 9, 12, 0, 0, U.TAU); ctx.fill();
+        ctx.fillStyle=cropId==='crop_glow_shroom'?'#4dd0e1':(cropId==='crop_crystal_vine'?'#f48fb1':(cropId==='crop_dew_fruit'?'#80cbc4':'#e0e0e0'));
+        ctx.beginPath(); ctx.arc(0, -12, 5, 0, U.TAU); ctx.fill();
+      } else if(stage >= 3){
+        // 成熟期: 动森风外星奇观
+        if(cropId === 'crop_glow_shroom'){
+          // 夜光荧蕈: 青蓝光晕 + 伞盖
+          ctx.fillStyle='rgba(77,208,225,.35)';
+          ctx.beginPath(); ctx.arc(0, -12, 18, 0, U.TAU); ctx.fill();
+          ctx.fillStyle='#e0f7fa';
+          ctx.fillRect(-3, -8, 6, 12);
+          ctx.fillStyle='#00e5ff';
+          ctx.beginPath(); ctx.arc(0, -12, 11, Math.PI, 0); ctx.fill();
+          ctx.fillStyle='#fff';
+          ctx.beginPath(); ctx.arc(-4, -14, 2, 0, U.TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(4, -14, 2, 0, U.TAU); ctx.fill();
+        } else if(cropId === 'crop_crystal_vine'){
+          // 晶脉拟态藤: 晶粉发光花果
+          ctx.strokeStyle='#33691e'; ctx.lineWidth=2.5;
+          ctx.beginPath(); ctx.moveTo(-10, 4); ctx.quadraticCurveTo(0, -10, 10, -12); ctx.stroke();
+          ctx.fillStyle='#ff80ab';
+          ctx.beginPath(); ctx.arc(-5, -6+bounce, 4.5, 0, U.TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(8, -12+bounce, 5.5, 0, U.TAU); ctx.fill();
+          ctx.fillStyle='#fff';
+          ctx.fillRect(7, -14+bounce, 2, 2);
+        } else if(cropId === 'crop_dew_fruit'){
+          // 露珠膨果: 半透明多汁果冻水球
+          ctx.fillStyle='rgba(0,188,212,.4)';
+          ctx.beginPath(); ctx.arc(0, -10+bounce, 12, 0, U.TAU); ctx.fill();
+          ctx.fillStyle='#26c6da';
+          ctx.beginPath(); ctx.arc(0, -10+bounce, 9, 0, U.TAU); ctx.fill();
+          ctx.fillStyle='#fff';
+          ctx.beginPath(); ctx.arc(-3, -13+bounce, 3, 0, U.TAU); ctx.fill();
+        } else if(cropId === 'crop_star_velvet'){
+          // 星绒草: 银白发光多重绒毛
+          ctx.fillStyle='#cfd8dc';
+          ctx.beginPath(); ctx.ellipse(-6, -8, 5, 10, -0.4, 0, U.TAU); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(6, -8, 5, 10, 0.4, 0, U.TAU); ctx.fill();
+          ctx.fillStyle='#eceff1';
+          ctx.beginPath(); ctx.ellipse(0, -12+bounce, 6, 12, 0, 0, U.TAU); ctx.fill();
+        }
+      }
+      ctx.restore();
+      return;
+    }
     /* 通用建筑(回退): 影子+主体+屋顶灯 */
     var col=BLD_COLORS[e.bid]||'#8fa3cc';
     var sz=(e.def&&e.def.size)||40;

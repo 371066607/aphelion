@@ -51,8 +51,11 @@ APH.Colony = (function(){
     bl_workshop:    { name:'工坊', cost:0, costMineral:25, costRes:{ wood:15, iron:20, stone:10 }, size:48, max:2, buildTime:18,
       dispH:110, cells:[2,2],
       desc:'有工匠时将草药提炼成药品。' },
+    bl_crop_plot:   { name:'外星种植圃', cost:0, costMineral:0, costRes:{ wood:10, stone:5 }, size:48, max:12, buildTime:8,
+      dispH:48, cells:[1,1],
+      desc:'培育外星奇幻作物的轻量田圃。可指派荧蕈、晶藤、露果、星绒草。' },
   };
-  var JOB_CYCLE = [null, 'bl_farm', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
+  var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
   /* ---------- Task3: 建筑等级 ---------- */
   function upgradeCost(def, curLv){
@@ -763,6 +766,101 @@ APH.Colony = (function(){
     return { ok:true, owned:o };
   }
 
+  /* ---------- 异星奇幻植物定义表 (ADR-9 crop_ 前缀) ---------- */
+  var ALIEN_CROPS = {
+    crop_glow_shroom:  { name:'夜光荧蕈', growTicks:3, baseYield:4, dropItem:'it_glow_fluid', glowR:60, desc:'夜间自发光青蓝微光' },
+    crop_crystal_vine: { name:'晶脉拟态藤', growTicks:5, baseYield:5, dropItem:'it_crystal_berry', extraItem:'it_crystal_ore', desc:'产出晶核果与微量晶体' },
+    crop_dew_fruit:    { name:'露珠膨果', growTicks:4, baseYield:6, dropItem:'it_dew_fruit', moodBoost:6, desc:'食用提供+6清甜心情' },
+    crop_star_velvet:  { name:'星绒草', growTicks:5, baseYield:4, dropItem:'it_star_fiber', desc:'外星防酸抗温纤维' },
+  };
+
+  /* 派生夜间生物发光源(夜光荧蕈自发光) */
+  function getGlowSources(buildings){
+    var lights = [];
+    (buildings||[]).forEach(function(b){
+      if(!b || (b.id!=='bl_crop_plot' && b.id!=='bl_farm')) return;
+      var cropId = b.crop || 'crop_glow_shroom';
+      var def = ALIEN_CROPS[cropId];
+      if(def && def.glowR && b.plot && (b.plot.stage||0) >= 2){
+        lights.push({
+          x: b.x, y: b.y, r: def.glowR || 60,
+          col: 'rgba(89,217,255,0.45)'
+        });
+      }
+    });
+    return lights;
+  }
+
+  /* 异星田圃生长推进(纯函数) */
+  function cropPlotTick(plot, farmerSkill, eff, lawMul, cropType){
+    if(farmerSkill == null || !plot) return plot;
+    var cropDef = ALIEN_CROPS[cropType || 'crop_glow_shroom'] || { growTicks:4 };
+    var growTicks = cropDef.growTicks || 4;
+    var e = (eff == null ? 1 : eff);
+    var lm = (lawMul == null ? 1 : lawMul);
+    var bonus = (1 + farmerSkill * 0.15) * e * lm;
+    plot.t = (plot.t || 0) + bonus;
+    var step = growTicks / 3;
+    if(plot.t >= step && plot.stage < 3){
+      plot.stage++;
+      plot.t = 0;
+    }
+    return plot;
+  }
+
+  /* 异星作物收割结算(纯函数): 产出主产品与特殊副产品 */
+  function harvestAlienCrop(cropType, farmerSkill){
+    var cropDef = ALIEN_CROPS[cropType || 'crop_glow_shroom'] || { baseYield:4, dropItem:'it_glow_fluid' };
+    var sk = farmerSkill || 0;
+    var mul = 1 + sk * 0.12;
+    var count = Math.max(1, Math.round((cropDef.baseYield || 4) * mul));
+    return {
+      dropItemId: cropDef.dropItem || 'it_food',
+      dropCount: count,
+      extraItemId: cropDef.extraItem || null,
+      extraCount: cropDef.extraItem ? Math.max(1, Math.round(count * 0.25)) : 0,
+      moodBoost: cropDef.moodBoost || 0
+    };
+  }
+
+  /* ---------- 土壤肥力与种植区划 (RimWorld 农业) ---------- */
+  function soilFertilityAt(x, y, seed){
+    var L = CFG.LAKE || { x:1660, y:1560, r:148 };
+    var H = CFG.HAB || { x:1100, y:1100, r:92 };
+    var S = CFG.soil || { rich:1.4, normal:1.0, poor:0.7, hydro:2.8 };
+    if(U.dst(x, y, L.x, L.y) < (L.r + 140)) return S.rich;
+    if(U.dst(x, y, H.x, H.y) > 750 || x < 200 || y < 200 || x > CFG.WORLD-200 || y > CFG.WORLD-200) return S.poor;
+    return S.normal;
+  }
+
+  function createGrowingZone(id, x, y, cols, rows, cropType){
+    cols = Math.max(1, cols || 1);
+    rows = Math.max(1, rows || 1);
+    var cells = [];
+    for(var r=0; r<rows; r++){
+      for(var c=0; c<cols; c++){
+        var cx = x + c * CFG.GRID;
+        var cy = y + r * CFG.GRID;
+        var fert = soilFertilityAt(cx, cy);
+        cells.push({
+          gx: cx, gy: cy, c: c, r: r, fertility: fert,
+          plant: null
+        });
+      }
+    }
+    return {
+      id: id,
+      x: x, y: y,
+      cols: cols, rows: rows,
+      cropType: cropType || 'crop_rice',
+      cells: cells
+    };
+  }
+
+  function removeGrowingZone(zones, id){
+    return (zones||[]).filter(function(z){ return z.id !== id; });
+  }
+
   /* ---------- 自然生态生成(纯函数) ---------- */
   function generateFlora(seed){
     var rng = U.makeRng((seed ^ 0xF108A) >>> 0 || 17);
@@ -842,5 +940,8 @@ APH.Colony = (function(){
     stockLabel:stockLabel, takeFromGround:takeFromGround,
     takeStock:takeStock, ensureStock:ensureStock,
     ensurePad:ensurePad, generateFlora:generateFlora, workOnFlora:workOnFlora,
+    soilFertilityAt:soilFertilityAt, createGrowingZone:createGrowingZone, removeGrowingZone:removeGrowingZone,
+    ALIEN_CROPS:ALIEN_CROPS, getGlowSources:getGlowSources,
+    cropPlotTick:cropPlotTick, harvestAlienCrop:harvestAlienCrop,
   };
 })();

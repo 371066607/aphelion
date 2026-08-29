@@ -454,6 +454,15 @@
   验证: `python3 build.py` 构建成功 27074KB 以 `</html>` 收尾；新增 `tests/tech.test.js` 与 `tests/resources.test.js`；单元 280/0；场景 28/0；perf 3/0；boss 7/0（全量 318 项自动化测试 100% 绿灯）。
   下一步: 实机浏览器体验试玩。
 
+- **2026-08-29 · 班次**: ✅异星奇幻农耕与远征驯化系统（#33~#38 全部闭环）。
+  - **4 大外星奇幻植物**：夜光荧蕈（`crop_glow_shroom`，夜间自发光 60px、荧光浆液）、晶脉拟态藤（`crop_crystal_vine`，晶核果 + 晶体副产物）、露珠膨果（`crop_dew_fruit`，多汁果冻 +6 清甜心情 Buff）、星绒草（`crop_star_velvet`，外星防酸银绒纤维）。
+  - **远征探险采种**：`Planet.generateExpeditionFlora` 生成野生异星植物，[E] 采种装入背包，返航结算自动入库。
+  - **家园外星田圃与发光动效**：新增轻量种植槽 `bl_crop_plot`（10木+5石）；`Colony.getGlowSources` 派生夜间发光源；`Ent.drawBuilding` 绘制动森风田垄与 4 阶段外星植株动效（果冻弹动露珠、荧光伞盖、晶粉花藤）。
+  - **培育照料与多维收获**：`cropPlotTick` 与 `harvestAlienCrop` 纯函数推进生长与多维特产结算。
+  验证: `python3 build.py` 构建成功 27084KB 以 `</html>` 收尾；新增 `tests/flora.test.js` 与 `tests/agri.test.js`；单元 292/0；场景 28/0；perf 3/0；boss 7/0（全量 330 项自动化测试 100% 绿灯）。
+  下一步: 实机体验外星发光农园。
+
+
 
 
 

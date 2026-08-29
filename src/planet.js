@@ -238,6 +238,32 @@ APH.Planet = (function(){
     return cloneFaction(ENEMY_FACTIONS[0]);
   }
 
+  /* 远征星球野生异星植物生成 (Flora #36) */
+  function generateExpeditionFlora(seed, tier){
+    var rng = U.makeRng((seed ^ 0xEE7A) >>> 0 || 31);
+    var out = [];
+    var count = 6 + Math.floor(rng() * 4);
+    var kinds = ['flora_glow', 'flora_crystal', 'flora_dew', 'flora_star'];
+    var W = (APH.CFG && APH.CFG.WORLD) || 2200;
+    for(var i=0; i<count; i++){
+      var kind = kinds[i % kinds.length];
+      var ang = rng() * U.TAU;
+      var dist = 220 + rng() * 650;
+      var x = U.clamp(1100 + Math.cos(ang)*dist, 120, W-120);
+      var y = U.clamp(1100 + Math.sin(ang)*dist, 120, W-120);
+      out.push({
+        id: 'exp_flora_' + i,
+        type: 'flora',
+        kind: kind,
+        x: x, y: y,
+        hp: 1, maxHp: 1,
+        seedItem: kind==='flora_glow'?'it_seed_glow':(kind==='flora_crystal'?'it_seed_crystal':(kind==='flora_dew'?'it_seed_dew':'it_seed_star'))
+      });
+    }
+    return out;
+  }
+
   return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
-           pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge };
+           pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
+           generateExpeditionFlora:generateExpeditionFlora };
 })();

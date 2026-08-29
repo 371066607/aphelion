@@ -16,6 +16,14 @@ APH.CFG = {
   HAB: { x: 1100, y: 1100, r: 92 },
   DAY_LEN: 210,                // 一天的秒数
 
+  /* 土壤肥力体系 (RimWorld 农业) */
+  soil: {
+    rich: 1.40,                // 沃土(湖畔/沼泽)
+    normal: 1.00,              // 普通土壤(平原)
+    poor: 0.70,                // 贫瘠砂砾(边陲荒原)
+    hydro: 2.80,               // 温控水培槽
+  },
+
   /* 人形贴图 (ADR-0001) */
   humanoid: {
     drawH: 78,                 // 所有人形目标内容高
@@ -109,18 +117,26 @@ APH.CFG = {
 
   /* 物品表 (ADR-9: it_ 前缀; w=负重 v=研究点价值; store=家园入库字段) */
   items: {
-    it_wood:        { name: '木材',   w: 1, v: 0, tint:'#b8874a', store:'wood' },
-    it_stone:       { name: '石料',   w: 2, v: 0, tint:'#8fa3cc', store:'stone' },
-    it_iron:        { name: '铁矿',   w: 2, v: 0, tint:'#7a8ba9', store:'iron' },
-    it_berry:       { name: '野果',   w: 1, v: 0, tint:'#ff6d7a', store:'food' },
-    it_herb:        { name: '草药',   w: 1, v: 0, tint:'#7dffab', store:'herb' },
-    it_crystal_ore: { name: '晶体矿', w: 2, v: 2, tint:'#ff9ad0' },
-    it_mineral:     { name: '矿材',   w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
-    it_alloy:       { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
-    it_relic:       { name: '信标遗件', w: 1, v: 40, tint:'#ffc857' },
-    it_food:        { name: '食物',   w: 1, v: 0, tint:'#c8e89a', store:'food' },
-    it_med:         { name: '药品',   w: 1, v: 0, tint:'#7dffab', store:'med' },
-    it_leather:     { name: '皮革',   w: 2, v: 0, tint:'#d4a574', store:'leather' },
+    it_wood:          { name: '木材',     w: 1, v: 0, tint:'#b8874a', store:'wood' },
+    it_stone:         { name: '石料',     w: 2, v: 0, tint:'#8fa3cc', store:'stone' },
+    it_iron:          { name: '铁矿',     w: 2, v: 0, tint:'#7a8ba9', store:'iron' },
+    it_berry:         { name: '野果',     w: 1, v: 0, tint:'#ff6d7a', store:'food' },
+    it_herb:          { name: '草药',     w: 1, v: 0, tint:'#7dffab', store:'herb' },
+    it_glow_fluid:    { name: '荧光浆液', w: 1, v: 5, tint:'#59d9ff', store:'glow_fluid' },
+    it_crystal_berry: { name: '晶核果',   w: 1, v: 3, tint:'#ff9ad0', store:'food' },
+    it_dew_fruit:     { name: '清甜露果', w: 1, v: 4, tint:'#80cbc4', store:'food' },
+    it_star_fiber:    { name: '星绒纤维', w: 1, v: 6, tint:'#e0e0e0', store:'leather' },
+    it_seed_glow:     { name: '荧蕈孢子', w: 1, v: 10, tint:'#59d9ff' },
+    it_seed_crystal:  { name: '晶藤插条', w: 1, v: 12, tint:'#ff9ad0' },
+    it_seed_dew:      { name: '露果种荚', w: 1, v: 8, tint:'#80cbc4' },
+    it_seed_star:     { name: '星绒绒种', w: 1, v: 15, tint:'#e0e0e0' },
+    it_crystal_ore:   { name: '晶体矿',   w: 2, v: 2, tint:'#ff9ad0' },
+    it_mineral:       { name: '矿材',     w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },
+    it_alloy:         { name: '合金碎片', w: 5, v: 10, tint:'#b8874a', store:'mineral', storeN:3 },
+    it_relic:         { name: '信标遗件', w: 1, v: 40, tint:'#ffc857' },
+    it_food:          { name: '食物',     w: 1, v: 0, tint:'#c8e89a', store:'food' },
+    it_med:           { name: '药品',     w: 1, v: 0, tint:'#7dffab', store:'med' },
+    it_leather:       { name: '皮革',     w: 2, v: 0, tint:'#d4a574', store:'leather' },
   },
 
   /* 实体 type 枚举 (ADR-3) */

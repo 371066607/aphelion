@@ -123,21 +123,24 @@ APH.Combat = (function(){
     }
     return gained;
   }
-  /* 背包分账: 矿材/合金入仓, 晶体/遗件变研究点 */
+  /* 背包分账: 矿材/合金入仓, 晶体/遗件变研究点, 异星种子入库 (Flora #36) */
   function settleGoods(carry){
-    var research=0, mineral=0;
-    if(!carry) return { research:0, mineral:0 };
+    var research=0, mineral=0, seeds={};
+    if(!carry) return { research:0, mineral:0, seeds:seeds };
     for(var k in carry){
       var n=carry[k]||0;
       if(!n) continue;
       if(k==='it_mineral') mineral += n;
       else if(k==='it_alloy') mineral += n*3;
+      else if(k.startsWith('it_seed_')){
+        seeds[k] = (seeds[k]||0) + n;
+      }
       else if(k==='it_crystal_ore' || k==='it_relic'){
         var it=CFG.items[k];
         research += (it && it.v ? it.v : 0) * n;
       }
     }
-    return { research:research, mineral:mineral };
+    return { research:research, mineral:mineral, seeds:seeds };
   }
 
   function raidPillage(meta, building){
