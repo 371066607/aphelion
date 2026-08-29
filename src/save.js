@@ -128,6 +128,9 @@ APH.Save = (function(){
       if(m.playerNeeds.rest == null){
         m.playerNeeds.rest = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
       }
+      if(m.playerNeeds.illness == null){
+        m.playerNeeds.illness = (CFG.player && CFG.player.homeIllnessStart != null) ? CFG.player.homeIllnessStart : 0;
+      }
     }
     try{
       var w = JSON.parse(rawGet('aphelion_war_v1')||'null');

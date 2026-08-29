@@ -53,6 +53,7 @@ test('meta 默认结构与写读一致 (ADR-2)', () => {
   if (m2.tech.te_weaponry !== 2) throw new Error('tech 键值对象未持久化');
   if (!m2.playerNeeds || m2.playerNeeds.food == null) throw new Error('旧档应补 playerNeeds.food');
   if (m2.playerNeeds.rest == null) throw new Error('旧档应补 playerNeeds.rest');
+  if (m2.playerNeeds.illness == null) throw new Error('旧档应补 playerNeeds.illness');
 });
 test('exo_suit 迁 te_exosuit, 战争并入 meta', () => {
   Save.saveMeta({ v:1, tech:{ exo_suit:2 }, res:{mineral:3,food:0,leather:0}, stats:{landings:0,deaths:0,kills:0,scans:0,playSec:0} });

@@ -523,10 +523,7 @@
   验证: 构建 27145KB；单元 336/0；场景 35/0；perf 3/0；boss 7/0。无浏览器工具，HUD 由场景测试 `player rest` 断言 DOM。
   下一步: 实机打开 game.html 看左上精力条；场上累塌仍未做。
 
-
-
-
-
-
-
-
+- **2026-08-29 · 班次**: ✅#58 玩家病情进 HUD。
+  `homeIllnessTick` identity+clamp（家园/远征都不改值）；左上 HUD 家园且病情>0 才显示，远征隐藏且不结算。
+  验证: `python3 build.py` 构建成功 27146KB 以 `</html>` 收尾；单元 338/0；场景 36/0；perf 3/0；boss 7/0。HUD 由场景测试 `player illness` 断言 DOM。
+  下一步: 场上生病/累塌仍未做。

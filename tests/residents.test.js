@@ -134,6 +134,25 @@ test('ensurePlayerNeeds: 缺省精力并兼容旧档', () => {
   if (c.playerNeeds.food !== 41) throw new Error('补精力不得覆盖已有饱食');
   if (c.playerNeeds.rest !== 100) throw new Error('旧档有饱食无精力时应补 100');
 });
+test('homeIllnessTick: 家园不改值, 远征不结算, 钳到 0..100', () => {
+  if (typeof Res.homeIllnessTick !== 'function') throw new Error('缺失 APH.Res.homeIllnessTick');
+  if (Res.homeIllnessTick(40, 'home') !== 40) throw new Error('家园病情应为身份, 不饿病');
+  if (Res.homeIllnessTick(40, 'expedition') !== 40) throw new Error('远征病情应冻结');
+  if (Res.homeIllnessTick(null, 'home') !== 0) throw new Error('缺省开局病情应为 0');
+  if (Res.homeIllnessTick(-3, 'home') !== 0) throw new Error('病情应钳到 0');
+  if (Res.homeIllnessTick(140, 'expedition') !== 100) throw new Error('病情应钳到 100');
+});
+test('ensurePlayerNeeds: 缺省病情 0 并兼容旧档', () => {
+  const a = Res.ensurePlayerNeeds({});
+  if (!a.playerNeeds || a.playerNeeds.illness !== 0) throw new Error('应写入默认病情 0: '+JSON.stringify(a.playerNeeds));
+  if (a.playerNeeds.food == null || a.playerNeeds.rest == null) throw new Error('补病情仍应填饱食/精力');
+  const b = Res.ensurePlayerNeeds({ playerNeeds:{ illness:17 } });
+  if (b.playerNeeds.illness !== 17) throw new Error('已有病情不得覆盖');
+  const c = Res.ensurePlayerNeeds({ playerNeeds:{ food:41, rest:41 } });
+  if (c.playerNeeds.food !== 41) throw new Error('补病情不得覆盖已有饱食');
+  if (c.playerNeeds.rest !== 41) throw new Error('补病情不得覆盖已有精力');
+  if (c.playerNeeds.illness !== 0) throw new Error('旧档有饱食/精力无病情时应补 0');
+});
 test('needsTick: 饿了有粮就吃, 没粮掉饱食', () => {
   const r={food:50, mood:60};
   const out=Res.needsTick(r,true);

@@ -54,6 +54,7 @@ APH.CFG = {
     carryMax: 40,              // 负重上限
     homeFoodStart: 80,         // 家园需求: 玩家开局饱食
     homeRestStart: 100,        // 家园需求: 玩家开局精力
+    homeIllnessStart: 0,        // 家园需求: 玩家开局病情 (0=HUD 隐藏)
   },
 
   /* 相机 */

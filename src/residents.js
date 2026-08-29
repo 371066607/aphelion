@@ -94,13 +94,21 @@ APH.Res = (function(){
     var drain = RS().restDrain != null ? RS().restDrain : 7;
     return clampNeed(v - drain, 0, 100);
   }
+  /* 玩家家园病情: 本票只钳 0..100; 家园/远征都不改值 (远征冻结可测; 涨病另票) */
+  function homeIllnessTick(ill, scene){
+    var start = (CFG.player && CFG.player.homeIllnessStart != null) ? CFG.player.homeIllnessStart : 0;
+    var v = ill == null ? start : ill;
+    return clampNeed(v, 0, 100);
+  }
   function ensurePlayerNeeds(meta){
     meta = meta || {};
     meta.playerNeeds = meta.playerNeeds || {};
     var foodStart = (CFG.player && CFG.player.homeFoodStart != null) ? CFG.player.homeFoodStart : 80;
     var restStart = (CFG.player && CFG.player.homeRestStart != null) ? CFG.player.homeRestStart : 100;
+    var illStart = (CFG.player && CFG.player.homeIllnessStart != null) ? CFG.player.homeIllnessStart : 0;
     if(meta.playerNeeds.food == null) meta.playerNeeds.food = foodStart;
     if(meta.playerNeeds.rest == null) meta.playerNeeds.rest = restStart;
+    if(meta.playerNeeds.illness == null) meta.playerNeeds.illness = illStart;
     return meta;
   }
 
@@ -1104,7 +1112,7 @@ APH.Res = (function(){
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
-    homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, ensurePlayerNeeds:ensurePlayerNeeds,
+    homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,

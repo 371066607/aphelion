@@ -41,6 +41,17 @@ APH.UI = (function(){
         if(vRest) vRest.textContent = Math.round(Math.max(0,rest));
       }
     }
+    var rowIll=$('rowIll');
+    if(rowIll){
+      var ill=(needs && needs.illness != null) ? needs.illness : 0;
+      var showIll=atHome && ill>0;
+      rowIll.style.display = showIll ? '' : 'none';
+      if(showIll){
+        var bIll=$('bIll'), vIll=$('vIll');
+        if(bIll) bIll.style.width = U.clamp(ill,0,100)+'%';
+        if(vIll) vIll.textContent = Math.round(Math.max(0,ill));
+      }
+    }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);

@@ -110,6 +110,33 @@ test('player rest: 家园 HUD 显示精力, 远征隐藏且不掉', () => {
   S.meta.playerNeeds.rest = start;
   S.meta.playerNeeds.food = foodStart;
 });
+test('player illness: 家园病情>0 才显示, 远征隐藏且不结算', () => {
+  APH.Res.ensurePlayerNeeds(S.meta);
+  const foodStart = S.meta.playerNeeds.food;
+  const restStart = S.meta.playerNeeds.rest;
+  const illStart = S.meta.playerNeeds.illness;
+  S.meta.playerNeeds.illness = 0;
+  S.scene = 'home';
+  APH.UI.updHUD();
+  const row = document.getElementById('rowIll');
+  A(row && row.style.display === 'none', '家园病情为 0 时 HUD 应隐藏');
+  S.meta.playerNeeds.illness = 40;
+  APH.UI.updHUD();
+  A(row.style.display !== 'none', '家园病情>0 时 HUD 应显示');
+  const v = document.getElementById('vIll');
+  A(v && Number(v.textContent) === 40, '家园病情数值应显示 40, 实际: '+(v && v.textContent));
+  M.residentsTick();
+  A(S.meta.playerNeeds.illness === 40, '家园生产跳病情应为身份, 实际: '+S.meta.playerNeeds.illness);
+  S.scene = 'expedition';
+  M.residentsTick();
+  A(S.meta.playerNeeds.illness === 40, '远征生产跳病情应冻结');
+  APH.UI.updHUD();
+  A(row.style.display === 'none', '远征应隐藏病情条');
+  S.scene = 'home';
+  S.meta.playerNeeds.food = foodStart;
+  S.meta.playerNeeds.rest = restStart;
+  S.meta.playerNeeds.illness = illStart;
+});
 test('殖民地世界: 有发射台, 无敌人, 无信标', () => {
   const pad = S.entities.find(e=>e.type===T.BUILDING && e.pad);
   A(pad, '发射台缺失');
