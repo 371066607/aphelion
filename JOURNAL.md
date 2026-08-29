@@ -543,3 +543,11 @@
   - **纯函数 seam**（#67 累塌/#70 医疗舱躺可复用）：`setPlayerSleeping` / `playerWake` / `playerRestTick` 导出至 `APH.Res`；`CFG.player` 加 `bedSleepRadius/bedRecover/floorRecover/restWakeAt`（读回退 `CFG.residents.*`）。
   验证: `python3 build.py` 构建成功 27252KB 以 `</html>` 收尾，script 标签 18/18 平衡；单元 352/0（survival.test 新增 7 例：playerRestTick 床/地铺/回满/远征冻结、setPlayerSleeping 绑床/地铺/清床、playerWake 返回值、ensurePlayerNeeds 默认）；场景 43/0（scenario.test 新增 5 例：靠床 nearBed 且 S.target 保持 null 不自动寻路、E 入睡+实体俯卧+drawPlayer 不崩、WASD 唤醒同帧移动、E 再按唤醒、受伤唤醒）；perf 3/0；boss 7/0。全量 405 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `updateHome`/`residentsTick`/`debugPressE` 断言状态机。
   下一步: 实机打开 game.html 在居住舱旁按 E 睡、WASD/E/受伤唤醒看俯卧；#67 场上累塌、#70 医疗舱躺接入复用此 seam。
+
+- **2026-08-29 21:52 · 班次**: ✅#67 玩家精力累塌（家园精力归零原地睡着）。
+  - **累塌触发点**：`residentsTick`（`main.js` 生产跳 `s.prodT>=30` 块内, 两场景都跑）每 30 游戏秒调纯函数 `APH.Res.playerRestTick(needs, scene, hasBed)`。清醒分支委托 `homeRestTick` 掉 7 后若 `rest<=0` 且 `scene==='home'` → `setPlayerSleeping(needs, true, false)` **原地打地铺睡**（`bedId=null`，不绑床、不走向床）。因生产跳与键盘输入无关，即使玩家正在操纵也会累塌。
+  - **scene 门**：只在家园触发（远征精力冻结不会见底）；`CFG.player.restCollapseAt:0` 阈值进配置可测。
+  - **唤醒继承 #66 零新增**：累塌只翻 `isSleeping=true`，WASD（`entities.js` 先醒后动同帧）/ E 再按（`debugPressE`+keydown 优先分支）/ 受伤（`hurtPlayer` 伤害真正落地）均走同一 `playerWake`。
+  - **三条评审修复折入**：① `playerRestTick` 自动醒同时清 `bedId`（对齐 `playerWake`，修全恢复床睡后 `bedId='bed_player'` 残留）；② `setPlayerSleeping` 增可选第 4 参 `bedIdParam`（#70 医疗舱预留，默认保留 `bed_player` 不破坏 #66 断言）；③ `updatePlayer` 睡眠分支 `pe.moving=false`（防俯卧残留走帧）。
+  验证: `python3 build.py` 构建成功 27253KB 以 `</html>` 收尾，script 标签 18/18 平衡；survival 38/0（新增 6 纯例）；场景 46/0（scenario 新增 3 冒烟：累塌→meta+实体俯卧+bedId=null+moving=false+drawPlayer 不崩、WASD 唤醒同帧移动、E/受伤唤醒）；单元全量 358/0；perf 3/0；boss 7/0。全量 414 项自动化测试 100% 绿灯。无浏览器工具，交互由场景测试经 `residentsTick`/`updateHome`/`debugPressE`/`hurtPlayer` 断言状态机。
+  下一步: 实机打开 game.html 让家园精力见底看原地俯卧，WASD/E/受伤唤醒；#70 医疗舱躺接入复用此 seam。

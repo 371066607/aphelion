@@ -840,6 +840,67 @@ test('#66: 受伤唤醒 (伤害真正落地时)', () => {
   A(pe && pe.isSleeping === false, '实体标志应同步清醒');
 });
 
+/* #67 累塌: 家园精力归零原地睡着(打地铺 bedId=null), 即使仍在操作
+   触发通道: residentsTick→playerRestTick(清醒跳掉 7 到 0) → setPlayerSleeping(true,false)
+   唤醒通道复用 #66: WASD / E / 受伤 */
+test('#67: 家园精力归零累塌 → meta+实体俯卧, bedId=null, moving=false', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.rest = 3;      // 清醒跳掉 7 → 0 → 触发累塌
+  S.nearBed = null;                 // 原地打地铺, 不绑床
+  S.keys = {};
+  M.residentsTick();
+  A(S.meta.playerNeeds.isSleeping === true, '精力归零应原地累塌睡着, 实际仍清醒');
+  A(S.meta.playerNeeds.rest === 0, '精力应钳到 0, 实际: ' + S.meta.playerNeeds.rest);
+  A(S.meta.playerNeeds.bedId === null, '累塌为打地铺 bedId 应为 null, 实际: ' + S.meta.playerNeeds.bedId);
+  M.updateHome(0.016);
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
+  A(pe && pe.moving === false, '累塌睡眠中实体不应残留走位 (moving 应 false)');
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #67 collapse draw err:', err.message); }
+  A(!threw, '累塌俯卧玩家绘制不应崩');
+});
+
+test('#67: 累塌后 WASD 唤醒并同帧移动 (复用 #66)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.meta.playerNeeds.bedId = null;
+  S.keys = {};
+  const px0 = S.px;
+  S.keys.KeyA = true;   // 向左(水平方向 px 必变)
+  M.updateHome(0.016);
+  A(S.meta.playerNeeds.isSleeping === false, 'WASD 应唤醒累塌睡眠, 实际仍睡');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
+  A(S.px !== px0, '唤醒帧应同帧移动 (px 应从 ' + px0 + ' 变化, 实际 ' + S.px + ')');
+  S.keys = {};
+});
+
+test('#67: 累塌后 E / 受伤唤醒 (复用 #66)', () => {
+  S.scene = 'home';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping = true;
+  S.meta.playerNeeds.bedId = null;
+  S.keys = {};
+  M.debugPressE();
+  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒累塌睡眠');
+  const pe = APH.Ent.findPlayer();
+  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
+  /* 重新入睡, 验证受伤唤醒 */
+  S.meta.playerNeeds.isSleeping = true;
+  S.meta.playerNeeds.bedId = null;
+  S.iFrameT = 0;
+  const hp0 = S.hp;
+  APH.Combat.hurtPlayer(5, 'test');
+  A(S.meta.playerNeeds.isSleeping === false, '受伤应唤醒累塌睡眠');
+  A(S.hp === hp0 - 5, '受伤应掉血, 实际 hp ' + S.hp + '(初始 ' + hp0 + ')');
+  M.updateHome(0.016);
+  const pe2 = APH.Ent.findPlayer();
+  A(pe2 && pe2.isSleeping === false, '实体标志应同步清醒');
+});
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

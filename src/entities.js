@@ -766,8 +766,8 @@ APH.Ent = (function(){
       sleeping = false;
     }
     if(sleeping){
-      /* 睡眠中: 不移动、不寻路; 实体同步俯卧; 计时器照常衰减 */
-      if(pe) pe.isSleeping = true;
+      /* 睡眠中: 不移动、不寻路; 实体同步俯卧+清走位; 计时器照常衰减 */
+      if(pe){ pe.isSleeping = true; pe.moving = false; }   // #67 累塌: 清 stale 走位, 避免醒后残留走帧
       s.target = null;
       if(s.fireCd>0) s.fireCd-=dt;
       if(s.iFrameT>0) s.iFrameT-=dt;

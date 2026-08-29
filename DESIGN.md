@@ -65,6 +65,7 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 - 矿材盖建筑，研究点买科技，食物喂人，皮革升牧场。
 - 殖民者生命：饱食 + 心情 + 病情（0–100）。饿了会生病、病压效率和心情；不饿死。**吃饭要走到仓库或地上粮堆**（直线、无寻路）；生产跳只掉饱食，不隔空扣堆。医疗舱给居民治病（有医更快）；玩家远征急救仍保留。远征不扣仓库粮矿。农田生长、畜牧产肉/皮与矿/实验室同一套效率系数。进食/心情阈值进 `CFG.residents`；ambient 得病用 seeded RNG。
 - 床边睡眠（Issue #66）：玩家靠近居住舱 `bl_house` 60px 内按 E 入睡（俯卧 `player_prone`）；**绝不自动走向床**（`nearBed` 只置提示位，不写 `s.target`）。唤醒：WASD/方向键（先醒后动同一帧）、E 再按、或受伤（伤害真正落地时）。睡着时除 E 外所有按键忽略；睡中每生产跳按床铺/地铺回精力（`bedRecover` 25 / `floorRecover` 18），回满自动醒。精力结算走纯函数 `APH.Res.playerRestTick`（清醒时委托 `homeRestTick`：家园掉 7、远征冻结）；#67 累塌/#70 医疗舱躺复用同一套 `setPlayerSleeping`/`playerWake`/`playerRestTick`。
+- 玩家精力累塌（Issue #67）：家园精力见底（`<=0`，`CFG.player.restCollapseAt:0`）时玩家**原地**强制睡着——即使正在操纵/站在床边——按**打地铺**处理（`bedId=null`，不绑床、不走向床），`playerRestTick` 清醒跳委托 `homeRestTick` 掉到 0 后触发。只在家园触发（远征精力冻结不会见底，scene 门防老档/调试 0 值误塌）。唤醒与 #66 完全一致（WASD/E/受伤走同一 `playerWake`）；睡眠中 `updatePlayer` 同步实体俯卧并清 `moving` 避免残留走帧。
 - 家园气候法则（`lw_night_acid` 夜间酸雨减农产、`lw_storm` 磁暴窗口实验室停摆）。由殖民地 seed 抽 1~2 条，进 `spec.laws`。
 - 远征法则：`lw_night_acid` 夜间湖岸腐蚀；`lw_echo` 猎手弱视、枪声半径放大；`lw_spore_light` 孢子近距排开开路。枪声 idle→alert 走 `CFG.enemy.noiseAggroR`（须有定义，否则 `heardShot` 永不生效）。
 - 袭击会打伤居民（涨病、掉心情，不致死），并抢粮/矿/**药**。工坊可被锁定。家园氧气始终补给；玩家生命只在靠近医疗舱时缓慢回。

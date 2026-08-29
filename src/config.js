@@ -59,6 +59,7 @@ APH.CFG = {
     bedRecover: 25,            // #66 床边睡眠: 床上恢复 /tick
     floorRecover: 18,          // #66 床边睡眠: 打地铺恢复 /tick (慢 ~30%)
     restWakeAt: 100,           // #66 床边睡眠: 精力回满自动醒
+    restCollapseAt: 0,          // #67 累塌: 家园精力见底阈值 (0=精力归零原地睡着)
   },
 
   /* 相机 */
