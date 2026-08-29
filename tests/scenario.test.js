@@ -740,6 +740,31 @@ test('tech map: 出航收起遮罩，远征上 T 可关', () => {
   A(S.scene === 'home', '应返航, got '+S.scene);
 });
 
+/* #59 俯卧渲染冒烟: 无俯卧图环境(单元不打 sprite_data)下, 睡/倒居民与玩家俯卧
+   必须走程序化回退而不崩、不旋转走循环。逻辑已在 humanoid.test.js 单元覆盖。 */
+test('#59 smoke: 睡/倒居民 drawResident/drawVisitor 不崩(程序化回退)', () => {
+  const e = { id:'rs_pr1', rid:'rs_pr1', type:T.RESIDENT, x:500, y:500, name:'俯卧甲',
+              mood:70, food:90, illness:0, face:Math.PI/2, walking:false, walkPh:0,
+              isSleeping:true, downed:false };
+  A(S.scene === 'home', '应在殖民地');
+  let threw = false;
+  try { APH.Ent.drawResident(e, 0); } catch(err){ threw = true; console.log('  sleeping draw err:', err.message); }
+  A(!threw, '睡中居民绘制不应崩');
+  e.isSleeping = false; e.downed = true;
+  try { APH.Ent.drawResident(e, 0); } catch(err){ threw = true; console.log('  downed draw err:', err.message); }
+  A(!threw, '击倒居民绘制不应崩');
+  e.face = 0;
+  try { APH.Ent.drawVisitor(e, 0); } catch(err){ threw = true; console.log('  visitor draw err:', err.message); }
+  A(!threw, '过客绘制不应崩');
+});
+
+test('#59 smoke: 玩家俯卧触发(惰性 flag)不崩、不走循环', () => {
+  const pe = { type:T.PLAYER, x:S.px, y:S.py, moving:false, walkPh:0 };
+  let threw = false;
+  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  player draw err:', err.message); }
+  A(!threw, '玩家(含俯卧flag惰性)绘制不应崩');
+});
+
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

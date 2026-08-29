@@ -527,3 +527,11 @@
   `homeIllnessTick` identity+clamp（家园/远征都不改值）；左上 HUD 家园且病情>0 才显示，远征隐藏且不结算。
   验证: `python3 build.py` 构建成功 27146KB 以 `</html>` 收尾；单元 338/0；场景 36/0；perf 3/0；boss 7/0。HUD 由场景测试 `player illness` 断言 DOM。
   下一步: 场上生病/累塌仍未做。
+
+- **2026-08-29 · 班次**: ✅#59 玩家俯卧图。
+  新增 `assets/player_prone_sheet.png`(4096×256, 4 向 × 4 呼吸 16 帧, 躺体接地线 bottom≈252/256, 管线占位图可随时被真图替换重跑)。
+  `humanoid.js`: `sheetKey('prone')→player_prone`(全角色/脸/包共用)、`sheetLayout /_prone$/→16 帧慢呼吸`、`pose(lying)` 独立 prone cycle(不吃 walkPh/moving, 帧=向*4+floor(time*idleFps)%4)、`poseFor(lying)` 短路+idle→walk 回退加 `!lying` 防御(俯卧绝不旋转走循环充数)。
+  `entities.js`: `drawPlayer` 俯卧触发 flag(今日惰性, 玩家无状态)、sprite 就绪门放宽含 prone、缺图落程序化站姿(不换走循环)、击倒叠 `drawProneWounds`(血泊+躯干/头伤痕, ADR-0003 不换色不叠五官)；`drawNpcSprite` 从 `isSleeping||downed` 进 prone 并叠伤；`drawResidentMarks` 俯卧图在场时压掉 🚨(伤痕体现, 程序化回退仍留 🚨)。
+  `build_sprites.py`: `use_feet` 纳入 `*_prone_sheet.png`(躺体底边=接地线)。`main.js` SPRITE_META 加 `player_prone:{baseline:253,h:68}`(build 实测)。`src/sprite_data.js` 重生成(33 sheets, 勿手改)。
+  验证: `python3 build.py` 构建成功 27246KB 以 `</html>` 收尾; 单元 345/0(新增 humanoid prone 7 用例: 布局/sheetKey/pose 四向与呼吸/俯卧盖 moving/poseFor 缺图不回退/共用); 场景 38/0(新增 2 冒烟: 睡倒居民绘制不崩、玩家惰性 flag 绘制不崩); perf 3/0; boss 7/0。另跑 mock draw 探针: 睡/倒居民与玩家俯卧均请求 `player_prone` 正确帧, 永不请求 walk。
+  下一步: 实机打开 game.html 看居民睡眠/击倒俯卧身+伤; 玩家累塌/床边 E 睡接入(另票)。

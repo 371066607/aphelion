@@ -137,7 +137,8 @@ def register_sheet(path):
     margin = cell // 2
     moved = 0
     base = os.path.basename(path)
-    use_feet = base.endswith('_walk_sheet.png') or base.endswith('_idle_sheet.png')
+    use_feet = (base.endswith('_walk_sheet.png') or base.endswith('_idle_sheet.png')
+                or base.endswith('_prone_sheet.png'))   # #59 俯卧: 躺体内容底边即接地线
     if use_feet:
         y0 = foot_y(im.crop((0, 0, cell, H)))
         for i in range(frames):

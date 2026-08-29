@@ -278,8 +278,12 @@ APH.Ent = (function(){
   function drawPlayer(e,time){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
+    /* #59: 俯卧触发(玩家暂无状态, 今日常 false → 惰性; 后续累塌/床边E接入) */
+    var lying = !!(s.downed || e.downed || e.isSleeping);
     ctx.save(); ctx.translate(e.x,e.y);
-    var sprOk = window.APH.Sprites && APH.Sprites.isReady('player_walk');
+    var sprOk = (window.APH.Sprites &&
+                 (APH.Sprites.isReady('player_walk') || APH.Sprites.isReady('player_idle') ||
+                  (lying && APH.Sprites.isReady('player_prone'))));
     /* T12 光圈: sprite 脚底锚在原点故圈心贴脚; 程序化小人站原点上方故圈心略偏南 */
     var hx = sprOk ? -3 : 1, hy = sprOk ? 0 : 4;
     if(!s.showMarkerOff){
@@ -293,20 +297,25 @@ APH.Ent = (function(){
     /* N1: 行走序列帧渲染(2列x4行表; 无图回退程序化小人) */
     if (sprOk && window.APH.Humanoid){
       var ang=(s.face!==undefined)?s.face:Math.PI/2;
-      var pose=APH.Humanoid.pose({ moving:!!e.moving, face:ang, walkPh:e.walkPh, time:time, role:'player' });
+      var pose=APH.Humanoid.pose({ moving:!!e.moving, face:ang, walkPh:e.walkPh, time:time, role:'player', lying: lying });
       var sheet=pose.sheet, frame=pose.frame;
-      if(!APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
+      /* #59: 俯卧缺图时落到程序化站姿(绝不用走循环旋转充数); idle 缺图才回退 walk 第0帧 */
+      if(!lying && !APH.Sprites.isReady(sheet) && pose.cycle==='idle'){
         sheet='player_walk';
         frame=pose.dir*(APH.CFG.humanoid.walkPerDir||8);
       }
-      var defS = APH.Sprites.sheetDef(sheet) || APH.Sprites.sheetDef('player_walk');
-      var ch = (defS && defS.contentH) || 211;
-      var sc = APH.Humanoid.spriteScale(ch);
-      if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
-      APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
-      ctx.globalAlpha=1;
-      ctx.restore();
-      return;
+      if(APH.Sprites.isReady(sheet)){
+        var defS = APH.Sprites.sheetDef(sheet) || APH.Sprites.sheetDef('player_walk');
+        var ch = (defS && defS.contentH) || 211;
+        var sc = APH.Humanoid.spriteScale(ch);
+        if(s.iFrameT>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
+        APH.Sprites.draw(ctx, sheet, 0, 0, frame, sc);
+        ctx.globalAlpha=1;
+        if(lying && e.downed) drawProneWounds(ctx);
+        ctx.restore();
+        return;
+      }
+      /* sheet 未就绪(含俯卧缺图) → 落到下方程序化站姿小人 */
     }
     ctx.translate(0,-bobbing);
     /* 受击无敌帧闪烁 */
@@ -819,31 +828,51 @@ APH.Ent = (function(){
       ctx.fillText('💤', 0, iconY-14+bob);
     }
     if(e.downed){
-      ctx.fillStyle='#ff4757';
-      ctx.font='11px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('🚨', 0, iconY-16+bob);
+      /* #59: 俯卧图在场时用伤痕+血泊体现击倒, 不再叠🚨(ADR-0003 站着加警报 avoid);
+         仅程序化回退(无俯卧图)时保留 🚨 */
+      var proneActive = !!(window.APH.Sprites && APH.Sprites.isReady('player_prone'));
+      if(!proneActive){
+        ctx.fillStyle='#ff4757';
+        ctx.font='11px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('🚨', 0, iconY-16+bob);
+      }
     }
     ctx.fillStyle='#f7f3df';
     ctx.font='9px sans-serif'; ctx.textAlign='center';
     ctx.fillText(e.name||'居民', 0, 16);
   }
 
+  function drawProneWounds(ctx){
+    /* #59: 击倒叠伤痕+血泊(ADR-0003: 不换色、不叠五官)。坐标: 俯卧身从原点(接地线)上到 -drawH */
+    ctx.fillStyle='rgba(150,28,24,.55)';
+    ctx.beginPath(); ctx.ellipse(0,-2,16,7,0,0,U.TAU); ctx.fill();      /* 血泊 */
+    ctx.fillStyle='rgba(120,18,18,.42)';
+    ctx.beginPath(); ctx.ellipse(2,-1,10,4.5,0,0,U.TAU); ctx.fill();
+    ctx.fillStyle='rgba(140,22,24,.8)';
+    ctx.beginPath(); ctx.ellipse(-6,-28,5,3.5,.3,0,U.TAU); ctx.fill();   /* 躯干伤痕 */
+    ctx.beginPath(); ctx.ellipse(8,-24,3.5,2.5,-.4,0,U.TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-34,-20,3.5,3,-.2,0,U.TAU); ctx.fill(); /* 头部擦伤 */
+  }
+
   function drawNpcSprite(e, time, role, pack){
     if (!(window.APH.Sprites && window.APH.Humanoid)) return false;
+    /* #59: 睡/倒共用俯卧 body */
+    var lying = !!(e.isSleeping || e.downed);
     var pose = APH.Humanoid.poseFor({
       role: role, id: e.rid || e.id, moving: !!e.walking, face: e.face,
-      walkPh: e.walkPh, time: time, pack: pack
+      walkPh: e.walkPh, time: time, pack: pack, lying: lying
     }, function(name){ return APH.Sprites.isReady(name); });
     var sheet = pose.sheet;
     if (!APH.Sprites.isReady(sheet)) return false;
     ctx.fillStyle='rgba(0,0,0,.28)';
-    ctx.beginPath(); ctx.ellipse(0,0,11,5.5,0,0,U.TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,0, lying?22:11, lying?8:5.5, 0,0,U.TAU); ctx.fill();
     var defS=APH.Sprites.sheetDef(sheet);
     var ch=(defS&&defS.contentH)||((CFG.humanoid&&CFG.humanoid.sheetContentH)||240);
     var sc=APH.Humanoid.spriteScale(ch);
     if(e.hitFlash>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
     APH.Sprites.draw(ctx, sheet, 0, 0, pose.frame, sc);
     ctx.globalAlpha=1;
+    if(lying && e.downed) drawProneWounds(ctx);
     return true;
   }
 

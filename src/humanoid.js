@@ -21,6 +21,7 @@ APH.Humanoid = (function(){
   }
 
   function sheetKey(role, faceIdx, pack, cycle){
+    if (cycle === 'prone') return 'player_prone';        // #59: 俯卧共用一张, 不分脸/包
     if (role === 'player') return cycle === 'idle' ? 'player_idle' : 'player_walk';
     var fi = (faceIdx|0);
     if (fi < 0) fi = 0;
@@ -30,10 +31,14 @@ APH.Humanoid = (function(){
     return 'hum_' + fi + '_' + ward + '_' + cyc;
   }
 
-  /* 人形横排 sheet 几何: walk 32 / idle 16。建筑/敌人返回 null。 */
+  /* 人形横排 sheet 几何: walk 32 / idle 16 / prone 16(4向x4呼吸)。建筑/敌人返回 null。 */
   function sheetLayout(name){
     var H = hum();
     if (!name || typeof name !== 'string') return null;
+    if (/_prone$/.test(name)) {                          // #59: 俯卧 16 帧, 慢呼吸同 idle
+      var pn = (H.idlePerDir || 4) * 4;
+      return { cols: pn, count: pn, fps: H.idleFps || 1 };
+    }
     if (/_walk$/.test(name)) {
       var wn = (H.walkPerDir || 8) * 4;
       return { cols: wn, count: wn, fps: H.walkFps || 10 };
@@ -70,6 +75,12 @@ APH.Humanoid = (function(){
     var idleN = H.idlePerDir || 4;
     var fps = H.idleFps || 1;
     var dir = dirOf(input.face);
+    /* #59: 俯卧——独立 cycle, 不吃 walkPh/moving, 慢呼吸同 idle */
+    if (input.lying) {
+      var lt = input.time || 0;
+      var lph = ((Math.floor(lt * fps) % idleN) + idleN) % idleN;
+      return { dir: dir, cycle: 'prone', frame: dir * idleN + lph, sheet: 'player_prone' };
+    }
     var moving = !!input.moving;
     var role = input.role || 'player';
     var pack = !!input.pack;
@@ -101,6 +112,10 @@ APH.Humanoid = (function(){
     var ready = typeof isReady === 'function' ? isReady : function(){ return true; };
     var walkKey = sheetKey(role, fi, pack, 'walk');
     if (!ready(walkKey)) fi = 0;
+    /* #59: 俯卧短路——共用 player_prone, 不选脸; 缺图由渲染层回退程序化, 永不换走循环 */
+    if (input.lying) {
+      return pose({ lying: true, face: input.face, time: input.time });
+    }
     var p = pose({
       moving: input.moving,
       face: input.face,
@@ -110,7 +125,8 @@ APH.Humanoid = (function(){
       pack: pack,
       faceIdx: fi
     });
-    if (!ready(p.sheet) && p.cycle === 'idle') {
+    /* 防御: 俯卧绝不进 idle→walk 回退 */
+    if (!ready(p.sheet) && p.cycle === 'idle' && !input.lying) {
       var wk = sheetKey(role, fi, pack, 'walk');
       if (ready(wk)) {
         p.sheet = wk;
