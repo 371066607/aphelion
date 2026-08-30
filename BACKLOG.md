@@ -188,8 +188,11 @@
 
 - [x] ADR 落盘：`docs/adr/0006-weather-system.md`（马尔可夫状态机/导演调度/暴露缝合）+ DESIGN.md 表 ADR-15 + 天气系统 v1 章节 + CONTEXT.md 天气术语节
 - [x] to-spec 发布：GitHub **#85** Spec（12 种天气/导演调度/暴露复活/玩家轻量裁剪/solarMul 预留）；to-tickets：#86-W1 状态机 / #87-W2 导演接线 / #88-W3 效果接线 / #89-W4 粒子渲染，blocking 边已挂
-- [ ] **W1 天气状态机（#86）**：Frontier 当前 = #86（无 blocker，可立即开）；W2-W4 待 #86
-- [ ] W2 导演调度接线（#87）/ W3 效果接线（#88）/ W4 粒子渲染（#89）
+- [x] **W1 天气状态机（#86）**：✅ 已完成合入（d356778）；W2-W4 并行实现已完成合入（a8840ea）
+- [x] W2 导演调度接线（#87）：✅ ev_weather 进事件卡组 + directorTick 掷骰 → meta.weather + 喘息窗口
+- [x] W3 效果接线（#88）：✅ exposureTick 复活 + 农场乘子 + 玩家减速 + HUD 天气行 + 雾天敌感知 + 装备减免
+- [x] W4 粒子渲染（#89）：✅ 雨/雪/雾粒子 + 天色 tint + fxParams 纯函数 + caps 预算
+- [ ] 天气系统收尾：三票 review 进行中；完成后关 #87/#88/#89
 - [ ] 数值全进 CFG（ADR-10）；solarMul 预留供建筑 v3 T6 太阳能板读取；玩家不新增 exposure 条（显式裁剪）
 
 ## 已知不做（用户红线）

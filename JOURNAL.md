@@ -668,3 +668,11 @@
   - **审查**：双轴独立 review → 无 blocker；2 major 修复（wx_rain_heavy exposure 8→0 与 ADR-15 极端清单对齐；测试覆盖补全表/进极端cd/dur边界）；minor 顺手修（死代码/空cd归一 null）；文档 12→11、ADR-9 补 wx_、0006 补大雨非极端修订。
   - 验证: weather 17/17；全量 421/0；scenario 78/0；perf 3/0；boss 7/0；构建成功 30508KB；提交 3ad9a9f+5c69a3a+d356778 已推。
   - 下一步: frontier 解锁 #87 W2 导演接线（ev_weather 进事件卡组）/ #88 W3 效果接线（exposureTick 复活！）/ #89 W4 粒子渲染（均 ← #86✅）。
+
+- **2026-08-30 · 班次**: 🔀 W2/W3/W4 三票并行实现合流（独立 worktree + patch 合并）。
+  - **并行方式**：workflowScript runs.all 逐票 worktree=true（从干净 HEAD 分支、各自 TDD+单测、产出 git diff patch 到 /tmp/aph_wx_<n>.patch），主会话统一 apply。
+  - **合并冲突处理（3 处，全部手工解决）**：①scenario.test.js 加载列表三票同位置加 weather.js → 保留一条、其余剔除首个 hunk；②weather.js 同位置 W3 辅助（currentId/expectDur/expectRemain）与 W4 视觉参数（fxOf/fxParams/rgbaOf/tintRGBA/fxCount）顺序追加，用 edit 手工合并（89 的 weather.js hunk 从 patch 剔除后手插）；③89 的 return 导出与 88 冲突 → 合并导出全量。
+  - **教训**：并行 patch 撞「同文件同位置插入」是必然（测试加载列表/导出表都在固定锚点），教训=并行任务应在任务书里指定「插入锚点差异化」或明确「禁止改共同文件（scenario.test.js 加载列表、weather.js 导出表由主会话统一合）」，或直接限定每票只碰自己的文件。
+  - **交付**：W2 ev_weather 进卡组+directorTick 掷骰+喘息窗口；W3 exposureTick 复活（Survival #19 的桩终于活了）+ 农场乘子 + 玩家减速 + HUD 天气行 + 雾天感知 + 装备减免；W4 雨/雪/雾粒子+天色 tint+fxParams 纯函数（caps 预算）。
+  - 验证: 语法全过；三新测试 39/0；全量 460/0；scenario 82/0；perf 3/0；boss 7/0；构建成功 30529KB；提交 e4e75c0(#87) + 46a1c1e(#88) + 63cdde2(#89) + 32363c2(scenario) + a8840ea(build)，已推 origin main。
+  - 下一步: 合流 review 后台运行中 → 听后关 #87/#88/#89；然后 T0 若已合入，衔接建筑 v3 T2。
