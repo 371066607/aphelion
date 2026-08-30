@@ -2070,7 +2070,7 @@ window.APH = window.APH || {};
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
-        player_prone:{baseline:197,h:154},   /* #59 通用俯卧(2026-08-30 换真美术: 分向生成, 原占位图 253/68 已废) */
+        player_prone:{baseline:162,h:86},   /* #59 通用俯卧(2026-08-30 两版: 先换真美术, 再缩小占比——角色横躺体积与站姿一致) */
         hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
         ,hum_1_nopack_prone:{baseline:248,h:139} /* #61 脸1无包居民俯卧 */
         ,hum_2_nopack_prone:{baseline:249,h:163} /* #62 脸2无包居民俯卧 */
