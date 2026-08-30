@@ -489,6 +489,47 @@ APH.CFG = {
     siegeWalkMul: 0.35,
   },
 
+  /* 家园天气 (ADR-15: 马尔可夫状态机; 单位: 秒; 一天=DAY_LEN) */
+  weather: {
+    dayLen: 210,                    // 与 DAY_LEN 同步(一天秒数)
+    /* 转移表: from→to 权重(每次到时掷骰); 晴→雨/雪 高freq, 极端低freq */
+    transitions: {
+      wx_clear:        { wx_clear: 4, wx_rain: 3, wx_snow: 2, wx_fog: 1, wx_heat: 1, wx_cold: 1 },
+      wx_rain:         { wx_clear: 4, wx_rain: 3, wx_rain_heavy: 2, wx_fog: 2, wx_acid: 1, wx_thunder: 1 },
+      wx_rain_heavy:   { wx_rain: 3, wx_clear: 3, wx_thunder: 1 },
+      wx_thunder:      { wx_rain: 3, wx_clear: 3, wx_blizzard: 1 },
+      wx_snow:         { wx_clear: 4, wx_snow: 2, wx_blizzard: 2, wx_cold: 1 },
+      wx_blizzard:     { wx_snow: 3, wx_clear: 2 },
+      wx_heat:         { wx_clear: 4, wx_rain: 2 },
+      wx_cold:         { wx_clear: 3, wx_snow: 3, wx_blizzard: 1 },
+      wx_acid:         { wx_clear: 3, wx_rain: 3 },
+      wx_storm:        { wx_clear: 3, wx_rain: 2 },
+      wx_fog:          { wx_clear: 4, wx_rain: 3, wx_acid: 1 },
+    },
+    /* 持续时长区间[天] (min..max); t 为当前天气已持续秒数 */
+    dur: {
+      wx_clear: [2, 5], wx_rain: [1, 3], wx_rain_heavy: [1, 2], wx_thunder: [1, 1],
+      wx_snow: [1, 3], wx_blizzard: [1, 2], wx_heat: [1, 3], wx_cold: [1, 3],
+      wx_acid: [1, 2], wx_storm: [1, 2], wx_fog: [1, 2],
+    },
+    /* 极端天气冷却(秒): 触发后此天气不可再选 (雷暴/暴雪/酸雨/磁暴) */
+    cd: { wx_thunder: 630, wx_blizzard: 840, wx_acid: 840, wx_storm: 630 },
+    /* 效果表: speedMul(玩家/居民室外减速) farmMul(农田产量) exposureGain(室外暴露/跳) enemySightMul(敌感知) solarMul(太阳能板, 供T6) */
+    effects: {
+      wx_clear:       { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 1,    solarMul: 1 },
+      wx_rain:        { speedMul: 0.7,  farmMul: 1.3,  exposureGain: 0,  enemySightMul: 1,    solarMul: 0.5 },
+      wx_rain_heavy:  { speedMul: 0.6,  farmMul: 1.2,  exposureGain: 0,  enemySightMul: 1,    solarMul: 0.3 },
+      wx_thunder:     { speedMul: 0.6,  farmMul: 1.1,  exposureGain: 10, enemySightMul: 1,    solarMul: 0.15 },
+      wx_snow:        { speedMul: 0.8,  farmMul: 0.6,  exposureGain: 0,  enemySightMul: 1,    solarMul: 0.4 },
+      wx_blizzard:    { speedMul: 0.6,  farmMul: 0.3,  exposureGain: 12, enemySightMul: 0.8,  solarMul: 0.2 },
+      wx_heat:        { speedMul: 1,    farmMul: 1,    exposureGain: 8,  enemySightMul: 1,    solarMul: 1 },
+      wx_cold:        { speedMul: 0.85, farmMul: 0.7,  exposureGain: 8,  enemySightMul: 1,    solarMul: 0.9 },
+      wx_acid:        { speedMul: 0.85, farmMul: 0.5,  exposureGain: 10, enemySightMul: 1,    solarMul: 0.4 },
+      wx_storm:       { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 1,    solarMul: 0.1 },
+      wx_fog:         { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 0.7, solarMul: 0.6 },
+    },
+  },
+
   /* 存档 */
   save: {
     PREFIX: 'aphelion_',
