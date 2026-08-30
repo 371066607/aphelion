@@ -709,3 +709,5 @@
   - **合并**：这次 apply 零冲突——上次「失败」是工作区残留半应用 patch 的假冲突；干净基线恢复后 t3→t4 顺序全部干净落位。**教训记：并行 patch 合流前先 git reset --hard HEAD 归零 + 清未跟踪测试文件**。
   - 验证: T3 9/9 + T4 16/16；全量 502/0；scenario 86/0；perf 3/0；boss 7/0；构建 31122KB；提交 d4da752+541b867+77a3c14 已推。
   - 下一步: 合并 review 后台运行 → 听后关 #76/#77；T5(#78 弹道掩体) 解锁。
+
+- **2026-08-30 · 班次续**: ✅ T3/T4 关票。合并 review worker（deepseek-v4-flash-vision-exp）运行 18min 无活动→stop 中断；主会话**快速自查**替代：①walkToward 签名 diff 核验未动（T3 铁律守住）②config 字段无重复定义 ③墙 hp 初始化（main.js b.hp=CFG.wall.hp）与 combat wallHp 兜底衔接 ④destroyWall 走 spawnDrop 石料地上堆（RimWorld 式, 居民会搬）⑤||6 为既有 stepSoldier 风格兜底（非新违规）。全部通过。**教训**：长时间 review 用 slow 模型会卡死——以后审查任务书注明「单文件量小时可跳过 command 全量验证, 用 git diff 快速核」或换更快模型。
