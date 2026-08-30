@@ -173,6 +173,17 @@
 - [x] 接线孤儿 `checkDowned`/`rescueTick`（生产跳=30s）：`residentsTick` 每户一判、倒计时递减、舱内有药救活（扣 1 药、击倒者不参与选病剂 `applyMed` 双扣）、超时死亡收口（名册 filter + `saveMetaQuiet`）；病情回落 ≤50 且未击倒自动起身（`needsTick` 起床门）；医疗舱被拆躺舱者起身
 - [x] 测试锁定：residents 单元 +4（needsMedBed 边界/clinicBedSpot 偏移/walkToward 躺舱守卫/needsTick 起身门），scenario +4（病重自动去床俯卧+sync 保留+俯卧 sheet、轻病慢走+✚、击倒匍匐 14px/帧、residentsTick 击倒判定+送医接线）
 
+## 建筑系统 v3 · 基建联动（2026-08-30 grilling 定案，以环世界为参考）
+
+- [x] ADR 落盘：`docs/adr/0004-grid-pathfinding.md`（网格寻路）+ `docs/adr/0005-power-grid.md`（实体导线电力网）+ DESIGN.md 表 ADR-13/14
+- [x] to-spec 发布：GitHub **#73** Spec（ready-for-agent）；to-tickets 发布：#74-T1 寻路引擎 / #75-T2 墙+门 / #76-T3 居民绕墙 / #77-T4 袭击破墙+围攻打墙 / #78-T5 弹道掩体 / #79-T6 电网核心 / #80-T7 耗电联动 / #81-T8 餐桌椅 / #82-T9 无顶房间+路灯 / #83-T10 陷阱+沙袋，blocking 边已挂（native dependencies）
+- [x] 资产补票：**#84-T0 建筑v3视觉资产**（12 座新建筑走 ADR-11 管线；Blocked by None，可与 T1 并行）；#75/#79/#81/#82/#83 全部加 `Blocked by #84`（用户指出「建筑还没有模型」——从 Out of Scope 移入范围，spec #73 已修订）
+- [ ] 班 1（T0,T1-T7）：Frontier 当前 = **#74（T1）+ #84（T0）**（均无 blocker，可立即开工）
+- [ ] 班 1：T2 墙与闸门 (#75) / T3 居民绕墙 (#76) / T4 袭击破墙 (#77) / T5 弹道掩体 (#78) 待前序解锁
+- [ ] 班 1：T6 电网核心 (#79) / T7 耗电联动 (#80) 待前序解锁
+- [ ] 班 2：T8 餐桌椅 (#81) / T9 无顶房间+路灯 (#82) / T10 陷阱+沙袋 (#83)
+- [ ] 数值全部进 CFG（ADR-10）；寻路/BFS/房间判定纯函数 node 可测；每票完成=构建绿+全量测试绿+JOURNAL
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事
