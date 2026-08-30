@@ -676,3 +676,8 @@
   - **交付**：W2 ev_weather 进卡组+directorTick 掷骰+喘息窗口；W3 exposureTick 复活（Survival #19 的桩终于活了）+ 农场乘子 + 玩家减速 + HUD 天气行 + 雾天感知 + 装备减免；W4 雨/雪/雾粒子+天色 tint+fxParams 纯函数（caps 预算）。
   - 验证: 语法全过；三新测试 39/0；全量 460/0；scenario 82/0；perf 3/0；boss 7/0；构建成功 30529KB；提交 e4e75c0(#87) + 46a1c1e(#88) + 63cdde2(#89) + 32363c2(scenario) + a8840ea(build)，已推 origin main。
   - 下一步: 合流 review 后台运行中 → 听后关 #87/#88/#89；然后 T0 若已合入，衔接建筑 v3 T2。
+
+- **2026-08-30 · 班次续**: ✅ W2-W4 合流 review 通过（0 blocker/0 major，合并正确性专项核验通过）+ minor 修复。
+  - **Review 发现**：CFG.weather.cd 缺热浪/寒潮 + tickWeather isExtreme 判定（cdCfg!=null）与 W2/W3/W4 统一闸门（exposureGain>0）不一致——W1 遗留，非合流引入。**修复**：cd 表补 wx_heat/wx_cold(630s)；tickWeather isExtreme 改读 weatherEffects(id).exposureGain>0（唯一真源）；weather.test.js +2（热浪/寒潮写cd、storm 非极端期间衰减）。
+  - 验证: weather 19/19；全量 462/0；scenario 82/0；构建 30529KB；提交 2a0f267+729b752 已推；#87/#88/#89 已关。
+  - **天气系统 v1 全链完成**：W1 状态机 + W2 导演调度 + W3 效果接线（exposureTick 复活）+ W4 粒子渲染。下一步: 等 da123wda T0 资产合入 → 建筑 v3 T2（#75）逻辑层；或天气进阶（天气预报）。
