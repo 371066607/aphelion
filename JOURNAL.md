@@ -694,3 +694,11 @@
   - **合入**：`gh pr merge --merge`（保留作者单 commit 7327b53，merge 7ed1509）；#84 已由作者关。rebase 强推已留言知会（分支历史重写）。
   - **验证**（rebase 后）：单测 464/0 · scenario 84/0 · perf 3/0 · boss 7/0 · 构建 31104KB —— T0 资产与天气 v1 全链兼容。
   - 下一步: **T2 墙与闸门（#75）已全解锁**（T1✅ + T0✅）——建筑 v3 基建第二票，逻辑层可开工。
+
+- **2026-08-30 · 班次**: ⚒ #75 T2 墙与闸门（建筑目录/canPlace 规则/格层渲染/拖拽连续放置/玩家撞墙推挤）。
+  - **TDD**：wall.test.js 10 条（后补 13）——BUILDINGS 注册/canPlace 豁免 130px/墙-墙相邻/墙-建筑拒/同格拒/墙 max≥500/wallCells/wallLine/wallNeighbors(闸门不算墙邻)。红→绿：wallCells 期望值是整数边界陷阱（648 恰 13.5 格 → round 到 672）改非边界值（620→624）。
+  - **实现**：colony.js BUILDINGS 增 bl_wall(石5, te_stonecutting, max2000, cells1x1)/bl_gate(石3木5)；canPlace isGrid 分支（130px 豁免+同类相邻+同格拒）；wallCells/wallLine/wallNeighbors 纯函数导出。entities.js drawWalls（格层渲染, ADR-13 例外不入实体表, 完成分支 isGridStatic 跳过 placeBuildingEntity）+ updatePlayer 湖约束→墙约束管道（轴分离滑墙）。main.js pointerdown/move/up 拖拽连续放置（按下即铺+增量线段+已铺集合去重）+ homeDrawers/expeditionDrawers walls 回调。world.js render 粒子后实体前调 walls 层。
+  - **Review（独立上下文）**：0 blocker/3 major 全修——**M1** wallR 22→35 进 CFG.wall.collideR（22<24 有 4px 幽灵缝可穿墙, review 模拟 THROUGH=true）；**M2** 拖拽从起点重算→幻影格+刷屏（5 格直线 9 次失败）, 改 wallLast 增量线段+wallPlaced 集合；**M3** 玩家被建在脚下的墙钉死（canPlace 不查玩家位置）→ 完成时沿最近轴推出。**m3** 素材建筑退款：refundResOf 仅纯 costRes 建筑（墙/门）退建材半价, 有研/矿成本建筑保持旧退款（colony.test.js 旧断言零破坏）。
+  - **划界（#75 评论留痕）**：墙 HP/弹幕打墙/袭击破墙→T4(#77)；闸门开合/打爆→T4+T5(#78)；拼接转角→渲染后补；敌人绕墙→T3(#76 Nav BLOCKERS 已备)。
+  - 验证: wall 13/13；全量 477/0；scenario 86/0（+2 冒烟）；perf 3/0；boss 7/0；构建 31112KB；提交 b21b3d2+0dcf44c+c0ba4cb 已推；#75 已关。
+  - 下一步: **T3(#76) 居民绕墙 与 T4(#77) 袭击破墙 双解锁**——建议并行（T3 走位/T4 战斗, 文件重叠低: T3 residents+nav 接线, T4 combat+main）。
