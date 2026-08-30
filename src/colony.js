@@ -111,6 +111,15 @@ APH.Colony = (function(){
     if (!def || def===BUILDINGS.bl_landing_pad) return 0;
     return Math.floor(((def && def.costMineral)||20)/2);
   }
+  /* T2 素材建筑退款: 仅纯 costRes 建筑(墙/门: cost=0 且 costMineral=0)走实物半价; 其余(null=走研/矿) */
+  function refundResOf(def){
+    if (!def || def===BUILDINGS.bl_landing_pad) return null;
+    if (def.cost || def.costMineral) return null;     // 有研/矿成本的建筑保持旧退款
+    var cr = def.costRes || {};
+    var hasRes = false, out = {};
+    for (var k in cr){ if (cr[k] && k!=='food'){ hasRes=true; out[k]=Math.floor((cr[k]||0)/2); } }
+    return hasRes ? out : null;
+  }
 
   /* 仓库负重加成(纯函数): 每 warehouse +20。
      取代曾直接改 CFG.player.carryMax 的做法——那会随重启丢失、拆除不回退。 */
@@ -1351,7 +1360,7 @@ APH.Colony = (function(){
     wallCells:wallCells, wallLine:wallLine, wallNeighbors:wallNeighbors,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
-    housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf,
+    housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf, refundResOf:refundResOf,
     carryBonus:carryBonus, carryMaxOf:carryMaxOf,
     builderBonusOf:builderBonusOf, isBuilder:isBuilder,
     assignByPriority:assignByPriority, JOB_SKILL:JOB_SKILL, JOB_SLOTS:JOB_SLOTS,

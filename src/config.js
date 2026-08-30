@@ -588,6 +588,12 @@ APH.CFG = {
     },
   },
 
+  /* 墙与闸门 (ADR-13) */
+  wall: {
+    collideR: 35,               // 玩家碰撞半径 = player.radius(11) + GRID/2(24); <格宽会漏缝穿墙
+    dragSpeedMul: 0.55,         // 撞墙完全堵死时速度衰减
+  },
+
   /* 存档 */
   save: {
     PREFIX: 'aphelion_',

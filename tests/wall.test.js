@@ -41,10 +41,31 @@ test('canPlace: 闸门可放墙线上(与墙同类相邻)', () => {
   if (!r.ok) throw new Error('闸门贴墙应允许: '+r.why);
 });
 
-test('canPlace: 墙数量大幅上限(围墙100+格不触顶)', () => {
-  // 默认 max||99 → 会挡; 墙应 max 高(如 2000) 或不限
-  const def = C.get('bl_wall');
-  if (!(def.max >= 500)) throw new Error('墙 max 应>=500: '+def.max);
+test('canPlace: 同格墙叠放拒绝', () => {
+  const r = C.canPlace([{ id:'bl_wall', x:600, y:600 }], 999, 'bl_wall', 600, 600, { stone: 99 });
+  if (r.ok) throw new Error('同格叠放应拒绝: '+r.why);
+});
+
+/* ---------- 退款: 素材建筑退建材(非研/矿) ---------- */
+test('refundOf: 墙拆退石料半价(5石→2石)', () => {
+  const w = C.get('bl_wall');
+  const r = C.refundResOf(w);
+  if (!r || r.stone !== 2) throw new Error('墙应退石料2: '+JSON.stringify(r));
+});
+test('refundOf: 闸门拆退石+木半价', () => {
+  const g = C.get('bl_gate');
+  const r = C.refundResOf(g);
+  if (!r || r.stone !== 1 || r.wood !== 2) throw new Error('闸门应退石1木2: '+JSON.stringify(r));
+});
+test('refundOf: 普通建筑(矿井)仍走研/矿退款不变', () => {
+  // bl_mine: cost=0 costMineral=30 → refundResOf 应 null(不抢退款), 旧退款语义保留
+  const m = C.get('bl_mine');
+  const rr = C.refundResOf(m);
+  if (rr !== null) throw new Error('有矿成本的建筑应不走实物退款: '+JSON.stringify(rr));
+  const r = C.refundOf(m);
+  if (r !== 22) throw new Error('矿井退款应22(45半价): '+r);
+  const rm = C.refundMineralOf(m);
+  if (rm !== 15) throw new Error('矿井退矿应15: '+rm);
 });
 
 /* ---------- 格子坐标辅助 ---------- */

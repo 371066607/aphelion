@@ -856,7 +856,7 @@ APH.Ent = (function(){
     }
     /* T2 玩家撞墙推挤(ADR-13: 墙=48px格障碍): 墙约束, 轴分离滑墙 */
     if(s.scene==='home' && (s.colony&&(s.colony.buildings||[]).some(function(b2){ return b2.id==='bl_wall'; }))){
-      var wallR=22;   // 玩家半径11 + 墙块半格约24 的近似
+      var wallR=(CFG.wall && CFG.wall.collideR!=null) ? CFG.wall.collideR : 35;
       function hitWall(px2, py2){
         var wb=(s.colony.buildings||[]);
         for(var i2=0;i2<wb.length;i2++){
@@ -870,7 +870,8 @@ APH.Ent = (function(){
       else{
         if(!hitWall(cx,s.py)) s.px=cx;      // 沿x滑
         if(!hitWall(s.px,cy)) s.py=cy;      // 沿y滑
-        if(s.px===cx && s.py===cy){ s.vx*=.55; s.vy*=.55; }  // 完全堵死: 减速
+        var wDamp=(CFG.wall && CFG.wall.dragSpeedMul!=null) ? CFG.wall.dragSpeedMul : 0.55;
+        if(s.px===cx && s.py===cy){ s.vx*=wDamp; s.vy*=wDamp; }  // 完全堵死: 减速
       }
     }else{ s.px=cx; s.py=cy; }
     if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh; pe.isSleeping=false; pe.downed=false; }

@@ -824,6 +824,15 @@ window.APH = window.APH || {};
           APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
           var justBuilt=s.entities[s.entities.length-1];
           if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
+        }else{
+          /* M3 修复: 墙建成时若玩家在碰撞盒内, 沿最近轴推出(防被自己的墙钉死) */
+          var wR=(CFG.wall||{}).collideR!=null ? CFG.wall.collideR : 35;
+          if(d.bid==='bl_wall' && Math.abs(s.px-d.x)<wR && Math.abs(s.py-d.y)<wR){
+            var dxW=s.px-d.x, dyW=s.py-d.y;
+            if(Math.abs(dxW)>Math.abs(dyW)) s.px=d.x+(dxW>0?wR:-wR);
+            else s.py=d.y+(dyW>0?wR:-wR);
+            s.px=U.clamp(s.px,40,CFG.WORLD-40); s.py=U.clamp(s.py,40,CFG.WORLD-40);
+          }
         }
         saveColony();
         U.emit('built',{id:d.bid});
@@ -1872,16 +1881,28 @@ window.APH = window.APH || {};
         if(!bestX){ APH.UI.floatText('附近没有可拆除的建筑','#8fa3cc'); }
         else{
           var def3=APH.Colony.get(bestX.b.id);
+          var refundR=APH.Colony.refundResOf(def3);   // T2: 素材建筑(墙/门)退建材
           var refund=APH.Colony.refundOf(def3);
           var refundM=APH.Colony.refundMineralOf(def3);
-          s.meta.research+=refund;
-          s.meta.res.mineral=(s.meta.res.mineral||0)+refundM;
+          var refundMsg;
+          if(refundR){
+            s.meta.res=s.meta.res||{ mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
+            var rParts=[];
+            for(var rk in refundR){
+              if(refundR[rk]>0){ s.meta.res[rk]=(s.meta.res[rk]||0)+refundR[rk]; rParts.push((CFG.items[rk]&&CFG.items[rk].name||rk)+' +'+refundR[rk]); }
+            }
+            refundMsg='🧨 '+def3.name+' 已拆除 ('+rParts.join(' ')+')';
+          }else{
+            s.meta.research+=refund;
+            s.meta.res.mineral=(s.meta.res.mineral||0)+refundM;
+            refundMsg='🧨 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)';
+          }
           s.colony.buildings.splice(bestX.idx,1);
           s.entities=s.entities.filter(function(en){
             return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
           });
           APH.Save.saveMeta(s.meta); saveColony();
-          APH.UI.floatText('🧨 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)','#ffc857');
+          APH.UI.floatText(refundMsg,'#ffc857');
           U.emit('demolished',{id:bestX.b.id});
         }
       }
@@ -1957,36 +1978,41 @@ window.APH = window.APH || {};
       knob.style.transform='translate(calc(-50% + '+(dx/len*cl)+'px), calc(-50% + '+(dy/len*cl)+'px))';
     }
 
-    var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0,wallDrag=false,wallFrom=null,wallLast=null;
+    var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0,wallDrag=false,wallFrom=null,wallLast=null,wallPlaced={};
     cv.addEventListener('pointerdown',function(e){
       downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
       /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
       var s0=APH.state;
       if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate')){
-        wallDrag=true; wallLast=null;
+        wallDrag=true; wallLast=null; wallPlaced={};
         var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
         wallFrom=APH.Colony.wallCells(wx0, wy0);
         wallLast=wallFrom;
+        wallPlaced[wallFrom.x+','+wallFrom.y]=true;
         tryPlace(s0.buildMode, wx0, wy0);
       }
     });
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
-      /* T2 拖拽续铺: 沿线逐格放置(去重) */
+      /* T2 拖拽续铺: 从上一格到当前格增量线段(防从起点重算的幻影格+重试刷屏) */
       if(wallDrag && APH.state.buildMode && APH.state.scene==='home'){
         var s0=APH.state;
         var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
-        var line=APH.Colony.wallLine(wallFrom||{x:0,y:0}, APH.Colony.wallCells(wx0, wy0));
+        var cur=APH.Colony.wallCells(wx0, wy0);
+        var line=APH.Colony.wallLine(wallLast||wallFrom||cur, cur);
         line.forEach(function(pt){
-          if(wallLast && wallLast.x===pt.x && wallLast.y===pt.y) return;
+          var key=pt.x+','+pt.y;
+          if(wallPlaced[key]) return;
+          wallPlaced[key]=true;
           wallLast=pt;
           tryPlace(s0.buildMode, pt.x, pt.y);
         });
+        if(!line.length) wallLast=cur;
       }
     });
     cv.addEventListener('pointerup',function(e){
-      wallDrag=false; wallFrom=null; wallLast=null;
+      wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
         /* 建造模式: 点地放置(墙/闸门已在 pointerdown 铺设, 防重复) */
         if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'){
