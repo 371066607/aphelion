@@ -661,3 +661,10 @@
   - **产出**：CONTEXT.md 天气术语节（天气/状态机/暴露/避难所/预报）；docs/adr/0006-weather-system.md；DESIGN.md ADR-15 表行+天气系统 v1 章节；GitHub **#85** Spec + #86 W1 状态机（frontier）/ #87 W2 导演/ #88 W3 效果/ #89 W4 渲染（blocked_by #86 已挂）；BACKLOG 天气系统 v1 路线。
   - 验证: 依赖图核验（86:0 / 87:1 / 88:1 / 89:1）；文档提交待 push。
   - 下一步: 开 #86 W1 天气状态机（TDD 纯函数先行），与 da123wda 的 T0 资产零冲突。
+
+- **2026-08-30 · 班次**: 🌤 #86 W1 天气状态机（APH.Weather 纯函数模块）。
+  - **TDD 全程**：先写 13 条（后补 17）注册式用例再实现。红→绿 4 轮：①CFG 枚举 11 种（spec 写"12 种"系笔误，测试断言 11）；②冷却衰减时机 bug（极端期间衰减→离开即失效）→ 修「仅非极端期间衰减」；③durOf 用 rng 随机取时长→测试 t=629 不保证到时→t=2000 强制掷骰；④转入极端写 cd 用例手算区间修正（wx_rain cum thunder=[12,13)）。
+  - **实现**：CFG.weather（transitions/dur/cd/effects 全表零魔数，ADR-10）；weather.js = tickWeather(state,dt,rng) 马尔可夫推进 + weatherEffects(id) + defaultWeather()；build.py MODULE_ORDER + run.js 注册（nav 后）。
+  - **审查**：双轴独立 review → 无 blocker；2 major 修复（wx_rain_heavy exposure 8→0 与 ADR-15 极端清单对齐；测试覆盖补全表/进极端cd/dur边界）；minor 顺手修（死代码/空cd归一 null）；文档 12→11、ADR-9 补 wx_、0006 补大雨非极端修订。
+  - 验证: weather 17/17；全量 421/0；scenario 78/0；perf 3/0；boss 7/0；构建成功 30508KB；提交 3ad9a9f+5c69a3a+d356778 已推。
+  - 下一步: frontier 解锁 #87 W2 导演接线（ev_weather 进事件卡组）/ #88 W3 效果接线（exposureTick 复活！）/ #89 W4 粒子渲染（均 ← #86✅）。
