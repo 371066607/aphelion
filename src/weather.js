@@ -87,10 +87,91 @@ APH.Weather = (function(){
     return E[id] || E.wx_clear || { speedMul: 1, farmMul: 1, exposureGain: 0, enemySightMul: 1, solarMul: 1 };
   }
 
+  /* ---------- W3 接线辅助(纯函数: 各循环读取同一真源, 单点兜底) ---------- */
+  /* 当前天气 id: 读 meta.weather, 老档/缺省兜底 wx_clear (零迁移) */
+  function currentId(meta){
+    var w = meta && meta.weather;
+    return (w && w.id) || 'wx_clear';
+  }
+  /* 预计持续秒数: dur 区间中值 × dayLen (HUD 预计时长用; 粗估即可) */
+  function expectDur(id){
+    var cfg = W();
+    var d = (cfg.dur && cfg.dur[id]) || [2, 5];
+    var dayLen = (cfg.dayLen != null ? cfg.dayLen : 210);
+    return ((d[0] + d[1]) / 2) * dayLen;
+  }
+  /* 预计剩余秒数: 中值 - 已持续 t, 不取负 */
+  function expectRemain(state){
+    var id = (state && state.id) || 'wx_clear';
+    return Math.max(0, expectDur(id) - ((state && state.t) || 0));
+  }
+
+  /* ---------- W4 视觉参数 (ADR-15: 程序化雨/雪/雾; ADR-11 显式例外) ----------
+     纯函数只读 CFG.weather.fx*: 粒子类型/密度/天色罩色, 供 world.js 渲染层
+     与 node 单测。fxParams 返回 null = 无粒子无罩色的天气(渲染层静默跳过)。 */
+  function fxOf(id){
+    return (W().fx || {})[id] || null;
+  }
+
+  function fxParams(id){
+    var f = fxOf(id);
+    if (!f) return null;
+    var p = {
+      parts: f.parts || 'none',
+      count: (f.count != null ? f.count : 0),
+      tint: f.tint || null,
+      tintA: (f.tintA != null ? f.tintA : 0),
+      fogA: (f.fogA != null ? f.fogA : 0),
+      rain: null,
+      snow: null,
+    };
+    if (p.parts === 'rain') p.rain = (W().fxRain) || null;
+    else if (p.parts === 'snow') p.snow = (W().fxSnow) || null;
+    if (p.parts !== 'none' && !p.rain && !p.snow) return null;   // 声明了粒子但运动学缺失: 视为无
+    if (p.parts === 'none' && !(p.tintA > 0) && !(p.fogA > 0)) return null;
+    return p;
+  }
+
+  /* '#rrggbb' + alpha → 'rgba(r,g,b,a)' (天气层统一用) */
+  function rgbaOf(hex, a){
+    if (!hex || hex.charAt(0) !== '#') return null;
+    var r = parseInt(hex.slice(1, 3), 16),
+        g = parseInt(hex.slice(3, 5), 16),
+        b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + (a || 0) + ')';
+  }
+
+  /* 天色罩色: 无罩色天气 → null */
+  function tintRGBA(id){
+    var p = fxParams(id);
+    if (!p || !p.tint || !(p.tintA > 0)) return null;
+    return rgbaOf(p.tint, p.tintA);
+  }
+
+  /* 视口粒子目标数: 按 fxView 参考面积缩放, caps.wxParticles 封顶 */
+  function fxCount(id, w, h){
+    var p = fxParams(id);
+    if (!p || !(p.count > 0)) return 0;
+    var view = (W().fxView) || { w: 1280, h: 720 };
+    var refArea = (view.w || 1) * (view.h || 1);
+    var area = Math.max(0, w || 0) * Math.max(0, h || 0);
+    var cap = (CFG.caps && CFG.caps.wxParticles != null) ? CFG.caps.wxParticles : 240;
+    var n = Math.round(p.count * area / refArea);
+    return Math.max(0, Math.min(n, cap));
+  }
+
   return {
     weatherDefs: weatherDefs,
     defaultWeather: defaultWeather,
     tickWeather: tickWeather,
     weatherEffects: weatherEffects,
+    currentId: currentId,
+    expectDur: expectDur,
+    expectRemain: expectRemain,
+    /* W4 视觉 (程序化粒子/天色) */
+    fxParams: fxParams,
+    rgbaOf: rgbaOf,
+    tintRGBA: tintRGBA,
+    fxCount: fxCount,
   };
 })();

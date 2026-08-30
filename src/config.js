@@ -80,6 +80,7 @@ APH.CFG = {
     crystals: 26,
     spores: 70,
     particles: 240,
+    wxParticles: 240,            // W4 天气粒子预算上限 (雨/雪/溅点合计, ADR-15)
     enemies: 18,
   },
 
@@ -422,6 +423,7 @@ APH.CFG = {
     intervalMax: 4.5,          // 事件间隔上限
     firstDelay: 3,             // 开局宽限
     restMinutes: [2, 4],      // 负面事件后强制 2~4 分钟喘息窗口
+    weatherStepSec: 210,        // ev_weather 每次掷骰至少推进的天气时钟(秒; 1天=DAY_LEN)
     moodMercyAt: 40,           // 心情均值低于此值 → 负面权重×moodMercyMul
     moodMercyMul: 0.5,
     wealthPerThreat: 120,      // 每 120 财富 +1 威胁级
@@ -442,10 +444,13 @@ APH.CFG = {
       ev_blight:        { w: 8,  cd: 8,  neg: true },
       ev_solar_flare:   { w: 7,  cd: 8,  neg: true },
       ev_raid:          { w: 14, cd: 5,  neg: true },
+      /* 天气: 环境压力源(ADR-15), 权重高=导演常掷骰; 冷却期不可选 */
+      ev_weather:       { w: 30, cd: 3 },
     },
     baseWeights: {
       ev_droppod:10, ev_refugee_wave:7, ev_herd:8, ev_aurora:8,
       ev_trader_caravan:9, ev_plague:8, ev_blight:8, ev_solar_flare:7, ev_raid:14,
+      ev_weather:30,
     },
     /* 事件效果数值 */
     droppodMineral: [4, 8],
@@ -514,6 +519,48 @@ APH.CFG = {
     },
     /* 极端天气冷却(秒): 触发后此天气不可再选 (雷暴/暴雪/酸雨/磁暴) */
     cd: { wx_thunder: 630, wx_blizzard: 840, wx_acid: 840, wx_storm: 630 },
+    /* ---- W4 程序化粒子/天色 (ADR-11 显式例外: 天气即时绘制, 不进 sprite 管线) ----
+       fxView=粒子计数参考视口; fx.count=参考视口目标粒子数, 实际按视口面积缩放,
+       并被 CFG.caps.wxParticles 封顶; tint/tintA=天色罩色; fogA 仅雾天>0。 */
+    fxView: { w: 1280, h: 720 },
+    fxRain: {
+      speed: 620,                // 雨丝下落速度 px/s
+      wind: 46,                  // 横向风漂移 px/s
+      len: 15,                   // 雨丝长度 px (速度方向摆线)
+      lineW: 1.4,
+      alpha: 0.34,
+      col: '#a9bdd4',
+      splashLife: 0.22,          // 溅点存活秒数
+      splashDots: 3,             // 每溅点圆点数
+      splashR: 3,                // 溅点圆点半径 px
+      splashEdge: 6,             // 溅点离视口底边内缩 px
+    },
+    fxSnow: {
+      fall: 58,                  // 雪花下落速度 px/s
+      drift: 20,                 // 横向风漂移 px/s
+      swayAmp: 13,               // 飘落摆动幅度 px
+      swayFreq: 1.2,             // 摆动频率 rad/s
+      r: 1.7,                    // 雪花半径 px
+      rJit: 0.7,                 // 半径抖动 ±
+      alpha: 0.85,
+      col: '#f2f7fb',
+    },
+    fxFog: {
+      edgeFrac: 0.22,            // 雾层边缘渐隐带宽 (占对角半径比例)
+    },
+    fx: {
+      wx_clear:      { parts:'none', count:0,   tint:'#ffffff', tintA:0 },
+      wx_rain:       { parts:'rain', count:130, tint:'#5f7189', tintA:0.10 },   // 雨: 灰蓝
+      wx_rain_heavy: { parts:'rain', count:200, tint:'#49596e', tintA:0.16 },
+      wx_thunder:    { parts:'rain', count:230, tint:'#39485c', tintA:0.20 },
+      wx_snow:       { parts:'snow', count:110, tint:'#dfe9f2', tintA:0.12 },   // 雪: 亮白
+      wx_blizzard:   { parts:'snow', count:170, tint:'#b9e2ea', tintA:0.18 },   // 暴雪: 偏青
+      wx_heat:       { parts:'none', count:0,   tint:'#e0a465', tintA:0.07 },   // 热浪: 暖橙
+      wx_cold:       { parts:'none', count:0,   tint:'#9fb8d8', tintA:0.10 },   // 寒潮: 灰蓝
+      wx_acid:       { parts:'rain', count:140, tint:'#a9c96f', tintA:0.14 },   // 酸雨: 黄绿
+      wx_storm:      { parts:'none', count:0,   tint:'#8b6fd8', tintA:0.13 },   // 磁暴: 紫
+      wx_fog:        { parts:'none', count:0,   tint:'#c9ced6', tintA:0.08, fogA:0.26 },
+    },
     /* 效果表: speedMul(玩家/居民室外减速) farmMul(农田产量) exposureGain(室外暴露/跳) enemySightMul(敌感知) solarMul(太阳能板, 供T6) */
     effects: {
       wx_clear:       { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 1,    solarMul: 1 },
@@ -527,6 +574,17 @@ APH.CFG = {
       wx_acid:        { speedMul: 0.85, farmMul: 0.5,  exposureGain: 10, enemySightMul: 1,    solarMul: 0.4 },
       wx_storm:       { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 1,    solarMul: 0.1 },
       wx_fog:         { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 0.7, solarMul: 0.6 },
+    },
+    /* W3 HUD: 天气名与图标 (显示数据; 同 CFG.items 的 name 模式) */
+    names: {
+      wx_clear:'晴', wx_rain:'雨', wx_rain_heavy:'大雨', wx_thunder:'雷暴',
+      wx_snow:'雪', wx_blizzard:'暴雪', wx_heat:'热浪', wx_cold:'寒潮',
+      wx_acid:'酸雨', wx_storm:'磁暴', wx_fog:'雾',
+    },
+    icons: {
+      wx_clear:'☀', wx_rain:'🌧', wx_rain_heavy:'🌧', wx_thunder:'⛈',
+      wx_snow:'🌨', wx_blizzard:'❄', wx_heat:'🔥', wx_cold:'🥶',
+      wx_acid:'☣', wx_storm:'🌀', wx_fog:'🌫',
     },
   },
 

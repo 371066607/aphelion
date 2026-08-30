@@ -11,6 +11,7 @@ APH.World = (function(){
 
   var cv, ctx, VW=0, VH=0, DPR=1;
   var chunks = [], NCH = 0;
+  var wxParts = [], wxKind = '';          // W4 天气粒子池 (程序化绘制的表现层)
   var vigCv = document.createElement('canvas');
   var darkCv = document.createElement('canvas'), darkCtx = darkCv.getContext('2d');
 
@@ -208,6 +209,9 @@ APH.World = (function(){
     /* 孢子 */
     drawSpores(time, dL);
 
+    /* W4 天气: 天色 tint + 雨/雪粒子 (暗幕之下, 与 drawSpores 同层 → 夜暗幕统一压暗) */
+    drawWeather(dt, time);
+
     /* 暗幕 + 发光体重绘 */
     drawDarkness(dL);
     s.entities.forEach(function(e){
@@ -215,6 +219,9 @@ APH.World = (function(){
       else if(e.type==='crystal' && !e.taken) APH.Ent.drawCrystalGlow(e,time);
     });
     drawEmissive(time);
+
+    /* W4 雾: 低透明雾层 (暗幕之上, 与 drawEmissive 同层 → 雾为大气散射, 夜里仍可见) */
+    drawFog();
 
     /* 屏幕空间(绝对重置, 无 restore 依赖) */
     applyScreen();
@@ -236,6 +243,157 @@ APH.World = (function(){
       ctx.fillStyle='rgba('+sr+','+sg+','+sb+','+((0.10+(1-dL)*0.30)*tw)+')';
       ctx.beginPath(); ctx.arc(sx,sy,1.6*sp.s,0,U.TAU); ctx.fill();
     }
+  }
+
+  /* ---------- W4 天气粒子/天色 (ADR-15; ADR-11 显式例外: 即时绘制不进 sprite 管线) ----------
+     读取 meta.weather.id (W1/W2 写, 缺省晴天); 参数全在 CFG.weather.fx*, 预算受 CFG.caps.wxParticles。
+     分层: tint+雨雪在暗幕之下 (与 drawSpores 同层), 雾在暗幕之上 (与 drawEmissive 同层)。 */
+  function curWeatherId(){
+    var s = APH.state;
+    return (s && s.meta && s.meta.weather && s.meta.weather.id) || 'wx_clear';
+  }
+  function curWxFx(){
+    return (APH.Weather && APH.Weather.fxParams) ? APH.Weather.fxParams(curWeatherId()) : null;
+  }
+
+  function drawWeather(dt, time){
+    var s = APH.state;
+    if(!s || !ctx || VW < 1 || VH < 1){ wxParts = []; wxKind = ''; return; }
+    if(s.scene !== 'home'){ wxParts = []; wxKind = ''; return; }   // 天气只属于家园场景
+    var fx = curWxFx();
+    if(!fx){ wxParts = []; wxKind = ''; return; }
+    /* 天色 tint: 屏幕空间低透明罩色 (暗幕之下) */
+    if(fx.tint && fx.tintA > 0){
+      ctx.save();
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+      ctx.fillStyle = APH.Weather.rgbaOf(fx.tint, fx.tintA);
+      ctx.fillRect(0,0,VW,VH);
+      ctx.restore();
+    }
+    /* 雨/雪粒子: 世界空间 (跟相机走) */
+    var kind = fx.rain ? 'rain' : (fx.snow ? 'snow' : '');
+    if(kind !== wxKind){ wxParts = []; wxKind = kind; }   // 类型切换: 清旧粒子
+    if(kind){ stepWx(fx, dt); drawWxParticles(fx, time); }
+  }
+
+  /* 雨/雪/溅点步进: 视口内循环, 落地溅点, 预算硬上限 */
+  function stepWx(fx, dt){
+    var s = APH.state, rain = fx.rain, snow = fx.snow;
+    var target = APH.Weather.fxCount(curWeatherId(), VW, VH);
+    var cap = (CFG.caps && CFG.caps.wxParticles != null) ? CFG.caps.wxParticles : 240;
+    var topY = s.camY - VH/2 - 40;
+    var botY = s.camY + VH/2 + 20;
+    var leftX = s.camX - VW/2 - 60;
+    var rightX = s.camX + VW/2 + 60;
+    var out = [];
+    for(var i=0;i<wxParts.length;i++){
+      var p = wxParts[i];
+      if(p.kind === 'splash'){
+        p.life -= dt;
+        if(p.life > 0) out.push(p);
+        continue;
+      }
+      if(p.kind === 'rain'){
+        p.x += rain.wind*dt; p.y += rain.speed*dt;
+        if(p.y >= botY - rain.splashEdge) pushSplash(out, p, rain, botY);
+        if(p.y >= botY - rain.splashEdge || p.y < topY - 80 || p.y > botY + 80
+           || p.x < leftX - 100 || p.x > rightX + 100){
+          p.x = U.rr(leftX, rightX); p.y = topY - U.rr(0, 40);
+        }
+        out.push(p);
+        continue;
+      }
+      /* snow: 下落 + 风漂 + 出界回卷 */
+      p.x += snow.drift*dt; p.y += snow.fall*dt;
+      if(p.y >= botY || p.y < topY - 60 || p.x < leftX - 60 || p.x > rightX + 60){
+        p.x = U.rr(leftX, rightX); p.y = topY - U.rr(0, 30);
+      }
+      out.push(p);
+    }
+    /* 补粒: 视口目标数 (fxCount 已按 caps 封顶; 溅点计入同一池) */
+    while(out.length < target){
+      if(rain){
+        out.push({ kind:'rain', x:U.rr(leftX, rightX),
+                   y:U.rr(topY - 40, botY - 40), ph:Math.random()*U.TAU });
+      }else{
+        out.push({ kind:'snow', x:U.rr(leftX, rightX),
+                   y:U.rr(topY - 30, botY + 20), ph:Math.random()*U.TAU,
+                   s:1 + U.rr(-snow.rJit, snow.rJit) });
+      }
+    }
+    while(out.length > cap) out.pop();   // 防溅点击穿预算
+    wxParts = out;
+  }
+
+  function pushSplash(arr, p, rain, botY){
+    arr.push({ kind:'splash', x:p.x, y:botY - rain.splashEdge,
+               life:rain.splashLife, maxLife:rain.splashLife, ph:Math.random()*U.TAU });
+  }
+
+  function drawWxParticles(fx, time){
+    var rain = fx.rain, snow = fx.snow, i, p;
+    if(rain){
+      var k = rain.len / rain.speed;              // 速度方向摆线斜率
+      ctx.strokeStyle = APH.Weather.rgbaOf(rain.col, rain.alpha);
+      ctx.lineWidth = rain.lineW;
+      for(i=0;i<wxParts.length;i++){
+        p = wxParts[i];
+        if(p.kind !== 'rain') continue;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - rain.wind*k, p.y - rain.len);
+        ctx.stroke();
+      }
+    }
+    if(snow){
+      ctx.fillStyle = APH.Weather.rgbaOf(snow.col, snow.alpha);
+      for(i=0;i<wxParts.length;i++){
+        p = wxParts[i];
+        if(p.kind !== 'snow') continue;
+        var sx = p.x + Math.sin(time*snow.swayFreq + p.ph)*snow.swayAmp;   // 飘落摆动
+        ctx.beginPath();
+        ctx.arc(sx, p.y, Math.max(0.4, snow.r*p.s), 0, U.TAU);
+        ctx.fill();
+      }
+    }
+    if(rain){
+      for(i=0;i<wxParts.length;i++){
+        p = wxParts[i];
+        if(p.kind !== 'splash') continue;
+        var t = p.life / p.maxLife;
+        ctx.fillStyle = APH.Weather.rgbaOf(rain.col, rain.alpha*t);
+        for(var d=0; d<rain.splashDots; d++){
+          var ang = p.ph + d*(U.TAU/rain.splashDots);
+          var dist = (1 - t)*rain.splashR*2;
+          ctx.beginPath();
+          ctx.arc(p.x + Math.cos(ang)*dist, p.y + Math.sin(ang)*dist*0.6,
+                  rain.splashR*(0.4 + 0.6*t), 0, U.TAU);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  /* 雾: 低透明雾层 + 视口边缘渐隐 (中心均匀, 靠边淡出) */
+  function drawFog(){
+    var s = APH.state;
+    if(!s || !ctx || VW < 1 || VH < 1) return;
+    if(s.scene !== 'home') return;
+    var fx = curWxFx();
+    if(!fx || !(fx.fogA > 0) || !fx.tint) return;
+    var fog = (CFG.weather && CFG.weather.fxFog) || { edgeFrac: 0.22 };
+    ctx.save();
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    var cx = VW/2, cy = VH/2;
+    var r1 = Math.sqrt(VW*VW + VH*VH)/2;          // 角距: 覆盖全视口
+    var r0 = r1*(1 - fog.edgeFrac);
+    var gr = ctx.createRadialGradient(cx,cy,0,cx,cy,r1);
+    gr.addColorStop(0, APH.Weather.rgbaOf(fx.tint, fx.fogA));
+    gr.addColorStop(U.clamp(r0/r1, 0, 1), APH.Weather.rgbaOf(fx.tint, fx.fogA));
+    gr.addColorStop(1, APH.Weather.rgbaOf(fx.tint, 0));
+    ctx.fillStyle = gr;
+    ctx.fillRect(0,0,VW,VH);
+    ctx.restore();
   }
 
   /* 信标顶部宝石 + 光柱（暗幕之上） */
@@ -323,6 +481,8 @@ APH.World = (function(){
   return {
     initCanvas:initCanvas, buildTerrain:buildTerrain,
     daylight:daylight, drawDarkness:drawDarkness, render:render,
+    drawWeather:drawWeather, drawFog:drawFog,
+    wxCount:function(){ return wxParts.length; },
     getViewport:function(){ return {w:VW,h:VH}; },
   };
 })();
