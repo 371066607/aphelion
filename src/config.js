@@ -605,6 +605,11 @@ APH.CFG = {
     dropStoneMax: 2,            // T4 破墙: 墙毁掉落石料上限
   },
 
+  /* T5 弹道掩体 (issue #78): 墙块=弹道障碍(真实掩体) */
+  ballistic: {
+    wallHalf: 24,               // 墙块碰撞盒半宽 = GRID/2 (48px 格, 墙记录格心±24)
+  },
+
   /* 存档 */
   save: {
     PREFIX: 'aphelion_',

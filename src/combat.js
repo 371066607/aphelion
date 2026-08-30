@@ -287,6 +287,33 @@ APH.Combat = (function(){
     s.shake = Math.min(1, (s.shake||0) + .12);
     U.emit('wallDown', { x:b.x, y:b.y });
   }
+  /* T5 弹道掩体 (issue #78): 线段 vs 轴对齐墙盒(48px 格)相交判定(slab 法)
+     弹丸本帧位移线段跨越墙块即命中(含贴边端点); 零长段=点是否在盒内。 */
+  function segHitBox(x1, y1, x2, y2, bx, by, half){
+    var minX = bx - half, maxX = bx + half;
+    var minY = by - half, maxY = by + half;
+    var dx = x2 - x1, dy = y2 - y1;
+    var t0 = 0, t1 = 1, ta, tb, tmp;
+    if(dx === 0){
+      if(x1 < minX || x1 > maxX) return false;
+    }else{
+      ta = (minX - x1) / dx; tb = (maxX - x1) / dx;
+      if(ta > tb){ tmp = ta; ta = tb; tb = tmp; }
+      if(ta > t0) t0 = ta;
+      if(tb < t1) t1 = tb;
+      if(t0 > t1) return false;
+    }
+    if(dy === 0){
+      if(y1 < minY || y1 > maxY) return false;
+    }else{
+      ta = (minY - y1) / dy; tb = (maxY - y1) / dy;
+      if(ta > tb){ tmp = ta; ta = tb; tb = tmp; }
+      if(ta > t0) t0 = ta;
+      if(tb < t1) t1 = tb;
+      if(t0 > t1) return false;
+    }
+    return true;
+  }
   /* 围攻炮击目标(纯函数): 优先墙/炮塔, 其次最近可停机建筑(发射台除外) */
   function pickShellTarget(cx, cy, buildings){
     var sg = (CFG.raidTactics && CFG.raidTactics.tactics && CFG.raidTactics.tactics.siege) || {};
@@ -586,6 +613,29 @@ APH.Combat = (function(){
         return Math.sqrt((px2-cx)*(px2-cx)+(py2-cy)*(py2-cy));
       }
 
+      /* T5 弹道掩体 (issue #78): 墙块拦截一切弹丸(player/siege/enemy)
+         本帧路径线段 vs 48px 格碰撞盒; 仅 bl_wall 拦弹(闸门不挡, 穿门语义延续)。
+         自家墙不豁免: 玩家/炮塔弹药打自家墙同扣血——墙=真实掩体。 */
+      var wList = (s.colony && s.colony.buildings) || [];
+      for(var wi = 0; wi < wList.length; wi++){
+        var wb = wList[wi];
+        if(!wb || wb.id !== 'bl_wall') continue;
+        if(wb.hp != null && wb.hp <= 0) continue;
+        if(!segHitBox(segX0, segY0, p.x, p.y, wb.x, wb.y, CFG.ballistic.wallHalf)) continue;
+        p.dead = true;
+        /* 弹丸伤害; 围攻炮弹无 dmg 字段(T4 语义: 固定 shellDmg 两发一墙) */
+        var wDmg = p.dmg || CFG.wall.shellDmg;
+        wb.hp = wallHp(wb) - wDmg;
+        wb.hitFlash = 0.1;
+        U.emit('wallHit', { x: wb.x, y: wb.y, hp: Math.max(0, wb.hp) });
+        if(wb.hp <= 0) destroyWall(wb, s);
+        s.shake = Math.min(1, (s.shake || 0) + 0.12);
+        if(p.side === 'siege' && window.APH.UI && APH.UI.floatText)
+          APH.UI.floatText('💥 围攻炮击! 墙体受损', '#ff9a9a');
+        break;
+      }
+      if(p.dead) return;      // 弹丸被墙消耗: 不再参与后续命中判定
+
       if(p.side === 'player'){
         for(var ei=0; ei<s.entities.length; ei++){
           var en=s.entities[ei];
@@ -617,20 +667,14 @@ APH.Combat = (function(){
         for(var bi=0; bi<blds.length; bi++){
           var tb=blds[bi];
           if(!tb || tb.id==='bl_landing_pad') continue;
+          /* T5: 墙块已在弹道障碍层拦截(segHitBox+墙伤害), 此处只处理非墙建筑 */
+          if(tb.id === 'bl_wall') continue;
           if(segDist(segX0,segY0,p.x,p.y,tb.x,tb.y) < 36){
             p.dead=true;
-            if(tb.id==='bl_wall'){
-              /* T4 破墙: 围攻炮弹击穿墙耐久(两发一墙) */
-              var wDmg=(CFG.wall&&CFG.wall.shellDmg!=null)?CFG.wall.shellDmg:30;
-              tb.hp=wallHp(tb)-wDmg;
-              U.emit('wallHit', {x:tb.x, y:tb.y, hp:Math.max(0,tb.hp)});
-              if(tb.hp<=0) destroyWall(tb, s);
-            }else{
-              tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
-            }
+            tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
             s.shake=Math.min(1,(s.shake||0)+.3);
             if(window.APH.UI && APH.UI.floatText)
-              APH.UI.floatText('💥 围攻炮击'+(tb.id==='bl_wall'?'! 墙体受损':'! 建筑停机'),'#ff9a9a');
+              APH.UI.floatText('💥 围攻炮击! 建筑停机','#ff9a9a');
             break;
           }
         }
@@ -942,5 +986,7 @@ APH.Combat = (function(){
     /* T4 寻路+破墙+围攻炮击目标 */
     wallHp:wallHp, breachFocus:breachFocus, planChase:planChase,
     strikeWall:strikeWall, destroyWall:destroyWall, pickShellTarget:pickShellTarget,
+    /* T5 弹道掩体 */
+    segHitBox:segHitBox,
   };
 })();
