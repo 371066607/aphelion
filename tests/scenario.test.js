@@ -51,7 +51,7 @@ let frameFn=null;
 /* ---------- 加载模块(顺序同 build.py) ---------- */
 const SRC = path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','weather.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
@@ -1800,6 +1800,124 @@ test('#69 home: residentsTick 击倒判定与送医接线 (checkDowned/rescueTic
     S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
     S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
     S.meta.res=oldRes; S.meta.workPrio=oldPrio;
+  }
+});
+
+/* ---------- W2 天气导演接线冒烟 (issue #87) ---------- */
+test('W2 天气接线: 极端暴雪结束→强制晴天窗口+喘息', () => {
+  const oldW=S.meta.weather, oldEv=S.meta.events;
+  try{
+    A(S.scene==='home', '应在殖民地场景');
+    S.meta.weather={ id:'wx_blizzard', t:2000, cd:{ wx_blizzard:840 } };
+    const cds={};
+    Object.keys(window.APH.CFG.events.deck).forEach(id=>{
+      if(id!=='ev_weather') cds[id]=99;
+    });
+    S.meta.events={ nextIn:0.1, sinceNeg:99, lastNeg:0,
+                    cooldowns:cds, history:[], weatherAcc:600 };
+    M.storyTick(0.5);
+    A(S.meta.weather && S.meta.weather.id==='wx_clear' && S.meta.weather.t===0,
+      '极端结束应强制晴天窗口, got '+JSON.stringify(S.meta.weather));
+    A(S.meta.weather.cd && S.meta.weather.cd.wx_blizzard===840,
+      '极端冷却应保留, got '+JSON.stringify(S.meta.weather.cd));
+    A(S.meta.events.sinceNeg===0, '喘息 sinceNeg 应归零, got '+S.meta.events.sinceNeg);
+    A(S.meta.events.restFor!=null && S.meta.events.restFor>=2 && S.meta.events.restFor<=4,
+      '喘息窗口应设置, got '+S.meta.events.restFor);
+    A((S.meta.events.cooldowns.ev_weather||0)>0, 'ev_weather 应进冷却');
+    A(S.meta.events.weatherAcc===0, '掷骰后天气时钟应归零');
+  }finally{
+    S.meta.weather=oldW; S.meta.events=oldEv;
+  }
+});
+test('W2 天气接线: 非天气事件不写 meta.weather', () => {
+  const oldW=S.meta.weather, oldEv=S.meta.events;
+  try{
+    S.meta.weather={ id:'wx_rain', t:0 };
+    const cds={};
+    Object.keys(window.APH.CFG.events.deck).forEach(id=>{
+      if(id!=='ev_droppod') cds[id]=99;
+    });
+    S.meta.events={ nextIn:0.1, sinceNeg:99, lastNeg:0,
+                    cooldowns:cds, history:[], weatherAcc:300 };
+    M.storyTick(0.5);
+    A(S.meta.weather && S.meta.weather.id==='wx_rain' && S.meta.weather.t===0,
+      '非天气事件不应改天气, got '+JSON.stringify(S.meta.weather));
+  }finally{
+    S.meta.weather=oldW; S.meta.events=oldEv;
+  }
+});
+
+/* ---------- W3 天气效果接线冒烟 (#88) ---------- */
+test('W3 冒烟: 雷暴室外居民暴露+10, HUD 天气行显示雷暴, 寒潮防寒服免减速', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war,
+        oldRes=S.meta.res, oldPrio=S.meta.workPrio, oldWx=S.meta.weather;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[]; S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ food:10, mineral:0, med:0 };
+    S.meta.workPrio={};
+    S.meta.weather={ id:'wx_thunder', t:0, cd:null };
+    S.meta.residents=[{ id:'rs_wxp', name:'暴露测试员', job:'bl_farm', skills:{sk_farm:5},
+      mood:80, food:80, illness:0, rest:80, recreation:80, exposure:0,
+      ailments:[], downed:false, isSleeping:false, bedId:null,
+      gear:{tool:null,suit:null,head:null} }];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_wxp');
+    A(!!e, '应创建居民实体');
+    e.x=600; e.y=600;                        /* 开阔荒野: 室外(核心/建筑外) */
+    /* 接线判定: 极端=exposureGain>0 → 喂入 exposureTick */
+    M.residentsTick();
+    const r=S.meta.residents[0];
+    A(r.exposure===10, '雷暴室外 1 生产跳暴露应 +10, got '+r.exposure);
+    /* HUD 天气行: updHUD 读 meta.weather → 图标+雷暴+预计时长 */
+    APH.UI.updHUD();
+    const rowWx=document.getElementById('rowWeather');
+    A(rowWx && rowWx.textContent && rowWx.textContent.indexOf('雷暴')>=0,
+      'HUD 应显示雷暴+时长, got: '+(rowWx&&rowWx.textContent));
+    /* 装备减免: 寒潮+防寒服免减速 (纯函数侧) */
+    A(APH.Res.weatherMoveMul({gear:{suit:'it_suit_cryo'}},'wx_cold',0.85,false)===1,
+      '寒潮+防寒服应免减速');
+    A(APH.Res.weatherMoveMul({gear:null},'wx_rain',0.7,false)===0.7, '雨室外应 0.7');
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+    S.meta.res=oldRes; S.meta.workPrio=oldPrio; S.meta.weather=oldWx;
+  }
+});
+
+/* #89 W4: 天气程序化粒子/天色 smoke (ADR-15; ADR-11 显式例外) — 切天气后绘制不崩 + 预算受控 */
+test('#89 smoke: 全 11 种天气 drawWeather/drawFog 不崩, 粒子数≤caps 预算', () => {
+  const oldScene = S.scene;
+  const oldWeather = S.meta.weather;
+  S.scene = 'home';
+  APH.World.initCanvas();                       // VW/VH = 800x600 (视口桩)
+  S.camX = S.px; S.camY = S.py;
+  const ids = ['wx_clear','wx_rain','wx_rain_heavy','wx_thunder','wx_snow','wx_blizzard',
+               'wx_heat','wx_cold','wx_acid','wx_storm','wx_fog'];
+  try{
+    ids.forEach(id => {
+      S.meta.weather = { id: id, t: 0 };
+      APH.World.drawWeather(0.016, 12.3);
+      APH.World.drawWeather(0.016, 12.4);       // 两步: 走粒子步进+重生路径
+      APH.World.drawFog();
+      const n = APH.World.wxCount();
+      A(n <= window.APH.CFG.caps.wxParticles, id+' 粒子应 ≤ caps 预算: '+n);
+    });
+    /* 雨/雪实际出粒子, 晴清池 */
+    S.meta.weather = { id: 'wx_rain', t: 0 };
+    APH.World.drawWeather(0.016, 12.5);
+    A(APH.World.wxCount() > 0, '雨天应有雨丝+溅点粒子');
+    A(APH.World.wxCount() <= window.APH.CFG.caps.wxParticles, '雨天粒子不超预算');
+    S.meta.weather = { id: 'wx_snow', t: 0 };
+    APH.World.drawWeather(0.016, 12.6);
+    A(APH.World.wxCount() > 0, '雪天应有雪花粒子');
+    S.meta.weather = { id: 'wx_clear', t: 0 };
+    APH.World.drawWeather(0.016, 12.7);         // 晴天清池
+    A(APH.World.wxCount() === 0, '晴天应清空粒子池');
+  } finally {
+    S.scene = oldScene;
+    if (oldWeather === undefined) delete S.meta.weather; else S.meta.weather = oldWeather;
   }
 });
 
