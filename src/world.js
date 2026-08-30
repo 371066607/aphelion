@@ -199,6 +199,9 @@ APH.World = (function(){
     /* 粒子层(地面) */
     drawEntityFns.particles(dt, time);
 
+    /* T2 墙/闸门格层 (ADR-13: 贴地矮块, 实体层之前) */
+    if(drawEntityFns.walls) drawEntityFns.walls(time);
+
     /* 统一实体 Y 排序 (ADR-3) */
     var sorted = s.entities.filter(function(e){ return !e.dead && e.type!=='player'; })
                   .concat([s.entities.find(function(e){return e.type==='player'})])

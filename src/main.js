@@ -818,9 +818,13 @@ window.APH = window.APH || {};
           return !(en.type===T.BLUEPRINT&&en.bid===d.bid&&
                    Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2);
         });
-        APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
-        var justBuilt=s.entities[s.entities.length-1];
-        if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
+        /* ADR-13: 墙/闸门=格上静态物, 不入 entities[](防爆实体预算); 渲染走 walls 层 */
+        var isGridStatic=(d.bid==='bl_wall'||d.bid==='bl_gate');
+        if(!isGridStatic){
+          APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
+          var justBuilt=s.entities[s.entities.length-1];
+          if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
+        }
         saveColony();
         U.emit('built',{id:d.bid});
         APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
@@ -1470,6 +1474,7 @@ window.APH = window.APH || {};
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
       blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
+      walls:function(t){ APH.Ent.drawWalls(t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -1544,6 +1549,7 @@ window.APH = window.APH || {};
       resident:function(e,t){ APH.Ent.drawResident(e,t); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       flora:function(e,t){ APH.Ent.drawFlora(e,t); },
+      walls:function(t){ APH.Ent.drawWalls(t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
     };
@@ -1951,18 +1957,39 @@ window.APH = window.APH || {};
       knob.style.transform='translate(calc(-50% + '+(dx/len*cl)+'px), calc(-50% + '+(dy/len*cl)+'px))';
     }
 
-    var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0;
+    var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0,wallDrag=false,wallFrom=null,wallLast=null;
     cv.addEventListener('pointerdown',function(e){
       downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
+      /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
+      var s0=APH.state;
+      if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate')){
+        wallDrag=true; wallLast=null;
+        var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
+        wallFrom=APH.Colony.wallCells(wx0, wy0);
+        wallLast=wallFrom;
+        tryPlace(s0.buildMode, wx0, wy0);
+      }
     });
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
+      /* T2 拖拽续铺: 沿线逐格放置(去重) */
+      if(wallDrag && APH.state.buildMode && APH.state.scene==='home'){
+        var s0=APH.state;
+        var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
+        var line=APH.Colony.wallLine(wallFrom||{x:0,y:0}, APH.Colony.wallCells(wx0, wy0));
+        line.forEach(function(pt){
+          if(wallLast && wallLast.x===pt.x && wallLast.y===pt.y) return;
+          wallLast=pt;
+          tryPlace(s0.buildMode, pt.x, pt.y);
+        });
+      }
     });
     cv.addEventListener('pointerup',function(e){
+      wallDrag=false; wallFrom=null; wallLast=null;
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
-        /* 建造模式: 点地放置 */
-        if(s.scene==='home'&&s.buildMode){
+        /* 建造模式: 点地放置(墙/闸门已在 pointerdown 铺设, 防重复) */
+        if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'){
           var wx=e.clientX-vpW()/2+s.camX, wy=e.clientY-vpH()/2+s.camY;
           tryPlace(s.buildMode,wx,wy);
           return;

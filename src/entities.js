@@ -847,11 +847,32 @@ APH.Ent = (function(){
     var nx=U.clamp(s.px+s.vx*dt,40,CFG.WORLD-40),
         ny=U.clamp(s.py+s.vy*dt,40,CFG.WORLD-40);
     var lakeR=s.spec.terrain.lakeR;
-    if(U.dst(nx,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ s.px=nx; s.py=ny; }
-    else{
-      if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.px=nx;
-      if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14) s.py=ny;
+    /* 湖面约束(轴分离): 候选点 → cx/cy */
+    var cx=nx, cy=ny;
+    if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<=lakeR-14){
+      if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ cy=s.py; }
+      else if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ cx=s.px; }
+      else { cx=s.px; cy=s.py; }
     }
+    /* T2 玩家撞墙推挤(ADR-13: 墙=48px格障碍): 墙约束, 轴分离滑墙 */
+    if(s.scene==='home' && (s.colony&&(s.colony.buildings||[]).some(function(b2){ return b2.id==='bl_wall'; }))){
+      var wallR=22;   // 玩家半径11 + 墙块半格约24 的近似
+      function hitWall(px2, py2){
+        var wb=(s.colony.buildings||[]);
+        for(var i2=0;i2<wb.length;i2++){
+          var b3=wb[i2];
+          if(b3.id!=='bl_wall') continue;
+          if(Math.abs(px2-b3.x)<wallR && Math.abs(py2-b3.y)<wallR) return true;
+        }
+        return false;
+      }
+      if(!hitWall(cx,cy)){ s.px=cx; s.py=cy; }
+      else{
+        if(!hitWall(cx,s.py)) s.px=cx;      // 沿x滑
+        if(!hitWall(s.px,cy)) s.py=cy;      // 沿y滑
+        if(s.px===cx && s.py===cy){ s.vx*=.55; s.vy*=.55; }  // 完全堵死: 减速
+      }
+    }else{ s.px=cx; s.py=cy; }
     if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; pe.moving=moving; pe.walkPh=s.walkPh; pe.isSleeping=false; pe.downed=false; }
 
     /* 计时器 */
@@ -1062,6 +1083,25 @@ APH.Ent = (function(){
     ctx.restore();
   }
 
+  /* T2 墙/闸门格层渲染 (ADR-13: 格上静态物不上 entities[])
+     贴地矮块: 地形后/实体前; 四邻拼接偏移, 转角靠 sheet 单块砖。 */
+  function drawWalls(time){
+    var s=APH.state;
+    var bs=(s.colony && s.colony.buildings)||[];
+    var walls=[], gates=[];
+    bs.forEach(function(b){
+      if(b.id==='bl_wall') walls.push(b);
+      else if(b.id==='bl_gate') gates.push(b);
+    });
+    var sc=0.92;
+    walls.forEach(function(w){
+      APH.Sprites.draw(ctx, 'bl_wall', w.x, w.y+20, 0, sc);
+    });
+    gates.forEach(function(g){
+      APH.Sprites.draw(ctx, 'bl_gate', g.x, g.y+20, 0, sc);
+    });
+  }
+
   /* 建筑绘制(殖民地/远征通用) */
     return {
     bindCtx:bindCtx,
@@ -1070,6 +1110,7 @@ APH.Ent = (function(){
     drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     drawBuilding:drawBuilding, drawFlora:drawFlora,
+    drawWalls:drawWalls,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
   };
 })();

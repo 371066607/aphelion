@@ -1980,5 +1980,24 @@ test('#89 smoke: 全 11 种天气 drawWeather/drawFog 不崩, 粒子数≤caps �
   }
 });
 
+
+test('T2 smoke: 墙入 colony.buildings 不占实体, drawWalls 不崩', () => {
+  const s0 = window.APH.state;
+  s0.scene = 'home';
+  s0.colony.buildings = s0.colony.buildings || [];
+  // 模拟一堵墙完成(不入实体的路径)
+  s0.colony.buildings.push({ id: 'bl_wall', x: 900, y: 900, lv: 1 });
+  const before = s0.entities.length;
+  // drawWalls 应能跑(贴图未加载时程序化回退, 不崩)
+  try { window.APH.Ent.drawWalls(0); } catch (e) { throw new Error('drawWalls 不应抛: '+e.message); }
+  if (s0.entities.length !== before) throw new Error('墙不应入实体列表');
+});
+
+test('T2 smoke: wallLine 拖拽连续铺墙 5 格', () => {
+  const line = window.APH.Colony.wallLine({ x: 900, y: 900 }, { x: 1092, y: 900 });
+  if (line.length !== 5) throw new Error('应 5 格: '+line.length);
+  line.forEach(p => { if (p.x % 48 !== 12 && p.x % 48 !== 0) return; });
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

@@ -60,6 +60,13 @@ APH.Colony = (function(){
     bl_kitchen:     { name:'烹饪灶台', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:20, stone:20, iron:15 }, size:52, max:2, buildTime:20,
       dispH:110, cells:[2,2],
       desc:'高级菜肴烹制与厨师岗位。需研发异星烹饪保鲜。' },
+    /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
+    bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
+      cells:[1,1], buildTime:6, dispH:96,
+      desc:'阻挡所有单位移动的墙体。袭击者会拆墙。' },
+    bl_gate:  { name:'闸门', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:3, wood:5 }, size:48, max:500,
+      cells:[1,1], buildTime:8, dispH:98,
+      desc:'可通行的门：己方秒开，袭击者开门有延迟。' },
   };
   var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_kitchen', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
@@ -251,16 +258,59 @@ APH.Colony = (function(){
 
     if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
-    if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
+    var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && (bid==='bl_wall'||bid==='bl_gate'));
+    /* 墙/闸门豁免离核心130px: 否则围不了家(ADR-13) */
+    if(!isGrid && U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     for(var i=0;i<colonyBuildings.length;i++){
       var b = colonyBuildings[i];
       var of = footprintOf(b.id), ohw = of.w/2, ohh = of.h/2;
+      /* 墙/闸门互相相邻视为占同一格线(允许拼接), 但只是0相邻不重叠 */
+      if(isGrid && (b.id==='bl_wall'||b.id==='bl_gate')){
+        /* 完全同格: 拒(不叠放); 邻格: 允许(围墙上补门) */
+        if(Math.abs(x-b.x)<1 && Math.abs(y-b.y)<1) return { ok:false, why:'该格已有墙/闸门' };
+        continue;
+      }
       if(Math.abs(x-b.x) < hw+ohw && Math.abs(y-b.y) < hh+ohh)
         return { ok:false, why:'与其他建筑重叠' };
     }
     if(x-hw<60||y-hh<60||x+hw>CFG.WORLD-60||y+hh>CFG.WORLD-60) return { ok:false, why:'超出殖民地边界' };
     return { ok:true };
+  }
+
+  /* ---------- T2 墙/闸门格网纯函数(ADR-13) ---------- */
+  /* 屏幕坐标→格中心 (48px, 与 tryPlace 一致) */
+  function wallCells(wx, wy){
+    return { x: Math.round(wx/CFG.GRID)*CFG.GRID, y: Math.round(wy/CFG.GRID)*CFG.GRID };
+  }
+  /* 从 a 到 b 的沿线格序列(拖拽连续铺墙): 取主导轴, 逐格推进 */
+  function wallLine(a, b){
+    var ax=Math.round(a.x/CFG.GRID), ay=Math.round(a.y/CFG.GRID);
+    var bx=Math.round(b.x/CFG.GRID), by=Math.round(b.y/CFG.GRID);
+    var dx=bx-ax, dy=by-ay;
+    var steps=Math.max(Math.abs(dx), Math.abs(dy));
+    var out=[];
+    for(var i=0;i<=steps;i++){
+      var t=steps? i/steps : 0;
+      var cx=Math.round(ax+dx*t), cy=Math.round(ay+dy*t);
+      var pt={x:cx*CFG.GRID, y:cy*CFG.GRID};
+      var last=out[out.length-1];
+      if(!last || last.x!==pt.x || last.y!==pt.y) out.push(pt);
+    }
+    return out;
+  }
+  /* 四邻墙判定(渲染拼接用): 闸门不算相邻墙 */
+  function wallNeighbors(walls, x, y){
+    var n={ north:false, south:false, east:false, west:false };
+    (walls||[]).forEach(function(w){
+      if(w.id!=='bl_wall') return;
+      var dx=w.x-x, dy=w.y-y;
+      if(dx===CFG.GRID && dy===0) n.east=true;
+      else if(dx===-CFG.GRID && dy===0) n.west=true;
+      else if(dx===0 && dy===CFG.GRID) n.south=true;
+      else if(dx===0 && dy===-CFG.GRID) n.north=true;
+    });
+    return n;
   }
 
   /* ---------- U3 农田生长(纯函数) ----------
@@ -1297,6 +1347,8 @@ APH.Colony = (function(){
     workshopTick:workshopTick,
     buildColonyWorld:buildColonyWorld,
     canPlace:canPlace, footprintOf:footprintOf, productionTick:productionTick,
+    /* T2 墙/闸门格网(ADR-13) */
+    wallCells:wallCells, wallLine:wallLine, wallNeighbors:wallNeighbors,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf,
