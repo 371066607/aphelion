@@ -2071,6 +2071,13 @@ window.APH = window.APH || {};
         bl_lab:{idle:1,baseline:243,h:156}, bl_landing_pad:{idle:1,baseline:243,h:162},
         bl_mine:{idle:1,baseline:175,h:134}, bl_pasture:{idle:1,baseline:177,h:94},
         bl_turret:{idle:1,baseline:173,h:72}, bl_warehouse:{idle:1,baseline:169,h:90},
+        /* #84 建筑 v3 视觉资产：静态单块 sheet 重复 8 帧，仅木柴发电机局部循环 */
+        bl_wall:{idle:1,baseline:241,h:144}, bl_gate:{idle:1,baseline:243,h:146},
+        bl_conduit:{idle:1,baseline:240,h:125}, bl_wood_generator:{idle:3,baseline:245,h:197},
+        bl_solar_panel:{idle:1,baseline:240,h:179}, bl_battery:{idle:1,baseline:241,h:156},
+        bl_lamp:{idle:1,baseline:240,h:187}, bl_dining_table:{idle:1,baseline:240,h:155},
+        bl_dining_chair:{idle:1,baseline:240,h:180}, bl_spike_trap:{idle:1,baseline:240,h:129},
+        bl_sandbag:{idle:1,baseline:240,h:106},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},

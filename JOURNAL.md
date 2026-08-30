@@ -681,3 +681,10 @@
   - **Review 发现**：CFG.weather.cd 缺热浪/寒潮 + tickWeather isExtreme 判定（cdCfg!=null）与 W2/W3/W4 统一闸门（exposureGain>0）不一致——W1 遗留，非合流引入。**修复**：cd 表补 wx_heat/wx_cold(630s)；tickWeather isExtreme 改读 weatherEffects(id).exposureGain>0（唯一真源）；weather.test.js +2（热浪/寒潮写cd、storm 非极端期间衰减）。
   - 验证: weather 19/19；全量 462/0；scenario 82/0；构建 30529KB；提交 2a0f267+729b752 已推；#87/#88/#89 已关。
   - **天气系统 v1 全链完成**：W1 状态机 + W2 导演调度 + W3 效果接线（exposureTick 复活）+ W4 粒子渲染。下一步: 等 da123wda T0 资产合入 → 建筑 v3 T2（#75）逻辑层；或天气进阶（天气预报）。
+- **2026-08-30 · 班次**: 🎨 #84 T0 建筑 v3 视觉资产完成（待 review/提交，不关闭 Issue）。
+  - **规格收口**：重新读取 GitHub #84（已认领 `da123wda`、无评论）；标题/正文写 12 但只枚举 11 项，已将 Issue 真相源统一为 11，并固化 `bl_wall/gate/conduit/wood_generator/solar_panel/battery/lamp/dining_table/dining_chair/spike_trap/sandbag`。静态项为 frame 0 重复的 8 帧传输容器（`idleFrames:1`），木柴发电机为 3 帧局部稳定循环；未增加第十二项。
+  - **资产/管线**：11 张透明 RGBA sheet 均经 `assets/build_sprites.py` 放大、清理、配准为 `2048×256`；实测 baseline=240–245、contentH=106–197。二次运行 `sprite_data.js` SHA-256 均为 `a4e36e19...b71e7db7`，确认幂等；新增内联约 589KB，`game.html` 增约 601KB。
+  - **视觉核验**：检查 frame 0 + 夜间 tint 联系表；无白框/裁边/烘焙大光晕，墙门同材质、导线端点居中、沙袋低矮、陷阱为机械尖刺而非 IED、桌椅分立；静态 10 项逐帧字节一致，发电机仅烟囱局部变化。
+  - **契约**：`SPRITE_META` 登记实测锚点；新增 PNG/IHDR/base64 字节测试，以及 scenario 的 11 项启动注册、256 格、tint、逐项 draw 与 Image onerror 程序化回退测试。真实 Chromium `game.html?autostart=1&debugmark=1` 探针 11/11 `ready/tinted=true`、`fw=fh=256`、`cols=count=8`，页面无控制台错误。
+  - **验证**：`python build.py` 成功（game.html 31088KB）；`node tests/run.js` 406/0；`node tests/scenario.test.js` 80/0；`node tests/perf.test.js` 3/0；`node tests/boss.test.js` 7/0；`git diff --check` 通过。窄测首次 scenario 遇到既有 #65 随机粮堆用例 79/1，立即重跑及最终全量均为 80/0，未修改 #64/#65 逻辑。
+  - 下一步: 双轴 review 后由维护者提交/推送并评论关闭 #84，再解锁 #75/#79/#81/#82/#83；本班未提交、未推送、未关闭票。

@@ -19,6 +19,7 @@ function stubEl(){
         if(k==='createRadialGradient' || k==='createLinearGradient'){
           return function(){ return grad; };
         }
+        if(k==='getImageData') return function(){ return {data:new Uint8ClampedArray(0)}; };
         if(typeof k === 'string'){ return function(){ return undefined; }; }
         return undefined;
       }});
@@ -43,13 +44,30 @@ global.innerWidth = 800; global.innerHeight = 600;
 global.devicePixelRatio = 1;
 global.performance = { now:()=>Date.now() };
 global.requestAnimationFrame = ()=>0;          // 不启动真实循环
-global.location = { reload(){} };
+global.location = { search:'', reload(){} };
+global.Image = class ImageStub {
+  constructor(){ this.width=2048; this.height=256; }
+  set src(value){ this._src=value; if(value.indexOf('fail:')===0){ if(this.onerror) this.onerror(); } else if(this.onload) this.onload(); }
+  get src(){ return this._src; }
+};
 
 /* 手工驱动帧: 直接调 APH.Main.__frame */
 let frameFn=null;
 
 /* ---------- 加载模块(顺序同 build.py) ---------- */
 const SRC = path.join(__dirname,'..','src');
+const ASSET_IDS = [
+  'bl_wall','bl_gate','bl_conduit','bl_wood_generator','bl_solar_panel','bl_battery',
+  'bl_lamp','bl_dining_table','bl_dining_chair','bl_spike_trap','bl_sandbag'
+];
+/* scenario 只抽取 #84 数据，避免执行完整 30MB 生成文件。 */
+const spriteDataSource=fs.readFileSync(path.join(SRC,'sprite_data.js'),'utf8');
+global.APH={SPRITE_DATA:{}};
+ASSET_IDS.forEach(function(id){
+  const line=spriteDataSource.split('\n').find(function(s){ return s.indexOf("APH.SPRITE_DATA['"+id+"']")===0; });
+  if(!line) throw new Error('#84 sprite_data 缺键: '+id);
+  new Function(line)();
+});
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','weather.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
@@ -64,6 +82,47 @@ function test(name, fn){
 }
 const A = (cond,msg)=>{ if(!cond) throw new Error(msg||'断言失败'); };
 const S = window.APH.state, M = window.APH.Main, C = window.APH.Colony, U = window.APH.U, T=window.APH.CFG.entType;
+
+/* ---------- #84 sprite 启动/回退契约 ---------- */
+test('#84: boot 注册 11 项 256 格 sheet 并生成夜间 tint', () => {
+  ASSET_IDS.forEach(function(id){
+    const d=APH.Sprites.sheetDef(id);
+    A(APH.Sprites.isReady(id), id+' 应加载成功');
+    A(d && d.fw===256 && d.fh===256 && d.cols===8 && d.count===8, id+' 布局错误');
+    A(d.baseline>0 && d.contentH>0, id+' 元数据应有效');
+    A(d.idleFrames===(id==='bl_wood_generator'?3:1), id+' idleFrames 错误');
+    A(!!APH.Sprites.getTinted(id), id+' 夜间 tint 缺失');
+  });
+});
+
+test('#84: sprite 成功走贴图，Image onerror 后程序化回退不抛错', () => {
+  let draws=0;
+  const grad={addColorStop(){}};
+  const ctx=new Proxy({}, {get:function(t,k){
+    if(k==='drawImage') return function(){ draws++; };
+    if(k==='createRadialGradient'||k==='createLinearGradient') return function(){ return grad; };
+    if(typeof k==='string') return function(){};
+  }, set:function(t,k,v){ t[k]=v; return true; }});
+  const oldDaylight=APH.World.daylight;
+  APH.World.daylight=function(){ return 1; };
+  APH.Ent.bindCtx(ctx);
+  try{
+    ASSET_IDS.forEach(function(id){
+      APH.Ent.drawBuilding({type:T.BUILDING,bid:id,x:100,y:100,def:{cells:[1,1],dispH:48}},0);
+    });
+    A(draws===ASSET_IDS.length, '11 项 ready 资产均应调用 drawImage');
+    APH.Sprites.define('bl_asset_fail',{src:'fail:test',cols:8,rows:1,count:8,baseline:200,contentH:120});
+    let completed=false;
+    APH.Sprites.loadAll(function(){ completed=true; });
+    A(completed && !APH.Sprites.isReady('bl_asset_fail'), 'onerror 应完成加载并保持 not-ready');
+    const before=draws;
+    APH.Ent.drawBuilding({type:T.BUILDING,bid:'bl_asset_fail',x:100,y:100,def:{cells:[1,1]}},0);
+    A(draws===before, '加载失败应进入程序化分支而非 drawImage');
+  } finally {
+    APH.World.daylight=oldDaylight;
+    APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
+  }
+});
 
 /* ---------- 场景链路 ---------- */
 test('boot 后: 出生在殖民地(home), spec=新曙光殖民地', () => {
