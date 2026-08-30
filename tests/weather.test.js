@@ -152,3 +152,23 @@ test('tickWeather: dur 边界(1天=210s 内不切, 210s 后切)', () => {
   // rng=0 → pick 命中首权重; wx_thunder 转移 {wx_rain:3, wx_clear:3, wx_blizzard:1} → wx_rain
   if (r2.id !== 'wx_rain') throw new Error('到时应切雨: ' + r2.id);
 });
+
+test('tickWeather: 热浪/寒潮属极端(写cd) — 冷却清单与 exposureGain>0 唯一真源一致', () => {
+  // 热浪进入: 从 wx_clear 到时, rng 命中 wx_heat (wx_clear 转移 {clear:4,rain:3,snow:2,fog:1,heat:1,cold:1} total=12; cum heat=[10,11)
+  const w = { id: 'wx_clear', t: 2000 };
+  const r = W.tickWeather(w, 1, () => 0.88);   // 0.88*12=10.56 → 4→6.56,3→3.56,2→1.56,1→0.56,1→-0.44 → wx_heat
+  if (r.id !== 'wx_heat') throw new Error('应选热浪: ' + r.id);
+  if (!r.cd || r.cd.wx_heat !== 630) throw new Error('热浪应写cd630: ' + JSON.stringify(r.cd));
+  // 寒潮同理: cum cold=[11,12) → rng=0.95*12=11.4 → wx_cold
+  const r2 = W.tickWeather(w, 1, () => 0.95);
+  if (r2.id !== 'wx_cold') throw new Error('应选寒潮: ' + r2.id);
+  if (!r2.cd || r2.cd.wx_cold !== 630) throw new Error('寒潮应写cd630: ' + JSON.stringify(r2.cd));
+});
+
+test('tickWeather: wx_storm 不算极端冷却真源(exposureGain=0, 极端期间衰减)', () => {
+  // wx_storm exposureGain=0 (磁暴=特殊事件), cd 里有 storm 时: 处于 storm 期间 → 不衰减? 否:
+  // isExtreme 按 exposureGain>0 → storm 非极端 → cd 衰减
+  const w = { id: 'wx_storm', t: 0, cd: { wx_storm: 630 } };
+  const r = W.tickWeather(w, 100, () => 0.5);
+  if (!(r.cd && r.cd.wx_storm < 630)) throw new Error('storm期间cd应衰减(非极端): ' + JSON.stringify(r.cd));
+});

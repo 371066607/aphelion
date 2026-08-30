@@ -30,6 +30,7 @@ APH.Weather = (function(){
      state = {id, t, cd?{wx_id:剩余秒}}; dt 秒; rng()→[0,1)
      rule: t 累加; t>=dur(随机取区间) 时掷骰选下一id(权重表, 冷却中排除);
            选中后 t=0; 进入极端天气时写 cd=cfg.cd[id]。
+     极端判定唯一真源 = weatherEffects(id).exposureGain > 0 (ADR-15 修订);
      cd 衰减时机: 仅当当前天气非极端时衰减(离开极端后开始计冷却, 防立刻连击)。 */
   function tickWeather(state, dt, rng){
     var cfg = W();
@@ -38,7 +39,7 @@ APH.Weather = (function(){
     var t = (state.t || 0) + (dt || 0);
     var cd = state.cd && Object.keys(state.cd).length ? Object.assign({}, state.cd) : null;
     var cdCfg = cfg.cd || {};
-    var isExtreme = cdCfg[id] != null;
+    var isExtreme = (weatherEffects(id).exposureGain || 0) > 0;
     /* 冷却衰减: 仅非极端天气期间(当前不在极端中) */
     if (cd && !isExtreme){
       for (var k in cd){ cd[k] = Math.max(0, cd[k] - (dt || 0)); if (cd[k] <= 0) delete cd[k]; }

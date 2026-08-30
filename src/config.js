@@ -517,8 +517,8 @@ APH.CFG = {
       wx_snow: [1, 3], wx_blizzard: [1, 2], wx_heat: [1, 3], wx_cold: [1, 3],
       wx_acid: [1, 2], wx_storm: [1, 2], wx_fog: [1, 2],
     },
-    /* 极端天气冷却(秒): 触发后此天气不可再选 (雷暴/暴雪/酸雨/磁暴) */
-    cd: { wx_thunder: 630, wx_blizzard: 840, wx_acid: 840, wx_storm: 630 },
+    /* 极端天气冷却(秒): 触发后此天气不可再选 (极端清单=exposureGain>0: 雷暴/暴雪/热浪/寒潮/酸雨; 磁暴为特殊事件) */
+    cd: { wx_thunder: 630, wx_blizzard: 840, wx_acid: 840, wx_storm: 630, wx_heat: 630, wx_cold: 630 },
     /* ---- W4 程序化粒子/天色 (ADR-11 显式例外: 天气即时绘制, 不进 sprite 管线) ----
        fxView=粒子计数参考视口; fx.count=参考视口目标粒子数, 实际按视口面积缩放,
        并被 CFG.caps.wxParticles 封顶; tint/tintA=天色罩色; fogA 仅雾天>0。 */
