@@ -285,6 +285,17 @@ APH.Ent = (function(){
     ctx.fillStyle='#c8e89a'; ctx.font='9px sans-serif'; ctx.textAlign='center';
     ctx.fillText('🍽', -11, y);
   }
+  /* #70 补充: 玩家生病头顶 ✚(镜像居民 drawResidentMarks 样式; 病情>=sickMarkAt 显示) */
+  function drawPlayerSickMark(e, y){
+    var s=APH.state;
+    var ill=(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness)||0;
+    var at=(CFG.residents&&CFG.residents.sickMarkAt!=null)?CFG.residents.sickMarkAt:20;
+    if(ill<at) return;
+    ctx.fillStyle='#ff6d7a';
+    ctx.font=(CFG.residents&&CFG.residents.sickMarkFontPx||14)+'px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('✚', 11, y);
+  }
   function drawPlayer(e,time){
     var step=Math.sin(e.walkPh), bobbing=e.moving?Math.abs(step)*1.6:.6;
     var s = APH.state;
@@ -323,6 +334,7 @@ APH.Ent = (function(){
         ctx.globalAlpha=1;
         /* #65: sprite 分支也要画 🍽(脚底锚原点, 头顶≈baseline*sc 之上) */
         drawPlayerHungerMark(e, -((defS&&defS.baseline)||248)*sc + 4);
+        drawPlayerSickMark(e, -((defS&&defS.baseline)||248)*sc + 4);
         if(lying && e.downed) drawProneWounds(ctx);
         ctx.restore();
         return;
@@ -356,6 +368,8 @@ APH.Ent = (function(){
     ctx.stroke();
     /* #65: 程序化分支头顶 🍽(translate 已带 -bobbing, 微调半幅抵消) */
     drawPlayerHungerMark(e, -40+(e.moving?bobbing*0.5:0));
+    /* #70 补充: 程序化分支玩家 ✚ */
+    drawPlayerSickMark(e, -40+(e.moving?bobbing*0.5:0));
     /* T12 头顶浮动三角 + 实时屏幕坐标(诊断铁证) */
     if(!s.showMarkerOff){
       ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';

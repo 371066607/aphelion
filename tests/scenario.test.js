@@ -1331,6 +1331,41 @@ test('#65: 饿玩家 drawPlayer 画 🍽 不崩', () => {
   S.prodT = 0;
 });
 
+test('#70 补充: 生病玩家 drawPlayer 画 ✚ (illness>=20), 康健不画', () => {
+  S.scene = 'home'; S.mode = 'running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.isSleeping = false;
+  S.keys = {}; S.target = null;
+  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
+  S.prodT = 0;
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const calls=[];
+  const spy=new Proxy({ fillStyle:'', font:'', textAlign:'', globalAlpha:1 }, {
+    get(t,k){
+      if(k==='fillText') return function(text,x,y){ calls.push({text, fillStyle:this.fillStyle}); };
+      if(typeof t[k]!=='undefined') return t[k];
+      if(k==='createRadialGradient'||k==='createLinearGradient') return function(){ return { addColorStop(){} }; };
+      return function(){};
+    }
+  });
+  try{
+    APH.Ent.bindCtx(spy);
+    S.meta.playerNeeds.illness = 30;
+    const pe = APH.Ent.findPlayer();
+    APH.Ent.drawPlayer(pe, 0);
+    A(calls.some(function(c){return c.text==='✚' && c.fillStyle==='#ff6d7a';}), '病玩家应画红色 ✚');
+    calls.length=0;
+    S.meta.playerNeeds.illness = 10;
+    APH.Ent.drawPlayer(pe, 0);
+    A(!calls.some(function(c){return c.text==='✚';}), '康健玩家(illness<20)不应画 ✚');
+  }finally{
+    APH.Ent.bindCtx(originalCtx);
+  }
+  S.prodT = 0;
+});
+
 /* #72 家园击倒: 击倒 != 死亡, 昏迷不可动/不可醒, 送医复活/倒计时死亡, 远征死法不变
    驱动通道: hurtPlayer → updateHome(playerDownedTick/carryPlayerToClinic) */
 test('#72: 家园击倒 → meta+实体俯卧, moving=false, drawPlayer 不崩', () => {
