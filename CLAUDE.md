@@ -44,6 +44,7 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 | rivals.js | `APH.Rivals` | 敌对殖民地战争态势 |
 | events.js | `APH.Events` | 事件叙事者：财富值威胁标尺+事件卡组+喘息窗口 (ADR-12) |
 | nav.js | `APH.Nav` | 48px 格网寻路引擎：障碍矩阵/A*/路径步进 (ADR-13) |
+| weather.js | `APH.Weather` | 家园天气马尔可夫状态机+效果表 (ADR-15) |
 | residents.js | `APH.Res` | 居民六维技能/心情/饱食/社交 |
 | combat.js | `APH.Combat` | 战斗/炮塔/士兵/Boss |
 | world.js | `APH.World` | 地形/视口/昼夜 |
@@ -63,6 +64,9 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 - **ADR-6 时间**：渲染变步长 dt≤50ms；殖民地/AI 发展固定 30s 生产 tick；非 running 态不 update。
 - **ADR-9 ID 前缀永不重命名**：`fx_`阵营 `it_`物品 `bl_`建筑 `bk_`信标 `rv_`敌殖民 `lw_`法则 `ev_`事件 `specimen_`实物标本（存档引用兼容）。
 - **ADR-10 数据/逻辑分离**：LLM 只产 schema 内数据；数值全进 CFG 表。LLM 配置存运行时 meta，**代码中永远没有 API key**。
+- **ADR-13 网格寻路**：居民/袭击者/过客共用 48px 格网 A*；墙=不可通行、闸门=可通行(敌有开门延迟)；无路可走袭击者破墙；玩家撞墙被推挤不寻路；墙/闸门/导线不入 `entities[]`(格上静态物走格层)。详见 `docs/adr/0004-grid-pathfinding.md`。
+- **ADR-14 实体导线电力网**：导线=可铺格实体，BFS 连网(发电机/蓄电池/耗电建筑)；无电停机、农场减产；供不应求按优先级停机+电池 60s 兜底；零发电机=电网未激活(老档兼容)。详见 `docs/adr/0005-power-grid.md`。
+- **ADR-15 家园天气系统**：11 种天气马尔可夫概率级联(持续 1~5 天+极端冷却)，切换经事件导演(ADR-12)调度；效果缝合居民暴露/农场乘子/玩家减速/敌雾视距；`wx_` 前缀，`meta.weather` 老档零迁移。详见 `docs/adr/0006-weather-system.md`。
 
 ### 视觉资产管线 (ADR-11)
 

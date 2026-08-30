@@ -725,3 +725,11 @@
   - **踩坑**：ui.js 插入 powerRow 时把「提示条」注释搞成 `*/ */` 双重闭合（SyntaxError，node --check 及时拦）——插注释块时检查边界闭合。
   - 验证: t7 8/8；全量 531/0；scenario 86/0；perf 3/0；boss 7/0；构建 31142KB；提交 267f713+d9e7901 已推；#80 已关。
   - **建筑 v3 班 1 全链完成**：T0-T7（寻路/墙/居民绕墙/袭击破墙/弹道/电网/耗电联动）——明日班 2（T8 餐桌椅/T9 房间+路灯/T10 陷阱沙袋）。
+
+- **2026-08-31 · 诊断**: 🐛 修复"所有角色躺姿都不对"（用户报告，/diagnosing-bugs 流程）。
+  - **定位**：`player_prone`/`hum_1/2/3_nopack_prone` 在 `src/main.js` SPRITE_META 里的 `h`(contentH) 是历次手抄旧值，与 `assets/*_prone_sheet.png` 实测内容高不符——`hum_2_nopack_prone` 偏差达 61px（声明163，实测102）。`baseline` 全部准确，只有 `h` 错。由于渲染缩放 `sc=drawH/h`，`h` 偏大→角色躺下时被压缩渲染得比标准体积小/瘪；`hum_0_nopack_prone` 唯一手抄准确的键作为对照组，证实这不是 `spriteScale()` 公式坏了，是数据漂移。
+  - **验证方法**：重跑 `python3 assets/build_sprites.py`（其 `baseline_y`/`content_bbox_h` 是真源，幂等未改动任何图片字节/`sprite_data.js`）拿到权威测量值，逐键 diff `src/main.js`。
+  - **修复**：`main.js` 4 处 `h` 值改回实测（player_prone 86→68，hum_1 139→138，hum_2 163→102，hum_3 139→124；hum_0 本就对不动）。
+  - **回归测试**：新增 `tests/sprite_meta.test.js`——纯 Node 内置 `zlib` 手写 PNG 解码器（无第三方依赖），独立复现 `build_sprites.py` 同口径测量，逐键断言 `main.js` 声明值＝实测值。`git stash` 验证过该测试在旧值下确实先红后绿（4/5 失败→5/5 通过），非摆设。**旧 `#71 geometry` 测试其实是重言式**（`contentH×(drawH/contentH)` 对任意输入恒等于 drawH），只锁 `spriteScale()` 公式没变，从未覆盖过"声明值是否等于真实资产"这一失守环节——新测试补的正是这个洞。
+  - 验证: sprite_meta 5/5；全量 536/0；scenario 86/0；perf 3/0；boss 7/0；构建 31142KB。
+  - 下一步: 无——此为独立诊断票，非 BACKLOG 排期项；建议今后改 SPRITE_META 一律重跑 `build_sprites.py` 整块复制，禁止手改单个数字。

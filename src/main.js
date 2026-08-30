@@ -2144,11 +2144,11 @@ window.APH = window.APH || {};
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
-        player_prone:{baseline:162,h:86},   /* #59 通用俯卧(2026-08-30 两版: 先换真美术, 再缩小占比——角色横躺体积与站姿一致) */
+        player_prone:{baseline:162,h:68},   /* #59 通用俯卧; h 修订: 手抄值86与实测(build_sprites.py)不符, 曾致缩放偏小 */
         hum_0_nopack_prone:{baseline:248,h:122} /* #60 脸0无包居民俯卧 */
-        ,hum_1_nopack_prone:{baseline:248,h:139} /* #61 脸1无包居民俯卧 */
-        ,hum_2_nopack_prone:{baseline:249,h:163} /* #62 脸2无包居民俯卧 */
-        ,hum_3_nopack_prone:{baseline:198,h:139} /* #63 脸3无包居民俯卧(分向生成后拼接) */
+        ,hum_1_nopack_prone:{baseline:248,h:138} /* #61 脸1无包居民俯卧 */
+        ,hum_2_nopack_prone:{baseline:249,h:102} /* #62 脸2无包居民俯卧; h 修订: 手抄值163与实测差61px, 曾致躺姿严重缩水 */
+        ,hum_3_nopack_prone:{baseline:198,h:124} /* #63 脸3无包居民俯卧(分向生成后拼接); h 修订: 手抄值139与实测差15px */
       };
       (function(){
         var i, k;
