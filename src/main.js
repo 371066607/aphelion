@@ -2237,6 +2237,21 @@ window.APH = window.APH || {};
         }
         var pad0=s.entities.find(function(e){return e.type===T.BUILDING&&e.pad;});
         if(pad0){ s.px=pad0.x; s.py=pad0.y+30; }   // 出生即站在发射台上
+        /* T8 调试通道(?t8debug=1): 餐桌+双椅+饥饿居民, 基于玩家实际位置放桌椅 */
+        if(_q.indexOf('t8debug=1')>=0){
+          var tb={x:s.px+220,y:s.py+60}; var ch1={x:s.px+110,y:s.py+60}; var ch2={x:s.px+330,y:s.py+60};
+          s.colony.buildings.push({id:'bl_dining_table',x:tb.x,y:tb.y,lv:1});
+          APH.Colony.placeBuildingEntity('bl_dining_table',tb.x,tb.y,1);
+          s.colony.buildings.push({id:'bl_dining_chair',x:ch1.x,y:ch1.y,lv:1});
+          APH.Colony.placeBuildingEntity('bl_dining_chair',ch1.x,ch1.y,1);
+          s.colony.buildings.push({id:'bl_dining_chair',x:ch2.x,y:ch2.y,lv:1});
+          APH.Colony.placeBuildingEntity('bl_dining_chair',ch2.x,ch2.y,1);
+          if(s.meta.residents&&s.meta.residents.length){
+            s.meta.residents.forEach(function(r2){ if(r2.food!=null) r2.food=40; });
+          }
+          s.entities.push({id:'t8f',type:CFG.entType.DROPPED,x:tb.x,y:tb.y+30,itemId:'it_food',n:9});
+          document.title='AUTO: t8debug ready';
+        }
       }
       if(_q.indexOf('exp=1')>=0){
         startGame();
@@ -3026,43 +3041,60 @@ window.APH = window.APH || {};
     }
     return best;
   }
-  function tryEatHere(e, r, grabR, dumpR){
+  /* T8: 无桌吃饭心情惩罚(在餐桌用餐豁免): 每次非atTable 吃成后结算 */
+  function applyNoTablePenalty(r){
+    var C=CFG.residents||{};
+    var pen=C.noTableMoodPenalty!=null?C.noTableMoodPenalty:-3;
+    if(pen>=0) return;
+    r.mood=Math.max(0, (r.mood||70)+pen);
+  }
+
+  function tryEatHere(e, r, grabR, dumpR, atTable, eatR){
     if(!r || !APH.Res.eatOnce) return false;
+    /* T8: 在餐桌用餐浮标 (atTable=true: 居民到椅上吃, 显示 😋 在餐桌用餐) */
+    var TBL_FLAG=!!atTable;
+    /* T8: 桌旁吃略放宽取食半径 (椅到桌旁粮堆可略远) */
+    var mealR = (eatR!=null) ? eatR : (TBL_FLAG && CFG.residents && CFG.residents.diningTableEatR!=null
+      ? CFG.residents.diningTableEatR : grabR);
     if(e.haulCarry && dropStore({itemId:e.haulCarry.itemId})==='food'){
       var itDefC = (CFG.items && CFG.items[e.haulCarry.itemId]) || { name:'食物', foodGain:25 };
-      var eatRes = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefC) : { ate: APH.Res.eatOnce(r, itDefC) };
+      var eatRes = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefC, { atTable: TBL_FLAG }) : { ate: APH.Res.eatOnce(r, itDefC) };
       if(!eatRes.ate) return false;
       e.haulCarry.n=(e.haulCarry.n||1)-1;
       if((e.haulCarry.n||0)<=0) e.haulCarry=null;
       if(itDefC.isCooked){
-        APH.UI.floatText('😋 '+(e.name||'居民')+' 享用了 '+itDefC.name+' (+'+(itDefC.foodGain||25)+'饱食 +'+(itDefC.moodGain||0)+'心情 +'+(itDefC.recGain||0)+'娱乐)', '#ffd54f');
+        APH.UI.floatText((TBL_FLAG?'😋 '+(e.name||'居民')+' 在餐桌用餐':'😋 '+(e.name||'居民')+' 享用了 '+itDefC.name)+' (+'+(itDefC.foodGain||25)+'饱食 +'+(itDefC.moodGain||0)+'心情 +'+(itDefC.recGain||0)+'娱乐)', '#ffd54f');
       }else{
-        APH.UI.floatText((e.name||'居民')+' 吃了手里的食物','#c8e89a');
+        APH.UI.floatText((e.name||'居民')+(TBL_FLAG?' 在餐桌吃了饭':' 吃了手里的食物'),'#c8e89a');
       }
+      if(!TBL_FLAG) applyNoTablePenalty(r);
       e.food=r.food;
       return true;
     }
     var meal=nearestMeal(e, 1e9);
     if(!meal) return false;
-    var need=meal.kind==='stock'?dumpR:grabR;
+    var need=meal.kind==='stock'?dumpR:mealR;
     if(U.dst(e.x,e.y,meal.x,meal.y)>=need) return false;
     if(meal.kind==='stock'){
       if((APH.state.meta.res.food||0)<=0) return false;
-      if(!APH.Res.eatOnce(r)) return false;
+      /* T8: 有桌在仓库吃也计「在餐桌用餐」 */
+      var eatStock = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, null, { atTable: TBL_FLAG }) : { ate: APH.Res.eatOnce(r) };
+      if(!eatStock.ate) return false;
       APH.state.meta.res.food--;
-      APH.UI.floatText((e.name||'居民')+' 在仓库吃了口粮 (+25饱食)','#c8e89a');
+      APH.UI.floatText((e.name||'居民')+(TBL_FLAG?' 在餐桌吃了口粮 (+'+(eatStock.foodGain||25)+'饱食 +'+(eatStock.moodGain||0)+'心情)':' 在仓库吃了口粮 (+25饱食)'),'#c8e89a');
     }else{
       if(!meal.drop || meal.drop.dead) return false;
       var itDefG = (CFG.items && CFG.items[meal.drop.itemId]) || { name:'食物', foodGain:25 };
-      var eatResG = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefG) : { ate: APH.Res.eatOnce(r, itDefG) };
+      var eatResG = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefG, { atTable: TBL_FLAG }) : { ate: APH.Res.eatOnce(r, itDefG) };
       if(!eatResG.ate) return false;
       nibblePile(meal.drop, 1);
       if(itDefG.isCooked){
-        APH.UI.floatText('😋 '+(e.name||'居民')+' 享用了 '+itDefG.name+' (+'+(itDefG.foodGain||25)+'饱食 +'+(itDefG.moodGain||0)+'心情 +'+(itDefG.recGain||0)+'娱乐)', '#ffd54f');
+        APH.UI.floatText((TBL_FLAG?'😋 '+(e.name||'居民')+' 在餐桌用餐':'😋 '+(e.name||'居民')+' 享用了 '+itDefG.name)+' (+'+(itDefG.foodGain||25)+'饱食 +'+(itDefG.moodGain||0)+'心情 +'+(itDefG.recGain||0)+'娱乐)', '#ffd54f');
       }else{
-        APH.UI.floatText((e.name||'居民')+' 吃了地上的食物','#c8e89a');
+        APH.UI.floatText((e.name||'居民')+(TBL_FLAG?' 在餐桌吃了饭':' 吃了地上的食物'),'#c8e89a');
       }
     }
+    if(!TBL_FLAG) applyNoTablePenalty(r);
     e.food=r.food;
     return true;
   }
@@ -3083,9 +3115,25 @@ window.APH = window.APH || {};
     var dumpR=H.dumpR!=null?H.dumpR:36;
     var raid=!!(s.war&&s.war.raidActive);
     var stock=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
+    /* T8 餐桌椅 (#81): 每帧收集桌椅+饥饿居民 → 座位分配 (纯函数; 每椅1人, 懒汉不受) */
+    var diningTbls=[], diningChairs=[];
+    (s.colony&&s.colony.buildings||[]).forEach(function(b){
+      if(b.id==='bl_dining_table' && !b.dead) diningTbls.push(b);
+      else if(b.id==='bl_dining_chair' && !b.dead) diningChairs.push(b);
+    });
+    var hungryRes=[], seatMap={};
+    if(!raid && diningTbls.length && diningChairs.length){
+      s.entities.forEach(function(e){
+        if(e && e.type===T.RESIDENT){
+          var r0=residentOf(e);
+          if(r0 && r0.food!=null && r0.food<eatBelow) hungryRes.push({id:r0.id,x:e.x,y:e.y});
+        }
+      });
+      seatMap=APH.Res.diningSeatAlloc(hungryRes, diningChairs, diningTbls);
+    }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
     var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
-    var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
     s.entities.forEach(function(e){
       if(!e || e.type!==T.RESIDENT) return;
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
@@ -3136,6 +3184,30 @@ window.APH = window.APH || {};
       }
       e.breaking=null;
       var hungry=r && r.food!=null && r.food<eatBelow;
+      /* T8: 有桌有座 → 优先去最近空椅坐吃 (座次分配已在本帧 seatMap) */
+      var seat=!raid && hungry ? (seatMap[r.id]||null) : null;
+      if(seat && seat.chair){
+        /* 到椅坐下: 椅子位置+小偏移(避叠); 到达后坐在椅上吃 */
+        var seatX=seat.chair.x+8, seatY=seat.chair.y-2;
+        var dSeat=U.dst(e.x,e.y,seatX,seatY);
+        if(dSeat>((CFG.residents&&CFG.residents.diningArriveR!=null)?CFG.residents.diningArriveR:6)){
+          e.tx=seatX; e.ty=seatY;
+          APH.Res.walkAround(e, {x:seatX,y:seatY}, dt, spd*sickSpeedMul*wxMul, navGrid);
+          /* 坐下后脸朝桌 (坐着吃=站姿, 只转脸) */
+          if(APH.Res.faceTable && U.dst(e.x,e.y,seatX,seatY)<=10) e.face=APH.Res.faceTable(seat.chair, seat.table);
+        }else{
+          e.x=seatX; e.y=seatY; e.walking=false;
+          e.face=APH.Res.faceTable(seat.chair, seat.table);
+          /* 在餐桌用餐: atTable=true → 心情增益+😊浮标+不罚无桌 */
+          var ateAtTable=tryEatHere(e, r, grabR, dumpR, true, ((CFG.residents&&CFG.residents.diningTableEatR!=null)?CFG.residents.diningTableEatR:90));
+          if(!ateAtTable && r.food<eatBelow){
+            /* 桌旁无粮兜底: 转最近粮堆/仓库(此时算无桌吃, 出惩罚) */
+            var meal2=nearestMeal(e, seekR);
+            if(meal2){ e.tx=meal2.x; e.ty=meal2.y; APH.Res.walkAround(e, meal2, dt, spd*sickSpeedMul*wxMul, navGrid); }
+          }
+        }
+        return;
+      }
       if(!raid && hungry){
         if(!tryEatHere(e, r, grabR, dumpR) && r.food<eatBelow){
           var meal=nearestMeal(e, seekR);

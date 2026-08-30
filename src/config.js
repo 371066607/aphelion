@@ -275,6 +275,13 @@ APH.CFG = {
     brawlIll: 8,               // 斗殴: 双方病情上涨
     brawlBondHit: 8,           // 斗殴: 好感损失
     tantrumMoodHit: 5,         // 怠工抱怨: 周围居民心情损失
+    /* T8 餐桌椅 (#81): 有桌吃心情增益/无桌罚/椅位分配 (纯函数 diningSeatAlloc 读) */
+    diningMoodGain: 4,         // 在餐桌用餐的心情增益 (进 eatMeal 结算)
+    noTableMoodPenalty: -3,    // 无桌吃饭的心情惩罚 (与 eatMeal 无桌分支)
+    diningChairR: 300,         // 居民分配空椅的最大距离 (椅须在桌旁 chairTableR 内; 300≈从居住舱走到食堂)
+    chairTableR: 60,           // 椅子须在桌旁此距离内才算可用餐位
+    diningArriveR: 6,          // 到椅坐下判定半径
+    diningTableEatR: 90,       // 坐椅后从桌旁粮堆取食的最大距离 (桌/椅在食堂内, 比 grabR 宽)
     /* 深度生存: 精力/睡眠/床位 (Survival #15) */
     restDrain: 7,              // 生产跳自然精力衰减
     restSleepAt: 20,           // 精力低于此值入睡

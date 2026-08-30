@@ -711,3 +711,49 @@ test('#69 needsTick: 病情回落自动起身, 击倒者不起, 重病继续躺'
   Res.needsTick(c, true);
   if(!c.medLying) throw new Error('击倒者应保持躺到救援');
 });
+
+/* ============ T8 餐桌与餐椅 (#81) ============ */
+test('#81 diningSeatAlloc: 每椅1人, 就近分配, 不抢座', () => {
+  // 两椅两饿人: 各近一把椅; 两椅都在桌旁(桌在两椅中间下方)
+  const hungry=[{id:'a',x:30,y:30},{id:'b',x:190,y:30}];
+  const chairs=[{id:'c1',x:90,y:30},{id:'c2',x:130,y:30}];
+  const tables=[{x:110,y:80}];
+  const m=Res.diningSeatAlloc(hungry, chairs, tables);
+  if(!m.a || !m.b) throw new Error('两人都应获座: '+JSON.stringify(m));
+  if(m.a.chair.id!=='c1') throw new Error('a 应就近 c1: '+JSON.stringify(m.a));
+  if(m.b.chair.id!=='c2') throw new Error('b 应就近 c2: '+JSON.stringify(m.b));
+  // 一椅两饿人: 只有一人获座
+  const m2=Res.diningSeatAlloc([{id:'a',x:0,y:0},{id:'b',x:50,y:0}], [{id:'c1',x:100,y:0}], [{x:100,y:60}]);
+  const winners=Object.keys(m2);
+  if(winners.length!==1) throw new Error('一椅只能一人: '+JSON.stringify(m2));
+  if(m2[winners[0]].chair.id!=='c1') throw new Error('获座者应是 c1');
+});
+test('#81 diningSeatAlloc: 独椅无桌不算可用餐位', () => {
+  const m=Res.diningSeatAlloc([{id:'a',x:0,y:0}], [{id:'c1',x:100,y:0}], [{x:500,y:500}]);
+  if(Object.keys(m).length!==0) throw new Error('离桌60px外的椅子不可用: '+JSON.stringify(m));
+});
+test('#81 diningSeatAlloc: 距离远超 diningChairR 不派座', () => {
+  const m=Res.diningSeatAlloc([{id:'a',x:0,y:0}], [{id:'c1',x:500,y:0}], [{x:500,y:60}]);
+  if(Object.keys(m).length!==0) throw new Error('居民距椅90px外不应派座');
+});
+test('#81 faceTable: 椅子看向桌子角度', () => {
+  const f=Res.faceTable({x:0,y:0},{x:0,y:60});
+  if(Math.abs(f-Math.PI/2)>1e-9) throw new Error('正下桌应为 π/2: '+f);
+  const f2=Res.faceTable({x:0,y:0},{x:60,y:0});
+  if(Math.abs(f2)>1e-9) throw new Error('正右桌应为 0: '+f2);
+});
+test('#81 eatMeal: opts.atTable 心情增益 (diningMoodGain)', () => {
+  const r={food:40,mood:80};
+  const res=Res.eatMeal(r, null, {atTable:true});
+  if(!res.ate) throw new Error('饿人应吃成');
+  if(res.moodGain!==4) throw new Error('atTable 应 +4 心情: '+res.moodGain);
+  if(r.mood!==84) throw new Error('心情应 84: '+r.mood);
+  if(r.food!==65) throw new Error('饱食应 65: '+r.food);
+});
+test('#81 eatMeal: 无 opts 不加桌心情', () => {
+  const r={food:40,mood:80};
+  const res=Res.eatMeal(r, null);
+  if(res.atTable) throw new Error('无 opts 不应标 atTable');
+  if(res.moodGain!==0) throw new Error('无桌心情应 0: '+res.moodGain);
+  if(r.mood!==80) throw new Error('无桌心情不变: '+r.mood);
+});

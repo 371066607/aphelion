@@ -74,6 +74,63 @@ APH.Res = (function(){
   }
 
   function RS(){ return (CFG.residents)||{}; }
+
+  /* ---------- T8 餐桌椅座位分配 (issue #81, 纯函数) ----------
+     输入: hungry=饥饿居民[{id,x,y}], chairs=[{id,x,y}], tables=[{x,y}]
+     规则:
+       - 每椅 1 人 (先到先得, 按距居民近优先)
+       - 椅子必须在某张桌子 chairTableR 内才算可用餐位 (独椅无桌不算)
+       - 就近分配: 每轮取「居民→椅」距离最小的一对
+     输出: { 由rid到 {chair, table} 的映射 }
+     返回是否全员有座无关——调用方对无座者退化为旧的无桌吃。 */
+  function diningSeatAlloc(hungry, chairs, tables){
+    var C=RS();
+    var chairR=C.diningChairR!=null?C.diningChairR:90;
+    var tableR=C.chairTableR!=null?C.chairTableR:60;
+    if(!hungry || !hungry.length || !chairs || !chairs.length || !tables || !tables.length){
+      return {};
+    }
+    /* 有效的椅子: 至少靠近一张桌子 + 距至少一名饥饿居民 ≤ chairR */
+    var usable=[];
+    chairs.forEach(function(ch){
+      var near=null;
+      for(var i=0;i<tables.length;i++){
+        var d=Math.sqrt(Math.pow(ch.x-tables[i].x,2)+Math.pow(ch.y-tables[i].y,2));
+        if(d<=tableR){ near=tables[i]; break; }
+      }
+      if(!near) return;
+      var reachable=false;
+      for(var k=0;k<hungry.length;k++){
+        var dh=Math.sqrt(Math.pow(ch.x-hungry[k].x,2)+Math.pow(ch.y-hungry[k].y,2));
+        if(dh<=chairR){ reachable=true; break; }
+      }
+      if(reachable){ usable.push({ chair:ch, table:near }); }
+    });
+    if(!usable.length) return {};
+    var out={};
+    /* 贪心: 反复取全局最近 (居民↔可用椅) 对 */
+    var left=hungry.slice();
+    while(left.length && usable.length){
+      var bi=-1, bj=-1, bd=Infinity;
+      for(var i=0;i<left.length;i++){
+        for(var j=0;j<usable.length;j++){
+          var d=Math.sqrt(Math.pow(left[i].x-usable[j].chair.x,2)+Math.pow(left[i].y-usable[j].chair.y,2));
+          if(d<bd){ bd=d; bi=i; bj=j; }
+        }
+      }
+      if(bi<0) break;
+      var r=left.splice(bi,1)[0];
+      var u=usable.splice(bj,1)[0];
+      out[r.id]={ chair:u.chair, table:u.table, dist:bd };
+    }
+    return out;
+  }
+
+  /* T8: 面向桌角度 (椅子处看桌子) */
+  function faceTable(chair, table){
+    if(!chair || !table) return 0;
+    return Math.atan2(table.y-chair.y, table.x-chair.x);
+  }
   function clampNeed(v, lo, hi){
     return Math.max(lo, Math.min(hi, v));
   }
@@ -300,8 +357,9 @@ APH.Res = (function(){
     return true;
   }
 
-  /* 享用菜肴纯函数(返回详尽身心增益与数值结算) (Cooking #49) */
-  function eatMeal(r, itemDef){
+  /* 享用菜肴纯函数(返回详尽身心增益与数值结算) (Cooking #49)
+     opts.atTable (T8 #81): 在餐桌用餐 → 额外 diningMoodGain 心情 (无桌吃见 noTableMoodPenalty) */
+  function eatMeal(r, itemDef, opts){
     var C=RS();
     var below=C.eatBelow!=null?C.eatBelow:60;
     var gain=C.eatGain!=null?C.eatGain:25;
@@ -311,11 +369,15 @@ APH.Res = (function(){
     var mGain = (def && def.moodGain != null) ? def.moodGain : 0;
     var rGain = (def && def.recGain != null) ? def.recGain : 0;
     var wBonus = (def && def.warmBonus != null) ? def.warmBonus : 0;
+    var cap = C.moodCap != null ? C.moodCap : 95;
 
     r.food = Math.min(100, (r.food||0) + fGain);
     if(mGain > 0){
-      var cap = C.moodCap != null ? C.moodCap : 95;
       r.mood = Math.min(cap, (r.mood || 70) + mGain);
+    }
+    if(opts && opts.atTable){
+      var tGain = C.diningMoodGain != null ? C.diningMoodGain : 4;
+      r.mood = Math.min(cap, (r.mood || 70) + tGain);
     }
     if(rGain > 0){
       r.recreation = Math.min(100, (r.recreation != null ? r.recreation : 80) + rGain);
@@ -326,11 +388,12 @@ APH.Res = (function(){
     return {
       ate: true,
       foodGain: fGain,
-      moodGain: mGain,
+      moodGain: mGain + (opts && opts.atTable ? (C.diningMoodGain != null ? C.diningMoodGain : 4) : 0),
       recGain: rGain,
       warmBonus: wBonus,
       isCooked: !!(def && def.isCooked),
-      item: def
+      item: def,
+      atTable: !!(opts && opts.atTable)
     };
   }
 
@@ -1311,6 +1374,7 @@ APH.Res = (function(){
     BREAK_NAMES:BREAK_NAMES, breakTypeOf:breakTypeOf, breakTick:breakTick,
     isBroken:isBroken, lowestBondMate:lowestBondMate,
     canRecruit:canRecruit, recruitInto:recruitInto, wanderStep:wanderStep, walkToward:walkToward,
+    diningSeatAlloc:diningSeatAlloc, faceTable:faceTable,
     walkAround:walkAround,
     bumpWalkPh:bumpWalkPh,
     joinIntentOf:joinIntentOf, joinChance:joinChance, attemptRecruit:attemptRecruit,

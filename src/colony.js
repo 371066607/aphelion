@@ -60,6 +60,13 @@ APH.Colony = (function(){
     bl_kitchen:     { name:'烹饪灶台', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:20, stone:20, iron:15 }, size:52, max:2, buildTime:20,
       dispH:110, cells:[2,2],
       desc:'高级菜肴烹制与厨师岗位。需研发异星烹饪保鲜。' },
+    /* T8 餐桌与餐椅 (#81): 居民吃饭时到最近空椅坐吃 (坐姿=站姿不播入座动画) */
+    bl_dining_table: { name:'餐桌', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:15, stone:5 }, size:48, max:8, buildTime:10,
+      dispH:155, cells:[1,1],
+      desc:'居民吃饭的场所：有餐桌+空椅才「在餐桌用餐」得心情增益；无桌吃有心情惩罚。' },
+    bl_dining_chair:{ name:'餐椅', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:6 }, size:48, max:16, buildTime:6,
+      dispH:180, cells:[1,1],
+      desc:'餐位一座一人。须放在餐桌旁（60px 内）才算可用餐位；居民自动走向最近空椅坐吃。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
     bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
       cells:[1,1], buildTime:6, dispH:96,
@@ -67,20 +74,7 @@ APH.Colony = (function(){
     bl_gate:  { name:'闸门', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:3, wood:5 }, size:48, max:500,
       cells:[1,1], buildTime:8, dispH:98,
       desc:'可通行的门：己方秒开，袭击者开门有延迟。' },
-    /* T6 电网 (ADR-14: 实体导线电力网) */
-    bl_conduit:      { name:'导线', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:3 }, size:48, max:2000,
-      cells:[1,1], buildTime:4, dispH:80,
-      desc:'铺在格上的电力管线，把电网成员连成一张网。' },
-    bl_wood_generator:{ name:'木柴火力发电机', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:20, stone:10 }, size:56, max:6, buildTime:25,
-      cells:[2,2], dispH:130,
-      desc:'烧木材产电（1木/10s → 10电/s）。稳定供电。' },
-    bl_solar_panel:  { name:'太阳能板', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:15, stone:5 }, size:48, max:8, buildTime:18,
-      cells:[1,1], dispH:110,
-      desc:'白天产电（受天气光照影响），夜间靠电池。' },
-    bl_battery:      { name:'蓄电池', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:10, stone:5 }, size:48, max:6, buildTime:15,
-      cells:[1,1], dispH:100,
-      desc:'存电并在停电时兜底 60 秒。' },
-    /* T6 电网 (issue #79): 导线=格上静态物(与墙同类规则, ADR-13) */
+    /* T6 电网 (ADR-14: 实体导线电力网; 定义见 #79 最终版, 旧雏形已删) */
     bl_conduit: { name:'电力导线', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ wood:2, iron:1 }, size:48, max:2000,
       cells:[1,1], buildTime:4, dispH:36,
       desc:'格上敷设的输电线：把发电机与用电建筑连成电网。' },

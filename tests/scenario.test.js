@@ -1999,5 +1999,111 @@ test('T2 smoke: wallLine 拖拽连续铺墙 5 格', () => {
   line.forEach(p => { if (p.x % 48 !== 12 && p.x % 48 !== 0) return; });
 });
 
+/* ============ T8 餐桌与餐椅 (#81) ============ */
+test('#81 home: 饥饿居民走到最近空椅坐下, 面向桌, 在餐桌用餐 (+心情)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[
+      {id:'bl_dining_table', x:500, y:500, lv:1},
+      {id:'bl_dining_chair', x:440, y:500, lv:1},
+      {id:'bl_dining_chair', x:560, y:500, lv:1},
+    ];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[{id:'rs_din1', name:'饿甲', job:null, skills:{},
+      mood:70, food:40, illness:0, downed:false, isSleeping:false,
+      rest:80, recreation:80, exposure:0, ailments:[]}];
+    S.meta.res={ wood:99, iron:99, stone:99, food:0 };
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_din1');
+    A(!!e, '应创建居民实体');
+    e.x=440; e.y=400;   /* 靠近左椅 */
+    const r0=S.meta.residents[0];
+    /* 有粮堆在桌旁(烤熟的): 居民到椅后应有饭可吃 */
+    S.entities.push({id:'f1', type:T.DROPPED, x:500, y:520, itemId:'it_food', n:5});
+
+    /* 逐帧驱动: 居民应走到椅边(448,498)吃上饭(food>40), 再返回岗位 */
+    let reachedSeat=false, minDist=Infinity;
+    for(let i=0;i<10;i++){ M.updateResidents(0.5); minDist=Math.min(minDist, Math.hypot(e.x-448,e.y-498)); }
+    for(let i=0;i<30;i++){ M.updateResidents(0.5); }
+    A(minDist<8, '应到达过椅边, 最小距离 '+minDist);
+    /* 有饭 → 已在餐桌用餐(饱食上涨+心情上涨) */
+    A(r0.food>40, '应吃上饭, food '+r0.food);
+    A(r0.mood>=74, '餐桌用餐应 +4 心情, mood '+r0.mood+'(原 70)');
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
+test('#81 home: 多居民多椅不抢座 (两居民两椅同时吃饭)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[
+      {id:'bl_dining_table', x:500, y:500, lv:1},
+      {id:'bl_dining_chair', x:440, y:500, lv:1},
+      {id:'bl_dining_chair', x:560, y:500, lv:1},
+    ];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[
+      {id:'rs_din2', name:'饿乙', job:null, skills:{},
+        mood:70, food:40, illness:0, downed:false, isSleeping:false,
+        rest:80, recreation:80, exposure:0, ailments:[]},
+      {id:'rs_din3', name:'饿丙', job:null, skills:{},
+        mood:70, food:40, illness:0, downed:false, isSleeping:false,
+        rest:80, recreation:80, exposure:0, ailments:[]},
+    ];
+    S.meta.res={ wood:99, iron:99, stone:99, food:0 };
+    M.syncResidents();
+    const e2=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_din2');
+    const e3=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_din3');
+    e2.x=200; e2.y=400; e3.x=800; e3.y=400;
+    S.entities.push({id:'f2', type:T.DROPPED, x:500, y:530, itemId:'it_food', n:20});
+    /* 逐帧跟踪: 两人都应到达各自椅位 (过程中) 且吃上饭 */
+    let dLMin=Infinity, dRMin=Infinity;
+    for(let i=0;i<60;i++){
+      M.updateResidents(0.5);
+      dLMin=Math.min(dLMin, Math.hypot(e2.x-448, e2.y-498));
+      dRMin=Math.min(dRMin, Math.hypot(e3.x-568, e3.y-498));
+    }
+    A(dLMin<8, '饿乙应到达左椅(448,498), 最小距离 '+dLMin);
+    A(dRMin<8, '饿丙应到达右椅(568,498), 最小距离 '+dRMin);
+    A(S.meta.residents[0].food>40, '饿乙应吃上饭, food '+S.meta.residents[0].food);
+    A(S.meta.residents[1].food>40, '饿丙应吃上饭, food '+S.meta.residents[1].food);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
+test('#81 home: 无桌吃心情惩罚 (无桌椅时吃地上食物扣心情)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[{id:'rs_din4', name:'饿丁', job:null, skills:{},
+      mood:70, food:40, illness:0, downed:false, isSleeping:false,
+      rest:80, recreation:80, exposure:0, ailments:[]}];
+    S.meta.res={ wood:99, iron:99, stone:99, food:0 };
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_din4');
+    e.x=100; e.y=100;
+    /* 地上放食物, 居民就地吃(无桌) → 扣心情 */
+    S.entities.push({id:'f3', type:T.DROPPED, x:104, y:104, itemId:'it_food', n:5});
+    const r0=S.meta.residents[0];
+    for(let i=0;i<30;i++) M.updateResidents(0.5);
+    A(r0.food>40, '无桌也应吃上饭, food '+r0.food);
+    A(r0.mood<70, '无桌吃应扣心情, mood '+r0.mood+'(原 70)');
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

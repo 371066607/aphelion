@@ -733,3 +733,12 @@
   - **回归测试**：新增 `tests/sprite_meta.test.js`——纯 Node 内置 `zlib` 手写 PNG 解码器（无第三方依赖），独立复现 `build_sprites.py` 同口径测量，逐键断言 `main.js` 声明值＝实测值。`git stash` 验证过该测试在旧值下确实先红后绿（4/5 失败→5/5 通过），非摆设。**旧 `#71 geometry` 测试其实是重言式**（`contentH×(drawH/contentH)` 对任意输入恒等于 drawH），只锁 `spriteScale()` 公式没变，从未覆盖过"声明值是否等于真实资产"这一失守环节——新测试补的正是这个洞。
   - 验证: sprite_meta 5/5；全量 536/0；scenario 86/0；perf 3/0；boss 7/0；构建 31142KB。
   - 下一步: 无——此为独立诊断票，非 BACKLOG 排期项；建议今后改 SPRITE_META 一律重跑 `build_sprites.py` 整块复制，禁止手改单个数字。
+
+- **2026-08-31 · 班 2 首票**: 🍽 #81 T8 餐桌与餐椅。
+  - **colony 注册**：bl_dining_table（木15石5, max8, 10s）+ bl_dining_chair（木6, max16, 6s），科技挂 te_alien_culinary 不新增节点；1×1 格、dispH 155/180（配 SPRITE_META 实测值）。
+  - **纯函数**：residents.js `diningSeatAlloc(hungry, chairs, tables)`——每椅1人（贪心全局最近对）、椅须在桌旁 chairTableR:60 内、居民距椅 ≤diningChairR:300 才算可用；`faceTable(chair,table)` 坐定后面向桌。eatMeal 加 `opts.atTable` → diningMoodGain:+4。
+  - **main.js 接线**：updateResidents 每帧收集桌椅+饥饿居民→seatMap→有座优先 walkAround 到椅（偏移 +8,-2），到椅 tryEatHere(atTable=true) 从桌旁粮堆吃（diningTableEatR:90 放宽取食半径），浮标「😋 X 在餐桌用餐」；无座/无桌走旧粮堆/仓库路径 + noTableMoodPenalty:-3 无桌罚。
+  - **踩坑**：①`eatBelow` 声明在 seatMap 计算**之后**（var 提升成 undefined → hungryRes 恒空）——T8 首版 10 帧居民直接跑去 homeSpot；②`it_protein_bar` 不是合法物品 id（要用 it_food）；③场景断言须逐帧跟踪 minDist,因为居民吃完会离开椅子回岗位（40 帧后断言"坐在椅上"必然失败）。
+  - **顺手清理**：colony.js 电网 4 键（bl_conduit/wood_generator/solar_panel/battery）**重复定义**——T6 合流时旧雏形+最终版并存,对象字面量后者静默覆盖前者（仓库血泪史同款坑）,删旧留新,零行为变化。
+  - **验证**：t81 新增 6 单元+3 场景；全量 542/0；scenario 89/0；perf 3/0；boss 7/0；构建 31149KB；无头 Chrome ?t8debug=1 截图确认桌椅渲染正常（无黑缝、食物堆显示、底座圆台）。
+  - 下一步: **#82 T9 无顶房间+路灯**（房间 flood fill 纯函数 + 路灯电力渲染, blocker T2/T7 已关）。
