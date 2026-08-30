@@ -618,3 +618,11 @@
   - **接线孤儿 checkDowned/rescueTick**（#17 遗留）：`residentsTick` 每生产跳（30s）一判一救——`checkDowned` 触发击倒（认知<30%/移动<15%）+ `bleedOutTimer` 启动；`rescueTick([r],…,30,hasClinic&&库存有药,{inClinic})` 舱内紧急救治（扣 1 药、`floatText` 提示）、无药倒计时 3 跳死亡（名册 filter + `saveMetaQuiet`，实体下一帧移除）；sickest 用藥块加 `if(r.downed) return` 防双扣。
   验证: TDD 后 `node tests/run.js` 390/0（+4 纯例）；`node tests/scenario.test.js` 77/0（+4 冒烟：病重 600,1200 → 5 帧向床靠近 → 40 帧躺床 medLying + sync 保留 + poseFor 俯卧 sheet；轻病 20/30 单帧 28/16.8px + ✚ 渲染；击倒 816,1222 → 单帧 14px → 20 帧躺床仍 downed；residentsTick 无药击倒倒计时→有药救活扣 1 药）；perf 3/0；boss 7/0；`python3 build.py` 构建成功 30199KB 以 `</html>` 收尾。全量 477 项自动化测试 100% 绿灯（390 单元 + 77 场景 + 3 perf + 7 boss）。
   下一步: 实机打开 game.html 给居民 `plague`（事件/console 加 ailments）观察自动走舱→俯卧、轻病慢走+✚；击倒居民看匍匐+送医救活/无药倒计时死亡；#69 床位重叠（多躺共用一点）属已记录可接受边界。
+
+- **2026-08-30 14:30 · 班次**: ✅玩家俯卧占位图换真美术 (#59 资产升级) + 玩家✚ (#70 补闭环)。
+  - **用户实测发现**: game.html 里玩家无床睡觉却显示"蓝色被子"大块 + "模型似放大"——根因是 `player_prone` 是我 #59 时程序化画的占位图(几何对但身体画成蓝被块, contentH=68 缩放失衡)。
+  - **修复**: codex 分向生成真 `player_prone`(16帧4向×4呼吸, 参照 player_idle 棕发男孩; 4张4帧strip拼16格+chroma_key), SPRITE_META 更新 baseline=197/h=154; 实机验证睡觉/击倒渲染真俯卧小人, 被子消失。
+  - **玩家✚**: 实机发现 #70"能走时走慢+✚"的✚只有居民有(drawResidentMarks), 玩家只有走慢(sickMul)——补 `drawPlayerSickMark`(镜像居民样式, sprite/程序化两分支)。
+  - **验证工具沉淀**: `tests/aph_live_probe.js`(无头Chrome+CDP 注入玩家状态+截图+状态探针) —— 首次真正实机验证了睡觉俯卧/击倒伤痕/生病站姿。
+  - 验证: run.js 390/0, scenario 78/0(含新✚测试, 修spy Proxy), perf 3/0, boss 7/0; 构建 30949KB。
+  - 下一步: 实机确认 dir1/2/3 玩家躺姿朝向渲染无裁切; 用户裁剪看到的"头旁蓝块"疑为背包/服饰, 待实机细看。
