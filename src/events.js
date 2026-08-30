@@ -5,7 +5,8 @@
      - wealthScore: 殖民地财富值 = 唯一威胁标尺
      - pickEvent: 按权重抽事件卡; 负面事件后强制喘息窗口;
        心情均值过低时负面权重减半(怜悯)
-     - directorTick: 事件节奏器(纯函数), 每生产跳推进一次
+     - directorTick: 事件节奏器(纯函数), 每生产跳推进一次;
+       ev_weather 路径: 导演掷骰切换天气(ADR-15), 极端结束强制晴天窗口+喘息
    效果应用(世界侧)在 main.js 的 applyEvent; 本模块零 DOM。
    数值全在 CFG.events (ADR-10)。事件 id 前缀 ev_ (ADR-9)。
    ============================================================ */
@@ -30,6 +31,11 @@ APH.Events = (function(){
     { id:'ev_blight',       can:function(c){ return !!c.hasFarm; } },
     { id:'ev_solar_flare',  can:function(c){ return !!c.hasTurret; } },
     { id:'ev_raid',         can:function(c){ return !!c.rivalReady && !c.raidActive; } },
+    /* 天气切换(ADR-15): 导演掷骰推进马尔可夫状态机;
+       can 谓词=非冷却期(与通用冷却同判) + 需天气上下文(驱动方必带)。 */
+    { id:'ev_weather',      can:function(c){
+      return !!(c && c.weather) && !((c.cooldowns||{})['ev_weather'] > 0);
+    } },
   ];
 
   /* 事件文案(降级用; LLM 富化在 enrichEvent) */
@@ -43,6 +49,7 @@ APH.Events = (function(){
     ev_blight:       { name:'作物枯萎', lore:'一夜之间, 农田里的叶片卷起了焦边。这一茬要减产了。' },
     ev_solar_flare:  { name:'太阳耀斑', lore:'恒星抛出一记耀斑, 炮塔的火控电路暂时全部烧保险了。' },
     ev_raid:         { name:'敌意集结', lore:'雷达上出现密集光点。他们不是来做客的。' },
+    ev_weather:      { name:'天气转变', lore:'大气的平衡被打破了。云层与风开始重新洗牌, 殖民地的天空正在换装。' },
   };
   function textOf(id){ return TEXTS[id] || { name:id, lore:'' }; }
 
@@ -100,6 +107,15 @@ APH.Events = (function(){
     return lo + (rng||Math.random)() * (hi-lo);
   }
 
+  /* ---------- 天气掷骰(ev_weather 生效, ADR-15) ----------
+     纯函数: 导演拍板何时掷; APH.Weather 只做状态机与效果表。
+     极端判定以 exposureGain>0 为闸门(ADR-15 修订, 与 W3 暴露复活同源)。 */
+  function weatherIsExtreme(id){
+    var e = APH.Weather && APH.Weather.weatherEffects
+      ? APH.Weather.weatherEffects(id) : null;
+    return !!(e && e.exposureGain > 0);
+  }
+
   /* ---------- 抽卡(纯函数) ----------
      ctx: { threat, moodAvg, sinceNeg(分钟), cooldowns:{id:剩余分钟},
             以及 DECK.can 需要的布尔字段 }
@@ -143,8 +159,9 @@ APH.Events = (function(){
   }
 
   /* ---------- 事件导演单步(纯函数) ----------
-     evSt: { nextIn, sinceNeg, cooldowns } (单位: 分钟)
+     evSt: { nextIn, sinceNeg, cooldowns, weatherAcc } (单位: 分钟, weatherAcc 为秒)
      返回 { state:新状态, fired:事件id|null, neg }
+     ev_weather 命中时追加 { weather: 新天气状态 }, 由调用方写回 meta.weather。
      不修改入参。 */
   function directorTick(evSt, ctx, rng, dtMin){
     var E = EV();
@@ -156,6 +173,8 @@ APH.Events = (function(){
       restFor: (evSt && evSt.restFor!=null) ? evSt.restFor : null,
       lastNeg: (evSt && evSt.lastNeg!=null) ? evSt.lastNeg : 0,
       cooldowns: {},
+      /* 天气时钟(秒): 两次天气掷骰之间的真实时间累计, 掷出时一次性授予状态机 */
+      weatherAcc: (evSt && evSt.weatherAcc!=null) ? evSt.weatherAcc : 0,
     };
     var cds = (evSt && evSt.cooldowns) || {};
     for(var k in cds){
@@ -163,6 +182,7 @@ APH.Events = (function(){
       if(left > 0) st.cooldowns[k] = left;
     }
     st.sinceNeg = Math.min(1e9, st.sinceNeg + dm);
+    st.weatherAcc += dm*60;
     st.nextIn -= dm;
     if(st.nextIn > 0) return { state:st, fired:null };
     var picked = pickEvent(Object.assign({}, ctx, {
@@ -174,8 +194,27 @@ APH.Events = (function(){
     if(!picked) return { state:st, fired:null };
     var deckCfg = (E.deck||{})[picked.id] || {};
     st.cooldowns[picked.id] = deckCfg.cd!=null ? deckCfg.cd : 6;
+    var out = { state:st, fired:picked.id, neg:!!picked.neg };
+    if(picked.id === 'ev_weather'){
+      /* 导演掷骰: 授予状态机天气时间并决定切换; 极端结束强制晴天窗口 */
+      var cur = (ctx && ctx.weather) || APH.Weather.defaultWeather();
+      var grant = Math.max(st.weatherAcc,
+        E.weatherStepSec!=null ? E.weatherStepSec : 210);
+      st.weatherAcc = 0;
+      var next = APH.Weather.tickWeather(cur, grant, rng);
+      if(weatherIsExtreme(cur.id) && !weatherIsExtreme(next.id)
+         && next.id !== 'wx_clear'){
+        next = { id:'wx_clear', t:0, cd: next.cd || null };   // 1 天气周期晴天窗口
+      }
+      if(weatherIsExtreme(cur.id) && !weatherIsExtreme(next.id)){
+        st.sinceNeg = 0;                        // 复用休息区间语义
+        st.restFor = rollRest(E, rng);
+      }
+      out.weather = next;
+      out.neg = false;
+    }
     if(picked.neg){ st.sinceNeg = 0; st.restFor = rollRest(E, rng); }
-    return { state:st, fired:picked.id, neg:picked.neg };
+    return out;
   }
 
   /* ---------- LLM 富化(异步, 静默降级) ---------- */
