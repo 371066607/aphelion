@@ -127,6 +127,29 @@ APH.UI = (function(){
           if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt;
           wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
         }catch(e){ /* HUD 只读展示, 失败静默 */ }
+        /* T7 电网行: 供电状态 (s.powerStatus 由生产跳写入) */
+        try{
+          var pwRow=powerRow();
+          if(pwRow){
+            var ps2=s.powerStatus||null;
+            var hasGen=(s.colony&&s.colony.buildings||[]).some(function(b2){
+              return b2.id==='bl_wood_generator'||b2.id==='bl_solar_panel';
+            });
+            if(!hasGen){
+              if(pwRow.textContent!==undefined) pwRow.textContent='⚡ 电网未激活';
+              pwRow.style.color='#8fa3cc';
+            }else if(ps2 && ps2.active){
+              if(pwRow.textContent!==undefined) pwRow.textContent='⚡ 供电中 · 产'+Math.round(ps2.prodW)+'/'+Math.round(ps2.loadW);
+              pwRow.style.color='#ffc857';
+            }else if(ps2 && ps2.shed && ps2.shed.length){
+              if(pwRow.textContent!==undefined) pwRow.textContent='⚡ 供电不足 · 停机 '+ps2.shed.length+' 座';
+              pwRow.style.color='#ff9a9a';
+            }else{
+              if(pwRow.textContent!==undefined) pwRow.textContent='⚡ 供电中';
+              pwRow.style.color='#ffc857';
+            }
+          }
+        }catch(e2){ /* 静默 */ }
       }
     }
   }
@@ -146,6 +169,23 @@ APH.UI = (function(){
     }
     wxRowCache=rowWx;
     return rowWx;
+  }
+
+  /* T7 电网行元素(懒建一次; 镜像 weatherRow) */
+  var wxRowCache2=null;
+  function powerRow(){
+    if(wxRowCache2) return wxRowCache2;
+    var rowPw=$('rowPower');
+    if(!rowPw){
+      rowPw=document.createElement('div');
+      rowPw.id='rowPower';
+      rowPw.className='row';
+      rowPw.style.cssText='letter-spacing:1px;text-shadow:0 0 8px rgba(0,0,0,.6);color:#ffc857';
+      var hudEl=document.getElementById('hud');
+      if(hudEl && hudEl.appendChild) hudEl.appendChild(rowPw);
+    }
+    wxRowCache2=rowPw;
+    return rowPw;
   }
 
   /* ---------- 提示条 ---------- */

@@ -622,6 +622,7 @@ APH.CFG = {
     solar: { watts: 8 },                  // 太阳能板: 基础功率 × 天气 solarMul (仅白天)
     battery: { cap: 100 },                // 蓄电池容量 (瓦·秒)
     blackoutSec: 60,                      // 停电兜底秒数 (电池耗尽后仍按兜底计时全负荷运行)
+    farmPowerMul: 0.5,                    // 农场无电减产乘子 (≠绝收, RimWorld 式半瘫痪)
   },
 
   /* 存档 */

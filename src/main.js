@@ -850,6 +850,17 @@ window.APH = window.APH || {};
       (s.colony.buildings||[]).forEach(function(b){
         if(b.offlineT>0) b.offlineT=Math.max(0, b.offlineT-30);
       });
+      /* T7 电网结算: powerSettle → 状态写入各建筑 b.powered/grid */
+      var powRes=APH.Colony.powerSettle(s.colony.buildings, s.meta.res, s.power||(s.power={}), 30,
+        { solarMul: APH.Colony.powerSolarMulOf(s.meta), isDay: APH.World.daylight()>=.5 });
+      var powState=APH.Colony.applyPowerState(s.colony.buildings, powRes.status);
+      (s.colony.buildings||[]).forEach(function(b){
+        var pk=Math.round(b.x||0)+','+Math.round(b.y||0);
+        var ps=powState[pk];
+        if(ps){ b.powered=ps.powered; b.grid=ps.grid; }
+        else if(APH.Colony.isPowerConsumer(b.id)){ b.powered=true; b.grid=false; }  // 未激活默认通电
+      });
+      s.powerStatus=powRes;
       var nightP=APH.World.daylight()<.5;
       var hmods=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightP);
       var prodWorkers=(s.meta.residents||[]).filter(function(r){
@@ -881,7 +892,7 @@ window.APH = window.APH || {};
       });
       s.colony.buildings.forEach(function(b){
         if(b.id!=='bl_turret') return;
-        if((b.offlineT||0)>0) return;              // ev_solar_flare: 火控停机
+        if(!APH.Colony.turretFireAllowed(b)) return;   // T7 无电/耀斑停机
         var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
         var fired=APH.Combat.turretStep(tw,raidFoes,dt);
         b.cd=tw.cd;
@@ -3392,7 +3403,10 @@ window.APH = window.APH || {};
         if(nj) APH.UI.floatText(r.name+' 开始在'+APH.Colony.get(nj).name+'工作','#8fd4ff');
       }
     });
-    var hasClinic=(s.colony.buildings||[]).some(function(b){ return b.id==='bl_clinic'; });
+    /* T7: 医疗舱需通电 (powered===false 停诊; 未激活默认通电) */
+    var hasClinic=(s.colony.buildings||[]).some(function(b){
+      return b.id==='bl_clinic' && APH.Colony.clinicPowered(b);
+    });
     var medicSkill=0;
     m.residents.forEach(function(r){
       if(APH.Res.isBroken && APH.Res.isBroken(r)) return;    // 崩溃的医生缺勤
@@ -3519,7 +3533,9 @@ window.APH = window.APH || {};
       var farmMul=((s.meta.tech&&s.meta.tech.te_radar)||0)*0.15;
       var farmEff=bestFarmer?APH.Res.efficiency(bestFarmer):1;
       var farmSk=bestFarmer?(bestFarmer.skills.sk_farm||0):0;
-      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx, b.crop);
+      /* T7: 无电农场减产 (powered===false 时×0.5; 未激活默认通电) */
+      var powMul=APH.Colony.farmPowerMul(b.powered);
+      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx*powMul, b.crop);
       if((b.plot.stage||0) >= 3){
         var h=APH.Colony.harvestAlienCrop(b.crop, farmSk);
         if(h.dropItemId && h.dropCount>0){

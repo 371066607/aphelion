@@ -591,6 +591,42 @@ APH.Colony = (function(){
     return out;
   }
 
+  /* ---------- T7 耗电联动消费方 (纯函数; settled=powerSettle().status) ---------- */
+  /* 把供电状态写入建筑记录 (key='x,y'): 返回 {key:{grid,powered}} 简易映射 */
+  function applyPowerState(buildings, status){
+    var out = {};
+    (buildings||[]).forEach(function(b){
+      var k = powerKey(b);
+      var st = status && status[k];
+      if(st){ out[k] = { grid: st.grid, powered: st.powered }; }
+    });
+    return out;
+  }
+  /* 农场产量乘子: 无电减产 (CFG.power.farmPowerMul); 未激活(null)/通电=1 */
+  function farmPowerMul(powered){
+    var P = CFG.power || {};
+    if(powered == null || powered === true) return 1;
+    return (P.farmPowerMul != null) ? P.farmPowerMul : 0.5;
+  }
+  /* 炮塔可开火: 通电 (powered!==false) 且 无耀斑停机 */
+  function turretFireAllowed(b){
+    if(!b) return false;
+    if(b.powered === false) return false;
+    if((b.offlineT||0) > 0) return false;
+    return true;
+  }
+  /* 医疗舱可用: powered!==false (未激活默认通电) 且 未离线 */
+  function clinicPowered(b){
+    if(!b) return true;
+    if(b.powered === false) return false;
+    return true;
+  }
+  /* 建筑是否耗电 (CFG.power.consumers 白名单) */
+  function isPowerConsumer(id){
+    var CON = (CFG.power && CFG.power.consumers) || {};
+    return !!CON[id];
+  }
+
   /* ---------- U3 农田生长(纯函数) ----------
      plot {stage:0~3, t:当前阶段累计}
      每30s一跳; 有农民(skills.sk_farm)则加速。 */
@@ -1631,6 +1667,10 @@ APH.Colony = (function(){
     powerNets:powerNets, powerSettle:powerSettle,
     powerSolarOutput:powerSolarOutput, powerWoodOutput:powerWoodOutput,
     powerSolarMulOf:powerSolarMulOf,
+    /* T7 耗电联动 */
+    applyPowerState:applyPowerState, farmPowerMul:farmPowerMul,
+    turretFireAllowed:turretFireAllowed, clinicPowered:clinicPowered,
+    isPowerConsumer:isPowerConsumer,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf, refundResOf:refundResOf,
