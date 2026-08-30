@@ -482,6 +482,29 @@ test('#64 home: wanderStep 游荡居民同样只乘一次病情倍率', () => {
   }
 });
 
+test('#68 home: 睡着居民原地俯卧不动 (不走位/不清走位)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_farm', x:1600, y:1100, lv:1}]; S.colony.buildQueue=[];
+    S.meta.residents=[{id:'rs_sleep', name:'睡者', job:'bl_farm', skills:{},
+      mood:80, food:80, illness:0, isSleeping:true}];
+    S.entities=[];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_sleep');
+    A(!!e, '应创建居民实体');
+    e.x=1100; e.y=1100;
+    for(let i=0;i<20;i++) M.updateResidents(0.5);
+    A(e.x===1100 && e.y===1100, '睡着居民不应移动, got '+e.x+','+e.y);
+    A(e.walking===false, '睡着居民 walking 应为 false');
+    A(!e.haulCarry, '睡着居民不应拾取物品');
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
 test('#64 player: 仅家园生病时走路与跑步使用同一减速倍率', () => {
   const old={scene:S.scene, px:S.px, py:S.py, vx:S.vx, vy:S.vy, face:S.face, walkPh:S.walkPh,
     run:S.run, keys:S.keys, joy:S.joy, target:S.target, parts:S.parts, fireCd:S.fireCd,
@@ -1484,7 +1507,8 @@ function woundCtx(){
     fillStyle:'', strokeStyle:'', font:'', textAlign:'', globalAlpha:1,
     save(){}, restore(){}, translate(){}, scale(){}, beginPath(){},
     ellipse(x,y,rx,ry){ calls.push({kind:'ellipse', fillStyle:this.fillStyle, strokeStyle:this.strokeStyle, rx:rx}); },
-    arc(){}, fill(){}, stroke(){}, fillRect(){}, strokeRect(){}, fillText(){}, drawImage(){},
+    arc(){}, fill(){}, stroke(){}, fillRect(){}, strokeRect(){}, drawImage(){},
+    fillText(text){ calls.push({kind:'fillText', text:text}); },
   };
   spy.getContext = function(){ return spy; };
   return { spy:spy, calls:calls,
@@ -1556,6 +1580,39 @@ test('#71 render: 玩家击倒叠伤痕(player_prone), 睡着同sheet不叠, 且
     wc.calls.length=0; wc.spy.fillStyle='';
     APH.Ent.drawPlayer(Object.assign({},pe,{downed:false, isSleeping:true}), 0);
     A(wc.wounds().length===0, '玩家睡着应不叠伤痕');
+  }finally{
+    APH.Sprites.draw=origDraw;
+    APH.Ent.bindCtx(originalCtx);
+    restoreProneReady();
+  }
+});
+
+test('#68 render: 睡着居民按脸用对应俯卧 sheet, 不叠Zzz/不叠伤痕/不走循环', () => {
+  const FACES = [ ['rs_3','hum_0_nopack_prone'], ['rs_4','hum_1_nopack_prone'],
+                  ['rs_1','hum_2_nopack_prone'], ['rs_6','hum_3_nopack_prone'] ];
+  const restoreProneReady = forceProneReady(['player_prone','hum_0_nopack_prone',
+    'hum_1_nopack_prone','hum_2_nopack_prone','hum_3_nopack_prone',
+    'hum_0_nopack_walk','hum_1_nopack_walk','hum_2_nopack_walk','hum_3_nopack_walk']);
+  const cv=document.getElementById('cv');
+  const originalCtx=cv.getContext('2d');
+  const wc=woundCtx();
+  const origDraw=APH.Sprites.draw;
+  APH.Sprites.draw=function(ctx,name,x,y,idx,sc){ wc.calls.push({kind:'drawImage', sheet:name}); return true; };
+  try{
+    APH.Ent.bindCtx(wc.spy);
+    FACES.forEach(function(pair){
+      const base={id:pair[0], rid:pair[0], type:T.RESIDENT, x:500, y:500, name:'睡民',
+        mood:70, food:90, illness:0, face:Math.PI/2, walking:true, walkPh:3.2};
+      wc.calls.length=0; wc.spy.fillStyle='';
+      APH.Ent.drawResident(Object.assign({},base,{isSleeping:true, downed:false}),0);
+      A(wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet===pair[1];}),
+        '睡着居民(id '+pair[0]+') 应走 '+pair[1]+', got '+JSON.stringify(wc.calls.filter(c=>c.kind==='drawImage')));
+      A(!wc.calls.some(function(c){return c.kind==='drawImage' && c.sheet.indexOf('_walk')>=0;}),
+        '睡着居民不得走 *_walk 循环');
+      A(wc.wounds().length===0, '睡着居民不应叠伤痕');
+      A(!wc.calls.some(function(c){return c.kind==='fillText' && String(c.text).indexOf('💤')>=0;}),
+        '睡着居民不应再画 💤 (站立+Zzz 冒充睡着已移除)');
+    });
   }finally{
     APH.Sprites.draw=origDraw;
     APH.Ent.bindCtx(originalCtx);

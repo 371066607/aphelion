@@ -351,6 +351,13 @@ test('walkToward: 走动推进 walkPh，停下冻结', () => {
   if(e.walking) throw new Error('应停下');
   if(e.walkPh!==ph) throw new Error('停下不应继续推进 walkPh, got '+e.walkPh+' vs '+ph);
 });
+test('#68 walkToward: 睡着不移动、清走位残留、不推进 walkPh', () => {
+  const e={x:0,y:0,isSleeping:true,walking:true,walkPh:7,face:0.5};
+  Res.walkToward(e, {x:100,y:0}, 1, 40);
+  if(e.x!==0 || e.y!==0) throw new Error('睡着不应移动: '+JSON.stringify(e));
+  if(e.walking!==false) throw new Error('睡着应清 walking');
+  if(e.walkPh!==7) throw new Error('睡着不应推进 walkPh, got '+e.walkPh);
+});
 test('wanderStep: 游荡时 walking、朝向、walkPh', () => {
   const e={x:1100,y:1100,wanderA:0,wanderT:10,walkPh:0};
   Res.wanderStep(e, 1, {x:1100,y:1100}, 220, ()=>0.5);

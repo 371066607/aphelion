@@ -879,6 +879,8 @@ APH.Res = (function(){
   /* 直线走向目标(无寻路): 到达后停下. 坐标不落盘 */
   function walkToward(e, target, dt, speed){
     if(!e || !target) return e;
+    /* #68: 睡着居民不移动(俯卧贴地): 冻结位置并清走位残留 */
+    if(e.isSleeping){ e.walking = false; return e; }
     var C=CFG.walk||{};
     var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
     var arrive=C.arriveR!=null?C.arriveR:3;

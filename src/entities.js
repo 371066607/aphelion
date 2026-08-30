@@ -867,11 +867,7 @@ APH.Ent = (function(){
       ctx.font='10px sans-serif'; ctx.textAlign='center';
       ctx.fillText('💢', 0, iconY-8+bob);
     }
-    if(e.isSleeping){
-      ctx.fillStyle='#8fd4ff';
-      ctx.font='10px sans-serif'; ctx.textAlign='center';
-      ctx.fillText('💤', 0, iconY-14+bob);
-    }
+    /* #68: 睡着居民不叠💤(站立待机+Zzz 冒充睡着已移除); 俯卧身+拉长阴影即睡眠指示 */
     if(e.downed){
       /* #59: 俯卧图在场时用伤痕+血泊体现击倒, 不再叠🚨(ADR-0003 站着加警报 avoid);
          仅程序化回退(无俯卧图)时保留 🚨 */

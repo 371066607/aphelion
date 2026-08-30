@@ -291,6 +291,16 @@ test('#60 poseFor: 专用 prone 未就绪只回退通用 prone，绝不回退 wa
   if (missing.sheet.indexOf('_walk') >= 0) throw new Error('俯卧绝不回退 walk');
 });
 
+test('#68 poseFor: 脸1/脸2 居民俯卧选对应专用 sheet', () => {
+  var readyAll = function(){ return true; };
+  var p1 = H.poseFor({ role:'resident', id:'rs_4', lying:true, face:Math.PI/2, time:0, pack:false }, readyAll);
+  if (p1.sheet !== 'hum_1_nopack_prone') throw new Error('脸1俯卧应为 hum_1_nopack_prone, got '+p1.sheet);
+  if (p1.cycle !== 'prone') throw new Error('应为 prone, got '+p1.cycle);
+  var p2 = H.poseFor({ role:'resident', id:'rs_1', lying:true, face:Math.PI/2, time:0, pack:false }, readyAll);
+  if (p2.sheet !== 'hum_2_nopack_prone') throw new Error('脸2俯卧应为 hum_2_nopack_prone, got '+p2.sheet);
+  if (p2.cycle !== 'prone') throw new Error('应为 prone, got '+p2.cycle);
+});
+
 test('#59 poseFor: 未配专用图的身份仍共用 player_prone', () => {
   var readyAll = function(){ return true; };
   /* 过客(pack=true)与玩家: 无脸区分, 共用 player_prone */

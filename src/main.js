@@ -3014,6 +3014,8 @@ window.APH = window.APH || {};
       var walkCfg=CFG.walk||{};
       var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
+      /* #68: 睡着居民不进食、不搬运、不上岗、不走动(俯卧贴地) — 优先于破碎分支, 防破碎+wander 睡着仍游荡 */
+      if(r && r.isSleeping){ e.walking = false; return; }
       if(!raid && r && APH.Res.isBroken(r)){
         e.breaking=r.breakType;
         if(r.breakType==='wander'){

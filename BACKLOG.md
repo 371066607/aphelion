@@ -148,6 +148,13 @@
 - [x] HUD：家园击倒显示红色倒计时条 `rowDowned`（`downT/downedTime` 百分比 + 剩余秒数），复活/死亡自动隐藏
 - [x] 测试锁定：survival 新增 6 纯例（倒计时递减/送医复活/有舱无居民不解救/归零死亡/远征 no-op/未击倒 no-op + ensurePlayerNeeds 默认），combat 新增 3 例（家园击倒≠死亡/不消耗 clinicKit/远征仍死亡），scenario 新增 6 冒烟（击倒→实体俯卧+绘制不崩、WASD 不移动不醒、hurtPlayer 家园 vs 远征、送医复活、远处拖行、无居民倒计时死亡）
 
+## 居民睡着改俯卧（Issue #68）
+
+- [x] 睡着的居民**原地冻结、俯卧贴地**：`updateResidents` 对 `isSleeping` 居民短路（跳过进食/搬运/岗位/行走，清 `walking`），`walkToward` 睡眠守卫冻结位置并清走位残留（俯卧身不再滑动）；不瞬移、不改变 `bumpWalkPh`/`face`
+- [x] 按脸用对应专用俯卧 sheet：睡/倒共用 `hum_0..3_nopack_prone`（脸由 FNV-1a mod 4 决定，`rs_3→0/rs_4→1/rs_1→2/rs_6→3`），**不再站立待机+💤**（`drawResidentMarks` 删除 Zzz 分支；俯卧身+拉长阴影即睡眠指示；恢复面板 `💤[睡眠]` 徽标属 UI 保留）
+- [x] 过客/士兵/玩家不动：过客无 `isSleeping` 触发（`drawVisitorMarks` 本无 Zzz 分支）、士兵 `drawEnemy` 无俯卧路径、玩家睡眠已由 #66/#67/#70/#71 接入；袭击唤醒（`disturbSleep` 清 `isSleeping`）不受影响
+- [x] 测试锁定：residents 单元 walkToward 睡眠守卫（不移动/清 walking/不推进 walkPh）+ humanoid poseFor 脸1/脸2 专用俯卧 sheet + scenario 渲染（四脸 sleep 命中对应 `hum_*_nopack_prone`、无 `*_walk`、无伤痕、无💤）+ scenario 场景（睡着居民 20 帧原地不动、walking=false、不拾取）
+
 ## 玩家病了躺医疗舱（Issue #70）
 
 - [x] 病了不自动走向医疗舱：`updateHome` 检测 60px 内最近医疗舱 `bl_clinic` 实体 → `s.nearClinic`（只置提示位，绝不写 `s.target`，无自动寻路）

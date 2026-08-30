@@ -602,3 +602,11 @@
   - **接线**: humanoid `sheetKey` fi===3→hum_3；SPRITE_META `hum_3_nopack_prone:{baseline:198,h:139}`。**测试适配全脸有图现实**: #59 poseFor 两测试改为验证"专用图缺图→回退通用 player_prone 而非走循环"与"过客/玩家共用 player_prone"；sheetKey 测试扩到四脸专用图。
   - 验证: `node tests/run.js` 384/0（sheetLayout #63 + 适配后 poseFor）；scenario 71/0；perf 3/0；boss 7/0；`python3 build.py` 构建成功 30195KB 以 `</html>` 收尾。全量 465 项绿灯。
   - 下一步: **#68 居民睡着改俯卧**——四脸俯卧图已全齐（#60-63 关），居民睡着应不再站姿呼吸+Zzz，测试断言睡着为俯卧姿态。
+
+- **2026-08-30 11:12 · 班次**: ✅#68 居民睡着改俯卧（原地冻结、俯卧贴地、撤站立+Zzz）。
+  - **双缺口定位（对齐计划）**：① `updateResidents`（main.js）睡民仍被 `walkToward` 呼叫 → 俯卧身滑动；② `drawResidentMarks`（entities.js）睡民叠 💤 → 站立待机+Zzz 冒充睡着。四脸俯卧图（#60-63）与 `sheetKey`/`poseFor` 俯卧路径早已就绪，本票只接行为与渲染收口。
+  - **行为**：`walkToward`（residents.js）首行守卫 `if(e.isSleeping){ e.walking=false; return e; }`（冻结位置、清走位残留、不推进 walkPh/face）；`updateResidents` 在 `e.breaking=null;` 后加 `if(r && r.isSleeping){ e.walking=false; return; }`（跳过饿/搬运/岗位/行走，防睡中 grab 与进食）。位置只冻结不瞬移。
+  - **渲染**：`drawResidentMarks` 删除 💤 Zzz 分支（仅此分支；病 ✚ / 餐 🍽 / 搬运框 / 💢 / downed 🚨 程序化回退 / 名字全保留）。俯卧身+拉长阴影即睡眠指示；恢复面板 `💤[睡眠]` 徽标（main.js:2786）是 UI 保留。过客/士兵/玩家零改动。
+  - **测试**：residents +1 单元（walkToward 睡眠守卫：不移动/walking 清/walkPh 冻结）；humanoid +1 单元（poseFor 脸1/脸2 → `hum_1/2_nopack_prone`，FNV-1a mod4 复算 rs_3→0 rs_4→1 rs_1→2 rs_6→3）；scenario +2：#68 render（四脸睡着命中各自 `hum_*_nopack_prone`、无 `*_walk`、无伤痕、无💤，`walking:true` 故意证明俯卧优先于走循环）与 #68 home（睡着居民 20×0.5s 原地不动、walking=false、不拾取）。`woundCtx.fillText` 改为记录文本（加法改动，既有断言只按 ellipse/drawImage 过滤不受影响）。**踩坑修正**：poseFor 对 lying 前先查该脸 walk sheet 就绪、缺则 fi 回退 0（`if (!ready(walkKey)) fi = 0;`）——渲染测试需把 `hum_0..3_nopack_walk` 一并 force-ready（与实机全量加载一致），否则 rs_4/rs_1 会落 `hum_0_nopack_prone`。
+  验证: `node tests/run.js` 386/0（+2 单元）；`node tests/scenario.test.js` 73/0（+2 场景）；perf 3/0；boss 7/0；`python3 build.py` 构建成功 30195KB 以 `</html>` 收尾。全量 469 项自动化测试 100% 绿灯。（注：scenario 为独立入口，`run.js` 按 EXCLUDE 排除，直接 `node tests/scenario.test.js`。）
+  下一步: 实机打开 game.html 等居民休息归零睡着→看按脸俯卧贴地（无 Zzz、无走位）；袭击启动看 `disturbSleep` 唤醒照旧。遗留已知边界：袭击进行中睡着的居民原地睡（不睡走）——可接受，已记录。
