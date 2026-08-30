@@ -812,6 +812,8 @@ window.APH = window.APH || {};
       });
       qr.done.forEach(function(d){
         var b={id:d.bid,x:d.x,y:d.y,lv:1};
+        /* T4 破墙: 墙块记录带耐久(旧存档缺 hp 由 Combat.wallHp 兜底) */
+        if(d.bid==='bl_wall' && CFG.wall && CFG.wall.hp!=null) b.hp=CFG.wall.hp;
         s.colony.buildings.push(b);
         /* 移除对应蓝图实体 */
         s.entities=s.entities.filter(function(en){
@@ -1178,13 +1180,10 @@ window.APH = window.APH || {};
     sg.t-=dt; sg.shellT-=dt;
     if(sg.shellT<=0){
       sg.shellT=t.shellPeriod!=null?t.shellPeriod:15;
-      /* 炮击: 向最近建筑发一发远程弹, 命中后停机 */
-      var tgt=null, td=1e9;
-      (s.colony.buildings||[]).forEach(function(b){
-        if(b.id==='bl_landing_pad') return;
-        var bd=U.dst(sg.cx,sg.cy,b.x,b.y);
-        if(bd<td){ td=bd; tgt=b; }
-      });
+      /* T4 炮击目标: 优先墙/炮塔(Combat.pickShellTarget 纯函数), 发射台除外 */
+      var tgt=(window.APH.Combat && APH.Combat.pickShellTarget)
+        ? APH.Combat.pickShellTarget(sg.cx, sg.cy, s.colony.buildings)
+        : null;
       if(tgt){
         var dx=tgt.x-sg.cx, dy=tgt.y-sg.cy, dd=Math.sqrt(dx*dx+dy*dy)||1;
         var spd=t.shellSpeed!=null?t.shellSpeed:280;
@@ -3073,6 +3072,8 @@ window.APH = window.APH || {};
     var dumpR=H.dumpR!=null?H.dumpR:36;
     var raid=!!(s.war&&s.war.raidActive);
     var stock=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+    /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
+    var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
     var eatBelow=(CFG.residents&&CFG.residents.eatBelow!=null)?CFG.residents.eatBelow:60;
     s.entities.forEach(function(e){
       if(!e || e.type!==T.RESIDENT) return;
@@ -3101,7 +3102,7 @@ window.APH = window.APH || {};
           var bSpot=APH.Res.clinicBedSpot(clinic);
           e.tx=bSpot.x; e.ty=bSpot.y;
           var crawlMul=(CFG.residents&&CFG.residents.downedCrawlMul!=null)?CFG.residents.downedCrawlMul:0.5;
-          APH.Res.walkToward(e, bSpot, dt, r.downed ? spd*crawlMul*wxMul : spd*sickSpeedMul*wxMul);
+          APH.Res.walkAround(e, bSpot, dt, r.downed ? spd*crawlMul*wxMul : spd*sickSpeedMul*wxMul, navGrid);
           var bedArrive=(CFG.residents&&CFG.residents.clinicBedArriveR!=null)?CFG.residents.clinicBedArriveR:6;
           if(U.dst(e.x,e.y,bSpot.x,bSpot.y)<=bedArrive){
             r.medLying=true; e.medLying=true; e.walking=false;
@@ -3159,7 +3160,7 @@ window.APH = window.APH || {};
           }
         }
       }
-      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul);
+      APH.Res.walkAround(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul, navGrid);
     });
   }
 

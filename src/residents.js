@@ -910,6 +910,55 @@ APH.Res = (function(){
     return e;
   }
 
+  /* ---------- T3 绕墙走位 (issue #76): walkToward 的寻路升级 ----------
+     grid: APH.Nav.gridOf(colony.buildings) 障碍矩阵(调用方每帧构建复用)
+     无墙/无 grid → 直线退化 = walkToward 原语义(逐帧一致);
+     有墙 & 视线被挡 → Nav.astar 绕行, 路径缓存 e.path/e.pathI (followPath 消费);
+     寻路失败 → 退化直线, 不卡死。
+     缓存触发重算: 目标变更(e.pathGoal 比对) 或 到段(path 走完)。 */
+  function clearPathCache(e){
+    e.path=null; e.pathI=0; e.pathGoal=null;
+  }
+  function hasWall(grid){
+    for(var y=0;y<grid.length;y++){
+      var row=grid[y];
+      for(var x=0;x<row.length;x++) if(row[x]===1) return true;
+    }
+    return false;
+  }
+  function walkAround(e, target, dt, speed, grid){
+    if(!e || !target || target.x==null || target.y==null) return e;
+    /* 守卫同 walkToward (#68/#69); 顺带清路径缓存(沉睡后旧路径无意义) */
+    if(e.isSleeping || e.medLying){ e.walking=false; clearPathCache(e); return e; }
+    var C=CFG.walk||{};
+    var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
+    /* 无墙=退化为逐帧直线(walkToward 原语义, 路径缓存清空) */
+    /* 防御: Nav 模块缺失(旧测试桩未加载 nav.js)时同样退化直线 */
+    if(!window.APH.Nav || !grid || !hasWall(grid)){
+      clearPathCache(e);
+      return walkToward(e, target, dt, speed);
+    }
+    var eps=(CFG.navWalk&&CFG.navWalk.goalEps!=null)?CFG.navWalk.goalEps:1e-6;
+    var goal=e.pathGoal;
+    var sameGoal=!!goal && Math.abs(goal.x-target.x)<eps && Math.abs(goal.y-target.y)<eps;
+    /* 缓存命中: 目标未变且路径未走完 → 沿 e.path 继续 (followPath 消费) */
+    if(sameGoal && e.path && e.path.length && e.pathI>=0 && e.pathI<e.path.length){
+      APH.Nav.followPath(e, e.path, dt, spd);
+      if(e.walking) bumpWalkPh(e, dt);
+      return e;
+    }
+    var p=APH.Nav.astar(grid, e, target);
+    if(!p || !p.length){
+      /* 寻路失败(封闭/目标在墙内): 退化直线, 不卡死 */
+      clearPathCache(e);
+      return walkToward(e, target, dt, speed);
+    }
+    e.pathGoal={x:target.x, y:target.y};
+    APH.Nav.followPath(e, p, dt, spd);
+    if(e.walking) bumpWalkPh(e, dt);
+    return e;
+  }
+
   /* 过客在家园院子里闲逛(无寻路): 走一段、站住喘气、到边界折返 */
   function wanderStep(e, dt, hab, yardR, rng, speed){
     var rand = rng || Math.random;
@@ -1262,6 +1311,7 @@ APH.Res = (function(){
     BREAK_NAMES:BREAK_NAMES, breakTypeOf:breakTypeOf, breakTick:breakTick,
     isBroken:isBroken, lowestBondMate:lowestBondMate,
     canRecruit:canRecruit, recruitInto:recruitInto, wanderStep:wanderStep, walkToward:walkToward,
+    walkAround:walkAround,
     bumpWalkPh:bumpWalkPh,
     joinIntentOf:joinIntentOf, joinChance:joinChance, attemptRecruit:attemptRecruit,
     chanceLabel:chanceLabel, recruitGate:recruitGate,

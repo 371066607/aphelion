@@ -386,6 +386,10 @@ APH.CFG = {
     sickSpeedMul: 0.6,
     arriveR: 3,
   },
+  /* T3 居民绕墙走位 (ADR-13 寻路, issue #76): 路径目标一致判定容差 */
+  navWalk: {
+    goalEps: 1e-6,
+  },
   /* 地上物(RimWorld 式): 产出堆在地上, 搬进仓库才入账 */
   haul: {
     pickR: 52,           // 有岗时脚边捡
@@ -481,7 +485,10 @@ APH.CFG = {
                  shellOffline: 20,   // 每发炮击建筑停机秒数
                  shellSpeed: 280,     // 围攻弹速度
                  shellLife: 5,        // 弹丸寿命(须能飞完 campDist)
-                 campMeleeR: 40 },    // 士兵拆营近战距离
+                 campMeleeR: 40,      // 士兵拆营近战距离
+                 /* T4 围攻炮击目标优先级: 优先墙/炮塔, 其余按距离+惩罚比较 */
+                 shellPrefer: { bl_wall:1, bl_turret:1 },
+                 shellPreferPenalty: 300 },
     },
     bigWaveAt: 90,        // 军力 ≥ 此值 → 拆两波
     waveGap: 45,          // 波次间隔(秒)
@@ -592,6 +599,10 @@ APH.CFG = {
   wall: {
     collideR: 35,               // 玩家碰撞半径 = player.radius(11) + GRID/2(24); <格宽会漏缝穿墙
     dragSpeedMul: 0.55,         // 撞墙完全堵死时速度衰减
+    hp: 60,                     // T4 破墙: 墙块耐久(袭击者近战/围攻炮弹可拆)
+    shellDmg: 30,               // T4 破墙: 围攻炮弹对墙伤害(两发击穿一墙)
+    dropStoneMin: 1,            // T4 破墙: 墙毁掉落石料下限
+    dropStoneMax: 2,            // T4 破墙: 墙毁掉落石料上限
   },
 
   /* 存档 */
