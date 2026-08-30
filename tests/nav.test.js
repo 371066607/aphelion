@@ -14,7 +14,7 @@ test('gridOf: 空建筑=全通矩阵', () => {
       if (g[y][x] !== 0) throw new Error('空白格应为0: '+x+','+y);
 });
 
-test('gridOf: 墙格=1 闸门=1 其他建筑=0 营地=1', () => {
+test('gridOf: 墙格=1 营地=1 闸门=可通行(0) 其他建筑=0', () => {
   const g = Nav.gridOf([
     { id: 'bl_wall', x: 48*5, y: 48*5 },
     { id: 'bl_gate', x: 48*6, y: 48*6 },
@@ -22,9 +22,33 @@ test('gridOf: 墙格=1 闸门=1 其他建筑=0 营地=1', () => {
     { id: 'bl_siege_camp', x: 48*8, y: 48*8 },
   ]);
   if (g[5][5] !== 1) throw new Error('墙应为1');
-  if (g[6][6] !== 1) throw new Error('闸门应为1(可通行但计价)');
+  if (g[6][6] !== 0) throw new Error('闸门应可通行(ADR-13, 开门延迟在T2移动层): '+g[6][6]);
   if (g[7][7] !== 0) throw new Error('普通建筑应可通行: '+g[7][7]);
   if (g[8][8] !== 1) throw new Error('围攻营地应为1');
+});
+
+test('astar: 围栏留闸门→路径穿门', () => {
+  /* 3×3 围栏: 墙圈, 南边一扇闸门 (1,2) — y=2 行只放 x=0/x=2, (1,2) 是闸门 */
+  const walls = [];
+  for (let x = 0; x <= 2; x++) {
+    walls.push({ id: 'bl_wall', x: 48*x, y: 0 });
+  }
+  walls.push({ id: 'bl_wall', x: 0, y: 48*2 });
+  walls.push({ id: 'bl_wall', x: 48*2, y: 48*2 });
+  walls.push({ id: 'bl_wall', x: 0, y: 48 });
+  walls.push({ id: 'bl_wall', x: 48*2, y: 48 });
+  walls.push({ id: 'bl_gate', x: 48*1, y: 48*2 });   // 唯一开口=闸门
+  const g = Nav.gridOf(walls);
+  if (g[2][1] !== 0) throw new Error('闸门格应为0: '+g[2][1]);
+  const p = Nav.astar(g, { x: 48*1, y: 48*1 }, { x: 48*1, y: 48*4 });
+  if (!p) throw new Error('闸门应可通行: '+JSON.stringify(p));
+  /* 终点精确; 且直线(1,1)→(1,4)纵向穿过门格(1,2)=门可通行的直接证据 */
+  if (p[p.length-1].x !== 48 || p[p.length-1].y !== 192) throw new Error('终点应精确: '+JSON.stringify(p));
+  /* 配对验证: 同样围栏没有门(缺口补墙) → 无路(锁死「门=唯一开口可出」语义) */
+  const w2 = walls.filter(w => w.id !== 'bl_gate');
+  w2.push({ id: 'bl_wall', x: 48*1, y: 48*2 });   // 缺口补墙
+  const g2 = Nav.gridOf(w2);
+  if (Nav.astar(g2, { x: 48*1, y: 48*1 }, { x: 48*1, y: 48*4 }) !== null) throw new Error('无门封闭应无路');
 });
 
 test('gridOf: 越界坐标 clamp 不出错', () => {
@@ -110,6 +134,14 @@ test('followPath: 最后一步超额吞掉(不越点)', () => {
   const e = { x: 0, y: 0, path: [{ x: 10, y: 0 }], pathI: 0 };
   Nav.followPath(e, e.path, 1, 100);
   if (e.x !== 10 || e.y !== 0) throw new Error('不能越过终点: '+JSON.stringify(e));
+});
+
+test('followPath: 精确落点帧保持walking(不闪烁)', () => {
+  /* 速度×dt 恰好等于到第一段距离: 到达中间点但还有路走, walking 必须保持 true */
+  const e = { x: 0, y: 0, path: [{ x: 48, y: 0 }, { x: 48, y: 48 }], pathI: 0 };
+  Nav.followPath(e, e.path, 1, 48);   // step=48 恰好到段1
+  if (e.pathI !== 1) throw new Error('应到段1: '+e.pathI);
+  if (e.walking !== true) throw new Error('还有第二段, walking应保持true: '+e.walking);
 });
 
 test('followPath: 空路径立即停', () => {

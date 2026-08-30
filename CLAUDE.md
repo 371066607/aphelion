@@ -43,6 +43,7 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 | colony.js | `APH.Colony` | 建筑/建造队列/科技/生产 |
 | rivals.js | `APH.Rivals` | 敌对殖民地战争态势 |
 | events.js | `APH.Events` | 事件叙事者：财富值威胁标尺+事件卡组+喘息窗口 (ADR-12) |
+| nav.js | `APH.Nav` | 48px 格网寻路引擎：障碍矩阵/A*/路径步进 (ADR-13) |
 | residents.js | `APH.Res` | 居民六维技能/心情/饱食/社交 |
 | combat.js | `APH.Combat` | 战斗/炮塔/士兵/Boss |
 | world.js | `APH.World` | 地形/视口/昼夜 |

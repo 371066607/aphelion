@@ -1,19 +1,20 @@
+'use strict';
 /* ============================================================
    Aphelion · nav.js — 48px 格网寻路引擎 (ADR-13 / docs/adr/0004)
    挂载: window.APH.Nav
    纯函数: 障碍矩阵·A星·路径步进, node 直测。
-   障碍集合: bl_wall / bl_gate / bl_siege_camp (其余建筑可通行,
-   ADR-13 显式简化: 墙是唯一移动障碍)。
+   障碍集合: bl_wall / bl_siege_camp (ADR-13: 闸门可通行,
+   开门延迟由 T2 移动层施加; 其余建筑可通行=显式简化)。
    ============================================================ */
 window.APH = window.APH || {};
 
 APH.Nav = (function(){
-  var CFG = (window.APH && window.APH.CFG) || {};
-  var GRID = CFG.GRID || 48;          // ADR-4 逻辑格网
-  var NC = 46;                        // 2200/48 向上取整
+  var CFG = APH.CFG;
+  var GRID = CFG.GRID;                    // ADR-4 逻辑格网
+  var NC = Math.ceil(CFG.WORLD / GRID);   // 2200/48 → 46 格
 
-  /* 障碍建筑 id 集合 */
-  var BLOCKERS = { bl_wall: 1, bl_gate: 1, bl_siege_camp: 1 };
+  /* 障碍建筑 id 集合 (闸门=可通行, 见 ADR-13) */
+  var BLOCKERS = { bl_wall: 1, bl_siege_camp: 1 };
 
   /* ---------- 障碍矩阵: 殖民地建筑记录 → 46×46 0/1 ---------- */
   function gridOf(buildings){
@@ -98,7 +99,7 @@ APH.Nav = (function(){
 
   function heur(x, y, tx, ty){
     var dx = Math.abs(x - tx), dy = Math.abs(y - ty);
-    return Math.max(dx, dy) + 0.41 * Math.min(dx, dy);   // octile
+    return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);   // octile
   }
 
   function rebuild(node, to){
@@ -120,7 +121,7 @@ APH.Nav = (function(){
      e.path / e.pathI 由调用方持久; 到达清 walking, 设 face。 */
   function followPath(e, path, dt, speed){
     if (!e || !path || !path.length){ if (e) e.walking = false; return e; }
-    var spd = speed != null ? speed : 56;
+    var spd = speed != null ? speed : (CFG.walk && CFG.walk.speed != null ? CFG.walk.speed : 56);
     var step = spd * (dt || 0);
     if (!e.path || e.path !== path){ e.path = path; e.pathI = 0; }
     while (e.pathI < e.path.length){
@@ -131,7 +132,7 @@ APH.Nav = (function(){
         e.x = t.x; e.y = t.y;
         e.pathI++;
         step -= d;               // 扣除本段耗步, 剩余步长续走下一段
-        if (step <= 1e-6) break;
+        if (step <= 1e-6) break; // 步长耗尽: 停在路径点上, 保持 walking(还有路要走)
         continue;
       }
       e.x += dx / d * step;
@@ -140,7 +141,7 @@ APH.Nav = (function(){
       e.walking = true;
       return e;
     }
-    e.walking = false;
+    e.walking = (e.pathI < e.path.length);   // 步长耗尽时还有路要走 → 保持 walking
     return e;
   }
 
