@@ -655,3 +655,9 @@
   - nit 顺手修：octile 0.41→`Math.SQRT2-1`；缺 'use strict' 补；CFG 兜底风格对齐兄弟模块；CLAUDE.md 模块表补 nav.js 行。
   - 验证: nav.test.js 14/14；全量 404/0；scenario 78/0；perf 3/0；boss 7/0；构建成功 30502KB；提交 fb5a4f6+4d385a6 已推 origin main。
   - 下一步: 关 #74；T0 视觉资产 #84（12 座新建筑贴图）或 T2 墙与闸门（#75，blocker=T1✓+T0）。
+
+- **2026-08-30 · 班次（规划）**: 🌤 天气系统 grilling 收口（三轮「以环世界为参考」）→ ADR-15 落盘 + spec/tickets 发布。
+  - **定案**：12 种天气马尔可夫状态机（转移概率表+持续 1~5 天+极端冷却）；切换经事件导演（ADR-12）；效果缝合零新机制——居民 exposureTick 复活（Survival #19 的桩！）/农场 farmMul/玩家减速/HUD/雾天敌感知；玩家不新增 exposure 条（显式裁剪）；solarMul 预留 T6 太阳能板；渲染程序化（ADR-11 例外）；meta.weather 老档零迁移；远征法则独立。
+  - **产出**：CONTEXT.md 天气术语节（天气/状态机/暴露/避难所/预报）；docs/adr/0006-weather-system.md；DESIGN.md ADR-15 表行+天气系统 v1 章节；GitHub **#85** Spec + #86 W1 状态机（frontier）/ #87 W2 导演/ #88 W3 效果/ #89 W4 渲染（blocked_by #86 已挂）；BACKLOG 天气系统 v1 路线。
+  - 验证: 依赖图核验（86:0 / 87:1 / 88:1 / 89:1）；文档提交待 push。
+  - 下一步: 开 #86 W1 天气状态机（TDD 纯函数先行），与 da123wda 的 T0 资产零冲突。
