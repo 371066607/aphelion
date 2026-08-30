@@ -702,3 +702,10 @@
   - **划界（#75 评论留痕）**：墙 HP/弹幕打墙/袭击破墙→T4(#77)；闸门开合/打爆→T4+T5(#78)；拼接转角→渲染后补；敌人绕墙→T3(#76 Nav BLOCKERS 已备)。
   - 验证: wall 13/13；全量 477/0；scenario 86/0（+2 冒烟）；perf 3/0；boss 7/0；构建 31112KB；提交 b21b3d2+0dcf44c+c0ba4cb 已推；#75 已关。
   - 下一步: **T3(#76) 居民绕墙 与 T4(#77) 袭击破墙 双解锁**——建议并行（T3 走位/T4 战斗, 文件重叠低: T3 residents+nav 接线, T4 combat+main）。
+
+- **2026-08-30 · 班次**: 🔀 T3(#76 居民绕墙)+T4(#77 袭击破墙) 并行合流（worktree+patch, 这次零冲突）。
+  - **T3**（d4da752）：APH.Res.walkAround 新增（walkToward 语义不动：无墙→逐帧一致，有墙视线被挡→Nav.astar→followPath 入 e.path/pathI，缓存=目标变更/到段重算，失败退化直线不卡死）；main.js updateResidents 两个走位调用点换 walkAround + navGrid 每帧构建；CFG.navWalk.goalEps；t3_nav_walk.test.js 9 例。
+  - **T4**（541b867）：planChase 三分支（direct 无墙直线/path 绕墙/breach 拆墙）、strikeWall/destroyWall（墙 HP 60、归零移除掉石料 1~2 地上堆+wallDown）、pickShellTarget 纯函数（围攻优先墙/炮塔，shellPreferPenalty 300）、updateCombat 接线（0.6s 路径缓存+沿 followPath 推）+ 墙血条（drawWalls）; CFG.wall.hp/shellDmg/dropStone; t4_breach.test.js 16 例。
+  - **合并**：这次 apply 零冲突——上次「失败」是工作区残留半应用 patch 的假冲突；干净基线恢复后 t3→t4 顺序全部干净落位。**教训记：并行 patch 合流前先 git reset --hard HEAD 归零 + 清未跟踪测试文件**。
+  - 验证: T3 9/9 + T4 16/16；全量 502/0；scenario 86/0；perf 3/0；boss 7/0；构建 31122KB；提交 d4da752+541b867+77a3c14 已推。
+  - 下一步: 合并 review 后台运行 → 听后关 #76/#77；T5(#78 弹道掩体) 解锁。
