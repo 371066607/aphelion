@@ -718,3 +718,10 @@
   - **验收语义确认**：供不应求=网运转 active:true + 消费者 powered:false + shed 列表（我初版测试期望 active:false 是错的，实现语义更正确）；零发电机=grid:false+powered:true（老档兼容）。
   - 验证: t5 10/10 + t6 11/11；全量 523/0；scenario 86/0；perf 3/0；boss 7/0；构建 31137KB；提交 15756fc+0e0a8585×？ + b523d01+144302b 已推；#78/#79 已关。
   - 下一步: **T7 耗电联动 (#80) 已解锁**（T6✅）——耗电建筑停机/⚡浮标/HUD 电网状态；然后班 2 T8-T10。
+
+- **2026-08-30 · 班次**: ⚡ #80 T7 耗电联动（班 1 收官票）。
+  - **纯函数层**：applyPowerState（status→建筑 powered/grid 映射）/farmPowerMul（无电 ×0.5）/turretFireAllowed（无电+耀斑禁射）/clinicPowered/isPowerConsumer——colony.js 导出，CFG.power.farmPowerMul=0.5。
+  - **接线**：main.js 生产跳 powerSettle→写 b.powered/grid（未激活默认通电）；炮塔 turretFireAllowed、农场 cropPlotTick 乘 powMul、医疗舱 hasClinic 加 clinicPowered；ui.js rowPower 懒建+三态（未激活灰/供电中金/不足红）。
+  - **踩坑**：ui.js 插入 powerRow 时把「提示条」注释搞成 `*/ */` 双重闭合（SyntaxError，node --check 及时拦）——插注释块时检查边界闭合。
+  - 验证: t7 8/8；全量 531/0；scenario 86/0；perf 3/0；boss 7/0；构建 31142KB；提交 267f713+d9e7901 已推；#80 已关。
+  - **建筑 v3 班 1 全链完成**：T0-T7（寻路/墙/居民绕墙/袭击破墙/弹道/电网/耗电联动）——明日班 2（T8 餐桌椅/T9 房间+路灯/T10 陷阱沙袋）。
