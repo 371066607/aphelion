@@ -1097,6 +1097,16 @@ APH.Ent = (function(){
     var sc=0.92;
     walls.forEach(function(w){
       APH.Sprites.draw(ctx, 'bl_wall', w.x, w.y+20, 0, sc);
+      /* T4 破墙: 受损墙块叠耐久条(满血不画) */
+      var wMax=(CFG.wall&&CFG.wall.hp!=null)?CFG.wall.hp:60;
+      var wHp=(w.hp!=null)?w.hp:wMax;
+      if(wHp < wMax){
+        var wp=Math.max(0, wHp/wMax);
+        ctx.fillStyle='#1a2334';
+        ctx.fillRect(w.x-12, w.y-6, 24, 3);
+        ctx.fillStyle = wp>0.5 ? '#ffd97a' : '#ff9a9a';
+        ctx.fillRect(w.x-12, w.y-6, 24*wp, 3);
+      }
     });
     gates.forEach(function(g){
       APH.Sprites.draw(ctx, 'bl_gate', g.x, g.y+20, 0, sc);

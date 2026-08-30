@@ -216,6 +216,92 @@ APH.Combat = (function(){
     return { x:CFG.HAB.x, y:CFG.HAB.y, kind:'pile' };
   }
 
+  /* ============================================================
+     T4 袭击者寻路+破墙+围攻炮击目标 (issue #77)
+     纯函数: planChase / breachFocus / wallHp / strikeWall / pickShellTarget
+     依赖 APH.Nav(T1) — 运行时调用, 模块加载顺序无关。
+     ============================================================ */
+  /* 墙块耐久(旧存档无 hp 字段 → 默认 CFG.wall.hp) */
+  function wallHp(b){
+    if(b && b.hp != null) return b.hp;
+    return (CFG.wall && CFG.wall.hp != null) ? CFG.wall.hp : 60;
+  }
+  /* 最近可拆墙块(纯函数; 排除已归零) */
+  function breachFocus(en, s){
+    var bs = (s && s.colony && s.colony.buildings) || [];
+    var best = null, bd = 1e9;
+    bs.forEach(function(b){
+      if(!b || b.id !== 'bl_wall') return;
+      if(b.hp != null && b.hp <= 0) return;
+      var d = U.dst(en.x, en.y, b.x, b.y);
+      if(d < bd){ bd = d; best = b; }
+    });
+    if(!best) return null;
+    return { x:best.x, y:best.y, kind:'wall', b:best };
+  }
+  /* 袭击者寻路计划(纯函数):
+     direct = 无墙或直线可见(原直线冲脸行为)
+     path   = 绕墙路径(Nav.astar; 闸门格不在障碍矩阵=可直接穿门)
+     breach = 完全堵死(astar 无解) → 拆最近墙(工兵行为) */
+  function planChase(en, focus, s){
+    var bs = (s && s.colony && s.colony.buildings) || [];
+    var hasWall = false;
+    for(var i = 0; i < bs.length; i++){
+      if(bs[i] && bs[i].id === 'bl_wall'){ hasWall = true; break; }
+    }
+    if(!hasWall || !window.APH.Nav || !en || !focus) return { mode:'direct' };
+    var grid = APH.Nav.gridOf(bs);
+    var path = APH.Nav.astar(grid, { x:en.x, y:en.y }, { x:focus.x, y:focus.y });
+    if(path && path.length > 1) return { mode:'path', path:path };
+    if(!path){
+      var wf = breachFocus(en, s);
+      if(wf) return { mode:'breach', wall:wf };
+    }
+    return { mode:'direct' };
+  }
+  /* 近战砍墙: 扣耐久, 归零→移除记录+掉落石料(返回是否命中过) */
+  function strikeWall(en, b, s){
+    if(!b || b.id !== 'bl_wall') return false;
+    if(b.hp != null && b.hp <= 0) return false;
+    var dmg = (en.faction && en.faction.dmg) || 6;
+    b.hp = wallHp(b) - dmg;
+    b.hitFlash = 0.1;
+    if(b.hp <= 0) destroyWall(b, s);
+    U.emit('wallHit', { x:b.x, y:b.y, hp:Math.max(0, b.hp) });
+    return true;
+  }
+  /* 墙毁: 从 colony.buildings 移除 + 地上掉落石料 1~2 */
+  function destroyWall(b, s){
+    b.hp = 0;
+    var list = (s && s.colony) ? s.colony.buildings : null;
+    if(list){
+      for(var i = 0; i < list.length; i++){
+        if(list[i] === b){ list.splice(i, 1); break; }
+      }
+    }
+    var W = CFG.wall || {};
+    var lo = (W.dropStoneMin != null) ? W.dropStoneMin : 1;
+    var hi = (W.dropStoneMax != null) ? W.dropStoneMax : 2;
+    var n = lo + Math.floor(Math.random() * (hi - lo + 1));
+    spawnDrop(b.x, b.y, 'it_stone', n, { stock:true, jitter:10 });
+    s.shake = Math.min(1, (s.shake||0) + .12);
+    U.emit('wallDown', { x:b.x, y:b.y });
+  }
+  /* 围攻炮击目标(纯函数): 优先墙/炮塔, 其次最近可停机建筑(发射台除外) */
+  function pickShellTarget(cx, cy, buildings){
+    var sg = (CFG.raidTactics && CFG.raidTactics.tactics && CFG.raidTactics.tactics.siege) || {};
+    var prefer = sg.shellPrefer || { bl_wall:1, bl_turret:1 };
+    var pen = (sg.shellPreferPenalty != null) ? sg.shellPreferPenalty : 300;
+    var best = null, bd = 1e9;
+    (buildings || []).forEach(function(b){
+      if(!b || b.id === 'bl_landing_pad') return;
+      if(b.id === 'bl_wall' && b.hp != null && b.hp <= 0) return;
+      var d = U.dst(cx, cy, b.x, b.y) + (prefer[b.id] ? 0 : pen);
+      if(d < bd){ bd = d; best = b; }
+    });
+    return best;
+  }
+
   /* 士兵找最近的非友军敌人 / 围攻营地 */
   function nearestRaidFoe(en, entities){
     var best=null, bd=1e9;
@@ -348,6 +434,31 @@ APH.Combat = (function(){
       var focus = (s.scene==='home')
         ? (en.pillager ? pickPillageFocus(en, s) : pickRaidFocus(en, s))
         : { x:s.px, y:s.py, kind:'player' };
+      /* T4 绕墙寻路: 非逃跑状态都算路径(0.6s 缓存, 防每帧 A*);
+         完全堵死 → 改瞄最近墙(拆墙工兵), 墙被拆后立即重算 */
+      var pathPlan = null;
+      if(s.scene==='home' && en.state !== 'flee'){
+        var fk = Math.round(focus.x)+','+Math.round(focus.y);
+        en.pathT = (en.pathT || 0) - dt;
+        if(!en.chasePlan || en.chasePlan.fk !== fk || en.pathT <= 0){
+          en.chasePlan = planChase(en, focus, s);
+          en.chasePlan.fk = fk;
+          en.pathT = 0.6;
+        }
+        pathPlan = en.chasePlan;
+        if(pathPlan.mode === 'breach'){
+          if(pathPlan.wall && (pathPlan.wall.hp == null || pathPlan.wall.hp > 0)){
+            focus = pathPlan.wall;          // 目标=墙块
+          }else{
+            /* 目标墙刚被拆: 立即重算(原目标此时可能已可达) */
+            en.chasePlan = planChase(en, focus, s);
+            en.chasePlan.fk = fk;
+            en.pathT = 0.6;
+            pathPlan = en.chasePlan;
+            if(pathPlan.mode === 'breach' && pathPlan.wall) focus = pathPlan.wall;
+          }
+        }
+      }
       var dist = U.dst(en.x, en.y, focus.x, focus.y);
       var echo = s.scene==='expedition' && window.APH.Planet && APH.Planet.hasLaw
         && APH.Planet.hasLaw(s.spec, 'lw_echo');
@@ -393,8 +504,12 @@ APH.Combat = (function(){
         U.emit('enemySpit', en);
       }
 
-      /* 近战: 士兵 → 玩家 → 居民 → 建筑掠夺 */
-      if(en.state === 'attack' && en.atkCd <= 0 && en.pillager){
+      /* 近战: 墙 → 士兵 → 玩家 → 居民 → 建筑掠夺 */
+      if(en.state === 'attack' && en.atkCd <= 0 && focus.kind === 'wall' && focus.b){
+        /* T4 破墙: 近战砍墙扣耐久 */
+        en.atkCd = CFG.enemy.attackCd;
+        strikeWall(en, focus.b, s);
+      }else if(en.state === 'attack' && en.atkCd <= 0 && en.pillager){
         /* 盗掠者(阶段E): 不打建筑不伤人, 只从仓库偷资源(不致停机) */
         en.atkCd = CFG.enemy.attackCd;
         if(focus.kind==='building' && focus.b){
@@ -434,12 +549,20 @@ APH.Combat = (function(){
         U.emit('enemyMelee', en);
       }
 
-      /* 移动 */
-      var mi = moveIntent(en, c);
-      en.x += mi.vx * dt; en.y += mi.vy * dt;
-      en.x = U.clamp(en.x, 30, CFG.WORLD-30);
-      en.y = U.clamp(en.y, 30, CFG.WORLD-30);
-      en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
+      /* 移动: 绕墙沿 A* 路径推进; 其余走原直线意图 */
+      if(pathPlan && pathPlan.mode === 'path' && en.state === 'chase'){
+        var pSpd = en.faction.speed * (night ? ((en.faction.nightBoost != null) ? en.faction.nightBoost : 1) : 1);
+        APH.Nav.followPath(en, pathPlan.path, dt, pSpd);
+        en.x = U.clamp(en.x, 30, CFG.WORLD-30);
+        en.y = U.clamp(en.y, 30, CFG.WORLD-30);
+        en.walkPh += dt * (en.walking ? 9 : 3);
+      }else{
+        var mi = moveIntent(en, c);
+        en.x += mi.vx * dt; en.y += mi.vy * dt;
+        en.x = U.clamp(en.x, 30, CFG.WORLD-30);
+        en.y = U.clamp(en.y, 30, CFG.WORLD-30);
+        en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
+      }
 
       /* 太远回收(家园袭击不按离玩家距离清波) */
       if(U.dst(en.x,en.y,s.px,s.py) > CFG.enemy.despawnR && s.scene !== 'home'){ en.dead = true; }
@@ -496,10 +619,18 @@ APH.Combat = (function(){
           if(!tb || tb.id==='bl_landing_pad') continue;
           if(segDist(segX0,segY0,p.x,p.y,tb.x,tb.y) < 36){
             p.dead=true;
-            tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
+            if(tb.id==='bl_wall'){
+              /* T4 破墙: 围攻炮弹击穿墙耐久(两发一墙) */
+              var wDmg=(CFG.wall&&CFG.wall.shellDmg!=null)?CFG.wall.shellDmg:30;
+              tb.hp=wallHp(tb)-wDmg;
+              U.emit('wallHit', {x:tb.x, y:tb.y, hp:Math.max(0,tb.hp)});
+              if(tb.hp<=0) destroyWall(tb, s);
+            }else{
+              tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
+            }
             s.shake=Math.min(1,(s.shake||0)+.3);
             if(window.APH.UI && APH.UI.floatText)
-              APH.UI.floatText('💥 围攻炮击! 建筑停机','#ff9a9a');
+              APH.UI.floatText('💥 围攻炮击'+(tb.id==='bl_wall'?'! 墙体受损':'! 建筑停机'),'#ff9a9a');
             break;
           }
         }
@@ -808,5 +939,8 @@ APH.Combat = (function(){
     raidPillage:raidPillage, pickRaidFocus:pickRaidFocus, hurtPlayer:hurtPlayer,
     homeRegen:homeRegen, strikeResident:strikeResident,
     spawnDrop:spawnDrop, stealNearbyDrop:stealNearbyDrop,
+    /* T4 寻路+破墙+围攻炮击目标 */
+    wallHp:wallHp, breachFocus:breachFocus, planChase:planChase,
+    strikeWall:strikeWall, destroyWall:destroyWall, pickShellTarget:pickShellTarget,
   };
 })();
