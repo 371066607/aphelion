@@ -688,3 +688,9 @@
   - **契约**：`SPRITE_META` 登记实测锚点；新增 PNG/IHDR/base64 字节测试，以及 scenario 的 11 项启动注册、256 格、tint、逐项 draw 与 Image onerror 程序化回退测试。真实 Chromium `game.html?autostart=1&debugmark=1` 探针 11/11 `ready/tinted=true`、`fw=fh=256`、`cols=count=8`，页面无控制台错误。
   - **验证**：`python build.py` 成功（game.html 31088KB）；`node tests/run.js` 406/0；`node tests/scenario.test.js` 80/0；`node tests/perf.test.js` 3/0；`node tests/boss.test.js` 7/0；`git diff --check` 通过。窄测首次 scenario 遇到既有 #65 随机粮堆用例 79/1，立即重跑及最终全量均为 80/0，未修改 #64/#65 逻辑。
   - 下一步: 双轴 review 后由维护者提交/推送并评论关闭 #84，再解锁 #75/#79/#81/#82/#83；本班未提交、未推送、未关闭票。
+
+- **2026-08-30 · 班次**: 🔀 T0 资产 PR #90 合入（da123wda 提交 → 维护者审查 + rebase + merge）。
+  - **审查**：双轴通过（Spec 11/11 sheet 齐全、SPRITE_META、资产测试 39 条；Standards 管线合规、幂等重建）。**冲突**：分支基线 c5e60a3 早于 W2-W4 合流（CONFLICTING）→ 本地 rebase 到 main，唯一冲突 JOURNAL.md（追加记录，全保无内容冲突）。
+  - **合入**：`gh pr merge --merge`（保留作者单 commit 7327b53，merge 7ed1509）；#84 已由作者关。rebase 强推已留言知会（分支历史重写）。
+  - **验证**（rebase 后）：单测 464/0 · scenario 84/0 · perf 3/0 · boss 7/0 · 构建 31104KB —— T0 资产与天气 v1 全链兼容。
+  - 下一步: **T2 墙与闸门（#75）已全解锁**（T1✅ + T0✅）——建筑 v3 基建第二票，逻辑层可开工。
