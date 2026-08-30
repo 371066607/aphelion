@@ -2884,14 +2884,14 @@ window.APH = window.APH || {};
           id:r.id, type:T.RESIDENT, x:home.x, y:home.y,
           name:r.name, rid:r.id, job:r.job, mood:r.mood, food:r.food,
           illness:r.illness||0, rest:r.rest, recreation:r.recreation, exposure:r.exposure,
-          isSleeping:!!r.isSleeping, downed:!!r.downed,
+          isSleeping:!!r.isSleeping, downed:!!r.downed, medLying:!!r.medLying,
           walking:false, face:Math.PI/2, walkPh:0,
         };
         s.entities.push(e);
       }else{
         e.name=r.name; e.job=r.job; e.mood=r.mood; e.food=r.food; e.illness=r.illness||0;
         e.rest=r.rest; e.recreation=r.recreation; e.exposure=r.exposure;
-        e.isSleeping=!!r.isSleeping; e.downed=!!r.downed;
+        e.isSleeping=!!r.isSleeping; e.downed=!!r.downed; e.medLying=!!r.medLying;
       }
       e.tx=tgt.x; e.ty=tgt.y;
       keep[r.id]=true;
@@ -3015,7 +3015,29 @@ window.APH = window.APH || {};
       var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
       /* #68: 睡着居民不进食、不搬运、不上岗、不走动(俯卧贴地) — 优先于破碎分支, 防破碎+wander 睡着仍游荡 */
-      if(r && r.isSleeping){ e.walking = false; return; }
+      /* #69: 医疗舱俯卧者同短路(俯卧不滑行) */
+      if(r && (r.isSleeping || r.medLying)){ e.walking = false; return; }
+      /* #69 病重/击倒: 前往医疗舱床位俯卧 (轻病不躺, 仍慢走+✚) */
+      if(r && !r.medLying && APH.Res.needsMedBed(r)){
+        var clinic=(s.colony.buildings||[]).find(function(b){ return b.id==='bl_clinic'; });
+        if(raid){
+          /* raid 中: 击倒者必须原地俯卧(不能趴着爬回家/工作); 病重暂不强迫去床 */
+          if(r.downed){ e.walking=false; return; }
+        }else if(clinic){
+          var bSpot=APH.Res.clinicBedSpot(clinic);
+          e.tx=bSpot.x; e.ty=bSpot.y;
+          var crawlMul=(CFG.residents&&CFG.residents.downedCrawlMul!=null)?CFG.residents.downedCrawlMul:0.5;
+          APH.Res.walkToward(e, bSpot, dt, r.downed ? spd*crawlMul : spd*sickSpeedMul);
+          var bedArrive=(CFG.residents&&CFG.residents.clinicBedArriveR!=null)?CFG.residents.clinicBedArriveR:6;
+          if(U.dst(e.x,e.y,bSpot.x,bSpot.y)<=bedArrive){
+            r.medLying=true; e.medLying=true; e.walking=false;
+            e.x=bSpot.x; e.y=bSpot.y;
+            r.job=null; e.job=null;      /* 与 checkDowned 一致: 躺床撤岗 */
+          }
+          return;
+        }
+        if(r.downed){ e.walking=false; return; }   /* 无医疗舱: 击倒者原地俯卧(渲染已由 e.downed 接管) */
+      }
       if(!raid && r && APH.Res.isBroken(r)){
         e.breaking=r.breakType;
         if(r.breakType==='wander'){
@@ -3314,6 +3336,24 @@ window.APH = window.APH || {};
         }
       }
       APH.Res.clinicTick(r, {hasClinic:hasClinic, inClinic:inClinic, medicSkill:medicSkill, rng:sickRng});
+      /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
+      if(r.medLying && !hasClinic) r.medLying = false;
+      /* #69 击倒判定+送医(接线孤儿 checkDowned/rescueTick; 生产跳=30s) */
+      if(!r.downed && APH.Res.checkDowned(r)){
+        APH.UI.floatText(r.name+' 倒下了!','#ff9a9a');
+      }
+      if(r.downed){
+        var rr=APH.Res.rescueTick([r], s.colony.buildings, 30, hasClinic && haveStock('med')>0, {inClinic:inClinic});
+        if(rr.medUsed){
+          APH.Colony.takeStock(m.res, s.entities, 'med', 1);
+          APH.UI.floatText(r.name+' 被紧急救治','#7dffab');
+        }
+        if(rr.dead.length){
+          APH.UI.floatText('☠ '+r.name+' 救治不及时, 去世了','#ff9a9a');
+          m.residents=m.residents.filter(function(x){ return x.id!==r.id; });
+          saveMetaQuiet();                       /* syncResidentEntities 下一帧移除实体 */
+        }
+      }
     });
     /* B: 心情崩溃状态机(seeded) + 崩溃行为落地 */
     var breakRng=U.makeRng((tickSeed^0x5EED2B)>>>0);
@@ -3364,6 +3404,7 @@ window.APH = window.APH || {};
       var sickest=null, bestScore=-1;
       m.residents.forEach(function(r){
         if((r.illness||0)<=0) return;
+        if(r.downed) return;                       /* #69: 击倒者由 rescueTick 用薬, 不双扣 */
         /* F: 疫病患者优先用药(药是唯一根治手段) */
         var plagued=(r.ailments||[]).some(function(a){ return a.type==='plague'; });
         var score=(r.illness||0)+(plagued?1000:0);

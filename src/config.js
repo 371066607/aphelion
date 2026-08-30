@@ -256,6 +256,9 @@ APH.CFG = {
     raidIFrame: 0.8,
     medHeal: 8,
     sickSkipAt: 60,            // 病情超过此值不派岗
+    sickBedAt: 50,             // #69 病情严格超过此值自动前往医疗舱床位俯卧 (轻病: >20 慢走+✚ 不躺)
+    downedCrawlMul: 0.5,       // #69 击倒者匍匐去床速度倍率 (×walk.speed 56 → 28 px/s)
+    clinicBedArriveR: 6,       // #69 到床判定半径 px (比 walk.arriveR 3 略宽, 提前上床)
     tantrumR: 140,             // 怠工抱怨影响半径(px)
     clinicNearR: 80,           // 进舱判定: 离医疗舱此距离内
     /* 心情崩溃(RimWorld mental break; 时间单位=生产跳30s) */

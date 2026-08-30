@@ -900,8 +900,8 @@ APH.Ent = (function(){
 
   function drawNpcSprite(e, time, role, pack){
     if (!(window.APH.Sprites && window.APH.Humanoid)) return false;
-    /* #59: 睡/倒共用俯卧 body */
-    var lying = !!(e.isSleeping || e.downed);
+    /* #59: 睡/倒共用俯卧 body; #69: 医疗舱俯卧同身 */
+    var lying = !!(e.isSleeping || e.downed || e.medLying);
     var pose = APH.Humanoid.poseFor({
       role: role, id: e.rid || e.id, moving: !!e.walking, face: e.face,
       walkPh: e.walkPh, time: time, pack: pack, lying: lying

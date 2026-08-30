@@ -164,6 +164,15 @@
 - [x] 配置：`CFG.player.clinicSleepRadius:60`（镜像 `bedSleepRadius`，读时回退 60）
 - [x] 测试锁定：survival 新增 3 纯例（bed_med 床速恢复/回满自动醒清床/playerWake 清 bed_med），scenario 新增 6 冒烟（不自动躺/不自动寻路、生病+靠舱 E 躺入+俯卧+绘制不崩、躺舱中再按 E 唤醒、健康玩家不躺、击倒玩家 E 阻断、舱内按床速 +25 恢复）
 
+## 病重/击倒居民躺医疗舱（Issue #69）
+
+- [x] 病情**严格超过 `CFG.residents.sickBedAt:50`**（`needsMedBed` 纯函数；恰 50 不躺，边界测试锁定）或击倒（`downed`）的居民**自动走向医疗舱床位**（`clinicBedSpot` 纯函数 = `bl_clinic` 实体 +16/+22，与 `residentSpot` 同款偏移；只覆写 `e.tx/ty`，镜像 #64 饥饿分支）
+- [x] 到床（`clinicBedArriveR:6`）即**俯卧**：`e.medLying`/`r.medLying` 并行标志（不复用 `isSleeping`，避免 rest≥100 自动醒冲突），复用 `hum_0..3_nopack_prone`（`drawNpcSprite` 的 `lying` 含 `medLying`）；`walkToward` 守卫冻结卧位，`updateResidents` 短路过正常岗位/走位；躺床撤岗（`r.job=null`），`assignByPriority` 缺勤，`syncResidentEntities` 每帧镜像
+- [x] 轻病（>20 且 ≤50）**不强制躺**：仍慢走（`sickSpeedMul:0.6`）+ ✚（`sickMarkAt:20`），渲染测试锁定两档病情都画 ✚
+- [x] 击倒者匍匐去床：`downedCrawlMul:0.5`（×56 → 28px/s）；无医疗舱时击倒者原地俯卧（`e.downed` 渲染接管）；病重无舱者走正常流程
+- [x] 接线孤儿 `checkDowned`/`rescueTick`（生产跳=30s）：`residentsTick` 每户一判、倒计时递减、舱内有药救活（扣 1 药、击倒者不参与选病剂 `applyMed` 双扣）、超时死亡收口（名册 filter + `saveMetaQuiet`）；病情回落 ≤50 且未击倒自动起身（`needsTick` 起床门）；医疗舱被拆躺舱者起身
+- [x] 测试锁定：residents 单元 +4（needsMedBed 边界/clinicBedSpot 偏移/walkToward 躺舱守卫/needsTick 起身门），scenario +4（病重自动去床俯卧+sync 保留+俯卧 sheet、轻病慢走+✚、击倒匍匐 14px/帧、residentsTick 击倒判定+送医接线）
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

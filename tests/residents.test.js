@@ -675,3 +675,39 @@ test('needsTick: 饥饿病计为外伤', () => {
   Res.needsTick(r, false);
   if(!r.ailments.some(a=>a.type==='wound')) throw new Error('饿出的病应为外伤');
 });
+
+/* ---------- #69 病重/击倒躺医疗舱 ---------- */
+test('#69 needsMedBed: 病情严格超阈值或击倒才需床, 边界 50 不躺', () => {
+  if(APH.CFG.residents.sickBedAt!==50) throw new Error('病重阈值应为 50');
+  if(Res.needsMedBed({illness:0})) throw new Error('病 0 不应躺');
+  if(Res.needsMedBed({illness:20})) throw new Error('病 20 轻病不应躺');
+  if(Res.needsMedBed({illness:50})) throw new Error('病恰 50 是轻病不应躺');
+  if(!Res.needsMedBed({illness:51})) throw new Error('病 51 严格超过应躺');
+  if(!Res.needsMedBed({illness:0, downed:true})) throw new Error('击倒者应躺(不论病情)');
+  if(Res.needsMedBed({illness:70, medLying:true})) throw new Error('已躺者不再触发');
+  if(Res.needsMedBed(null)) throw new Error('空应 false');
+});
+test('#69 clinicBedSpot: 与 residentSpot 同款偏移', () => {
+  const s=Res.clinicBedSpot({x:100,y:120});
+  if(s.x!==116 || s.y!==142) throw new Error('应 116,142: '+JSON.stringify(s));
+  const d=Res.clinicBedSpot(null);
+  if(d.x!==16 || d.y!==22) throw new Error('空建筑也应给 16,22: '+JSON.stringify(d));
+});
+test('#69 walkToward: 医疗舱俯卧者不移动, 清走位残留, 不推进 walkPh', () => {
+  const e={x:0,y:0,medLying:true,walking:true,walkPh:7,face:0.5};
+  Res.walkToward(e, {x:100,y:0}, 1, 40);
+  if(e.x!==0 || e.y!==0) throw new Error('躺舱者不应移动: '+JSON.stringify(e));
+  if(e.walking!==false) throw new Error('躺舱者应清 walking');
+  if(e.walkPh!==7) throw new Error('躺舱者不应推进 walkPh, got '+e.walkPh);
+});
+test('#69 needsTick: 病情回落自动起身, 击倒者不起, 重病继续躺', () => {
+  const a={food:80,mood:80,rest:80,illness:45,medLying:true};
+  Res.needsTick(a, true);
+  if(a.medLying) throw new Error('病 45≤50 应起身');
+  const b={food:80,mood:80,rest:80,illness:60,medLying:true};
+  Res.needsTick(b, true);
+  if(!b.medLying) throw new Error('病 60>50 应继续躺');
+  const c={food:80,mood:80,rest:80,illness:10,medLying:true,downed:true};
+  Res.needsTick(c, true);
+  if(!c.medLying) throw new Error('击倒者应保持躺到救援');
+});

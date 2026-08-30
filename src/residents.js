@@ -239,6 +239,11 @@ APH.Res = (function(){
       if(r.rest < restSleepAt) r.isSleeping = true;
     }
 
+    /* #69 病重躺舱: 病情回落到阈值以下且未击倒 → 起身 (独立于 isSleeping, 与睡醒互不干扰)
+       (lag: 生产跳内 needsTick 先于运动分支, 起身至多晚 1 跳) */
+    var bedAt = C.sickBedAt!=null ? C.sickBedAt : 50;
+    if(r.medLying && !r.downed && (r.illness||0) <= bedAt) r.medLying = false;
+
     /* 床铺舒适度 vs 地铺惩罚 */
     var bedMood = C.bedMood!=null?C.bedMood:3;
     var floorMood = C.floorMood!=null?C.floorMood:-5;
@@ -880,7 +885,8 @@ APH.Res = (function(){
   function walkToward(e, target, dt, speed){
     if(!e || !target) return e;
     /* #68: 睡着居民不移动(俯卧贴地): 冻结位置并清走位残留 */
-    if(e.isSleeping){ e.walking = false; return e; }
+    /* #69: 医疗舱俯卧者同守卫(防御; updateResidents 已短路) */
+    if(e.isSleeping || e.medLying){ e.walking = false; return e; }
     var C=CFG.walk||{};
     var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
     var arrive=C.arriveR!=null?C.arriveR:3;
@@ -995,6 +1001,20 @@ APH.Res = (function(){
       }
     });
     return residents;
+  }
+
+  /* #69 病重/击倒判定(纯函数): 病情严格超阈值或已击倒 → 需要医疗舱床位 */
+  function needsMedBed(r){
+    if(!r || r.medLying) return false;
+    if(r.downed) return true;
+    var C=RS();
+    var at=C.sickBedAt!=null ? C.sickBedAt : 50;
+    return (r.illness||0) > at;
+  }
+
+  /* #69 医疗舱床位坐标(纯函数): 与 residentSpot 同款偏移, 无床位注册表 */
+  function clinicBedSpot(b){
+    return { x:(b&&b.x||0)+16, y:(b&&b.y||0)+22 };
   }
 
   /* 三维机能损毁派生(纯函数): Moving, Manipulation, Consciousness (0%~100%) (Survival #16) */
@@ -1208,6 +1228,7 @@ APH.Res = (function(){
     playerDownedTick:playerDownedTick,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
+    needsMedBed:needsMedBed, clinicBedSpot:clinicBedSpot,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
     /* F 健康分型 */

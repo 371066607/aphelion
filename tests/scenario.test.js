@@ -1620,5 +1620,153 @@ test('#68 render: 睡着居民按脸用对应俯卧 sheet, 不叠Zzz/不叠伤�
   }
 });
 
+test('#69 home: 病重居民自动前往医疗舱床并俯卧 (逾50重病, 轻病不躺另测)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_clinic', x:1000, y:1200, lv:1}];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[{id:'rs_med1', name:'重症甲', job:'bl_farm', skills:{},
+      mood:80, food:80, illness:70,
+      ailments:[{type:'plague', sev:70, age:0}],
+      downed:false, isSleeping:false, rest:80, recreation:80, exposure:0}];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_med1');
+    A(!!e, '应创建居民实体');
+    e.x=600; e.y=1200;
+    const bed=APH.Res.clinicBedSpot({x:1000,y:1200});
+    A(bed.x===1016 && bed.y===1222, '床位应为 1016,1222');
+    const d0=Math.hypot(e.x-bed.x, e.y-bed.y);
+    for(let i=0;i<5;i++) M.updateResidents(0.5);
+    const d5=Math.hypot(e.x-bed.x, e.y-bed.y);
+    A(d5<d0, '病重居民应走向医疗舱床: d '+d5+' < '+d0);
+    for(let i=0;i<40;i++) M.updateResidents(0.5);
+    A(S.meta.residents[0].medLying===true, '病重居民应躺床, got '+S.meta.residents[0].medLying);
+    A(e.medLying===true, '实体应同步 medLying');
+    A(e.walking===false, '躺床应清 walking');
+    A(e.x===1016 && e.y===1222, '应躺在床位, got '+e.x+','+e.y);
+    A(S.meta.residents[0].job===null, '躺床应撤岗');
+    A(APH.Res.needsMedBed(S.meta.residents[0])===false, '已躺床不应再触发');
+    M.syncResidents();   /* 下一帧同步不得丢失 medLying */
+    A(e.medLying===true, 'sync 后实体 medLying 应保留');
+    const pr=APH.Humanoid.poseFor({role:'resident', id:'rs_med1', lying:true,
+      moving:false, face:0, walkPh:0, time:0, pack:false}, ()=>true);
+    A(/_prone$/.test(pr.sheet), '躺床应命中俯卧 sheet, got '+pr.sheet);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
+test('#69 home: 轻病居民不躺, 仍慢走并画 ✚', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_clinic', x:1000, y:1200, lv:1},
+                        {id:'bl_farm', x:1600, y:1100, lv:1}];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[
+      {id:'rs_mild20', name:'轻病20', job:'bl_farm', skills:{}, mood:80, food:80, illness:20, rest:80},
+      {id:'rs_mild30', name:'轻病30', job:'bl_farm', skills:{}, mood:80, food:80, illness:30, rest:80},
+    ];
+    M.syncResidents();
+    const es=S.meta.residents.map(r=>S.entities.find(e=>e.type===T.RESIDENT && (e.rid||e.id)===r.id));
+    es.forEach(e=>{ e.x=1100; e.y=1100; });
+    M.updateResidents(0.5);
+    const moved=es.map(e=>Math.hypot(e.x-1100, e.y-1100));
+    A(Math.abs(moved[0]-28)<1e-6, '轻病20 应走满速 28px, got '+moved[0]);
+    A(Math.abs(moved[1]-16.8)<1e-6, '轻病30 应减速到 16.8px, got '+moved[1]);
+    A(es.every(e=>e.walking===true), '轻病应正常行走');
+    A(S.meta.residents.every(r=>!r.medLying), '轻病不得强制躺床');
+    A(S.meta.residents.every(r=>!r.isSleeping), '轻病不得被误判睡眠');
+    /* ✚ 渲染: 两条轻病都可画病号标记 (sickMarkAt 20) */
+    const cv=document.getElementById('cv');
+    const originalCtx=cv.getContext('2d');
+    const calls=[];
+    const spy={ fillStyle:'', font:'', textAlign:'', globalAlpha:1,
+      save(){}, restore(){}, translate(){}, scale(){}, beginPath(){}, ellipse(){}, arc(){}, fill(){},
+      fillRect(){}, strokeRect(){}, fillText(text){ calls.push({text, font:this.font, fillStyle:this.fillStyle}); } };
+    try{
+      APH.Ent.bindCtx(spy);
+      es.forEach(function(e,i){
+        calls.length=0;
+        APH.Ent.drawResident(Object.assign({}, e, {illness:S.meta.residents[i].illness}), 0);
+        const mark=calls.find(c=>c.text==='✚');
+        A(!!mark, '轻病居民应画 ✚');
+        A(mark.fillStyle==='#ff6d7a', '✚ 应为红色, got '+mark.fillStyle);
+      });
+    }finally{
+      APH.Ent.bindCtx(originalCtx);
+    }
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
+test('#69 home: 击倒居民匍匐前往医疗舱床, 保持 downed', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_clinic', x:1000, y:1200, lv:1}];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[{id:'rs_down1', name:'击倒者', job:null, skills:{},
+      mood:80, food:80, illness:5, downed:true, isSleeping:false, rest:80}];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_down1');
+    A(!!e, '应创建居民实体');
+    e.x=816; e.y=1222;   /* 距床位 200px */
+    M.updateResidents(0.5);
+    A(Math.abs(e.x-830)<1e-6, '击倒者单帧应匍匐 14px (56×0.5×0.5), got '+(e.x-816));
+    for(let i=0;i<20;i++) M.updateResidents(0.5);
+    A(S.meta.residents[0].medLying===true, '击倒者应爬到床并躺下');
+    A(e.medLying===true, '实体应 medLying');
+    A(S.meta.residents[0].downed===true, '躺床仍保持 downed (等救援接线)');
+    A(e.x===1016 && e.y===1222, '应趴在床位, got '+e.x+','+e.y);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+  }
+});
+
+test('#69 home: residentsTick 击倒判定与送医接线 (checkDowned/rescueTick)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war,
+        oldRes=S.meta.res, oldPrio=S.meta.workPrio;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[{id:'bl_clinic', x:1000, y:1200, lv:1}];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ food:10, mineral:0, med:0 };
+    S.meta.workPrio={};
+    S.meta.residents=[{id:'rs_sev1', name:'重症乙', job:null, skills:{sk_social:3},
+      mood:80, food:80, illness:70, rest:80, recreation:80, exposure:0,
+      ailments:[{type:'plague', sev:70, age:0}],
+      downed:false, isSleeping:false, bedId:null}];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_sev1');
+    A(!!e, '应创建居民实体');
+    e.x=1016; e.y=1222;   /* 在医疗舱治疗半径内 */
+    /* 阶段1: 无药 → checkDowned 触发, 倒计时递减但不死 */
+    M.residentsTick();
+    const r=S.meta.residents[0];
+    A(r.downed===true, '严重疫病应经 residentsTick 触发击倒, got '+r.downed);
+    A(r.bleedOutTimer<90, '击倒应启动倒计时: '+r.bleedOutTimer);
+    A(S.meta.res.med===0, '无药不得扣药');
+    /* 阶段2: 有药+在舱 → rescueTick 紧急救治, 用药且起身 */
+    S.meta.res.med=1;
+    M.residentsTick();
+    A(r.downed===false, '舱内有药应紧急救治成功');
+    A(S.meta.res.med===0, '救治应消耗 1 药, got '+S.meta.res.med);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+    S.meta.res=oldRes; S.meta.workPrio=oldPrio;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);
