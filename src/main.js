@@ -1027,6 +1027,8 @@ window.APH = window.APH || {};
       hasTurret:buildings.some(function(b){return b.id==='bl_turret';}),
       visitorSlot:visitorCount()<((CFG.visitor&&CFG.visitor.max)||2),
       rivalReady:rivalReady,
+      /* 天气上下文(ADR-15): 导演掷骰把当前天气交给 ev_weather 路径 */
+      weather:m.weather || APH.Weather.defaultWeather(),
     };
   }
   function storyTick(dtMin){
@@ -1038,6 +1040,8 @@ window.APH = window.APH || {};
     var rng=U.makeRng(seed);
     var out=APH.Events.directorTick(m.events, storyCtx(), rng, dtMin);
     var lastNeg=m.events.lastNeg||0;
+    /* ev_weather 掷骰结果写回 meta.weather → 生产跳读取(ADR-15 生效链) */
+    if(out.weather) m.weather=out.weather;
     m.events=Object.assign({}, out.state, { history:m.events.history||[], lastNeg:lastNeg });
     if(out.fired){
       m.events.history.push({ id:out.fired, at:Math.round(s.clock||0) });
@@ -2998,6 +3002,10 @@ window.APH = window.APH || {};
     if(s.scene!=='home') return;
     syncResidentEntities();
     var spd=(CFG.walk&&CFG.walk.speed)||56;
+    /* W3 天气效果(家园): 居民室外移动减速乘子(寒潮+防寒服=免; 远征不适用) */
+    var resWxId=(window.APH.Weather&&APH.Weather.currentId)?APH.Weather.currentId(s.meta):'wx_clear';
+    var resWxEff=(window.APH.Weather&&APH.Weather.weatherEffects)?APH.Weather.weatherEffects(resWxId):null;
+    var resWxSpeedMul=(resWxEff&&resWxEff.speedMul!=null)?resWxEff.speedMul:1;
     var H=CFG.haul||{};
     var pickR=H.pickR!=null?H.pickR:52;
     var seekR=H.seekR!=null?H.seekR:420;
@@ -3013,6 +3021,12 @@ window.APH = window.APH || {};
       var r=residentOf(e);
       var walkCfg=CFG.walk||{};
       var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
+      /* W3 天气室外减速: 室内避难所免罚; 寒潮+防寒服=免 */
+      var wxMul=1;
+      if(r && APH.Res && APH.Res.weatherMoveMul){
+        wxMul=APH.Res.weatherMoveMul(r, resWxId, resWxSpeedMul,
+          APH.Res.isSheltered({x:e.x, y:e.y}, (s.colony&&s.colony.buildings)||[]));
+      }
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
       /* #68: 睡着居民不进食、不搬运、不上岗、不走动(俯卧贴地) — 优先于破碎分支, 防破碎+wander 睡着仍游荡 */
       /* #69: 医疗舱俯卧者同短路(俯卧不滑行) */
@@ -3027,7 +3041,7 @@ window.APH = window.APH || {};
           var bSpot=APH.Res.clinicBedSpot(clinic);
           e.tx=bSpot.x; e.ty=bSpot.y;
           var crawlMul=(CFG.residents&&CFG.residents.downedCrawlMul!=null)?CFG.residents.downedCrawlMul:0.5;
-          APH.Res.walkToward(e, bSpot, dt, r.downed ? spd*crawlMul : spd*sickSpeedMul);
+          APH.Res.walkToward(e, bSpot, dt, r.downed ? spd*crawlMul*wxMul : spd*sickSpeedMul*wxMul);
           var bedArrive=(CFG.residents&&CFG.residents.clinicBedArriveR!=null)?CFG.residents.clinicBedArriveR:6;
           if(U.dst(e.x,e.y,bSpot.x,bSpot.y)<=bedArrive){
             r.medLying=true; e.medLying=true; e.walking=false;
@@ -3041,7 +3055,7 @@ window.APH = window.APH || {};
       if(!raid && r && APH.Res.isBroken(r)){
         e.breaking=r.breakType;
         if(r.breakType==='wander'){
-          var wanderSpd=((CFG.visitor&&CFG.visitor.speed)||48)*sickSpeedMul;
+          var wanderSpd=((CFG.visitor&&CFG.visitor.speed)||48)*sickSpeedMul*wxMul;
           APH.Res.wanderStep(e, dt, CFG.HAB, (CFG.visitor&&CFG.visitor.yardR)||220, null, wanderSpd);
         }else{
           e.walking=false;
@@ -3085,7 +3099,7 @@ window.APH = window.APH || {};
           }
         }
       }
-      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul);
+      APH.Res.walkToward(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul);
     });
   }
 
@@ -3278,6 +3292,10 @@ window.APH = window.APH || {};
   }
   function residentsTick(){
     var s=APH.state, m=s.meta;
+    /* W3 天气效果: 当前天气 id(读 meta.weather, 老档兜底 wx_clear); 极端清单以 exposureGain>0 为准 */
+    var wxId=(window.APH.Weather&&APH.Weather.currentId)?APH.Weather.currentId(m):'wx_clear';
+    var wxFx=(window.APH.Weather&&APH.Weather.weatherEffects)?APH.Weather.weatherEffects(wxId):{};
+    var wxExtreme=((wxFx.exposureGain)||0)>0;
     /* 深度生存: 床位分配 (Survival #15) */
     APH.Res.assignBeds(s.colony.buildings, m.residents);
 
@@ -3323,19 +3341,22 @@ window.APH = window.APH || {};
     var sickRng=U.makeRng(tickSeed);
     var clinicR=(CFG.residents&&CFG.residents.clinicNearR!=null)?CFG.residents.clinicNearR:80;
     m.residents.forEach(function(r){
+      var ent=null;
+      s.entities.forEach(function(e){
+        if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) ent=e;
+      });
       var inClinic=false;
-      if(hasClinic){
-        var ent=null;
-        s.entities.forEach(function(e){
-          if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) ent=e;
+      if(hasClinic && ent){
+        (s.colony.buildings||[]).forEach(function(b){
+          if(b.id==='bl_clinic' && U.dst(ent.x,ent.y,b.x,b.y)<clinicR) inClinic=true;
         });
-        if(ent){
-          (s.colony.buildings||[]).forEach(function(b){
-            if(b.id==='bl_clinic' && U.dst(ent.x,ent.y,b.x,b.y)<clinicR) inClinic=true;
-          });
-        }
       }
       APH.Res.clinicTick(r, {hasClinic:hasClinic, inClinic:inClinic, medicSkill:medicSkill, rng:sickRng});
+      /* W3 天气暴露接线(本票核心): 极端天气室外累积/避难所消退 (Survival #19 桩复活);
+         sheltered 用既有 isSheltered; 实体缺位兜底按室内(不误积累) */
+      APH.Res.exposureTick(r,
+        ent ? APH.Res.isSheltered({x:ent.x, y:ent.y}, s.colony.buildings) : true,
+        wxExtreme, wxId);
       /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
       if(r.medLying && !hasClinic) r.medLying = false;
       /* #69 击倒判定+送医(接线孤儿 checkDowned/rescueTick; 生产跳=30s) */
@@ -3423,6 +3444,7 @@ window.APH = window.APH || {};
     var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm'||b.id==='bl_crop_plot';});
     var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
     var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
+    var farmWx=(wxFx.farmMul!=null)?wxFx.farmMul:1;   // W3: 天气农产乘子(雨+30%/酸雨×0.5/雪停滞) 乘入 harvestMods 链
     farms.forEach(function(b){
       if(!b.plot) b.plot={stage:0,t:0};
       if(!b.crop){
@@ -3436,7 +3458,7 @@ window.APH = window.APH || {};
       var farmMul=((s.meta.tech&&s.meta.tech.te_radar)||0)*0.15;
       var farmEff=bestFarmer?APH.Res.efficiency(bestFarmer):1;
       var farmSk=bestFarmer?(bestFarmer.skills.sk_farm||0):0;
-      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm, b.crop);
+      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx, b.crop);
       if((b.plot.stage||0) >= 3){
         var h=APH.Colony.harvestAlienCrop(b.crop, farmSk);
         if(h.dropItemId && h.dropCount>0){

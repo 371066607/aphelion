@@ -825,7 +825,16 @@ APH.Ent = (function(){
     var walkCfg=CFG.walk||{};
     var needs=s.meta&&s.meta.playerNeeds;
     var sickMul=s.scene==='home' && needs && needs.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
-    var spd=(s.run?P.runSpeed:P.walkSpeed)*sickMul*(ml>0?ml:0);
+    /* W3 家园天气室外减速(雨0.7/雪0.8/暴雪0.6/寒潮0.85/酸雨0.85): 室内免罚,
+       寒潮+防寒服(it_suit_cryo)=免减速; 远征不适用(法则独立) */
+    var wxMul=1;
+    if(s.scene==='home' && window.APH.Weather && APH.Weather.currentId && APH.Res && APH.Res.weatherMoveMul){
+      var wxIdNow=APH.Weather.currentId(s.meta);
+      var wxFxNow=APH.Weather.weatherEffects(wxIdNow);
+      wxMul=APH.Res.weatherMoveMul(needs, wxIdNow, wxFxNow.speedMul,
+        APH.Res.isSheltered({x:s.px, y:s.py}, (s.colony&&s.colony.buildings)||[]));
+    }
+    var spd=(s.run?P.runSpeed:P.walkSpeed)*sickMul*wxMul*(ml>0?ml:0);
     if(moving){
       s.face=Math.atan2(my,mx);
       s.vx=U.lerp(s.vx,mx*spd,dt*P.accel);

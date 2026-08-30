@@ -352,7 +352,12 @@ APH.Combat = (function(){
       var echo = s.scene==='expedition' && window.APH.Planet && APH.Planet.hasLaw
         && APH.Planet.hasLaw(s.spec, 'lw_echo');
       var L = CFG.laws || {};
-      var sightMul = echo ? (L.echoSightMul || 0.45) : 1;
+      /* W3 雾天感知: enemySightMul 乘入 aggro 判定(与 nightAggroMul 同乘法位置); 家园天气, 远征不适用 */
+      var wxSightMul = 1;
+      if(s.scene === 'home' && window.APH.Weather && APH.Weather.currentId){
+        wxSightMul = APH.Weather.weatherEffects(APH.Weather.currentId(s.meta)).enemySightMul || 1;
+      }
+      var sightMul = (echo ? (L.echoSightMul || 0.45) : 1) * wxSightMul;
       var noiseMul = echo ? (L.echoNoiseMul || 1.8) : 1;
       var noiseR = (CFG.combat.noiseRadius || 300) * noiseMul;
       var c = {

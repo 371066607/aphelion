@@ -107,6 +107,45 @@ APH.UI = (function(){
     }
     var vig = $('vig');
     vig.style.opacity = s.o2<25 ? (1-s.o2/25)*.85 : 0;
+
+    /* W3 天气行(家园 HUD): 图标+天气名+预计剩余时长; 极端天气预警色 (值源 CFG.weather + APH.Weather) */
+    var wxRow=weatherRow();
+    if(wxRow){
+      wxRow.style.display = atHome ? '' : 'none';
+      if(atHome){
+        try{
+          var wxMeta=(s.meta&&s.meta.weather)||{};
+          var wxIdNow=(window.APH.Weather&&APH.Weather.currentId)?APH.Weather.currentId(s.meta):'wx_clear';
+          var wxNames=(APH.CFG.weather&&APH.CFG.weather.names)||{};
+          var wxIcons=(APH.CFG.weather&&APH.CFG.weather.icons)||{};
+          var wxName=wxNames[wxIdNow]||wxIdNow;
+          var wxIcon=wxIcons[wxIdNow]||wxIcons.wx_clear||'';
+          var wxRemain=(window.APH.Weather&&APH.Weather.expectRemain)?APH.Weather.expectRemain(wxMeta):0;
+          var wxDays=wxRemain/APH.CFG.DAY_LEN;
+          var wxDurTxt=wxDays>=1 ? (Math.round(wxDays*10)/10+' 天') : (Math.round(wxDays*24)+' 小时');
+          var wxIsExtrem=((window.APH.Weather&&APH.Weather.weatherEffects(wxIdNow).exposureGain)||0)>0;
+          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt;
+          wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
+        }catch(e){ /* HUD 只读展示, 失败静默 */ }
+      }
+    }
+  }
+
+  /* W3 天气行元素(懒建一次; 挂在 #hud 下复用 .row 样式; game.html 未预置则动态创建) */
+  var wxRowCache=null;
+  function weatherRow(){
+    if(wxRowCache) return wxRowCache;
+    var rowWx=$('rowWeather');
+    if(!rowWx){
+      rowWx=document.createElement('div');
+      rowWx.id='rowWeather';
+      rowWx.className='row';
+      rowWx.style.cssText='letter-spacing:1px;text-shadow:0 0 8px rgba(0,0,0,.6);color:#8fd4ff';
+      var hudEl=document.getElementById('hud');
+      if(hudEl && hudEl.appendChild) hudEl.appendChild(rowWx);
+    }
+    wxRowCache=rowWx;
+    return rowWx;
   }
 
   /* ---------- 提示条 ---------- */
