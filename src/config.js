@@ -610,6 +610,20 @@ APH.CFG = {
     wallHalf: 24,               // 墙块碰撞盒半宽 = GRID/2 (48px 格, 墙记录格心±24)
   },
 
+  /* T6 电网 (issue #79): 导线/木柴发电机/太阳能板/蓄电池/供电结算 */
+  power: {
+    /* 用电建筑: load=功率(抽象单位), prio=停机优先级(小=优先保供; 同级全保才轮到下级) */
+    consumers: {
+      bl_turret: { load: 10, prio: 1 },   // 防御炮塔: 保供级
+      bl_clinic: { load: 6,  prio: 1 },   // 医疗舱: 保供级
+      bl_lamp:   { load: 3,  prio: 2 },   // T9 路灯: 预留(本票只入优先级表)
+    },
+    wood:  { watts: 14, burnSec: 15 },    // 木柴发电机: 额定功率, 每 burnSec 秒烧 1 木材
+    solar: { watts: 8 },                  // 太阳能板: 基础功率 × 天气 solarMul (仅白天)
+    battery: { cap: 100 },                // 蓄电池容量 (瓦·秒)
+    blackoutSec: 60,                      // 停电兜底秒数 (电池耗尽后仍按兜底计时全负荷运行)
+  },
+
   /* 存档 */
   save: {
     PREFIX: 'aphelion_',

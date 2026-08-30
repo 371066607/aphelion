@@ -67,6 +67,32 @@ APH.Colony = (function(){
     bl_gate:  { name:'闸门', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:3, wood:5 }, size:48, max:500,
       cells:[1,1], buildTime:8, dispH:98,
       desc:'可通行的门：己方秒开，袭击者开门有延迟。' },
+    /* T6 电网 (ADR-14: 实体导线电力网) */
+    bl_conduit:      { name:'导线', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:3 }, size:48, max:2000,
+      cells:[1,1], buildTime:4, dispH:80,
+      desc:'铺在格上的电力管线，把电网成员连成一张网。' },
+    bl_wood_generator:{ name:'木柴火力发电机', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:20, stone:10 }, size:56, max:6, buildTime:25,
+      cells:[2,2], dispH:130,
+      desc:'烧木材产电（1木/10s → 10电/s）。稳定供电。' },
+    bl_solar_panel:  { name:'太阳能板', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:15, stone:5 }, size:48, max:8, buildTime:18,
+      cells:[1,1], dispH:110,
+      desc:'白天产电（受天气光照影响），夜间靠电池。' },
+    bl_battery:      { name:'蓄电池', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:10, stone:5 }, size:48, max:6, buildTime:15,
+      cells:[1,1], dispH:100,
+      desc:'存电并在停电时兜底 60 秒。' },
+    /* T6 电网 (issue #79): 导线=格上静态物(与墙同类规则, ADR-13) */
+    bl_conduit: { name:'电力导线', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ wood:2, iron:1 }, size:48, max:2000,
+      cells:[1,1], buildTime:4, dispH:36,
+      desc:'格上敷设的输电线：把发电机与用电建筑连成电网。' },
+    bl_wood_generator: { name:'木柴发电机', cost:0, costMineral:20, reqTech:'te_machining', costRes:{ iron:20, wood:15 }, size:44, max:4, buildTime:25,
+      dispH:96, cells:[1,1],
+      desc:'烧木材发电：每15秒消耗1木材。需接入导线。' },
+    bl_solar_panel: { name:'太阳能板', cost:0, costMineral:25, reqTech:'te_machining', costRes:{ iron:25, stone:10 }, size:52, max:6, buildTime:22,
+      dispH:74, cells:[1,1],
+      desc:'白天发电，功率随天气打折(雨/雷暴/暴雪/雾)。需接入导线。' },
+    bl_battery: { name:'蓄电池', cost:0, costMineral:15, reqTech:'te_machining', costRes:{ iron:15, wood:8 }, size:44, max:4, buildTime:18,
+      dispH:84, cells:[1,1],
+      desc:'存储富余电力；停电时兜底供电。需接入导线。' },
   };
   var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_kitchen', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 
@@ -226,6 +252,9 @@ APH.Colony = (function(){
     });
   }
 
+  /* 格上静态物集合 (ADR-13 + T6 导线): 1x1 格, 不入 entities[], 可拖拽敷设 */
+  var GRID_STATICS = { bl_wall:1, bl_gate:1, bl_conduit:1 };
+
   /* ---------- 建造逻辑(纯函数部分) ---------- */
   /* 占位格: cells×48px格网(ADR-4), 中心对齐 */
   function footprintOf(bid){
@@ -268,16 +297,16 @@ APH.Colony = (function(){
     if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
     var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
-    var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && (bid==='bl_wall'||bid==='bl_gate'));
-    /* 墙/闸门豁免离核心130px: 否则围不了家(ADR-13) */
+    var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && GRID_STATICS[bid]);
+    /* 墙/闸门/导线豁免离核心130px: 否则围不了家(ADR-13) */
     if(!isGrid && U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     for(var i=0;i<colonyBuildings.length;i++){
       var b = colonyBuildings[i];
       var of = footprintOf(b.id), ohw = of.w/2, ohh = of.h/2;
-      /* 墙/闸门互相相邻视为占同一格线(允许拼接), 但只是0相邻不重叠 */
-      if(isGrid && (b.id==='bl_wall'||b.id==='bl_gate')){
-        /* 完全同格: 拒(不叠放); 邻格: 允许(围墙上补门) */
-        if(Math.abs(x-b.x)<1 && Math.abs(y-b.y)<1) return { ok:false, why:'该格已有墙/闸门' };
+      /* 格上静态物互相相邻视为占同一格线(允许拼接: 墙上补门/过线), 但不叠放 */
+      if(isGrid && GRID_STATICS[b.id]){
+        /* 完全同格: 拒(不叠放); 邻格: 允许 */
+        if(Math.abs(x-b.x)<1 && Math.abs(y-b.y)<1) return { ok:false, why:'该格已有格上建筑' };
         continue;
       }
       if(Math.abs(x-b.x) < hw+ohw && Math.abs(y-b.y) < hh+ohh)
@@ -320,6 +349,246 @@ APH.Colony = (function(){
       else if(dx===0 && dy===-CFG.GRID) n.north=true;
     });
     return n;
+  }
+
+  /* ============================================================
+     T6 电网核心 (issue #79, parent #73)
+     纯函数: 导线 BFS 连网 / 供电结算 / 电池充放 / 兜底停电 / 优先级停机。
+     状态契约: powerSettle().status[key] = {grid:连网?, powered:通电?},
+     key = 建筑位姿 'x,y' (T8 渲染层消费, 未接线显示 ⚡)。
+     电源只走导线: 发电机/电池/用电建筑经导线边邻(manhattan=1)并入同一网;
+     零发电机 = 电网未激活, 所有耗电建筑默认通电 (老档兼容, 零迁移)。
+     ============================================================ */
+  var GRID = CFG.GRID;   // 电网段局部格网引用 (ADR-4)
+  function powerRole(b){
+    if(!b || !b.id) return null;
+    if(b.id==='bl_wood_generator') return 'woodgen';
+    if(b.id==='bl_solar_panel') return 'solar';
+    if(b.id==='bl_battery') return 'battery';
+    if((CFG.power && CFG.power.consumers && CFG.power.consumers[b.id])) return 'consumer';
+    return null;
+  }
+  /* 建筑占位格: 中心格取 floor(x/GRID) (与 Nav 障碍格同规); cells 宽高扩展 */
+  function powerCells(b){
+    var def = BUILDINGS[b.id] || { cells:[1,1] };
+    var w = (def.cells && def.cells[0]) || 1, h = (def.cells && def.cells[1]) || 1;
+    var cx = Math.floor((b.x || 0) / GRID), cy = Math.floor((b.y || 0) / GRID);
+    var out = [];
+    for(var dy=0; dy<h; dy++) for(var dx=0; dx<w; dx++) out.push([cx+dx, cy+dy]);
+    return out;
+  }
+  function powerKey(b){ return Math.round(b.x || 0) + ',' + Math.round(b.y || 0); }
+
+  /* ---------- BFS 连网 (纯函数) ----------
+     沿导线(4邻接)把发电机/电池/用电建筑分网;
+     孤立导线 = 无成员组(不连网); 不接导线的节点 = 独自成组(不发电/不通电)。 */
+  function powerNets(buildings){
+    var cellsMap = {};                     // 'cx,cy' -> 导线格
+    var nodes = [];                        // 电力节点 [{b,kind,cells}]
+    (buildings || []).forEach(function(b){
+      if(!b) return;
+      var kind = powerRole(b);
+      if(kind){
+        nodes.push({ b:b, kind:kind, cells:powerCells(b) });
+      } else if(b.id === 'bl_conduit'){
+        var cx = Math.round((b.x || 0) / GRID), cy = Math.round((b.y || 0) / GRID);
+        cellsMap[cx + ',' + cy] = true;
+      }
+    });
+    /* 导线格连通分量 (BFS, 4邻接) */
+    var comp = {};                         // 'cx,cy' -> 分量号
+    var comps = [];
+    Object.keys(cellsMap).forEach(function(k){
+      if(comp[k] != null) return;
+      var p = k.split(','), sx = +p[0], sy = +p[1];
+      var id = comps.length;
+      comps.push({ cells:{} });
+      comp[k] = id;
+      var stack = [[sx, sy]];
+      while(stack.length){
+        var c = stack.pop();
+        comps[id].cells[c[0] + ',' + c[1]] = true;
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(d){
+          var nk = (c[0]+d[0]) + ',' + (c[1]+d[1]);
+          if(cellsMap[nk] && comp[nk] == null){ comp[nk] = id; stack.push([c[0]+d[0], c[1]+d[1]]); }
+        });
+      }
+    });
+    var groups = comps.map(function(c){ return { cells:c.cells, gens:[], bats:[], cons:[] }; });
+    /* 节点挂网: 任一占位格边邻(manhattan=1)导线格即并网 */
+    nodes.forEach(function(n){
+      var attached = null;
+      n.cells.some(function(cell){
+        var cands = [[cell[0]+1,cell[1]],[cell[0]-1,cell[1]],[cell[0],cell[1]+1],[cell[0],cell[1]-1]];
+        for(var i=0; i<cands.length; i++){
+          var id = comp[cands[i][0] + ',' + cands[i][1]];
+          if(id != null){ attached = id; return true; }
+        }
+        return false;
+      });
+      var g = (attached != null) ? groups[attached]
+        : (groups.push({ cells:{}, gens:[], bats:[], cons:[] }), groups[groups.length-1]);
+      if(n.kind === 'woodgen' || n.kind === 'solar') g.gens.push(n.b);
+      else if(n.kind === 'battery') g.bats.push(n.b);
+      else g.cons.push(n.b);
+    });
+    return { groups: groups };
+  }
+
+  /* ---------- 发电输出 (纯函数) ---------- */
+  /* 太阳能板: 白天 = 基础值 × solarMul(天气); 夜间 = 0 */
+  function powerSolarOutput(b, isDay, solarMul){
+    var cfg = (CFG.power && CFG.power.solar) || {};
+    var base = cfg.watts != null ? cfg.watts : 8;
+    if(isDay === false) return 0;
+    var m = (solarMul != null && solarMul >= 0) ? solarMul : 1;
+    return base * m;
+  }
+  /* 木柴发电机: 每 burnSec 秒烧 1 木材, 有木才产电; 无木时计时器冻结在即燃点 */
+  function powerWoodOutput(b, res, dt){
+    var cfg = (CFG.power && CFG.power.wood) || {};
+    var base = cfg.watts != null ? cfg.watts : 14;
+    var burnSec = cfg.burnSec != null ? cfg.burnSec : 15;
+    if(!b) return 0;
+    if(b.burnT == null) b.burnT = 0;
+    b.burnT += (dt || 0);
+    var wood = res ? ((res.wood != null ? res.wood : res.it_wood) || 0) : 0;
+    var fueled = wood >= 1;
+    var guard = 0;
+    while(wood >= 1 && b.burnT >= burnSec && guard++ < 64){
+      b.burnT -= burnSec;
+      wood -= 1;
+    }
+    if(res){
+      if(res.wood != null) res.wood = wood;
+      else if(res.it_wood != null) res.it_wood = wood;
+    }
+    if(wood < 1 && b.burnT > burnSec) b.burnT = burnSec;   // 无木冻结在即燃点
+    return fueled ? base : 0;
+  }
+  /* 当前天气 solarMul (接入 APH.Weather 接口; 老档/缺省兜底晴天=1) */
+  function powerSolarMulOf(meta){
+    var W = APH.Weather;
+    if(!W || !W.weatherEffects) return 1;
+    var eff = W.weatherEffects(W.currentId(meta));
+    return (eff && eff.solarMul != null) ? eff.solarMul : 1;
+  }
+
+  /* ---------- 电池充放 (每网内按建筑顺序贪心) ---------- */
+  function powerStore(b, charge, cap, rem){
+    if(rem <= 0 || !b) return rem;
+    var k = powerKey(b);
+    var cur = (charge[k] != null) ? charge[k] : 0;
+    var add = Math.min(cap - cur, rem);
+    charge[k] = cur + add;
+    return rem - add;
+  }
+  function powerDrainAll(bats, charge, need){
+    var left = need;
+    bats.forEach(function(b){
+      if(left <= 0) return;
+      var k = powerKey(b);
+      var cur = (charge[k] != null) ? charge[k] : 0;
+      var take = Math.min(cur, left);
+      charge[k] = cur - take;
+      left -= take;
+    });
+    return need - left;
+  }
+  /* 优先级分配: prio 小=优先保供; 同级按建造顺序贪心; 同级未全保 → 更低级全切 */
+  function powerAssignBudget(cons, budget, CON){
+    var on = {};
+    var queue = cons.map(function(b, i){
+      return { b:b, i:i, prio:((CON[b.id] && CON[b.id].prio) != null) ? CON[b.id].prio : 9 };
+    });
+    queue.sort(function(a, c){ return a.prio - c.prio || a.i - c.i; });
+    var cum = 0, blocked = false;
+    queue.forEach(function(e){
+      if(blocked) return;
+      var l = (CON[e.b.id] && CON[e.b.id].load) || 0;
+      if(cum + l <= budget + 1e-9){ cum += l; on[powerKey(e.b)] = true; }
+      else blocked = true;
+    });
+    return on;
+  }
+
+  /* ---------- 供电结算 (纯函数, 每帧 dt 秒推进) ----------
+     buildings: 殖民地建筑记录; res: 资源库存(烧木); power: 持久态
+     {charge:{'x,y':Ws}, grace:{'x,y':秒}}; opts: {solarMul, isDay}。
+     产出: {active, prodW, loadW, groups, shed, status}。 */
+  function powerSettle(buildings, res, power, dt, opts){
+    power = power || {};
+    var P = CFG.power || {};
+    var CON = P.consumers || {};
+    var cap = (P.battery && P.battery.cap != null) ? P.battery.cap : 100;
+    var blackSec = (P.blackoutSec != null) ? P.blackoutSec : 60;
+    var charge = power.charge || (power.charge = {});
+    var grace = power.grace || (power.grace = {});
+    var dtS = (dt > 0) ? dt : 0;
+    var solarMul = (opts && opts.solarMul != null && opts.solarMul >= 0) ? opts.solarMul : 1;
+    var isDay = !opts || opts.isDay !== false;
+
+    var out = { active:false, prodW:0, loadW:0, status:{}, groups:[], shed:[] };
+    var anyGen = false;
+    (buildings || []).forEach(function(b){
+      if(b && (b.id === 'bl_wood_generator' || b.id === 'bl_solar_panel')) anyGen = true;
+    });
+    if(!anyGen){
+      /* 零发电机 = 电网未激活: 所有耗电建筑默认通电 (老档不崩) */
+      (buildings || []).forEach(function(b){
+        if(b && CON[b.id]) out.status[powerKey(b)] = { grid:false, powered:true };
+      });
+      return out;
+    }
+    out.active = true;
+
+    var nets = powerNets(buildings);
+    out.groups = nets.groups.map(function(){ return null; });
+    nets.groups.forEach(function(g, gi){
+      var rec = { grid: g.gens.length > 0, prod:0, load:0 };
+      var prod = 0, load = 0;
+      g.gens.forEach(function(b){
+        if(b.id === 'bl_wood_generator') prod += powerWoodOutput(b, res, dtS);
+        else if(b.id === 'bl_solar_panel') prod += powerSolarOutput(b, isDay, solarMul);
+      });
+      g.cons.forEach(function(b){ load += (CON[b.id] && CON[b.id].load) || 0; });
+      rec.prod = prod; rec.load = load;
+      out.groups[gi] = rec;
+      out.prodW += prod;
+      out.loadW += load;
+
+      if(prod >= load){
+        /* 产能≥负载: 满供, 富余充入本网蓄电池, 兜底计时回满 */
+        var rem = (prod - load) * dtS;
+        g.bats.forEach(function(b){ rem = powerStore(b, charge, cap, rem); });
+        g.cons.forEach(function(b){ grace[powerKey(b)] = blackSec; });
+        g.cons.forEach(function(b){ out.status[powerKey(b)] = { grid:rec.grid, powered:true }; });
+      } else {
+        /* 供不应求: 先耗蓄电池兜底; 电池耗尽 → 兜底计时(blackoutSec) → 优先级停机 */
+        var need = (load - prod) * dtS;
+        var drained = powerDrainAll(g.bats, charge, need);
+        if(drained >= need - 1e-9){
+          g.cons.forEach(function(b){ grace[powerKey(b)] = blackSec; });
+          g.cons.forEach(function(b){ out.status[powerKey(b)] = { grid:rec.grid, powered:true }; });
+        } else {
+          g.cons.forEach(function(b){
+            var k = powerKey(b);
+            var g0 = (grace[k] != null) ? grace[k] : 0;
+            if(g0 > 0){ grace[k] = Math.max(0, g0 - dtS); out.status[k] = { grid:rec.grid, powered:true }; }
+          });
+          /* 电池已空: 兜底到期者按优先级分配剩余水电 (发电+残电) */
+          var on = powerAssignBudget(g.cons, prod + drained, CON);
+          g.cons.forEach(function(b){
+            var k = powerKey(b);
+            if(out.status[k]) return;          // 仍在兜底通电
+            var powered = !!on[k];
+            out.status[k] = { grid:rec.grid, powered:powered };
+            if(!powered) out.shed.push(k);
+          });
+        }
+      }
+    });
+    return out;
   }
 
   /* ---------- U3 农田生长(纯函数) ----------
@@ -1358,6 +1627,10 @@ APH.Colony = (function(){
     canPlace:canPlace, footprintOf:footprintOf, productionTick:productionTick,
     /* T2 墙/闸门格网(ADR-13) */
     wallCells:wallCells, wallLine:wallLine, wallNeighbors:wallNeighbors,
+    /* T6 电网核心 (#79) */
+    powerNets:powerNets, powerSettle:powerSettle,
+    powerSolarOutput:powerSolarOutput, powerWoodOutput:powerWoodOutput,
+    powerSolarMulOf:powerSolarMulOf,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf, refundResOf:refundResOf,
