@@ -711,3 +711,10 @@
   - 下一步: 合并 review 后台运行 → 听后关 #76/#77；T5(#78 弹道掩体) 解锁。
 
 - **2026-08-30 · 班次续**: ✅ T3/T4 关票。合并 review worker（deepseek-v4-flash-vision-exp）运行 18min 无活动→stop 中断；主会话**快速自查**替代：①walkToward 签名 diff 核验未动（T3 铁律守住）②config 字段无重复定义 ③墙 hp 初始化（main.js b.hp=CFG.wall.hp）与 combat wallHp 兜底衔接 ④destroyWall 走 spawnDrop 石料地上堆（RimWorld 式, 居民会搬）⑤||6 为既有 stepSoldier 风格兜底（非新违规）。全部通过。**教训**：长时间 review 用 slow 模型会卡死——以后审查任务书注明「单文件量小时可跳过 command 全量验证, 用 git diff 快速核」或换更快模型。
+
+- **2026-08-30 · 班次**: ⚡ T5(#78 弹道掩体)+T6(#79 电网核心) 并行合流。
+  - **T5**（15756fc）：segHitBox（线段 vs 墙 48px AABB slab）接入统一弹道拦截层——三侧弹丸先过墙，命中扣血消散，**自家墙不豁免**，墙碎恢复穿透，围攻 shellDmg 30 两发一墙；闸门不挡弹。t5 10/10。
+  - **T6**（b523d01）：**worker 半成品抢救**——卡死在生成 patch 前，stop 后源码改动落入工作区（colony 284 行/config 14 行）。**教训：worker 卡死≠无产出，先查工作区/临时 worktree 的 git diff 再决定重做**。发现 2 个 worker 半成品 bug 并修：①`GRID is not defined`（电网段用了裸 GRID，补 `var GRID=CFG.GRID`）②测试适配真实接口（powerNets 返回 {groups}、cons 裸建筑、status 字段 grid/powered 而非 inactive）。t6 11/11。
+  - **验收语义确认**：供不应求=网运转 active:true + 消费者 powered:false + shed 列表（我初版测试期望 active:false 是错的，实现语义更正确）；零发电机=grid:false+powered:true（老档兼容）。
+  - 验证: t5 10/10 + t6 11/11；全量 523/0；scenario 86/0；perf 3/0；boss 7/0；构建 31137KB；提交 15756fc+0e0a8585×？ + b523d01+144302b 已推；#78/#79 已关。
+  - 下一步: **T7 耗电联动 (#80) 已解锁**（T6✅）——耗电建筑停机/⚡浮标/HUD 电网状态；然后班 2 T8-T10。
