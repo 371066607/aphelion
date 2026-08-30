@@ -39,7 +39,7 @@ let pass = 0, fail = 0;
 for (const file of files) {
   const p = path.isAbsolute(file) ? file : path.join(__dirname, file);
   if (!fs.existsSync(p)) { console.error(`✗ 找不到 ${p}`); process.exit(1); }
-  new Function('test', fs.readFileSync(p, 'utf-8'))(test);
+  new Function('test', 'require', '__dirname', fs.readFileSync(p, 'utf-8'))(test, require, __dirname);
 }
 console.log('');
 for (const c of cases) {
