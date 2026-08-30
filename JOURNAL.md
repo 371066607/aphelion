@@ -640,3 +640,18 @@
   - 下一步: 按 `/implement` 开 T1（#74）——先 claim（gh issue edit 74 --add-assignee @me），TDD 纯函数先行。
 
 - **2026-08-30 · 班次（规划修订）**: 🎨 用户指出「建筑还没有模型」——补 **#84 T0 建筑v3视觉资产** 票（12 座新建筑走 ADR-11 Codex exec 管线：墙/闸门/导线/发电机/太阳能/电池/路灯/餐桌/餐椅/陷阱/沙袋；格上静态物单块砖式贴图+渲染层程序化转角，动画类 8 帧 sheet 惯例）。spec #73 修订：Out of Scope 移除「新建筑 sprite 贴图」，新增实现决策与依赖边（#75/#79/#81/#82/#83 ← #84）。Frontier = #74 + #84 双开工。验证：依赖图 blocked_by 全部核验（75:2/79:2/81:2/82:3/83:3）。
+
+- **2026-08-30 · 班次**: ✅#74 T1 网格寻路引擎（APH.Nav 纯函数模块）。
+  - **TDD 全程**：先写 12 条注册式用例（期望值手工推导：绕缺口路径/封闭无路/起点墙内逃生/步长跨段），再实现。红→绿 4 轮：①注释 `A*/」提前闭合块注释（SyntaxError，node --check 未拦注释级）→改「A星」；②rebuild 起点格中心入路径→跳过 chain[0]；③followPath 步长吞掉多段→`step-=d` 续走；④空地直线返回格心序列→加 `lineClear` 视线快速路径（起终点直线无墙直接 [终点]，walkToward 兼容关键）。
+  - **seam**：新模块 src/nav.js（寻路三方共享：居民/袭击者/过客→独立模块，ADR-13）；build.py MODULE_ORDER 注册 nav.js（residents 前），tests/run.js 同步。
+  - **语义对齐**：followPath 与 walkToward 一致（到达清 walking/设 face/空路径停）；`e.path/pathI` 由调用方持久（引擎不碰实体），T3 接实体时补缓存。
+  - 验证: nav.test.js 12/0；全量 402/0；构建成功 30502KB；提交 a5cfb39 + 产物 4ef4d5e，已推 origin main。
+  - 下一步: /code-review 双轴审查（后台运行中）→ 通过后关 #74；接着 frontier 双票 #84 T0 视觉资产（12 座新建筑贴图管线）。
+
+- **2026-08-30 · 班次续**: 🔍 #74 T1 code-review 双轴（独立新鲜上下文）→ 2 major + 1 minor 全修。
+  - **major① 闸门语义**：验收文字写「墙/闸门/营地=障碍」与 ADR-13 相悖（ADR-13 锁定：闸门可通行、延迟在移动层）。修正=BLOCKERS 只留 bl_wall/bl_siege_camp；新增「围栏留门→穿门 + 无门封闭→null」配对测试锁死语义（第一次测试构造错：y=2 行叠墙+门同格 → 修围栏只放 x=0/x=2；第二次：无门配对忘了补缺口墙 → 补）。
+  - **major② ADR-10 魔数**：NC=46 → `Math.ceil(CFG.WORLD/CFG.GRID)`；默认 speed 56 → `CFG.walk.speed`。
+  - **minor 精确落点帧 walking 假停**：`step-=d` 后 break 会清 walking（还有路走 → 单帧闪烁）；修=break 后 `e.walking=(e.pathI<e.path.length)`，新增「恰好到段1保持 walking」测试。
+  - nit 顺手修：octile 0.41→`Math.SQRT2-1`；缺 'use strict' 补；CFG 兜底风格对齐兄弟模块；CLAUDE.md 模块表补 nav.js 行。
+  - 验证: nav.test.js 14/14；全量 404/0；scenario 78/0；perf 3/0；boss 7/0；构建成功 30502KB；提交 fb5a4f6+4d385a6 已推 origin main。
+  - 下一步: 关 #74；T0 视觉资产 #84（12 座新建筑贴图）或 T2 墙与闸门（#75，blocker=T1✓+T0）。
