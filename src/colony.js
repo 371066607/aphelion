@@ -69,13 +69,13 @@ APH.Colony = (function(){
       desc:'餐位一座一人。须放在餐桌旁（60px 内）才算可用餐位；居民自动走向最近空椅坐吃。' },
     /* P3 生活家具 (#97): 房间内摆放给心情增益 (科技机械锻造) */
     bl_tv:     { name:'电视', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:8, wood:4 }, size:48, max:8, buildTime:8,
-      cells:[1,1], dispH:132,
+      cells:[1,1], dispH:110,
       desc:'房间内的娱乐家具：房屋心情 +1（电视/书架/地毯各 +1，可叠加）。' },
     bl_shelf:  { name:'书架', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ wood:8 }, size:48, max:12, buildTime:8,
-      cells:[1,1], dispH:140,
+      cells:[1,1], dispH:120,
       desc:'房间内的知识家具：房屋心情 +1（电视/书架/地毯各 +1，可叠加）。' },
     bl_carpet: { name:'地毯', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ leather:4 }, size:48, max:12, buildTime:8,
-      cells:[1,1], dispH:40,
+      cells:[1,1], dispH:55,
       desc:'房间内的软装家具：房屋心情 +1（电视/书架/地毯各 +1，可叠加）。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
     bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,

@@ -221,7 +221,7 @@
 
 - [x] 家具三件套逻辑 (#97)：bl_tv/bl_shelf/bl_carpet 注册（te_machining/成本/核心豁免）+ roomMoodGain 聚合扩展（卧室级+家具逐件, CFG.furnitureMood）—— 已完成（渲染待 #96 资产）
 - [x] 房间幸福度聚合：(#97) 房间心情 = 卧室级(2) + 家具加成(电视/书架/地毯各1)；T9 兼容（无家具仍 +2）—— 已完成
-- [ ] P3a 家具视觉资产 (#96)：codex exec 生图 3 件 → build_sprites.py → P3 全链完成
+- [x] P3a 家具视觉资产 (#96)：codex exec 生图（tv/shelf/carpet）→ flood fill 抠绿打包 8 帧 sheet → build_sprites.py → SPRITE_META 实测值 → 截图验证 —— **P3 全链完成**
 
 ### P4 远景（大, 单独立项, 本排期不排细节）
 

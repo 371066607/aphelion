@@ -809,3 +809,13 @@
   - **踩坑**：①测试用 ring(45,45)/(50,50) 太靠右下——墙格 45+4=49*48=2352 > WORLD 2200, roomsOf 网格 clamp 致房间恒空(返回 [])——**世界坐标测试必须留边界余量**(<格44)；②测试名"=+4"断言写 3（笔误,断言值 3 正确）。
   - 验证: residents +3 单元（聚合/卧室+家具叠加/墙外不加）+ scenario +2（家具房间+4/可建造+核心豁免）；全量 577/0；scenario 105/0；perf 3/0；boss 7/0；构建 31178KB。
   - 下一步: **P3a 资产票（#96）**——codex exec 生图 3 件家具 → build_sprites.py → 完成 P3。
+
+- **2026-08-31 · P3a**: 🎨 家具视觉资产（#96, ADR-11 管线）。
+  - **codex exec 生图 3 张**（skill 规范: 动森 chibi/奶油薄荷棕描边/纯绿#00FF00/无地台阴影）→ tv/shelf/carpet raw 均 1536×1536, 构图合格（电视木壳+薄荷屏+旋钮、书架双架彩书、地毯同心编+星心）。
+  - **打包管线**（手写 python 内联）：flood fill 从四边抠绿（G>200,R<60,B<60）→ 内容 bbox → 缩放至 256 格 85% → 居中到 256×256 → 复制 8 帧横排 → `assets/bl_*_sheet.png`(2048×256 RGBA)。**没用 assets/chroma_key.py——它假设 sheet 是 cell 倍数切格（单张居中画不适用），IndexError；手写 flood fill 更通用**。
+  - **build_sprites.py 重跑** → sprite_data.js（51 sheets, 30895KB）+ 实测 SPRITE_META 输出（bl_tv/shelf: baseline236,h217; carpet: baseline207,h159）。
+  - **main.js SPRITE_META**：三键照抄实测 baseline/h, idle:1（T0 定案: 静态块固定 idleFrames:1——**不照抄 build_sprites.py 的 idle:4**——复制帧差异 0% 触发"帧差≤30%"算法误判循环, 相同帧循环无视觉差但语义应 1）。**colony.js dispH 更新**：tv110/shelf120/carpet55（= 显示尺寸而非 contentH, 同 bl_house 模式 128/174≈0.74 缩放）。
+  - **scenario ASSET_IDS 补三键**（桩只抽 #84 的 id 清单, 家具键缺失会抛）。
+  - 验证: 全量 577/0; scenario 105/0（**#94 偶发 1 败后连跑 3 次全绿——敌人初始位置随 spec faction 变, 既有 flake 非本票引入**）; perf 3/0; boss 7/0; 构建 31471KB; 无头 Chrome ?p3debug=1 截图: 电视/书架/地毯三件 sprite 渲染正常（无绿边/尺寸合理）。
+  - **P3 全链完成**（#97 逻辑 + #96 资产）。"家园纵深轮" P1-P3 全部落地。
+  - 下一步: 手玩验证一轮（可选）或 P4 远景立项（暂缓）。

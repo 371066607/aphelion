@@ -2140,6 +2140,7 @@ window.APH = window.APH || {};
         bl_solar_panel:{idle:1,baseline:240,h:179}, bl_battery:{idle:1,baseline:241,h:156},
         bl_lamp:{idle:1,baseline:240,h:187}, bl_dining_table:{idle:1,baseline:240,h:155},
         bl_dining_chair:{idle:1,baseline:240,h:180}, bl_spike_trap:{idle:1,baseline:240,h:129},
+        bl_tv:{idle:1,baseline:236,h:217}, bl_shelf:{idle:1,baseline:236,h:217}, bl_carpet:{idle:1,baseline:207,h:159},
         bl_sandbag:{idle:1,baseline:240,h:106},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
@@ -2278,6 +2279,17 @@ window.APH = window.APH || {};
           s.colony.buildings.push({id:'bl_sandbag', x:48*tx0, y:48*(ty0+1)});
           s.colony.buildings.push({id:'bl_sandbag', x:48*(tx0+1), y:48*(ty0+1)});
           document.title='AUTO: t10debug ready';
+        }
+        /* P3 调试通道(?p3debug=1): 电视/书架/地毯三件家具, 视觉验证sprite渲染 */
+        if(_q.indexOf('p3debug=1')>=0){
+          var p3x=Math.round(s.px/48)+2, p3y=Math.round(s.py/48);
+          s.colony.buildings.push({id:'bl_tv', x:48*p3x, y:48*p3y});
+          APH.Colony.placeBuildingEntity('bl_tv', 48*p3x, 48*p3y, 1);
+          s.colony.buildings.push({id:'bl_shelf', x:48*(p3x+1), y:48*p3y});
+          APH.Colony.placeBuildingEntity('bl_shelf', 48*(p3x+1), 48*p3y, 1);
+          s.colony.buildings.push({id:'bl_carpet', x:48*(p3x+2), y:48*p3y});
+          APH.Colony.placeBuildingEntity('bl_carpet', 48*(p3x+2), 48*p3y, 1);
+          document.title='AUTO: p3debug ready';
         }
       }
       if(_q.indexOf('exp=1')>=0){

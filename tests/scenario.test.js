@@ -58,7 +58,8 @@ let frameFn=null;
 const SRC = path.join(__dirname,'..','src');
 const ASSET_IDS = [
   'bl_wall','bl_gate','bl_conduit','bl_wood_generator','bl_solar_panel','bl_battery',
-  'bl_lamp','bl_dining_table','bl_dining_chair','bl_spike_trap','bl_sandbag'
+  'bl_lamp','bl_dining_table','bl_dining_chair','bl_spike_trap','bl_sandbag',
+  'bl_tv','bl_shelf','bl_carpet'
 ];
 /* scenario 只抽取 #84 数据，避免执行完整 30MB 生成文件。 */
 const spriteDataSource=fs.readFileSync(path.join(SRC,'sprite_data.js'),'utf8');
