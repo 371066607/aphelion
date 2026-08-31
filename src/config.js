@@ -120,7 +120,8 @@ APH.CFG = {
     trapBleedSec: 5,           // 触发后出血减速时长(秒)
     bleedSpeedMul: 0.7,        // 出血减速乘子(×敌人速度)
     sandbagMul: 0.5,           // 沙袋减速乘子(敌人/居民穿过)
-    trapResetCost: { stone: 1 } // 居民重置陷阱耗材(默认1石)
+    trapResetCost: { stone: 1 }, // 居民重置陷阱耗材(默认1石)
+    trapAvoidCost: 6,          // P2: 敌人寻路绕陷阱的格代价惩罚(绕路总代价<直踩才绕)
   },
 
   /* 敌人通用 */

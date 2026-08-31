@@ -779,3 +779,13 @@
   - 验证: residents +5 单测（累积/消退/防酸减免/不转化/值域）; scenario +2（雷暴室外累积+HUD 行/圈房消退）; 全量 567/0; scenario 99/0; perf 3/0; boss 7/0; 构建 31172KB。
   - **P1 天气闭环全部完成**（预报 #92 + 暴露条 #93）。
   - 下一步: P2 战争纵深（敌 A* 代价惩罚绕陷阱 #94 待开）。
+
+- **2026-08-31 · P2a**: 🕳 敌人寻路绕陷阱（#94）。
+  - **nav.js astar 增可选 costFn(gx,gy)**：格额外代价进 g 值（`g+1+pen`）——纯函数改造，无 costFn 行为不变（旧 nav 测试全绿锁定）。**lineClear 增 costFn 检查**：直线途经被罚格 → 判不清 → 强制进 A* 比较（绕行 vs 直踩）。
+  - **combat.js planChase**：传陷阱代价（CFG.defense.trapAvoidCost=6，仅 armed 陷阱——已触发不罚）；**无墙但有待触发陷阱同样寻路**（原 planChase 无墙直接直线,陷阱绕行失效）。
+  - **避之策略语义**：绕行总代价 < 直踩才绕；绕无可绕（窄通道唯一陷阱）仍踩——绝不卡死。
+  - **踩坑①（关键）**：`if (lineClear(grid, from, to, pen))` 里 `pen` 在**调用之后**才 `var pen = ...` 定义——var 提升但未赋值 → lineClear 收到 undefined → `costFn && ...` 短路 → **永远直线**（陷阱绕行完全不生效）。修正：pen 定义提前到 lineClear 前。**教训：var 提升 + 函数调用参数 = 静默 undefined 陷阱**（node --check 不报）。
+  - **踩坑②**：combat.js 里 costFn 闭包引用裸 `GRID`——combat.js 从未定义 GRID（只有 nav.js 有）→ 运行时 ReferenceError（planChase 外层无 try 时直接崩但 main.js 主循环有兜底静默吞掉）→ 表现为"plan 恒 direct"。修正：`var GRID = (CFG&&CFG.GRID)||48`。
+  - **踩坑③**：场景测试"绕无可绕"初版布局=陷阱四邻全墙——敌人 A* 根本到不了陷阱格（墙=1 不可进）→ 走 breach（破墙）而不踩,恒失败。修正：窄通道布局（左右竖墙 1 格宽,通道内陷阱）,敌人才会沿通道走并踩中。
+  - **验证**：nav +3（绕开/高罚仍穿/无costFn兼容）+ scenario +2（绕开不踩/窄道必踩）；全量 570/0；scenario 101/0；perf 3/0；boss 7/0；构建 31173KB。
+  - 下一步: P2b 围攻工兵拆陷阱（#95）。

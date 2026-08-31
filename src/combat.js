@@ -246,12 +246,25 @@ APH.Combat = (function(){
   function planChase(en, focus, s){
     var bs = (s && s.colony && s.colony.buildings) || [];
     var hasWall = false;
+    var armedTraps = [];
     for(var i = 0; i < bs.length; i++){
-      if(bs[i] && bs[i].id === 'bl_wall'){ hasWall = true; break; }
+      if(bs[i] && bs[i].id === 'bl_wall'){ hasWall = true; }
+      if(bs[i] && bs[i].id === 'bl_spike_trap' && bs[i].armed !== false) armedTraps.push(bs[i]);
     }
-    if(!hasWall || !window.APH.Nav || !en || !focus) return { mode:'direct' };
+    /* P2: 无墙但有待触发陷阱 → 也走寻路(绕陷阱); 两者皆无 → 直线 */
+    if((!hasWall && !armedTraps.length) || !window.APH.Nav || !en || !focus) return { mode:'direct' };
     var grid = APH.Nav.gridOf(bs);
-    var path = APH.Nav.astar(grid, { x:en.x, y:en.y }, { x:focus.x, y:focus.y });
+    var GRID = (CFG && CFG.GRID) || 48;   /* ADR-4 逻辑格网 (costFn 闭包用) */
+    var trapPen = (CFG.defense && CFG.defense.trapAvoidCost != null) ? CFG.defense.trapAvoidCost : 6;
+    var costFn = armedTraps.length ? function(gx, gy){
+      for (var i = 0; i < armedTraps.length; i++){
+        var tgx = Math.floor((armedTraps[i].x || 0) / GRID);
+        var tgy = Math.floor((armedTraps[i].y || 0) / GRID);
+        if (tgx === gx && tgy === gy) return trapPen;
+      }
+      return 0;
+    } : null;
+    var path = APH.Nav.astar(grid, { x:en.x, y:en.y }, { x:focus.x, y:focus.y }, costFn);
     if(path && path.length > 1) return { mode:'path', path:path };
     if(!path){
       var wf = breachFocus(en, s);

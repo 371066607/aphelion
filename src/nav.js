@@ -31,7 +31,9 @@ APH.Nav = (function(){
   }
 
   /* 视线检查: from→to 线段逐格采样, 无墙则无需绕行 */
-  function lineClear(grid, from, to){
+  /* 视线检查: from→to 线段逐格采样, 无墙则无需绕行
+     P2 (#94): 传入 trapCost 时——直线途经任何被惩罚格(陷阱)也判不清(强制走 A* 比较绕行) */
+  function lineClear(grid, from, to, costFn){
     var dx = to.x - from.x, dy = to.y - from.y;
     var d = Math.sqrt(dx * dx + dy * dy);
     if (d < 1) return true;
@@ -41,6 +43,7 @@ APH.Nav = (function(){
       var py = from.y + dy * i / steps;
       var cx = Math.floor(px / GRID), cy = Math.floor(py / GRID);
       if (grid[cy][cx] === 1) return false;
+      if (costFn && costFn(cx, cy) > 0) return false;   // 途经陷阱: 强制寻路比较
     }
     return true;
   }
@@ -49,14 +52,16 @@ APH.Nav = (function(){
      p = [{x,y}...] 不含起点、含终点(终点精确坐标)。
      8 向邻接 + 对角线禁止穿角。
      起终点直线无墙时直接返回 [终点] (空地=直线, walkToward 兼容)。 */
-  function astar(grid, from, to){
+  /* P2 敌避陷阱 (#94): astar 可选 cost 函数 (见下) —— 通过它实现罚权绕行 */
+  function astar(grid, from, to, costFn){
     if (!grid || !from || !to) return null;
+    var pen = costFn || function(){ return 0; };   // P2: 代价惩罚函数(陷阱格) — 必须先定义, lineClear 用
     var sx = Math.max(0, Math.min(NC - 1, Math.floor(from.x / GRID)));
     var sy = Math.max(0, Math.min(NC - 1, Math.floor(from.y / GRID)));
     var tx = Math.max(0, Math.min(NC - 1, Math.floor(to.x / GRID)));
     var ty = Math.max(0, Math.min(NC - 1, Math.floor(to.y / GRID)));
     if (grid[ty][tx] === 1 && !(sx === tx && sy === ty)) return null;  // 目标在墙内: 无精确路径
-    if (lineClear(grid, from, to)) return [{ x: to.x, y: to.y }];
+    if (lineClear(grid, from, to, pen)) return [{ x: to.x, y: to.y }];
     if (grid[sy][sx] === 1) sx = -1;   // 起点本身被墙覆盖: 从邻格逃生(起点不入路径)
 
     var open = [{ x: sx, y: sy, g: 0, f: heur(sx, sy, tx, ty), prev: null }];
@@ -84,7 +89,7 @@ APH.Nav = (function(){
           }
           var nk = key(nx, ny);
           if (closed[nk]) continue;
-          var ng = cur.g + 1;
+          var ng = cur.g + 1 + pen(nx, ny);   // P2: +代价惩罚(陷阱格)
           var ex = open.find(function(o){ return o.x === nx && o.y === ny; });
           if (ex){
             if (ng < ex.g) { ex.g = ng; ex.f = ng + heur(nx, ny, tx, ty); ex.prev = cur; }

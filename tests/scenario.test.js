@@ -2320,5 +2320,63 @@ test('#93 home: 房间内玩家暴露消退 (T9 免疫复用)', () => {
   }
 });
 
+/* ============ P2 敌避陷阱 (#94) ============ */
+test('#94 home: 敌人寻路绕开待触发陷阱 (不踩)', () => {
+  const oldScene=S.scene, oldEntities=S.entities, oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    /* 无墙有陷阱: planChase 也应寻路绕陷阱 */
+    S.colony.buildings=[{id:'bl_spike_trap', x:1000, y:1000, armed:true}];
+    S.entities=[];
+    /* 构造敌人在陷阱上方, 目标下方 (直线会穿过陷阱格) */
+    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 940);
+    en.hp=en.faction.hp;
+    S.entities.push(en);
+    /* 直接调 planChase 内部接口不可达(未导出), 用 updateCombat 驱动多帧观察是否绕行 */
+    S.war.raidActive=true;
+    /* 目标=玩家在陷阱下方 */
+    S.px=1000; S.py=1060;
+    let minDist=Infinity, steppedOnTrap=false;
+    for(let i=0;i<80;i++){
+      window.APH.Combat.updateCombat(0.5, false);
+      const t=S.colony.buildings[0];
+      if(t.armed===false){ steppedOnTrap=true; break; }
+      minDist=Math.min(minDist, Math.hypot(en.x-1000, en.y-1000));
+    }
+    /* 核心: 绕行不踩(陷阱保持 armed) —— 敌 never 触发陷阱 */ 
+    A(!steppedOnTrap, '绕行应不触发陷阱');
+  }finally{
+    S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+test('#94 home: 绕无可绕 → 敌仍踩陷阱 (不卡死)', () => {
+  const oldScene=S.scene, oldEntities=S.entities, oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    /* 陷阱堵住唯一通道: 左右两列竖直墙, 中间 1 格宽通道, 通道内全是陷阱(x=1000 列) */
+    const walls94=[];
+    for(let y=940; y<=1060; y+=48){ walls94.push({id:'bl_wall', x:955, y:y}); walls94.push({id:'bl_wall', x:1045, y:y}); }
+    S.colony.buildings=[
+      {id:'bl_spike_trap', x:1000, y:1000, armed:true},
+    ].concat(walls94);
+    S.entities=[];
+    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 940);
+    en.hp=en.faction.hp;
+    S.entities.push(en);
+    S.war.raidActive=true;
+    /* 目标 = 陷阱下方更远玩家 */
+    S.px=1000; S.py=1060;
+    let stepped=false;
+    for(let i=0;i<120;i++){
+      window.APH.Combat.updateCombat(0.5, false);
+      const t=S.colony.buildings[0];
+      if(t.armed===false){ stepped=true; break; }
+    }
+    A(stepped, '绕无可绕应触发陷阱(直踩不卡死)');
+  }finally{
+    S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

@@ -189,3 +189,30 @@ test('#82 inRooms: 点在世界坐标判房间内外', () => {
   if(Nav.inRooms({x:48*40+24, y:48*40+24}, rooms)) throw new Error('墙格不算房间');
   if (Nav.inRooms({x:48*45+24, y:48*45+24}, rooms)) throw new Error('外部点不应在房间');
 });
+
+/* ============ P2 敌避陷阱 (#94) ============ */
+test('#94 astar: costFn 使路径绕开陷阱格', () => {
+  /* 直线路径 (0,0)→(8,0) 上格 (4,0) 是陷阱(代价6); 绕行代价=绕一圈(多走2格) vs 直踩=+6 */
+  const grid = [];
+  for(let y=0;y<46;y++){ grid.push(new Array(46).fill(0)); }
+  const cost=(gx,gy)=> (gx===4 && gy===0) ? 6 : 0;
+  const p = Nav.astar(grid, {x:0,y:24}, {x:48*8,y:24}, cost);
+  let hit=false;
+  for(const n of p) if(Math.floor(n.x/48)===4 && Math.floor(n.y/48)===0) hit=true;
+  if(hit) throw new Error('应绕开陷阱格(4,0): '+JSON.stringify(p));
+});
+test('#94 astar: 陷阱代价极高且无绕路 → 仍走直线(绕无可绕不卡死)', () => {
+  /* 竖直隔断: 墙横排把上下分开, 仅一格过道 (4,*) 该格是陷阱且绕不开 */
+  const grid = [];
+  for(let y=0;y<46;y++){ grid.push(new Array(46).fill(0)); }
+  for(let x=0;x<46;x++){ if(x!==4) grid[22][x]=1; }   // y=22 是墙, 只有 x=4 通
+  const cost=(gx,gy)=> (gx===4 && gy===22) ? 9999 : 0;
+  const p = Nav.astar(grid, {x:48*4,y:48*20}, {x:48*4,y:48*24}, cost);
+  if(!p || !p.length) throw new Error('应有路径(穿唯一通道): '+JSON.stringify(p));
+});
+test('#94 astar: 外部行为不变 (无 costFn 全绿兼容)', () => {
+  const grid = [];
+  for(let y=0;y<46;y++){ grid.push(new Array(46).fill(0)); }
+  const p = Nav.astar(grid, {x:0,y:24}, {x:48*5,y:24});
+  if(!p) throw new Error('无代价应照常出路径');
+});
