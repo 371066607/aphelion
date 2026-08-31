@@ -47,6 +47,11 @@ APH.CFG = {
     healInHab: 7,              // 远征返回舱回血 /s
     healAtClinic: 4,           // 家园靠近医疗舱回血 /s
     clinicHealR: 80,           // 医疗舱治疗半径 px
+    /* P1b 玩家暴露 (#93): 极端天气室外累积/室内消退; >阈值减速(不转化伤病) */
+    exposureGain: 8,           // 极端天气室外每生产跳累积 (居民 10, 玩家轻量)
+    exposureDecay: 12,         // 室内/房间每跳消退
+    exposureSlowAt: 80,        // 暴露超过此值减速
+    exposureSlowMul: 0.9,      // 减速乘子(×walkSpeed)
     o2HomeRefill: 10,          // 家园氧气补给 /s
     o2Max: 100,
     o2Drain: 0.72,

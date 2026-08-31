@@ -69,7 +69,7 @@ ASSET_IDS.forEach(function(id){
   new Function(line)();
 });
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','weather.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
@@ -2270,6 +2270,53 @@ test('#92 home: 雷暴→明日依旧雷雨链 (转移表 wx_rain 最高), HUD �
     A(txt.indexOf('明日')>=0, '应含明日: '+txt);
   }finally{
     S.scene=oldScene; S.meta.weather=oldWx;
+  }
+});
+
+/* ============ P1b 玩家暴露条 (#93) ============ */
+test('#93 home: 雷暴室外玩家暴露累积+HUD 第六行显示', () => {
+  const oldScene=S.scene, oldWx=S.meta.weather, oldNeeds=JSON.stringify(S.meta.playerNeeds),
+        oldBuildings=S.colony.buildings, oldPos={x:S.px,y:S.py};
+  try{
+    S.scene='home';
+    S.meta.weather={ id:'wx_thunder', t:0, cd:null };
+    if(!S.meta.playerNeeds) S.meta.playerNeeds={};
+    S.meta.playerNeeds.exposure=0;
+    S.colony.buildings=[];  /* 空旷处: 无建筑避难 */
+    S.px=2000; S.py=2000;   /* 远离 HAB(1100,1100) 与所有建筑 */
+    M.residentsTick();
+    const ex=S.meta.playerNeeds.exposure;
+    A(ex>0, '雷暴室外应累积暴露, got '+ex);
+    /* HUD: exposure 行显示 */
+    APH.UI.updHUD();
+    const rowEx=document.getElementById('rowExposure');
+    A(rowEx && rowEx.textContent && rowEx.textContent.indexOf('暴露')>=0,
+      'HUD 应显示暴露行, got: '+(rowEx&&rowEx.textContent));
+  }finally{
+    S.scene=oldScene; S.meta.weather=oldWx;
+    S.meta.playerNeeds=JSON.parse(oldNeeds);
+    S.colony.buildings=oldBuildings; S.px=oldPos.x; S.py=oldPos.y;
+  }
+});
+test('#93 home: 房间内玩家暴露消退 (T9 免疫复用)', () => {
+  const oldScene=S.scene, oldWx=S.meta.weather, oldNeeds=JSON.stringify(S.meta.playerNeeds),
+        oldBuildings=S.colony.buildings, oldPos={x:S.px,y:S.py};
+  try{
+    S.scene='home';
+    S.meta.weather={ id:'wx_acid', t:0, cd:null };
+    if(!S.meta.playerNeeds) S.meta.playerNeeds={};
+    S.meta.playerNeeds.exposure=80;
+    /* 圈房: 5×5 墙环(远离 HAB), 玩家在房内 */
+    S.colony.buildings=[];
+    for(let x=0;x<5;x++){ S.colony.buildings.push({id:'bl_wall',x:48*(30+x),y:48*30}); S.colony.buildings.push({id:'bl_wall',x:48*(30+x),y:48*34}); }
+    for(let y=0;y<5;y++){ S.colony.buildings.push({id:'bl_wall',x:48*30,y:48*(30+y)}); S.colony.buildings.push({id:'bl_wall',x:48*34,y:48*(30+y)}); }
+    S.px=48*32+24; S.py=48*32+24;
+    M.residentsTick();
+    A(S.meta.playerNeeds.exposure<80, '房间内酸雨应消退, got '+S.meta.playerNeeds.exposure);
+  }finally{
+    S.scene=oldScene; S.meta.weather=oldWx;
+    S.meta.playerNeeds=JSON.parse(oldNeeds);
+    S.colony.buildings=oldBuildings; S.px=oldPos.x; S.py=oldPos.y;
   }
 });
 

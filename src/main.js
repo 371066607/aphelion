@@ -3516,6 +3516,12 @@ window.APH = window.APH || {};
     if(APH.Res.homeIllnessTick && m.playerNeeds){
       m.playerNeeds.illness = APH.Res.homeIllnessTick(m.playerNeeds.illness, s.scene);
     }
+    /* P1b 玩家暴露(#93): 极端天气室外累积(装备减免)/室内+房间消退; 远征不结算 */
+    if(APH.Res.playerExposureTick && m.playerNeeds && s.scene==='home'){
+      APH.Res.playerExposureTick(m.playerNeeds,
+        APH.Res.shelteredFor({x:s.px, y:s.py}, s.colony.buildings, T9_rooms),
+        wxExtreme, wxId);
+    }
     /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
     m.workPrio=m.workPrio||{};
     m.residents.forEach(function(r){

@@ -106,7 +106,13 @@ APH.UI = (function(){
         : ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med'));
     }
     var vig = $('vig');
-    vig.style.opacity = s.o2<25 ? (1-s.o2/25)*.85 : 0;
+    /* P1b 暴露警示: >50 边缘红雾(与氧气低共用 vig, 取更强) */
+    var expVig=0;
+    try{
+      var exN2=(s.meta&&s.meta.playerNeeds&&s.meta.playerNeeds.exposure)||0;
+      if(exN2>50) expVig=Math.min(.6, (exN2-50)/50*.6);
+    }catch(eV){ /* 静默 */ }
+    vig.style.opacity = Math.max(s.o2<25 ? (1-s.o2/25)*.85 : 0, expVig);
 
     /* W3 天气行(家园 HUD): 图标+天气名+预计剩余时长; 极端天气预警色 (值源 CFG.weather + APH.Weather) */
     var wxRow=weatherRow();
@@ -137,6 +143,23 @@ APH.UI = (function(){
           if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt+wxTomorrow;
           wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
         }catch(e){ /* HUD 只读展示, 失败静默 */ }
+        /* P1b 玩家暴露条: 第六生存条 (>50 红色警示; 0 隐藏) */
+        try{
+          var exRow=exposureRow();
+          if(exRow){
+            var exN=(s.meta&&s.meta.playerNeeds&&s.meta.playerNeeds.exposure)||0;
+            if(exN>0.5){
+              var exTxt='☣ 暴露 '+Math.round(exN)+
+                (exN>=80?' · 移动减速!':(exN>=50?' · 警惕!':''));
+              if(exRow.textContent!==undefined) exRow.textContent=exTxt;
+              exRow.style.display='';
+              exRow.style.color = exN>=80 ? '#ff6d7a' : (exN>=50 ? '#ffd97a' : '#c8e89a');
+            }else if(exRow.style.display!=='none'){
+              if(exRow.textContent!==undefined) exRow.textContent='';
+              exRow.style.display='none';
+            }
+          }
+        }catch(e4){ /* 静默 */ }
         /* T7 电网行: 供电状态 (s.powerStatus 由生产跳写入) */
         try{
           var pwRow=powerRow();
@@ -196,6 +219,23 @@ APH.UI = (function(){
     }
     wxRowCache2=rowPw;
     return rowPw;
+  }
+
+  /* P1b 玩家暴露行(懒建一次): 第六生存条 (值源 meta.playerNeeds.exposure) */
+  var wxRowCache3=null;
+  function exposureRow(){
+    if(wxRowCache3) return wxRowCache3;
+    var rowEx=$('rowExposure');
+    if(!rowEx){
+      rowEx=document.createElement('div');
+      rowEx.id='rowExposure';
+      rowEx.className='row';
+      rowEx.style.cssText='letter-spacing:1px;text-shadow:0 0 8px rgba(0,0,0,.6);color:#c8e89a';
+      var hudEl=document.getElementById('hud');
+      if(hudEl && hudEl.appendChild) hudEl.appendChild(rowEx);
+    }
+    wxRowCache3=rowEx;
+    return rowEx;
   }
 
   /* ---------- 提示条 ---------- */

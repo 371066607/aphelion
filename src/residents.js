@@ -173,6 +173,8 @@ APH.Res = (function(){
     if(meta.playerNeeds.downT == null) meta.playerNeeds.downT = null;
     /* W3 天气装备: 玩家 gear 挂载点(与居民同结构; 寒潮防寒服/酸雨防酸服减免读取处) */
     if(meta.playerNeeds.gear == null) meta.playerNeeds.gear = { tool:null, suit:null, head:null };
+    /* P1b 玩家暴露: 老档零迁移 (缺失=0 起步; 晴天恒 0 由 tick 消退维持) */
+    if(meta.playerNeeds.exposure == null) meta.playerNeeds.exposure = 0;
     return meta;
   }
 
@@ -1297,6 +1299,32 @@ APH.Res = (function(){
     return r;
   }
 
+  /* ---------- P1b 玩家暴露结算 (issue #93, 纯函数) ----------
+     与居民 exposureTick 同语义但**不转化伤病/不加心情**（显式裁剪）:
+       - 极端天气室外: exposure +CFG.player.exposureGain (酸雨/寒潮照装备减免)
+       - 室内/房间: 快速消退 -CFG.player.exposureDecay
+       - 暴露值域 0~100; 老档缺失兜底 0 (由 ensurePlayerNeeds 做)
+     返回值: needs(原地改) + amount(本跳净变化, 供 HUD/浮标)。 */
+  function playerExposureTick(needs, sheltered, hasExtremeWeather, weatherType){
+    if(!needs) return needs;
+    var P = CFG.player || {};
+    var gain = P.exposureGain != null ? P.exposureGain : 8;
+    var decay = P.exposureDecay != null ? P.exposureDecay : 12;
+    needs.exposure = needs.exposure != null ? needs.exposure : 0;
+    var before = needs.exposure;
+    if(hasExtremeWeather && !sheltered){
+      var g = gain;
+      if(isAcidWx(weatherType)){
+        var r = suitResistOf(needs, 'acidResist');
+        if(r > 0) g = Math.round(g * (1 - r) * 100) / 100;
+      }
+      needs.exposure = Math.min(100, needs.exposure + g);
+    }else{
+      needs.exposure = Math.max(0, needs.exposure - decay);
+    }
+    return { needs: needs, amount: needs.exposure - before };
+  }
+
   /* 篝火身心与社交光环(纯函数) (Cooking #49) */
   function campfireAuraTick(residents, campfires, opts){
     opts = opts || {};
@@ -1414,6 +1442,7 @@ APH.Res = (function(){
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
     roomShelter:roomShelter, shelteredFor:shelteredFor, roomMoodGain:roomMoodGain,
+    playerExposureTick:playerExposureTick,
     suitResistOf:suitResistOf, weatherMoveMul:weatherMoveMul,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,

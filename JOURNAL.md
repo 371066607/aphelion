@@ -770,3 +770,12 @@
   - **踩坑**：ui.js 注释里写了 `权重最高\b冷却排除`——JS 字符串字面量把 `\b` 变退格符(0x08), 源码里出现隐形控制字符（node --check 不报但 grep 显示异常）——写注释/字符串时警惕 `\b`/`\t` 等转义。
   - 验证: weather +5；scenario +2；全量 562/0；scenario 97/0；perf 3/0；boss 7/0；构建 31167KB；无头 Chrome 截图 HUD「☀ 晴 · 预计 3.5 天 · 明日依旧 ☀ 晴」。
   - 下一步: **P1b 玩家 exposure 条（#93）**。
+
+- **2026-08-31 · P1b**: ☣ 玩家 exposure 条（#93）。
+  - **纯函数**：`APH.Res.playerExposureTick(needs, sheltered, hasExtremeWeather, weatherType)` — 极端室外 +CFG.player.exposureGain(8)/跳, 室内/房间 -exposureDecay(12)/跳; 酸雨照防酸服减免(resist 0.8 复用 suitResistOf); **不转化伤病/不动心情**（显式裁剪）; 值域 0~100; 老档缺失兜底 0（ensurePlayerNeeds 单点）。
+  - **接线**：residentsTick 玩家需求结算处（homeIllnessTick 后）喂 shelteredFor（T9 房间免疫复用）+ scene==='home' 门（远征不结算）；entities.js updatePlayer 移动速度乘 expMul（exposure>80 → ×0.9, 与 wxMul/sickMul 同级）。
+  - **HUD**：ui.js `exposureRow` 懒建第六行（☣ 暴露 N · 警惕!/移动减速! 三级色）；>50 与氧气低共用 vig 红雾（取 max, 不覆盖）。
+  - **重大发现：scenario 测试桩从未加载 nav.js！**（模块列表漏了）——此前 T9「圈房免疫/缺口暴露」场景测试靠 **墙的 isSheltered 半径(72px) 假阳性通过**（圈房中心距墙 96px 时其实该暴露，但中心格 72px 内被 isSheltered 兜底）；玩家暴露测试在同一圈房下暴露真问题（中心距墙 96 > 72 → 累积）。**修复：scenario 加载列表补 nav.js**——此后 T9/T9_rooms 场景测试才真正验证房间判定。教训：场景桩模块列表必须与生产 MODULE_ORDER 对照补齐（nav.js 是 main.js 运行时依赖, 桩漏载 = 防御式代码吞掉真实路径）。
+  - 验证: residents +5 单测（累积/消退/防酸减免/不转化/值域）; scenario +2（雷暴室外累积+HUD 行/圈房消退）; 全量 567/0; scenario 99/0; perf 3/0; boss 7/0; 构建 31172KB。
+  - **P1 天气闭环全部完成**（预报 #92 + 暴露条 #93）。
+  - 下一步: P2 战争纵深（敌 A* 代价惩罚绕陷阱 #94 待开）。

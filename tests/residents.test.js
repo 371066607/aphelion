@@ -801,3 +801,39 @@ test('#82 roomMoodGain: 室外 → 0', () => {
   const g=Res.roomMoodGain({x:48*5+24, y:48*5+24}, rooms, b);
   if(g!==0) throw new Error('室外应 0: '+g);
 });
+
+/* ============ P1b 玩家暴露条 (#93) ============ */
+test('#93 playerExposureTick: 极端天气室外累积+8/跳', () => {
+  const needs={food:80,exposure:20};
+  const r=Res.playerExposureTick(needs, false, true, 'wx_thunder');
+  if(needs.exposure!==28) throw new Error('室外雷暴应+8: '+needs.exposure);
+  if(r.amount!==8) throw new Error('净变化应8: '+r.amount);
+});
+test('#93 playerExposureTick: 室内/房间消退 -12/跳', () => {
+  const needs={food:80,exposure:80};
+  Res.playerExposureTick(needs, true, true, 'wx_thunder');
+  if(needs.exposure!==68) throw new Error('室内应-12: '+needs.exposure);
+});
+test('#93 playerExposureTick: 酸雨+防酸服减免', () => {
+  const needs={food:80,exposure:0,gear:{suit:'it_suit_hazard',tool:null,head:null}};
+  /* 防酸服 acidResist>0 → gain×(1-resist) */
+  Res.playerExposureTick(needs, false, true, 'wx_acid');
+  const withSuit=needs.exposure;
+  const noSuit={food:80,exposure:0};
+  Res.playerExposureTick(noSuit, false, true, 'wx_acid');
+  if(!(withSuit<noSuit.exposure)) throw new Error('防酸服应减免: '+withSuit+' vs '+noSuit.exposure);
+});
+test('#93 playerExposureTick: 不转化伤病/不加心情 (显式裁剪)', () => {
+  const needs={food:80,exposure:95,mood:80,illness:0};
+  Res.playerExposureTick(needs, false, true, 'wx_thunder');
+  if(needs.illness!==0) throw new Error('玩家暴露不应转伤病');
+  if(needs.mood!==80) throw new Error('玩家暴露不应动心情');
+});
+test('#93 playerExposureTick: 值域钳 0~100, 老档缺失兜底0', () => {
+  const a={};   // 无 exposure
+  Res.playerExposureTick(a, true, false, 'wx_clear');
+  if(a.exposure!==0) throw new Error('缺省应0起步: '+a.exposure);
+  const b={exposure:98};
+  Res.playerExposureTick(b, false, true, 'wx_thunder');
+  if(b.exposure!==100) throw new Error('应钳100: '+b.exposure);
+});

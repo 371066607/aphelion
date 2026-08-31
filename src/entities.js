@@ -857,7 +857,13 @@ APH.Ent = (function(){
       wxMul=APH.Res.weatherMoveMul(needs, wxIdNow, wxFxNow.speedMul,
         APH.Res.isSheltered({x:s.px, y:s.py}, (s.colony&&s.colony.buildings)||[]));
     }
-    var spd=(s.run?P.runSpeed:P.walkSpeed)*sickMul*wxMul*(ml>0?ml:0);
+    /* P1b 玩家暴露减速: exposure>CFG.player.exposureSlowAt → ×slowMul (纯数值, 不致死) */
+    var expMul=1;
+    if(s.scene==='home' && needs && needs.exposure!=null){
+      var expSlowAt=(P.exposureSlowAt!=null)?P.exposureSlowAt:80;
+      if(needs.exposure>expSlowAt) expMul=(P.exposureSlowMul!=null)?P.exposureSlowMul:0.9;
+    }
+    var spd=(s.run?P.runSpeed:P.walkSpeed)*sickMul*wxMul*expMul*(ml>0?ml:0);
     if(moving){
       s.face=Math.atan2(my,mx);
       s.vx=U.lerp(s.vx,mx*spd,dt*P.accel);
