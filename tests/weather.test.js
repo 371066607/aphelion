@@ -172,3 +172,32 @@ test('tickWeather: wx_storm 不算极端冷却真源(exposureGain=0, 极端期�
   const r = W.tickWeather(w, 100, () => 0.5);
   if (!(r.cd && r.cd.wx_storm < 630)) throw new Error('storm期间cd应衰减(非极端): ' + JSON.stringify(r.cd));
 });
+
+/* ============ P1a 天气预报 (#92) ============ */
+test('#92 forecast: 当前晴 → 权重最高目标是晴(自身权重4)/预报应给 rain 或雪? —— 取转移表最高=wx_clear', () => {
+  /* 晴的转移表: wx_clear:4, wx_rain:3, wx_snow:2, ... → 最高=wx_clear(继续晴) */
+  const f = W.forecast({ weather: { id: 'wx_clear', t: 0 } });
+  if (f !== 'wx_clear') throw new Error('晴时应预报继续晴(权重最高自身): ' + f);
+});
+test('#92 forecast: 当前雨 → 预报最高=wx_clear(权重4)', () => {
+  const f = W.forecast({ weather: { id: 'wx_rain', t: 10 } });
+  if (f !== 'wx_clear') throw new Error('雨时应预报晴: ' + f);
+});
+test('#92 forecast: 冷却中的目标被排除 (晴的 cd 含 rain → 预报转向 snow)', () => {
+  const f = W.forecast({ weather: { id: 'wx_clear', t: 0, cd: { wx_rain: 300 } } });
+  /* 晴转移: clear4 / rain3(cd中排除) / snow2 → 最高=clear */
+  if (f !== 'wx_clear') throw new Error('排除rain后仍应为自身clear(权重4): ' + f);
+});
+test('#92 forecast: 无转转移/全冷却兑底 wx_clear, 老档无 weather 兜底晴', () => {
+  const f1 = W.forecast({});
+  if (f1 !== 'wx_clear') throw new Error('无weather应兜底晴: ' + f1);
+  const f2 = W.forecast(null);
+  if (f2 !== 'wx_clear') throw new Error('空 meta 也应晴: ' + f2);
+});
+test('#92 forecast: 确定性 — 同输入重复调用结果一致(不消费rng)', () => {
+  const a = W.forecast({ weather: { id: 'wx_thunder', t: 0 } });
+  const b = W.forecast({ weather: { id: 'wx_thunder', t: 0 } });
+  if (a !== b) throw new Error('预报应确定: ' + a + ' vs ' + b);
+  /* 雷暴转移: wx_rain:3, wx_clear:3, wx_blizzard:1 → 最高=rain(先到者) */
+  if (a !== 'wx_rain') throw new Error('雷暴转移最高应rain: ' + a);
+});

@@ -107,6 +107,23 @@ APH.Weather = (function(){
     return Math.max(0, expectDur(id) - ((state && state.t) || 0));
   }
 
+  /* ---------- P1a 天气预报 (issue #92) ----------
+     明日预报 = 当前天气到时后最可能的切换目标: 读 transitions 权重表,
+     排除冷却中(cd>0), 取权重最高者; 无转移/全冷却兑底 wx_clear。
+     确定性: 不消费 rng (ADR-5 seeded RNG 纯净, 摇骰仍归导演)。 */
+  function forecast(meta){
+    var id = currentId(meta);
+    var cfg = W();
+    var tr = (cfg.transitions && cfg.transitions[id]) || { wx_clear: 1 };
+    var w = meta && meta.weather && meta.weather.cd;
+    var best = 'wx_clear', bestW = -1;
+    for (var to in tr){
+      if (w && w[to] > 0) continue;      // 冷却排除
+      if (tr[to] > bestW){ bestW = tr[to]; best = to; }
+    }
+    return best;
+  }
+
   /* ---------- W4 视觉参数 (ADR-15: 程序化雨/雪/雾; ADR-11 显式例外) ----------
      纯函数只读 CFG.weather.fx*: 粒子类型/密度/天色罩色, 供 world.js 渲染层
      与 node 单测。fxParams 返回 null = 无粒子无罩色的天气(渲染层静默跳过)。 */
@@ -169,6 +186,7 @@ APH.Weather = (function(){
     currentId: currentId,
     expectDur: expectDur,
     expectRemain: expectRemain,
+    forecast: forecast,
     /* W4 视觉 (程序化粒子/天色) */
     fxParams: fxParams,
     rgbaOf: rgbaOf,

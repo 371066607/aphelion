@@ -2243,5 +2243,35 @@ test('#83 home: 居民路过自动重置陷阱 (耗建材)', () => {
   }
 });
 
+/* ============ P1a 天气预报 (#92) ============ */
+test('#92 home: HUD 天气行显示明日预报 (雨→明日晴)', () => {
+  const oldScene=S.scene, oldWx=S.meta.weather, oldRes=S.meta.residents;
+  try{
+    S.scene='home';
+    S.meta.weather={ id:'wx_rain', t:0, cd:null };
+    APH.UI.updHUD();
+    const rowWx=document.getElementById('rowWeather');
+    const txt=(rowWx&&rowWx.textContent)||'';
+    A(txt.indexOf('雨')>=0, '应显示当前雨: '+txt);
+    A(txt.indexOf('明日')>=0, '应含明日预报: '+txt);
+    A(txt.indexOf('晴')>=0, '雨→明日应晴(转移最高): '+txt);
+  }finally{
+    S.scene=oldScene; S.meta.weather=oldWx; S.meta.residents=oldRes;
+  }
+});
+test('#92 home: 雷暴→明日依旧雷雨链 (转移表 wx_rain 最高), HUD 不崩', () => {
+  const oldScene=S.scene, oldWx=S.meta.weather;
+  try{
+    S.scene='home';
+    S.meta.weather={ id:'wx_thunder', t:0, cd:null };
+    APH.UI.updHUD();
+    const txt=(document.getElementById('rowWeather')&&document.getElementById('rowWeather').textContent)||'';
+    A(txt.indexOf('雷暴')>=0, '应显示雷暴: '+txt);
+    A(txt.indexOf('明日')>=0, '应含明日: '+txt);
+  }finally{
+    S.scene=oldScene; S.meta.weather=oldWx;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

@@ -124,7 +124,17 @@ APH.UI = (function(){
           var wxDays=wxRemain/APH.CFG.DAY_LEN;
           var wxDurTxt=wxDays>=1 ? (Math.round(wxDays*10)/10+' 天') : (Math.round(wxDays*24)+' 小时');
           var wxIsExtrem=((window.APH.Weather&&APH.Weather.weatherEffects(wxIdNow).exposureGain)||0)>0;
-          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt;
+          /* P1a 天气预报: 明日=确定性 forecast (权重最高/冷却排除), 复用 names/icons */
+          var wxTomorrow='';
+          try{
+            var wxNext=(window.APH.Weather&&APH.Weather.forecast)?APH.Weather.forecast(s.meta):'';
+            if(wxNext && wxNext!==wxIdNow){
+              wxTomorrow=' · 明日 '+ (wxIcons[wxNext]||'')+' '+(wxNames[wxNext]||wxNext);
+            }else if(wxNext){
+              wxTomorrow=' · 明日依旧 '+ (wxIcons[wxNext]||'')+' '+(wxNames[wxNext]||wxNext);
+            }
+          }catch(e3){ /* 预报失败静默, 不影响主行 */ }
+          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt+wxTomorrow;
           wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
         }catch(e){ /* HUD 只读展示, 失败静默 */ }
         /* T7 电网行: 供电状态 (s.powerStatus 由生产跳写入) */
