@@ -751,3 +751,13 @@
   - **踩坑**：①场景测试初版圈房位置在 HAB(1100,1100) r92 覆盖内——isSheltered 的核心半径兜底让"缺口圈"也显示 shelter,暴露恒 0（假阳性），把圈挪到 (1440+) 才暴露真问题；②路灯 powered 写在 colony.buildings 记录（b.powered）而非实体 e——entities 渲染需按坐标查记录（缺失记录视为通电=老档兼容）。
   - **验证**：nav +4、residents +5（shelteredFor×2/roomMoodGain×3）、scenario +3（圈房免疫/缺口暴露/路灯亮灭）；全量 551/0；scenario 92/0；perf 3/0；boss 7/0；构建 31159KB；无头 Chrome ?t9debug=1（强制夜间 clock=0.75DAY）截图：墙环围合+房内居住舱+路灯光晕+暗幕。
   - 下一步: **#83 T10 尖刺陷阱+沙袋**（班 2 收官, blocker #77/#80 已关）。
+
+- **2026-08-31 · 班 2 收官票**: 🗡 #83 T10 尖刺陷阱与沙袋。
+  - **colony 注册**：bl_spike_trap（石3木2,max200,6s,te_ballistics）+ bl_sandbag（石3,max500,5s,te_ballistics），入 GRID_STATICS（与墙同清单/格层渲染）。
+  - **纯函数**（Colony 导出）：trapTriggers（格内24px且armed→触发）/ trapStrike（穿刺12+出血5s+hitFlash）/ sandbagMul（格内×0.5）/ bleedMul（出血×0.7）。CFG.defense 数值表。
+  - **combat.js 接线**：敌人移动乘子 t10Mul=sandbagMul×bleedMul（path/直线两条移动路径都乘,出血 dt 衰减）；移动后陷阱触发判定（非盗掠/溃退/围攻）→ armed=false 一次性 + spark 粒子 + ⚠浮标。
+  - **main.js**：居民路过已触发陷阱（40px）→ 耗1石自动重置（无建材则保持触发态=验收「触发态不再触发,直到重置」语义）；沙袋减速乘入居民全部 walkAround（含 T8 餐桌/医疗舱分支）；拆除兼容（静态物无实体,拆记录即拆）。
+  - **entities.js drawWalls**：陷阱/沙袋格层渲染;已触发=压暗+红色警示框+X（加大可见性）。
+  - **踩坑**：①GRID_STATICS 注册但 queueTick 完成路径 isGridStatic 判断漏了陷阱/沙袋 → 会错误入 entities 双重渲染（修:四 id 统一）；②拖拽白名单 pointerdown/up 只有墙/门——陷阱/沙袋不能连续铺（修:加两 id）；③edit 引入多余 `}` 破坏 try 结构（node --check 拦下）。
+  - **验证**：colony +6 单元（触发/一次性/伤害/沙袋/出血/可建）+ scenario +3（敌踩陷阱伤+出血+一次性/沙袋乘子/居民重置耗石）；全量 557/0；scenario 95/0；perf 3/0；boss 7/0；构建 31166KB；无头 Chrome ?t10debug=1 截图（尖刺×2 一格红色警示框/沙袋×2）。
+  - **建筑 v3 班 2 全链完成**：T8 餐桌椅 ✅ / T9 房间+路灯 ✅ / T10 陷阱沙袋 ✅ —— 建筑系统 v3（#73）全部落地。

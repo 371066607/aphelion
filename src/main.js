@@ -820,8 +820,8 @@ window.APH = window.APH || {};
           return !(en.type===T.BLUEPRINT&&en.bid===d.bid&&
                    Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2);
         });
-        /* ADR-13: 墙/闸门=格上静态物, 不入 entities[](防爆实体预算); 渲染走 walls 层 */
-        var isGridStatic=(d.bid==='bl_wall'||d.bid==='bl_gate');
+        /* ADR-13: 墙/闸门/陷阱/沙袋=格上静态物, 不入 entities[](防爆实体预算); 渲染走 walls 层 */
+        var isGridStatic=(d.bid==='bl_wall'||d.bid==='bl_gate'||d.bid==='bl_spike_trap'||d.bid==='bl_sandbag');
         if(!isGridStatic){
           APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
           var justBuilt=s.entities[s.entities.length-1];
@@ -1993,7 +1993,7 @@ window.APH = window.APH || {};
       downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
       /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
       var s0=APH.state;
-      if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate')){
+      if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate'||s0.buildMode==='bl_spike_trap'||s0.buildMode==='bl_sandbag')){
         wallDrag=true; wallLast=null; wallPlaced={};
         var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
         wallFrom=APH.Colony.wallCells(wx0, wy0);
@@ -2025,7 +2025,7 @@ window.APH = window.APH || {};
       wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
         /* 建造模式: 点地放置(墙/闸门已在 pointerdown 铺设, 防重复) */
-        if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'){
+        if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'&&s.buildMode!=='bl_spike_trap'&&s.buildMode!=='bl_sandbag'){
           var wx=e.clientX-vpW()/2+s.camX, wy=e.clientY-vpH()/2+s.camY;
           tryPlace(s.buildMode,wx,wy);
           return;
@@ -2269,6 +2269,15 @@ window.APH = window.APH || {};
           APH.Colony.placeBuildingEntity('bl_lamp', 48*(gx0+6), 48*(gy0+2), 1);
           s.clock=(CFG.DAY_LEN||210)*0.75;   /* 强制夜间(照片验证照明) */
           document.title='AUTO: t9debug ready';
+        }
+        /* T10 调试通道(?t10debug=1): 尖刺陷阱(待触发+已触发)+沙袋, 白天清晰截图 */
+        if(_q.indexOf('t10debug=1')>=0){
+          var tx0=Math.round(s.px/48)+2, ty0=Math.round(s.py/48);
+          s.colony.buildings.push({id:'bl_spike_trap', x:48*tx0, y:48*ty0});
+          s.colony.buildings.push({id:'bl_spike_trap', x:48*(tx0+1), y:48*ty0, armed:false});
+          s.colony.buildings.push({id:'bl_sandbag', x:48*tx0, y:48*(ty0+1)});
+          s.colony.buildings.push({id:'bl_sandbag', x:48*(tx0+1), y:48*(ty0+1)});
+          document.title='AUTO: t10debug ready';
         }
       }
       if(_q.indexOf('exp=1')>=0){
@@ -3167,6 +3176,12 @@ window.APH = window.APH || {};
         wxMul=APH.Res.weatherMoveMul(r, resWxId, resWxSpeedMul,
           APH.Res.shelteredFor({x:e.x, y:e.y}, (s.colony&&s.colony.buildings)||[], rooms));
       }
+      /* T10 沙袋: 居民穿过减速 ×sandbagMul (home 限定) */
+      var bagMul=1;
+      if(s.colony&&s.colony.buildings){
+        var bagList=s.colony.buildings.filter(function(b){ return b.id==='bl_sandbag'; });
+        if(bagList.length) bagMul=APH.Colony.sandbagMul(bagList, e);
+      }
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
       /* #68: 睡着居民不进食、不搬运、不上岗、不走动(俯卧贴地) — 优先于破碎分支, 防破碎+wander 睡着仍游荡 */
       /* #69: 医疗舱俯卧者同短路(俯卧不滑行) */
@@ -3181,7 +3196,7 @@ window.APH = window.APH || {};
           var bSpot=APH.Res.clinicBedSpot(clinic);
           e.tx=bSpot.x; e.ty=bSpot.y;
           var crawlMul=(CFG.residents&&CFG.residents.downedCrawlMul!=null)?CFG.residents.downedCrawlMul:0.5;
-          APH.Res.walkAround(e, bSpot, dt, r.downed ? spd*crawlMul*wxMul : spd*sickSpeedMul*wxMul, navGrid);
+          APH.Res.walkAround(e, bSpot, dt, r.downed ? spd*crawlMul*wxMul*bagMul : spd*sickSpeedMul*wxMul*bagMul, navGrid);
           var bedArrive=(CFG.residents&&CFG.residents.clinicBedArriveR!=null)?CFG.residents.clinicBedArriveR:6;
           if(U.dst(e.x,e.y,bSpot.x,bSpot.y)<=bedArrive){
             r.medLying=true; e.medLying=true; e.walking=false;
@@ -3212,7 +3227,7 @@ window.APH = window.APH || {};
         var dSeat=U.dst(e.x,e.y,seatX,seatY);
         if(dSeat>((CFG.residents&&CFG.residents.diningArriveR!=null)?CFG.residents.diningArriveR:6)){
           e.tx=seatX; e.ty=seatY;
-          APH.Res.walkAround(e, {x:seatX,y:seatY}, dt, spd*sickSpeedMul*wxMul, navGrid);
+          APH.Res.walkAround(e, {x:seatX,y:seatY}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
           /* 坐下后脸朝桌 (坐着吃=站姿, 只转脸) */
           if(APH.Res.faceTable && U.dst(e.x,e.y,seatX,seatY)<=10) e.face=APH.Res.faceTable(seat.chair, seat.table);
         }else{
@@ -3223,7 +3238,7 @@ window.APH = window.APH || {};
           if(!ateAtTable && r.food<eatBelow){
             /* 桌旁无粮兜底: 转最近粮堆/仓库(此时算无桌吃, 出惩罚) */
             var meal2=nearestMeal(e, seekR);
-            if(meal2){ e.tx=meal2.x; e.ty=meal2.y; APH.Res.walkAround(e, meal2, dt, spd*sickSpeedMul*wxMul, navGrid); }
+            if(meal2){ e.tx=meal2.x; e.ty=meal2.y; APH.Res.walkAround(e, meal2, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid); }
           }
         }
         return;
@@ -3263,7 +3278,27 @@ window.APH = window.APH || {};
           }
         }
       }
-      APH.Res.walkAround(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul, navGrid);
+      /* T10 陷阱重置: 居民路过已触发陷阱(armed=false) → 耗建材自动复位 */
+      if(!raid && r && !r.isBroken && !r.isSleeping && !r.medLying && (s.colony&&s.colony.buildings)){
+        var tblds=s.colony.buildings.filter(function(b){ return b.id==='bl_spike_trap' && b.armed===false; });
+        if(tblds.length){
+          for(var ti=0;ti<tblds.length;ti++){
+            var tt=tblds[ti];
+            if(U.dst(e.x,e.y,tt.x,tt.y) < 40){
+              var rc=(CFG.defense&&CFG.defense.trapResetCost)||{stone:1};
+              var haveAll=true;
+              for(var rk in rc){ if(((s.meta.res&&s.meta.res[rk])||0) < rc[rk]){ haveAll=false; break; } }
+              if(haveAll){
+                for(var rk2 in rc){ s.meta.res[rk2]=Math.max(0,(s.meta.res[rk2]||0)-rc[rk2]); }
+                tt.armed=true; tt.cd=0;
+                APH.UI.floatText((e.name||'居民')+' 重置了尖刺陷阱','#9fe8c8');
+              }
+              break;
+            }
+          }
+        }
+      }
+      APH.Res.walkAround(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
     });
   }
 

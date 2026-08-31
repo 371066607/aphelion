@@ -74,6 +74,13 @@ APH.Colony = (function(){
     bl_gate:  { name:'闸门', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:3, wood:5 }, size:48, max:500,
       cells:[1,1], buildTime:8, dispH:98,
       desc:'可通行的门：己方秒开，袭击者开门有延迟。' },
+    /* T10 阵地设备 (issue #83): 格上静态物 (与墙同清单/渲染/建造交互) */
+    bl_spike_trap: { name:'尖刺陷阱', cost:0, costMineral:0, reqTech:'te_ballistics', costRes:{ stone:3, wood:2 }, size:48, max:200,
+      cells:[1,1], buildTime:6, dispH:129,
+      desc:'敌人踩中穿刺伤害+出血减速；一次性触发，居民靠近自动重置（耗少量建材）。' },
+    bl_sandbag:    { name:'沙袋', cost:0, costMineral:0, reqTech:'te_ballistics', costRes:{ stone:3 }, size:48, max:500,
+      cells:[1,1], buildTime:5, dispH:106,
+      desc:'穿过减速 50%，无血量（双方均可穿越的软掩体）。' },
     /* T6 电网 (ADR-14: 实体导线电力网; 定义见 #79 最终版, 旧雏形已删) */
     bl_conduit: { name:'电力导线', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ wood:2, iron:1 }, size:48, max:2000,
       cells:[1,1], buildTime:4, dispH:36,
@@ -251,7 +258,7 @@ APH.Colony = (function(){
   }
 
   /* 格上静态物集合 (ADR-13 + T6 导线): 1x1 格, 不入 entities[], 可拖拽敷设 */
-  var GRID_STATICS = { bl_wall:1, bl_gate:1, bl_conduit:1 };
+  var GRID_STATICS = { bl_wall:1, bl_gate:1, bl_conduit:1, bl_spike_trap:1, bl_sandbag:1 };
 
   /* ---------- 建造逻辑(纯函数部分) ---------- */
   /* 占位格: cells×48px格网(ADR-4), 中心对齐 */
@@ -623,6 +630,56 @@ APH.Colony = (function(){
   function isPowerConsumer(id){
     var CON = (CFG.power && CFG.power.consumers) || {};
     return !!CON[id];
+  }
+
+  /* ---------- T10 尖刺陷阱与沙袋 (issue #83, 纯函数) ----------
+     陷阱记录字段: { id:'bl_spike_trap', x, y, armed:true|false, cd:0 }
+     armed=true=待触发; 触发后 armed=false 进入已触发态(不再触发, 居民重置恢复)。 */
+
+  /* 敌人踩中判定: 位置进入陷阱格(中心48px)且 armed → 触发 */
+  function trapTriggers(traps, pos){
+    if(!traps || !traps.length || !pos) return null;
+    for(var i=0;i<traps.length;i++){
+      var t=traps[i];
+      if(!t || t.armed===false || t.armed==null || t.x==null) continue;
+      if(Math.abs(pos.x-t.x) <= 24 && Math.abs(pos.y-t.y) <= 24){
+        return t;
+      }
+    }
+    return null;
+  }
+
+  /* 穿刺伤害结算: 命中陷阱后敌人掉血 (CFG.defense.trapDamage) + 出血减速时长 */
+  function trapStrike(en, defs){
+    var D=defs||(CFG.defense||{});
+    var dmg=(D.trapDamage!=null?D.trapDamage:12);
+    var bleed=(D.trapBleedSec!=null?D.trapBleedSec:5);
+    if(!en) return { dmg:0, bleed:0 };
+    en.hp=Math.max(0, (en.hp||0)-dmg);
+    en.bleedT=(en.bleedT||0)+bleed;    // 出血减速计时(移动乘子吃它)
+    en.hitFlash=0.15;
+    return { dmg:dmg, bleed:bleed };
+  }
+
+  /* 沙袋减速乘子: 位置在沙袋格内 → ×CFG.defense.sandbagMul (默认0.5) */
+  function sandbagMul(bags, pos, defs){
+    if(!bags || !bags.length || !pos) return 1;
+    var D=defs||(CFG.defense||{});
+    var mul=(D.sandbagMul!=null?D.sandbagMul:0.5);
+    if(mul>=1) return 1;
+    for(var i=0;i<bags.length;i++){
+      var b=bags[i];
+      if(!b || b.x==null) continue;
+      if(Math.abs(pos.x-b.x) <= 24 && Math.abs(pos.y-b.y) <= 24) return mul;
+    }
+    return 1;
+  }
+
+  /* 出血移动乘子: 敌人出血期间减速 (×CFG.defense.bleedSpeedMul 默认0.7) */
+  function bleedMul(en, defs){
+    if(!en || !(en.bleedT>0)) return 1;
+    var D=defs||(CFG.defense||{});
+    return (D.bleedSpeedMul!=null?D.bleedSpeedMul:0.7);
   }
 
   /* ---------- U3 农田生长(纯函数) ----------
@@ -1668,7 +1725,8 @@ APH.Colony = (function(){
     /* T7 耗电联动 */
     applyPowerState:applyPowerState, farmPowerMul:farmPowerMul,
     turretFireAllowed:turretFireAllowed, clinicPowered:clinicPowered,
-    isPowerConsumer:isPowerConsumer,
+    isPowerConsumer:isPowerConsumer, trapTriggers:trapTriggers, trapStrike:trapStrike,
+    sandbagMul:sandbagMul, bleedMul:bleedMul,
     placeBuildingEntity:placeBuildingEntity,
     queueTick:queueTick,
     housingCapacity:housingCapacity, refundOf:refundOf, refundMineralOf:refundMineralOf, refundResOf:refundResOf,

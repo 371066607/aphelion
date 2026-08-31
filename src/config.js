@@ -109,6 +109,15 @@ APH.CFG = {
     hitStop: 0.035,            // 击杀顿帧
   },
 
+  /* T10 阵地设备 (#83): 尖刺陷阱与沙袋数值 */
+  defense: {
+    trapDamage: 12,            // 尖刺陷阱穿刺伤害
+    trapBleedSec: 5,           // 触发后出血减速时长(秒)
+    bleedSpeedMul: 0.7,        // 出血减速乘子(×敌人速度)
+    sandbagMul: 0.5,           // 沙袋减速乘子(敌人/居民穿过)
+    trapResetCost: { stone: 1 } // 居民重置陷阱耗材(默认1石)
+  },
+
   /* 敌人通用 */
   enemy: {
     aggroR: 195,

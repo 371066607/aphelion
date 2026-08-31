@@ -577,18 +577,40 @@ APH.Combat = (function(){
       }
 
       /* 移动: 绕墙沿 A* 路径推进; 其余走原直线意图 */
+      /* T10 减速: 沙袋 ×0.5 + 出血 ×0.7 (敌近战/远程皆适用); home 限定(远征无阵地) */
+      if(en.bleedT>0) en.bleedT=Math.max(0, en.bleedT-dt);   // 出血衰减
+      var t10Mul = 1;
+      if(s.scene==='home' && window.APH.Colony){
+        var bags=(s.colony&&s.colony.buildings||[]).filter(function(b){ return b.id==='bl_sandbag'; });
+        t10Mul = APH.Colony.sandbagMul(bags, en) * APH.Colony.bleedMul(en);
+      }
       if(pathPlan && pathPlan.mode === 'path' && en.state === 'chase'){
-        var pSpd = en.faction.speed * (night ? ((en.faction.nightBoost != null) ? en.faction.nightBoost : 1) : 1);
+        var pSpd = en.faction.speed * (night ? ((en.faction.nightBoost != null) ? en.faction.nightBoost : 1) : 1) * t10Mul;
         APH.Nav.followPath(en, pathPlan.path, dt, pSpd);
         en.x = U.clamp(en.x, 30, CFG.WORLD-30);
         en.y = U.clamp(en.y, 30, CFG.WORLD-30);
         en.walkPh += dt * (en.walking ? 9 : 3);
       }else{
         var mi = moveIntent(en, c);
-        en.x += mi.vx * dt; en.y += mi.vy * dt;
+        en.x += mi.vx * t10Mul * dt; en.y += mi.vy * t10Mul * dt;
         en.x = U.clamp(en.x, 30, CFG.WORLD-30);
         en.y = U.clamp(en.y, 30, CFG.WORLD-30);
         en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
+      }
+
+      /* T10 尖刺陷阱: 敌人踩中(armed格内) → 穿刺伤害+出血+触发布置(一次性) */
+      if(s.scene==='home' && window.APH.Colony && !en.pillager && !en.retreat && !en.sieging){
+        var traps=(s.colony&&s.colony.buildings||[]).filter(function(b){ return b.id==='bl_spike_trap'; });
+        var hitTrap=APH.Colony.trapTriggers(traps, en);
+        if(hitTrap){
+          var strike=APH.Colony.trapStrike(en);
+          hitTrap.armed=false;                       /* 一次性: 触发后不再触发 */
+          hitTrap.cd=2;                              /* 触发展示计时(已触发态) */
+          s.parts= s.parts||[];
+          s.parts.push({t:'spark', x:en.x, y:en.y-14, life:.4, max:.4});
+          if(window.APH.UI && APH.UI.floatText)
+            APH.UI.floatText('⚠ 尖刺 '+Math.round(strike.dmg)+' 出血!','#ff6d7a');
+        }
       }
 
       /* 太远回收(家园袭击不按离玩家距离清波) */

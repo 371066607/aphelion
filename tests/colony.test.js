@@ -393,3 +393,50 @@ test('shortageBrief: 地上粮药计入短缺', () => {
   }, [], {med:1});
   if(b.text.indexOf('生病')>=0) throw new Error('地上有药不应催工坊: '+b.text);
 });
+
+/* ============ T10 尖刺陷阱与沙袋 (#83) ============ */
+test('#83 trapTriggers: 敌人进入陷阱格(24px)且armed → 触发', () => {
+  const traps=[{id:'bl_spike_trap',x:100,y:100,armed:true}];
+  const hit=Colony.trapTriggers(traps,{x:110,y:105});
+  if(!hit) throw new Error('格内应触发: '+JSON.stringify(hit));
+  if(hit!==traps[0]) throw new Error('应返回该陷阱');
+  const miss=Colony.trapTriggers(traps,{x:160,y:160});
+  if(miss) throw new Error('格外不应触发');
+});
+test('#83 trapTriggers: 已触发(armed=false)不再触发', () => {
+  const traps=[{id:'bl_spike_trap',x:100,y:100,armed:false}];
+  const hit=Colony.trapTriggers(traps,{x:105,y:103});
+  if(hit) throw new Error('已触发陷阱不应再触发');
+});
+test('#83 trapStrike: 穿刺伤害+出血计时+hitFlash', () => {
+  const en={hp:50};
+  const r=Colony.trapStrike(en);
+  if(r.dmg!==12) throw new Error('应 12 伤: '+r.dmg);
+  if(en.hp!==38) throw new Error('hp 应 38: '+en.hp);
+  if(en.bleedT!==5) throw new Error('出血 5s: '+en.bleedT);
+  if(!(en.hitFlash>0)) throw new Error('应 hitFlash');
+});
+test('#83 sandbagMul: 沙袋格内 ×0.5 格外 ×1', () => {
+  const bags=[{id:'bl_sandbag',x:200,y:200}];
+  const inside=Colony.sandbagMul(bags,{x:205,y:198});
+  if(inside!==0.5) throw new Error('格内应 0.5: '+inside);
+  const outside=Colony.sandbagMul(bags,{x:300,y:300});
+  if(outside!==1) throw new Error('格外应 1: '+outside);
+  if(Colony.sandbagMul([],{x:0,y:0})!==1) throw new Error('无沙袋应 1');
+});
+test('#83 bleedMul: 出血减速 ×0.7, 无出血 ×1', () => {
+  const bleeding={bleedT:3};
+  if(Colony.bleedMul(bleeding)!==0.7) throw new Error('出血应 0.7');
+  const fine={bleedT:0};
+  if(Colony.bleedMul(fine)!==1) throw new Error('无出血应 1');
+});
+test('#83 canPlace: 陷阱/沙袋科技挂靠炮术+成本', () => {
+  const t1=Colony.canPlace([], {te_ballistics:true}, 'bl_spike_trap', 500, 500, {stone:99,wood:99});
+  if(!t1.ok) throw new Error('炮术后可建陷阱: '+JSON.stringify(t1));
+  const t2=Colony.canPlace([], {}, 'bl_spike_trap', 500, 500, {stone:99,wood:99});
+  if(t2.ok) throw new Error('无炮术不可建');
+  const t3=Colony.canPlace([], {te_ballistics:true}, 'bl_sandbag', 500, 500, {stone:99});
+  if(!t3.ok) throw new Error('沙袋应可建');
+  const t4=Colony.canPlace([], {te_ballistics:true}, 'bl_sandbag', 500, 500, {stone:0});
+  if(t4.ok) throw new Error('缺石不可建');
+});

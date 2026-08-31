@@ -2188,5 +2188,60 @@ test('#82 home: 路灯可建造, 通电夜间亮/断电灭 (drawDarkness 不崩)
   }
 });
 
+/* ============ T10 尖刺陷阱与沙袋 (#83) ============ */
+test('#83 home: 敌人踩陷阱受伤出血+陷阱触发一次性', () => {
+  const oldScene=S.scene, oldEntities=S.entities, oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:true};
+    S.colony.buildings=[{id:'bl_spike_trap', x:1000, y:1000, armed:true}];
+    S.entities=[];
+    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 1000);
+    en.hp=en.faction.hp;
+    S.entities.push(en);
+    /* 直接构造陷阱触发路径: updateCombat 处理敌走位会触发 */
+    window.APH.Combat.updateCombat(0.016, false);
+    A(en.hp < en.faction.hp, '踩陷阱应掉血, hp '+en.hp+'/'+en.faction.hp);
+    A(en.bleedT>0, '应出血减速, bleedT '+en.bleedT);
+    A(S.colony.buildings[0].armed===false, '陷阱应触发(一次性)');
+    /* 已触发不再触发: 连续两拍 hp 不再因陷阱掉 */
+    const hpAfter=S.entities.find(x=>x.type===T.ENEMY&&!x.dead).hp;
+    window.APH.Combat.updateCombat(0.016, false);
+    const hp2=S.entities.find(x=>x.type===T.ENEMY&&!x.dead).hp;
+    /* 敌人可能仍会走位/打玩家, 但陷阱不再重复扣(仅验证标记) */
+    A(S.colony.buildings[0].armed===false, '触发态保持');
+  }finally{
+    S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+test('#83 home: 沙袋减速乘子生效 (敌人移动减速通过 sandbagMul)', () => {
+  /* 纯函数侧已测; 场景验证接线不崩+格内判定可用 */
+  const bags=[{id:'bl_sandbag',x:500,y:500}];
+  const mul=window.APH.Colony.sandbagMul(bags,{x:510,y:505});
+  A(mul===0.5, '格内应 0.5, got '+mul);
+  A(window.APH.Colony.sandbagMul(bags,{x:600,y:600})===1, '格外应 1');
+});
+test('#83 home: 居民路过自动重置陷阱 (耗建材)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldWar=S.war, oldRes=S.meta.res;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    S.colony.buildings=[{id:'bl_spike_trap', x:1000, y:1000, armed:false}];
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ stone:5, wood:5, food:0 };
+    S.meta.residents=[{id:'rs_t10', name:'修理工', job:null, skills:{},
+      mood:70, food:80, illness:0, downed:false, isSleeping:false,
+      rest:80, recreation:80, exposure:0, ailments:[], gear:{}}];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_t10');
+    e.x=970; e.y=1000;   /* 陷阱旁 30px 内 */
+    M.updateResidents(0.5);
+    A(S.colony.buildings[0].armed===true, '居民应重置陷阱, armed '+S.colony.buildings[0].armed);
+    A(S.meta.res.stone===4, '重置应耗1石, stone '+S.meta.res.stone);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.war=oldWar; S.meta.res=oldRes;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

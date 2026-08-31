@@ -1112,10 +1112,12 @@ APH.Ent = (function(){
   function drawWalls(time){
     var s=APH.state;
     var bs=(s.colony && s.colony.buildings)||[];
-    var walls=[], gates=[];
+    var walls=[], gates=[], traps=[], bags=[];
     bs.forEach(function(b){
       if(b.id==='bl_wall') walls.push(b);
       else if(b.id==='bl_gate') gates.push(b);
+      else if(b.id==='bl_spike_trap') traps.push(b);
+      else if(b.id==='bl_sandbag') bags.push(b);
     });
     var sc=0.92;
     walls.forEach(function(w){
@@ -1133,6 +1135,27 @@ APH.Ent = (function(){
     });
     gates.forEach(function(g){
       APH.Sprites.draw(ctx, 'bl_gate', g.x, g.y+20, 0, sc);
+    });
+    /* T10 尖刺陷阱: 待触发正常画; 已触发(armed=false)叠「已触发」标记(扁平+红点) */
+    traps.forEach(function(t){
+      if(t.armed===false){
+        /* 已触发态: 整体压暗+红色警示框(尺寸加大确保可见) */
+        APH.Sprites.draw(ctx, 'bl_spike_trap', t.x, t.y+20, 0, sc*0.92);
+        ctx.fillStyle='rgba(30,10,15,.5)';
+        ctx.fillRect(t.x-24, t.y-16, 48, 30);
+        ctx.strokeStyle='#ff5d6e'; ctx.lineWidth=3;
+        ctx.strokeRect(t.x-24, t.y-16, 48, 30);
+        ctx.strokeStyle='#ffd0d4'; ctx.lineWidth=2.5;
+        ctx.beginPath();
+        ctx.moveTo(t.x-12, t.y-10); ctx.lineTo(t.x+2, t.y+4);
+        ctx.moveTo(t.x+2, t.y-10); ctx.lineTo(t.x-12, t.y+4);
+        ctx.stroke();
+      }else{
+        APH.Sprites.draw(ctx, 'bl_spike_trap', t.x, t.y+20, 0, sc);
+      }
+    });
+    bags.forEach(function(bg){
+      APH.Sprites.draw(ctx, 'bl_sandbag', bg.x, bg.y+20, 0, sc);
     });
   }
 
