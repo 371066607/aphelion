@@ -278,6 +278,7 @@ APH.CFG = {
     /* T8 餐桌椅 (#81): 有桌吃心情增益/无桌罚/椅位分配 (纯函数 diningSeatAlloc 读) */
     diningMoodGain: 4,         // 在餐桌用餐的心情增益 (进 eatMeal 结算)
     noTableMoodPenalty: -3,    // 无桌吃饭的心情惩罚 (与 eatMeal 无桌分支)
+    roomMoodGain: 2,           // T9 卧室级房间(含居住舱)心情增益/生产跳
     diningChairR: 300,         // 居民分配空椅的最大距离 (椅须在桌旁 chairTableR 内; 300≈从居住舱走到食堂)
     chairTableR: 60,           // 椅子须在桌旁此距离内才算可用餐位
     diningArriveR: 6,          // 到椅坐下判定半径

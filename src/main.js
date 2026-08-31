@@ -2252,6 +2252,24 @@ window.APH = window.APH || {};
           s.entities.push({id:'t8f',type:CFG.entType.DROPPED,x:tb.x,y:tb.y+30,itemId:'it_food',n:9});
           document.title='AUTO: t8debug ready';
         }
+        /* T9 调试通道(?t9debug=1): 墙环圈房+居住舱+路灯, 供房间/照明视觉验证 */
+        if(_q.indexOf('t9debug=1')>=0){
+          var gx0=Math.round(s.px/48)+2, gy0=Math.round(s.py/48);
+          for(var rw=0; rw<5; rw++){
+            s.colony.buildings.push({id:'bl_wall', x:48*(gx0+rw), y:48*gy0});
+            s.colony.buildings.push({id:'bl_wall', x:48*(gx0+rw), y:48*(gy0+4)});
+          }
+          for(var rh=0; rh<5; rh++){
+            s.colony.buildings.push({id:'bl_wall', x:48*gx0, y:48*(gy0+rh)});
+            s.colony.buildings.push({id:'bl_wall', x:48*(gx0+4), y:48*(gy0+rh)});
+          }
+          s.colony.buildings.push({id:'bl_house', x:48*(gx0+2), y:48*(gy0+2)});
+          APH.Colony.placeBuildingEntity('bl_house', 48*(gx0+2), 48*(gy0+2), 1);
+          s.colony.buildings.push({id:'bl_lamp', x:48*(gx0+6), y:48*(gy0+2), lv:1, powered:true});
+          APH.Colony.placeBuildingEntity('bl_lamp', 48*(gx0+6), 48*(gy0+2), 1);
+          s.clock=(CFG.DAY_LEN||210)*0.75;   /* 强制夜间(照片验证照明) */
+          document.title='AUTO: t9debug ready';
+        }
       }
       if(_q.indexOf('exp=1')>=0){
         startGame();
@@ -3134,6 +3152,8 @@ window.APH = window.APH || {};
     }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
     var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
+    /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
+    var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
     s.entities.forEach(function(e){
       if(!e || e.type!==T.RESIDENT) return;
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
@@ -3141,11 +3161,11 @@ window.APH = window.APH || {};
       var r=residentOf(e);
       var walkCfg=CFG.walk||{};
       var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
-      /* W3 天气室外减速: 室内避难所免罚; 寒潮+防寒服=免 */
+      /* W3 天气室外减速: 房间内/避难所免罚; 寒潮+防寒服=免 */
       var wxMul=1;
       if(r && APH.Res && APH.Res.weatherMoveMul){
         wxMul=APH.Res.weatherMoveMul(r, resWxId, resWxSpeedMul,
-          APH.Res.isSheltered({x:e.x, y:e.y}, (s.colony&&s.colony.buildings)||[]));
+          APH.Res.shelteredFor({x:e.x, y:e.y}, (s.colony&&s.colony.buildings)||[], rooms));
       }
       /* B: 崩溃者不吃不搬不上岗; 出走型在院子里游荡, 其余原地停工 */
       /* #68: 睡着居民不进食、不搬运、不上岗、不走动(俯卧贴地) — 优先于破碎分支, 防破碎+wander 睡着仍游荡 */
@@ -3440,6 +3460,8 @@ window.APH = window.APH || {};
     var wxId=(window.APH.Weather&&APH.Weather.currentId)?APH.Weather.currentId(m):'wx_clear';
     var wxFx=(window.APH.Weather&&APH.Weather.weatherEffects)?APH.Weather.weatherEffects(wxId):{};
     var wxExtreme=((wxFx.exposureGain)||0)>0;
+    /* T9 无顶房间: 生产跳重算房间(墙/门围合), 供暴露免疫+卧室心情 */
+    var T9_rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf(s.colony.buildings):[];
     /* 深度生存: 床位分配 (Survival #15) */
     APH.Res.assignBeds(s.colony.buildings, m.residents);
 
@@ -3499,11 +3521,16 @@ window.APH = window.APH || {};
         });
       }
       APH.Res.clinicTick(r, {hasClinic:hasClinic, inClinic:inClinic, medicSkill:medicSkill, rng:sickRng});
-      /* W3 天气暴露接线(本票核心): 极端天气室外累积/避难所消退 (Survival #19 桩复活);
-         sheltered 用既有 isSheltered; 实体缺位兜底按室内(不误积累) */
+      /* W3 天气暴露接线(本票核心): 极端天气室外累积/房间内免疫 (Survival #19 桩复活; T9 房间覆盖)
+         sheltered: 房间内=true; 房间外回退 isSheltered(建筑半径); 实体缺位兜底按室内(不误积累) */
       APH.Res.exposureTick(r,
-        ent ? APH.Res.isSheltered({x:ent.x, y:ent.y}, s.colony.buildings) : true,
+        ent ? APH.Res.shelteredFor({x:ent.x, y:ent.y}, s.colony.buildings, T9_rooms) : true,
         wxExtreme, wxId);
+      /* T9 卧室级房间心情增益: 所在房间含居住舱 → +roomMoodGain/跳 */
+      if(ent){
+        var rmGain=APH.Res.roomMoodGain({x:ent.x,y:ent.y}, T9_rooms, s.colony.buildings);
+        if(rmGain>0) r.mood=Math.min((CFG.residents&&CFG.residents.moodCap)||95, (r.mood||70)+rmGain);
+      }
       /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
       if(r.medLying && !hasClinic) r.medLying = false;
       /* #69 击倒判定+送医(接线孤儿 checkDowned/rescueTick; 生产跳=30s) */

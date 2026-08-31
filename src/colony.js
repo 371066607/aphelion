@@ -87,6 +87,10 @@ APH.Colony = (function(){
     bl_battery: { name:'蓄电池', cost:0, costMineral:15, reqTech:'te_machining', costRes:{ iron:15, wood:8 }, size:44, max:4, buildTime:18,
       dispH:84, cells:[1,1],
       desc:'存储富余电力；停电时兜底供电。需接入导线。' },
+    /* T9 路灯 (issue #82): 夜间照亮周围; 无电/未接线熄灭 (CFG.power.consumers 已预留) */
+    bl_lamp:  { name:'路灯', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:10, wood:5 }, size:48, max:12, buildTime:10,
+      dispH:187, cells:[1,1],
+      desc:'夜间照亮周围区域的电灯。需接入电网；断电熄灭。' },
   };
   var JOB_CYCLE = [null, 'bl_crop_plot', 'bl_farm', 'bl_kitchen', 'bl_pasture', 'bl_mine', 'bl_workshop', 'bl_lab', 'bl_clinic'];
 

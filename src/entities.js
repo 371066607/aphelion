@@ -546,6 +546,29 @@ APH.Ent = (function(){
       } else {
         APH.Sprites.draw(ctx, e.bid, e.x, e.y+10, frame, sc);
       }
+      /* T9 路灯: 夜间通电时亮暖色光晕(挖洞之外的可见光源); 断电熄灭
+         powered 写在 colony.buildings 记录(b), 实体按坐标查; 缺失记录视为通电(老档兼容) */
+      if(e.bid==='bl_lamp' && dL<0.5){
+        var lit=true;
+        var bl=window.APH.state&&window.APH.state.colony&&window.APH.state.colony.buildings;
+        if(bl){
+          for(var bi=0;bi<bl.length;bi++){
+            var bb=bl[bi];
+            if(bb.id==='bl_lamp' && Math.abs(bb.x-e.x)<2 && Math.abs(bb.y-e.y)<2){
+              lit = bb.powered !== false;
+              break;
+            }
+          }
+        }
+        if(lit){
+          var lp=ctx.createRadialGradient(e.x,e.y-30,4,e.x,e.y-30,110);
+          lp.addColorStop(0,'rgba(255,214,130,.55)');
+          lp.addColorStop(.5,'rgba(255,190,90,.22)');
+          lp.addColorStop(1,'rgba(255,190,90,0)');
+          ctx.fillStyle=lp;
+          ctx.beginPath(); ctx.arc(e.x,e.y-30,110,0,U.TAU); ctx.fill();
+        }
+      }
       return;
     }
     /* Task4: 防御炮塔——底座+可旋转炮管 */

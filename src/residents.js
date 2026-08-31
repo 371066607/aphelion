@@ -1239,6 +1239,13 @@ APH.Res = (function(){
     });
   }
 
+  /* T9 房间避难 (issue #82): 房间内=免疫极端天气暴露 (墙/门围合, 见 Nav.roomsOf)
+     优先级: 返回 null=无房间信息(调用方回退 isSheltered); true/false=房间内/外(后者仍需 isSheltered 补充) */
+  function roomShelter(pos, rooms){
+    if(!pos || !rooms || !rooms.length) return null;
+    return window.APH.Nav && window.APH.Nav.inRooms ? window.APH.Nav.inRooms(pos, rooms) : false;
+  }
+
   /* W3 装备减免(纯函数): 当前所穿防具 suit 的指定抗性 (acidResist/cryoResist), 无装=0 */
   function suitResistOf(r, key){
     var g = r && r.gear;
@@ -1354,6 +1361,46 @@ APH.Res = (function(){
     };
   }
 
+  /* T9 房间心情增益 (issue #82): 所在房间含居住舱(bl_house) = 卧室级 → 心情增益
+     纯函数: pos=世界坐标, rooms=Nav.roomsOf() 输出, buildings=建筑记录; 返回 >=0 的增益值 */
+  function roomMoodGain(pos, rooms, buildings){
+    var C=RS();
+    var gain=C.roomMoodGain!=null?C.roomMoodGain:2;
+    if(gain<=0) return 0;
+    if(!pos || !rooms || !rooms.length || !buildings) return 0;
+    var G=CFG.GRID||48;
+    var gx=Math.floor((pos.x||0)/G), gy=Math.floor((pos.y||0)/G);
+    var room=null;
+    for(var i=0;i<rooms.length;i++){
+      var r=rooms[i];
+      if(gx<r.minX||gx>r.maxX||gy<r.minY||gy>r.maxY) continue;
+      for(var j=0;j<r.cells.length;j++){
+        if(r.cells[j].gx===gx && r.cells[j].gy===gy){ room=r; break; }
+      }
+      if(room) break;
+    }
+    if(!room) return 0;
+    /* 卧室级: 房间 bbox 内含 bl_house */
+    for(var k=0;k<buildings.length;k++){
+      var b=buildings[k];
+      if(!b || b.id!=='bl_house') continue;
+      var bx=Math.floor((b.x||0)/G), by=Math.floor((b.y||0)/G);
+      if(bx>=room.minX && bx<=room.maxX && by>=room.minY && by<=room.maxY){
+        return gain;
+      }
+    }
+    return 0;
+  }
+
+  /* T9: 组合避难判定 — 房间内(true) > 房间外回退 isSheltered(建筑半径) */
+
+  /* T9: 组合避难判定 — 房间内(true) > 房间外回退 isSheltered(建筑半径) */
+  function shelteredFor(pos, buildings, rooms){
+    var rr = roomShelter(pos, rooms);
+    if(rr === true) return true;
+    return isSheltered(pos, buildings);
+  }
+
   return {
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
@@ -1366,6 +1413,7 @@ APH.Res = (function(){
     needsMedBed:needsMedBed, clinicBedSpot:clinicBedSpot,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
+    roomShelter:roomShelter, shelteredFor:shelteredFor, roomMoodGain:roomMoodGain,
     suitResistOf:suitResistOf, weatherMoveMul:weatherMoveMul,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,

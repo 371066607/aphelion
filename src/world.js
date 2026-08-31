@@ -147,6 +147,12 @@ APH.World = (function(){
     var s = APH.state;
     (s.colony? s.colony.buildings : []).forEach(function(b){
       if(b.id==='bl_landing_pad') return;
+      if(b.id==='bl_lamp'){
+        /* T9 路灯: 夜间通电才亮(挖大洞); 断电/未接线(b.powered===false)熄灭 */
+        if(b.powered !== false && dL < 0.5) hole(b.x, b.y-6, 120, .92);
+        hole(b.x, b.y, 70, .45);   // 本体微光(断电也可见轮廓)
+        return;
+      }
       hole(b.x, b.y, 70, .45);
     });
     ctx.drawImage(darkCv, 0, 0, VW, VH);

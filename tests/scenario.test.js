@@ -2105,5 +2105,88 @@ test('#81 home: 无桌吃心情惩罚 (无桌椅时吃地上食物扣心情)', (
   }
 });
 
+/* ============ T9 无顶房间与路灯 (#82) ============ */
+function ring9(gx, gy, w, h){
+  const out=[];
+  for(let x=0; x<w; x++){ out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy)}); out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy+h-1)}); }
+  for(let y=0; y<h; y++){ out.push({id:'bl_wall', x:48*gx, y:48*(gy+y)}); out.push({id:'bl_wall', x:48*(gx+w-1), y:48*(gy+y)}); }
+  return out;
+}
+test('#82 home: 圈房免疫极端天气暴露 (房间内 residentsTick 不累积)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war,
+        oldRes=S.meta.res, oldWx=S.meta.weather;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    /* 5×5 墙环(格20,20 起), 房间内放居民与居住舱 */
+    S.colony.buildings=ring9(30,30,5,5);   /* 世界 1440 起, 远离 HAB(1100,1100) */
+    S.colony.buildings.push({id:'bl_house', x:48*32, y:48*32});
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ food:10, mineral:0, med:0 };
+    S.meta.weather={ id:'wx_acid', t:0, cd:null };   /* 酸雨: 极端天气 */
+    S.meta.residents=[{ id:'rs_room1', name:'圈内甲', job:null, skills:{},
+      mood:80, food:80, illness:0, rest:80, recreation:80, exposure:0,
+      ailments:[], downed:false, isSleeping:false, bedId:null, gear:{} }];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_room1');
+    e.x=48*32+24; e.y=48*32+24;   /* 房间中心 */
+    M.residentsTick();
+    const r=S.meta.residents[0];
+    A(r.exposure===0, '房间内酸雨暴露应 0, got '+r.exposure);
+    /* 卧室级心情增益: 房间含居住舱 → +roomMoodGain */
+    A(r.mood>80, '卧室房间应心情增益, mood '+r.mood);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+    S.meta.res=oldRes; S.meta.weather=oldWx;
+  }
+});
+test('#82 home: 有缺口的圈不算房间 (室外照常累积暴露)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war,
+        oldRes=S.meta.res, oldWx=S.meta.weather;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=ring9(30,30,5,5);   /* 远离 HAB */
+    /* 拆掉顶边一格 = 缺口 */
+    const idx=S.colony.buildings.findIndex(x=>x.x===48*32 && x.y===48*30);
+    S.colony.buildings.splice(idx,1);
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ food:10, mineral:0, med:0 };
+    S.meta.weather={ id:'wx_acid', t:0, cd:null };
+    S.meta.residents=[{ id:'rs_room2', name:'缺口乙', job:null, skills:{},
+      mood:80, food:80, illness:0, rest:80, recreation:80, exposure:0,
+      ailments:[], downed:false, isSleeping:false, bedId:null, gear:{} }];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_room2');
+    e.x=48*32+24; e.y=48*32+24;
+    M.residentsTick();
+    A(S.meta.residents[0].exposure>0, '缺口圈非房间应暴露, got '+S.meta.residents[0].exposure);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+    S.meta.res=oldRes; S.meta.weather=oldWx;
+  }
+});
+test('#82 home: 路灯可建造, 通电夜间亮/断电灭 (drawDarkness 不崩)', () => {
+  const oldScene=S.scene, oldBuildings=S.colony.buildings, oldEntities=S.entities;
+  try{
+    S.scene='home';
+    S.colony.buildings=[{id:'bl_lamp', x:1000, y:1000, lv:1, powered:true}];
+    APH.Colony.placeBuildingEntity('bl_lamp',1000,1000,1);
+    try{ APH.World.drawDarkness(0.1); }catch(err){ throw new Error('夜亮 drawDarkness 抛: '+err.message); }
+    /* 断电: powered=false 再画不崩(熄灭) */
+    S.colony.buildings[0].powered=false;
+    try{ APH.World.drawDarkness(0.1); }catch(err){ throw new Error('断电 drawDarkness 抛: '+err.message); }
+    /* 白天: 不亮也不崩 */
+    try{ APH.World.drawDarkness(0.9); }catch(err){ throw new Error('白天 drawDarkness 抛: '+err.message); }
+    /* 建造检查: 科技门槛+成本 */
+    const p=APH.Colony.canPlace([], {te_machining:true}, 'bl_lamp', 500, 500, {iron:99,wood:99,stone:99});
+    A(p.ok, '机械锻造解锁后应可建, got '+JSON.stringify(p));
+  }finally{
+    S.scene=oldScene; S.colony.buildings=oldBuildings; S.entities=oldEntities;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

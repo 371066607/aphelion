@@ -757,3 +757,47 @@ test('#81 eatMeal: 无 opts 不加桌心情', () => {
   if(res.moodGain!==0) throw new Error('无桌心情应 0: '+res.moodGain);
   if(r.mood!==80) throw new Error('无桌心情不变: '+r.mood);
 });
+
+/* ============ T9 无顶房间与路灯 (#82) ============ */
+const Nav = window.APH.Nav;
+function ring(gx, gy, w, h){
+  const out=[];
+  for(let x=0; x<w; x++){ out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy)}); out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy+h-1)}); }
+  for(let y=0; y<h; y++){ out.push({id:'bl_wall', x:48*gx, y:48*(gy+y)}); out.push({id:'bl_wall', x:48*(gx+w-1), y:48*(gy+y)}); }
+  return out;
+}
+test('#82 shelteredFor: 房间内=true (免疫暴露)', () => {
+  const b=ring(10,10,3,3);
+  const rooms=Nav.roomsOf(b);
+  const sheltered=Res.shelteredFor({x:48*11+24, y:48*11+24}, b, rooms);
+  if(sheltered!==true) throw new Error('房间内应免疫: '+sheltered);
+});
+test('#82 shelteredFor: 房间外回退 isSheltered(建筑半径)', () => {
+  const b=ring(10,10,3,3);
+  const rooms=Nav.roomsOf(b);
+  /* 远处无建筑 → 非避难 */
+  const s1=Res.shelteredFor({x:48*30+24, y:48*30+24}, b, rooms);
+  if(s1!==false) throw new Error('空旷处应不避: '+s1);
+  /* 建筑旁(半径内) → 避难 */
+  const s2=Res.shelteredFor({x:48*10+24, y:48*10+24}, b, rooms);
+  if(s2!==true) throw new Error('墙旁半径内应避: '+s2);
+});
+test('#82 roomMoodGain: 房间含居住舱=卧室级 → +2', () => {
+  const b=ring(20,20,5,5);
+  b.push({id:'bl_house', x:48*22, y:48*22});   // 房间内
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*22+24, y:48*22+24}, rooms, b);
+  if(g!==2) throw new Error('卧室级应 +2: '+g);
+});
+test('#82 roomMoodGain: 房间无居住舱 → 0', () => {
+  const b=ring(30,30,4,4);
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*31+24, y:48*31+24}, rooms, b);
+  if(g!==0) throw new Error('无居住舱房间应 0: '+g);
+});
+test('#82 roomMoodGain: 室外 → 0', () => {
+  const b=ring(25,25,3,3);
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*5+24, y:48*5+24}, rooms, b);
+  if(g!==0) throw new Error('室外应 0: '+g);
+});

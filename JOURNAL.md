@@ -742,3 +742,12 @@
   - **顺手清理**：colony.js 电网 4 键（bl_conduit/wood_generator/solar_panel/battery）**重复定义**——T6 合流时旧雏形+最终版并存,对象字面量后者静默覆盖前者（仓库血泪史同款坑）,删旧留新,零行为变化。
   - **验证**：t81 新增 6 单元+3 场景；全量 542/0；scenario 89/0；perf 3/0；boss 7/0；构建 31149KB；无头 Chrome ?t8debug=1 截图确认桌椅渲染正常（无黑缝、食物堆显示、底座圆台）。
   - 下一步: **#82 T9 无顶房间+路灯**（房间 flood fill 纯函数 + 路灯电力渲染, blocker T2/T7 已关）。
+
+- **2026-08-31 · 班 2 第二票**: 🏠 #82 T9 无顶房间与路灯。
+  - **房间判定纯函数**（nav.js `roomsOf`）：墙/门=边界矩阵（门算围合,RimWorld 房间含门）→ 从四边 flood 外部 → 未灌开放格=房间（按连通分量分组,输出 cells/bbox/sz/中心）。`inRooms` 世界坐标判内外。5×5 墙环留缺口=非房间（测试锁定）。
+  - **暴露免疫接线**（residents.js `shelteredFor` 组合判定）：房间内=true > 建筑半径回退 isSheltered；updateResidents（天气减速 wxMul）与 residentsTick（exposureTick）双点换用。老档无墙=rooms=[]=回退原逻辑。
+  - **卧室心情增益**（`roomMoodGain` 纯函数）：所在房间 bbox 含 bl_house → +2/生产跳（CFG.residents.roomMoodGain）。
+  - **路灯 bl_lamp**（colony.js 注册,te_machining,铁10木5,max12,10s）：powered 由 T7 powerSettle 写（CFG 已预留 load3/prio2）；渲染=world.js drawDarkness 挖大洞(r120,str.92, 仅 dL<0.5 && powered!==false) + entities.js 暖色光晕渐变（夜里通电亮/断电灭）。
+  - **踩坑**：①场景测试初版圈房位置在 HAB(1100,1100) r92 覆盖内——isSheltered 的核心半径兜底让"缺口圈"也显示 shelter,暴露恒 0（假阳性），把圈挪到 (1440+) 才暴露真问题；②路灯 powered 写在 colony.buildings 记录（b.powered）而非实体 e——entities 渲染需按坐标查记录（缺失记录视为通电=老档兼容）。
+  - **验证**：nav +4、residents +5（shelteredFor×2/roomMoodGain×3）、scenario +3（圈房免疫/缺口暴露/路灯亮灭）；全量 551/0；scenario 92/0；perf 3/0；boss 7/0；构建 31159KB；无头 Chrome ?t9debug=1（强制夜间 clock=0.75DAY）截图：墙环围合+房内居住舱+路灯光晕+暗幕。
+  - 下一步: **#83 T10 尖刺陷阱+沙袋**（班 2 收官, blocker #77/#80 已关）。

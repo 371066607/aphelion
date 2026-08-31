@@ -145,5 +145,97 @@ APH.Nav = (function(){
     return e;
   }
 
-  return { GRID: GRID, NC: NC, gridOf: gridOf, astar: astar, followPath: followPath };
+  /* ---------- T9 无顶房间判定 (issue #82): 墙/门围合封闭区域 = 房间 ----------
+     ADR-13: 墙=不可通行; 门=可通行(移动)但围合判定里门同样算边界(RimWorld 房间含门)。
+     算法: 边界矩阵(boundary=1: 墙或门) → 从四边灌外部(flood) → 未灌到的开放格 = 房间内部。
+     纯函数: 输入 buildings 记录数组, 输出房间列表:[{cells:[{gx,gy}], minX,minY,maxX,maxY, sz}]。
+     边界外(远于任一建筑3格)的开放格不算房间(防把整张地图当房间)。 */
+  var ROOM_EDGE = { bl_wall: 1, bl_gate: 1 };   // 房间边界集合 (门算围合)
+
+  function roomsOf(buildings){
+    var g = [];
+    for (var y = 0; y < NC; y++) { g.push(new Array(NC).fill(0)); }
+    var hasAny=false;
+    (buildings || []).forEach(function(b){
+      if (!b || !ROOM_EDGE[b.id]) return;
+      var cx = Math.floor((b.x || 0) / GRID), cy = Math.floor((b.y || 0) / GRID);
+      cx = Math.max(0, Math.min(NC - 1, cx));
+      cy = Math.max(0, Math.min(NC - 1, cy));
+      g[cy][cx] = 1;
+      hasAny=true;
+    });
+    if(!hasAny) return [];
+
+    /* 外部泛滥: 从四条边界的开放格(非边界) BFS——所有通向外界的格归外部 */
+    var outside = [];
+    for (var y2 = 0; y2 < NC; y2++) { outside.push(new Array(NC).fill(false)); }
+    var stack = [];
+    for (var x = 0; x < NC; x++) {
+      if (g[0][x] === 0) stack.push([0, x]);
+      if (g[NC-1][x] === 0) stack.push([NC-1, x]);
+    }
+    for (var y3 = 0; y3 < NC; y3++) {
+      if (g[y3][0] === 0) stack.push([y3, 0]);
+      if (g[y3][NC-1] === 0) stack.push([y3, NC-1]);
+    }
+    while (stack.length) {
+      var c = stack.pop();
+      var cy2 = c[0], cx2 = c[1];
+      if (cy2 < 0 || cy2 >= NC || cx2 < 0 || cx2 >= NC) continue;
+      if (outside[cy2][cx2] || g[cy2][cx2] === 1) continue;
+      outside[cy2][cx2] = true;
+      stack.push([cy2-1, cx2], [cy2+1, cx2], [cy2, cx2-1], [cy2, cx2+1]);
+    }
+
+    /* 未灌到且非边界的开放格 = 房间; 按连通分量分组 */
+    var rooms = [];
+    var seen = [];
+    for (var y4 = 0; y4 < NC; y4++) { seen.push(new Array(NC).fill(false)); }
+    for (var y5 = 0; y5 < NC; y5++) {
+      for (var x5 = 0; x5 < NC; x5++) {
+        if (outside[y5][x5] || g[y5][x5] === 1 || seen[y5][x5]) continue;
+        var cells = [];
+        var q = [[y5, x5]];
+        seen[y5][x5] = true;
+        while (q.length) {
+          var cur = q.pop();
+          cells.push({ gx: cur[1], gy: cur[0] });
+          var nbs = [[cur[0]-1, cur[1]], [cur[0]+1, cur[1]], [cur[0], cur[1]-1], [cur[0], cur[1]+1]];
+          nbs.forEach(function(n){
+            var ny=n[0], nx=n[1];
+            if (ny < 0 || ny >= NC || nx < 0 || nx >= NC) return;
+            if (outside[ny][nx] || g[ny][nx] === 1 || seen[ny][nx]) return;
+            seen[ny][nx] = true;
+            q.push([ny, nx]);
+          });
+        }
+        if (!cells.length) continue;
+        var mnX=Infinity, mnY=Infinity, mxX=-1, mxY=-1;
+        cells.forEach(function(cell){
+          mnX=Math.min(mnX,cell.gx); mnY=Math.min(mnY,cell.gy);
+          mxX=Math.max(mxX,cell.gx); mxY=Math.max(mxY,cell.gy);
+        });
+        rooms.push({ cells: cells, minX:mnX, minY:mnY, maxX:mxX, maxY:mxY,
+          sz: cells.length, cx:(mnX+mxX)/2, cy:(mnY+mxY)/2 });
+      }
+    }
+    return rooms;
+  }
+
+  /* 点(世界坐标)是否落在任一房间内 */
+  function inRooms(point, rooms){
+    if (!point || !rooms || !rooms.length) return false;
+    var gx = Math.floor((point.x || 0) / GRID), gy = Math.floor((point.y || 0) / GRID);
+    for (var i = 0; i < rooms.length; i++) {
+      var r = rooms[i];
+      if (gx < r.minX || gx > r.maxX || gy < r.minY || gy > r.maxY) continue;
+      for (var j = 0; j < r.cells.length; j++) {
+        if (r.cells[j].gx === gx && r.cells[j].gy === gy) return true;
+      }
+    }
+    return false;
+  }
+
+  return { GRID: GRID, NC: NC, gridOf: gridOf, astar: astar, followPath: followPath,
+           roomsOf: roomsOf, inRooms: inRooms };
 })();

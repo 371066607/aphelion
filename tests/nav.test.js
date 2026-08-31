@@ -149,3 +149,43 @@ test('followPath: 空路径立即停', () => {
   Nav.followPath(e, [], 1, 48);
   if (e.walking !== false) throw new Error('空路径应停');
 });
+
+/* ============ T9 无顶房间判定 (#82) ============ */
+function ring(gx, gy, w, h){
+  /* 构造 w×h 矩形墙环(世界坐标, 48px 格中心) */
+  const out=[];
+  for(let x=0; x<w; x++){ out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy)}); out.push({id:'bl_wall', x:48*(gx+x), y:48*(gy+h-1)}); }
+  for(let y=0; y<h; y++){ out.push({id:'bl_wall', x:48*gx, y:48*(gy+y)}); out.push({id:'bl_wall', x:48*(gx+w-1), y:48*(gy+y)}); }
+  return out;
+}
+test('#82 roomsOf: 3×3 墙环 → 内部 1×1 房间', () => {
+  const rooms = Nav.roomsOf(ring(10,10,3,3));
+  if(rooms.length!==1) throw new Error('应 1 个房间: '+rooms.length);
+  const r=rooms[0];
+  if(r.sz!==1) throw new Error('3×3 环内部应 1 格: '+r.sz);
+  if(r.minX!==11 || r.minY!==11) throw new Error('房间应在 (11,11): '+JSON.stringify(r));
+});
+test('#82 roomsOf: 5×5 墙环(留缺口) → 无房间(有缺口即连通外部)', () => {
+  const b=ring(20,20,5,5);
+  /* 拆掉顶边中间一格 = 缺口 */
+  const idx=b.findIndex(x=>x.x===48*22 && x.y===48*20);
+  b.splice(idx,1);
+  const rooms = Nav.roomsOf(b);
+  if(rooms.length!==0) throw new Error('有缺口不应有房间: '+rooms.length);
+});
+test('#82 roomsOf: 门算边界(围合含门) → 仍成房间', () => {
+  const b=ring(30,30,4,4);
+  /* 顶边中间一格换成门 */
+  const idx=b.findIndex(x=>x.x===48*31 && x.y===48*30);
+  b[idx]={id:'bl_gate', x:48*31, y:48*30};
+  const rooms = Nav.roomsOf(b);
+  if(rooms.length!==1) throw new Error('含门的围合应为房间: '+rooms.length);
+  if(rooms[0].sz!==4) throw new Error('4×4 环内部应 4 格: '+rooms[0].sz);
+});
+test('#82 inRooms: 点在世界坐标判房间内外', () => {
+  const rooms = Nav.roomsOf(ring(40,40,3,3));
+  /* 房间格 (41,41) → 世界 48*41+24 */
+  if(!Nav.inRooms({x:48*41+24, y:48*41+24}, rooms)) throw new Error('内部点应在房间');
+  if(Nav.inRooms({x:48*40+24, y:48*40+24}, rooms)) throw new Error('墙格不算房间');
+  if (Nav.inRooms({x:48*45+24, y:48*45+24}, rooms)) throw new Error('外部点不应在房间');
+});
