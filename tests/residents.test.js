@@ -837,3 +837,29 @@ test('#93 playerExposureTick: 值域钳 0~100, 老档缺失兜底0', () => {
   Res.playerExposureTick(b, false, true, 'wx_thunder');
   if(b.exposure!==100) throw new Error('应钳100: '+b.exposure);
 });
+
+/* ============ P3 生活家具 (#97) ============ */
+test('#97 roomMoodGain: 房间含家具 → 逐件加成聚合 (电视+书架=+2)', () => {
+  const b=ring(40,40,5,5);
+  b.push({id:'bl_tv', x:48*42, y:48*42});
+  b.push({id:'bl_shelf', x:48*43, y:48*43});
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*42+24, y:48*42+24}, rooms, b);
+  if(g!==2) throw new Error('电视+书架应 +2: '+g);
+});
+test('#97 roomMoodGain: 卧室级+家具叠加 (居住舱+电视+书架=+4)', () => {
+  const b=ring(25,25,5,5);
+  b.push({id:'bl_house', x:48*27, y:48*27});
+  b.push({id:'bl_tv', x:48*26, y:48*26});
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*26+24, y:48*26+24}, rooms, b);
+  if(g!==3) throw new Error('卧室2+电视1 应 +3: '+g);
+});
+test('#97 roomMoodGain: 家具在房间外(墙外)不加成', () => {
+  const b=ring(28,28,5,5);
+  b.push({id:'bl_tv', x:48*30, y:48*30});   /* 房内 */
+  b.push({id:'bl_shelf', x:48*38, y:48*38}); /* 墙外远 */
+  const rooms=Nav.roomsOf(b);
+  const g=Res.roomMoodGain({x:48*30+24, y:48*30+24}, rooms, b);
+  if(g!==1) throw new Error('仅房内电视应 +1(书架在墙外不顾): '+g);
+});

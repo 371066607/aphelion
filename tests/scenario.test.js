@@ -2439,5 +2439,46 @@ test('#95 home: 无陷阱堵点 → 保持原破墙行为 (回归零破坏)', ()
   }
 });
 
+/* ============ P3 生活家具 (#97) ============ */
+test('#97 home: 家具房间心情 > 普通房间 (生产跳 roomMoodGain 聚合)', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    /* 圈房(30,30 5×5)+居住舱+电视+书架; 居民在房内 */
+    const walls97=[];
+    for(let x=0;x<5;x++){ walls97.push({id:'bl_wall',x:48*(30+x),y:48*30}); walls97.push({id:'bl_wall',x:48*(30+x),y:48*34}); }
+    for(let y=0;y<5;y++){ walls97.push({id:'bl_wall',x:48*30,y:48*(30+y)}); walls97.push({id:'bl_wall',x:48*34,y:48*(30+y)}); }
+    S.colony.buildings=walls97.concat([
+      {id:'bl_house', x:48*32, y:48*32},
+      {id:'bl_tv', x:48*31, y:48*31},
+      {id:'bl_shelf', x:48*33, y:48*33},
+    ]);
+    S.colony.buildQueue=[]; S.entities=[];
+    S.meta.residents=[{id:'rs_p3', name:'家具测试员', job:null, skills:{},
+      mood:70, food:80, illness:0, downed:false, isSleeping:false,
+      rest:80, recreation:80, exposure:0, ailments:[], gear:{}}];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_p3');
+    e.x=48*32+24; e.y=48*32+24;
+    M.residentsTick();
+    /* 卧室2 + 电视1 + 书架1 = +4 (70→74) */
+    const actualMood=S.meta.residents[0].mood;
+    A(actualMood>=74, '家具房间应 +4 心情, mood '+actualMood);
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+test('#97 home: 家具可建造 (te_machining 解锁, 成本校验)', () => {
+  /* canPlace: 科技解锁 + 离核心豁免(放家旁) + 材料 */
+  const p1=APH.Colony.canPlace([], {te_machining:true}, 'bl_tv', window.APH.CFG.HAB.x+40, window.APH.CFG.HAB.y+40, {iron:99,wood:99,leather:99});
+  A(p1.ok, '电视应可建(核心旁豁免): '+JSON.stringify(p1));
+  const p2=APH.Colony.canPlace([], {}, 'bl_tv', 500, 500, {iron:99,wood:99,leather:99});
+  if(p2.ok) throw new Error('无科技不可建');
+  const p3=APH.Colony.canPlace([], {te_machining:true}, 'bl_carpet', window.APH.CFG.HAB.x+40, window.APH.CFG.HAB.y+40, {iron:99,wood:99,leather:99});
+  A(p3.ok, '地毯应可建: '+JSON.stringify(p3));
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

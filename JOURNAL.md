@@ -800,3 +800,12 @@
   - 验证: combat +4 单测（pathHasTrap×2/strikeTrap×2）+ scenario +2；#94 场景 1 例语义更新；全量 574/0；scenario 103/0；perf 3/0；boss 7/0；构建 31177KB。
   - **P2 战争纵深全部完成**（#94 绕陷阱 + #95 拆陷阱）。
   - 下一步: P3 生活家具（电视/书架/地毯 + 房间幸福度聚合）。
+
+- **2026-08-31 · P3b**: 🛋 家具建造与房间幸福度聚合（#97）。
+  - **colony 注册**：bl_tv（铁8木4,max8）/ bl_shelf（木8,max12）/ bl_carpet（皮4,max12），科技 te_machining，1×1 格；**离核心130px 豁免**（室内家具放家旁, 与墙同理）。
+  - **roomMoodGain 扩展**（residents.js）：房间心情 = 卧室级(含 bl_house, +2) + 房间 bbox 内家具逐件加成（CFG.residents.furnitureMood: tv/shelf/carpet 各 +1）——原"卧室级独占"语义升级为聚合（T9 测试向后兼容: 无家具房间仍 +2）。
+  - **接线**：复用 T9 生产跳 roomMoodGain 调用（已有），聚合值直接进 mood。
+  - **无资产渲染**：SPRITE 未就绪（#96 资产未到）走 drawBuilding 通用回退（方块+屋顶灯）——#96 到了自动走 sprite 路径。
+  - **踩坑**：①测试用 ring(45,45)/(50,50) 太靠右下——墙格 45+4=49*48=2352 > WORLD 2200, roomsOf 网格 clamp 致房间恒空(返回 [])——**世界坐标测试必须留边界余量**(<格44)；②测试名"=+4"断言写 3（笔误,断言值 3 正确）。
+  - 验证: residents +3 单元（聚合/卧室+家具叠加/墙外不加）+ scenario +2（家具房间+4/可建造+核心豁免）；全量 577/0；scenario 105/0；perf 3/0；boss 7/0；构建 31178KB。
+  - 下一步: **P3a 资产票（#96）**——codex exec 生图 3 件家具 → build_sprites.py → 完成 P3。
