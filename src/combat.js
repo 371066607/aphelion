@@ -239,6 +239,38 @@ APH.Combat = (function(){
     if(!best) return null;
     return { x:best.x, y:best.y, kind:'wall', b:best };
   }
+  /* P2b 拆陷阱 (issue #95): breach 时若堵点=陷阱(零罚通/有罚不通) → 目标陷阱 */
+  function trapBreachFocus(en, focus, s, costFn){
+    if(!costFn || !window.APH.Nav) return null;
+    var bs = (s && s.colony && s.colony.buildings) || [];
+    var grid = APH.Nav.gridOf(bs);
+    /* 零罚路径存在 → 堵点来自惩罚格(陷阱) */
+    var freePath = APH.Nav.astar(grid, {x:en.x,y:en.y}, {x:focus.x,y:focus.y}, null);
+    if(freePath) {
+      /* 找最近的 armed 陷阱作为拆解目标 */
+      var best = null, bd = 1e9;
+      bs.forEach(function(b){
+        if(!b || b.id !== 'bl_spike_trap' || b.armed === false) return;
+        var d = U.dst(en.x, en.y, b.x, b.y);
+        if(d < bd){ bd = d; best = b; }
+      });
+      if(best) return { x:best.x, y:best.y, kind:'trap', b:best };
+    }
+    return null;
+  }
+  /* 路径是否途经待触发陷阱格 (P2b 拆陷阱判定; armed=false 已触发不罚不算) */
+  function pathHasTrap(path, traps, GRID){
+    if(!path || !traps || !traps.length) return false;
+    for(var i = 0; i < path.length; i++){
+      var gx = Math.floor(path[i].x / GRID), gy = Math.floor(path[i].y / GRID);
+      for(var j = 0; j < traps.length; j++){
+        if(traps[j].armed === false) continue;
+        var tgx = Math.floor((traps[j].x||0) / GRID), tgy = Math.floor((traps[j].y||0) / GRID);
+        if(tgx === gx && tgy === gy) return true;
+      }
+    }
+    return false;
+  }
   /* 袭击者寻路计划(纯函数):
      direct = 无墙或直线可见(原直线冲脸行为)
      path   = 绕墙路径(Nav.astar; 闸门格不在障碍矩阵=可直接穿门)
@@ -265,7 +297,18 @@ APH.Combat = (function(){
       return 0;
     } : null;
     var path = APH.Nav.astar(grid, { x:en.x, y:en.y }, { x:focus.x, y:focus.y }, costFn);
-    if(path && path.length > 1) return { mode:'path', path:path };
+    if(path && path.length > 1){
+      /* P2b: 路径途经陷阱(罚格)且无绕行 → 拆陷阱意图(标记; 敌人到边 attack 拆, 不踩) */
+      var trapOnPath = pathHasTrap(path, armedTraps, GRID);
+      if(trapOnPath){
+        var tf = trapBreachFocus(en, focus, s, costFn);
+        if(tf){
+          en.trapAtkId = Math.round(tf.b.x) + ',' + Math.round(tf.b.y);
+          return { mode:'breach', wall:tf, trap:true };
+        }
+      }
+      return { mode:'path', path:path };
+    }
     if(!path){
       var wf = breachFocus(en, s);
       if(wf) return { mode:'breach', wall:wf };
@@ -281,6 +324,24 @@ APH.Combat = (function(){
     b.hitFlash = 0.1;
     if(b.hp <= 0) destroyWall(b, s);
     U.emit('wallHit', { x:b.x, y:b.y, hp:Math.max(0, b.hp) });
+    return true;
+  }
+  /* P2b 拆陷阱: 近战拆掉陷阱记录(耐久1次), 掉落石料, 恢复通途 */
+  function strikeTrap(en, b, s){
+    if(!b || b.id !== 'bl_spike_trap') return false;
+    if(b.armed === false) return false;      // 已触发(扁平)无需拆
+    b.armed = false;
+    b.cd = 0;
+    var list = (s && s.colony) ? s.colony.buildings : null;
+    if(list){
+      for(var i = 0; i < list.length; i++){
+        if(list[i] === b){ list.splice(i, 1); break; }
+      }
+    }
+    spawnDrop(b.x, b.y, 'it_stone', 1, { stock:true, jitter:8 });
+    s.parts = s.parts || [];
+    s.parts.push({t:'spark', x:b.x, y:b.y-10, life:.4, max:.4});
+    U.emit('trapDown', { x:b.x, y:b.y });
     return true;
   }
   /* 墙毁: 从 colony.buildings 移除 + 地上掉落石料 1~2 */
@@ -544,8 +605,12 @@ APH.Combat = (function(){
         U.emit('enemySpit', en);
       }
 
-      /* 近战: 墙 → 士兵 → 玩家 → 居民 → 建筑掠夺 */
-      if(en.state === 'attack' && en.atkCd <= 0 && focus.kind === 'wall' && focus.b){
+      /* 近战: 陷阱 → 墙 → 士兵 → 玩家 → 居民 → 建筑掠夺 */
+      if(en.state === 'attack' && en.atkCd <= 0 && focus.kind === 'trap' && focus.b){
+        /* P2b: 工兵拆陷阱(耐久1次, 拆后通途恢复) */
+        en.atkCd = CFG.enemy.attackCd;
+        strikeTrap(en, focus.b, s);
+      }else if(en.state === 'attack' && en.atkCd <= 0 && focus.kind === 'wall' && focus.b){
         /* T4 破墙: 近战砍墙扣耐久 */
         en.atkCd = CFG.enemy.attackCd;
         strikeWall(en, focus.b, s);
@@ -611,10 +676,14 @@ APH.Combat = (function(){
         en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
       }
 
-      /* T10 尖刺陷阱: 敌人踩中(armed格内) → 穿刺伤害+出血+触发布置(一次性) */
+      /* T10 尖刺陷阱: 敌人踩中(armed格内) → 穿刺伤害+出血+触发布置(一次性)
+         P2b: 拆陷阱意图(trapAtkId)的敌人对目标陷阱豁免踩(工兵到边 attack 拆, 不踩) */
       if(s.scene==='home' && window.APH.Colony && !en.pillager && !en.retreat && !en.sieging){
         var traps=(s.colony&&s.colony.buildings||[]).filter(function(b){ return b.id==='bl_spike_trap'; });
         var hitTrap=APH.Colony.trapTriggers(traps, en);
+        if(hitTrap && en.trapAtkId && en.trapAtkId === (Math.round(hitTrap.x)+','+Math.round(hitTrap.y))){
+          hitTrap=null;   /* 工兵豁免: 该陷阱留待 attack 拆除 */
+        }
         if(hitTrap){
           var strike=APH.Colony.trapStrike(en);
           hitTrap.armed=false;                       /* 一次性: 触发后不再触发 */
@@ -623,6 +692,17 @@ APH.Combat = (function(){
           s.parts.push({t:'spark', x:en.x, y:en.y-14, life:.4, max:.4});
           if(window.APH.UI && APH.UI.floatText)
             APH.UI.floatText('⚠ 尖刺 '+Math.round(strike.dmg)+' 出血!','#ff6d7a');
+        }
+      }
+
+      /* P2b 工兵拆陷阱: breach trap 意图的敌人接近陷阱(≤48px)即刻拆除(不等 attack 判定) */
+      if(en.trapAtkId && s.scene==='home'){
+        var tb=(s.colony&&s.colony.buildings||[]).find(function(b){
+          return b.id==='bl_spike_trap' && b.armed!==false && en.trapAtkId===(Math.round(b.x)+','+Math.round(b.y));
+        });
+        if(tb && U.dst(en.x,en.y,tb.x,tb.y)<=48){
+          strikeTrap(en, tb, s);
+          en.trapAtkId=null;
         }
       }
 
@@ -1021,6 +1101,7 @@ APH.Combat = (function(){
     /* T4 寻路+破墙+围攻炮击目标 */
     wallHp:wallHp, breachFocus:breachFocus, planChase:planChase,
     strikeWall:strikeWall, destroyWall:destroyWall, pickShellTarget:pickShellTarget,
+    strikeTrap:strikeTrap, pathHasTrap:pathHasTrap, trapBreachFocus:trapBreachFocus,
     /* T5 弹道掩体 */
     segHitBox:segHitBox,
   };

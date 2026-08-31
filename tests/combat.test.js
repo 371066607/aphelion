@@ -442,3 +442,37 @@ test('raidBaseSuccess: 击毁敌对基地正常掉落战利品与保底遗件(�
   }
 });
 
+
+/* ============ P2b 工兵拆陷阱 (#95) ============ */
+test('#95 pathHasTrap: 路径途经待触发陷阱格 → true', () => {
+  const traps=[{id:'bl_spike_trap', x:1000, y:1000, armed:true}];
+  const path=[{x:952,y:952},{x:1000,y:1000},{x:1048,y:1048}];
+  if(!C.pathHasTrap(path, traps, 48)) throw new Error('路径应途经陷阱(1000,1000)格');
+  const path2=[{x:952,y:952},{x:1048,y:1048}];
+  if(C.pathHasTrap(path2, traps, 48)) throw new Error('绕行路径不应报陷阱');
+});
+test('#95 pathHasTrap: 已触发陷阱不算 (可踩无伤)', () => {
+  const traps=[{id:'bl_spike_trap', x:1000, y:1000, armed:false}];
+  const path=[{x:952,y:952},{x:1000,y:1000},{x:1048,y:1048}];
+  if(C.pathHasTrap(path, traps, 48)) throw new Error('已触发陷阱不算堵点');
+});
+test('#95 strikeTrap: 拆陷阱=移除记录+掉落石料+armed清', () => {
+  /* 需 world 桩: spawnDrop 用 APH.state; 造最小桩 */
+  const prevState=window.APH.state;
+  window.APH.state={ colony:{ buildings:[{id:'bl_spike_trap', x:500,y:500, armed:true}] }, parts:[], meta:{}, };
+  const trap=window.APH.state.colony.buildings[0];
+  const en={x:490,y:500,faction:{dmg:6}};
+  const r=C.strikeTrap(en, trap, window.APH.state);
+  if(r!==true) throw new Error('应拆成功');
+  if(window.APH.state.colony.buildings.length!==0) throw new Error('陷阱记录应移除');
+  window.APH.state=prevState;
+});
+test('#95 strikeTrap: 已触发(armed=false)不拆', () => {
+  const prevState=window.APH.state;
+  const trap={id:'bl_spike_trap', x:500,y:500, armed:false};
+  window.APH.state={ colony:{ buildings:[trap] }, parts:[], meta:{} };
+  const r=C.strikeTrap({x:0,y:0}, trap, window.APH.state);
+  if(r!==false) throw new Error('已触发不应拆');
+  if(window.APH.state.colony.buildings.length!==1) throw new Error('记录应保留');
+  window.APH.state=prevState;
+});

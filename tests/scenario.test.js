@@ -2372,7 +2372,68 @@ test('#94 home: 绕无可绕 → 敌仍踩陷阱 (不卡死)', () => {
       const t=S.colony.buildings[0];
       if(t.armed===false){ stepped=true; break; }
     }
-    A(stepped, '绕无可绕应触发陷阱(直踩不卡死)');
+    /* P2b 语义修订: 窄通道唯一陷阱 → 敌人触发 trapAtkId 改拆陷阱(记录移除)而非踩 */
+    A(stepped || !S.colony.buildings.some(b=>b.id==='bl_spike_trap'),
+      '绕无可绕应踩或拆(不卡死), stepped='+stepped+' trap存在='+S.colony.buildings.some(b=>b.id==='bl_spike_trap'));
+  }finally{
+    S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+
+/* ============ P2b 工兵拆陷阱 (#95) ============ */
+test('#95 home: 窄道陷阱+近墙 → 工兵拆陷阱(不拆墙), 拆后通途恢复', () => {
+  const oldScene=S.scene, oldEntities=S.entities, oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    /* 窄通道(左右竖墙), 通道内唯一陷阱; 陷阱旁加一堵墙干扰(最近目标) */
+    const walls95=[];
+    for(let y=940; y<=1060; y+=48){ walls95.push({id:'bl_wall', x:955, y:y}); walls95.push({id:'bl_wall', x:1045, y:y}); }
+    S.colony.buildings=[
+      {id:'bl_spike_trap', x:1000, y:1000, armed:true},
+    ].concat(walls95);
+    S.entities=[];
+    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 940);
+    en.hp=en.faction.hp;
+    S.entities.push(en);
+    S.war.raidActive=true;
+    S.px=1000; S.py=1096;   /* 玩家在通道下方更远(目标) */
+    let trapRemoved=false, trapArmedSeen=false;
+    for(let i=0;i<160;i++){
+      window.APH.Combat.updateCombat(0.5, false);
+      const t=S.colony.buildings.find(b=>b.id==='bl_spike_trap');
+      if(!t){ trapRemoved=true; break; }
+      if(t.armed===true) trapArmedSeen=true;
+    }
+    /* 工兵应拆掉陷阱(记录移除) 而非踩(踩也移除——区分: 踩=armed false 但记录在; 拆=记录没了) */
+    A(trapRemoved, '工兵应拆掉陷阱(记录移除)');
+  }finally{
+    S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
+  }
+});
+test('#95 home: 无陷阱堵点 → 保持原破墙行为 (回归零破坏)', () => {
+  const oldScene=S.scene, oldEntities=S.entities, oldBuildings=S.colony.buildings, oldWar=S.war;
+  try{
+    S.scene='home'; S.war={raidActive:false};
+    /* 玩家被 3×3 墙环完全围死(无陷阱): 敌人应破墙突破 */
+    S.colony.buildings=[];
+    for(let x=952; x<=1048; x+=48){
+      for(let y=952; y<=1048; y+=48){
+        if(x===1000 && y===1000) continue;   /* 玩家格 */
+        S.colony.buildings.push({id:'bl_wall', x:x, y:y});
+      }
+    }
+    S.entities=[];
+    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 880);
+    en.hp=en.faction.hp;
+    S.entities.push(en);
+    S.war.raidActive=true;
+    S.px=1000; S.py=1000;
+    let wallBroken=false;
+    for(let i=0;i<200;i++){
+      window.APH.Combat.updateCombat(0.5, false);
+      if(S.colony.buildings.length<8){ wallBroken=true; break; }   /* 拆掉至少一堵=破墙成功 */
+    }
+    A(wallBroken, '无陷阱时应破墙(回归)');
   }finally{
     S.scene=oldScene; S.entities=oldEntities; S.colony.buildings=oldBuildings; S.war=oldWar;
   }
