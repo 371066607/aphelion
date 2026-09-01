@@ -2141,6 +2141,7 @@ window.APH = window.APH || {};
         bl_lamp:{idle:1,baseline:240,h:187}, bl_dining_table:{idle:1,baseline:240,h:155},
         bl_dining_chair:{idle:1,baseline:240,h:180}, bl_spike_trap:{idle:1,baseline:240,h:129},
         bl_tv:{idle:1,baseline:236,h:217}, bl_shelf:{idle:1,baseline:236,h:217}, bl_carpet:{idle:1,baseline:207,h:159},
+        bl_workshop:{idle:1,baseline:241,h:216},   /* #97补: 漏键致工坊渲染退化(权威值来自 build_sprites.py) */
         bl_sandbag:{idle:1,baseline:240,h:106},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},

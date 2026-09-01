@@ -819,3 +819,11 @@
   - 验证: 全量 577/0; scenario 105/0（**#94 偶发 1 败后连跑 3 次全绿——敌人初始位置随 spec faction 变, 既有 flake 非本票引入**）; perf 3/0; boss 7/0; 构建 31471KB; 无头 Chrome ?p3debug=1 截图: 电视/书架/地毯三件 sprite 渲染正常（无绿边/尺寸合理）。
   - **P3 全链完成**（#97 逻辑 + #96 资产）。"家园纵深轮" P1-P3 全部落地。
   - 下一步: 手玩验证一轮（可选）或 P4 远景立项（暂缓）。
+
+- **2026-08-31 · 自主维护轮**（用户授权自动打磨）:
+  - **扩展 sprite_meta.test.js 覆盖全部 25 个 bl_ 建筑键**（原只测 5 个俯卧键——建筑 SPRITE_META 手抄漂移无防护, 恰是躺姿 bug 同款盲区）。
+  - **发现并修复真 bug：bl_workshop SPRITE_META 漏键**——main.js 的 SPRITE_META 一直缺 bl_workshop（其余建筑键都有）; 缺失导致工坊渲染 contentH=0/退化。补 `bl_workshop:{idle:1,baseline:241,h:216}`（权威值来自 build_sprites.py）。
+  - **测试测量口径修正**：原 sprite_meta 测试用自写 node zlib PNG 解码器（alpha>8 阈值）——对建筑 sheet 的半透明羽化边缘测量偏差（如 barracks 实测 80 vs PIL 88），**此前对人形俯卧恰好通过是巧合/口径差未暴露**; 建筑键一扩就全漂（假阳性 22/25）。**重构为调 build_sprites.py 解析权威 SPRITE_META**——零重写解码, 口径与真源完全一致（node 手写解码器已弃用, prone 也换权威口径）。
+  - **排查误报存档**：一度以为 src/main.js 的 applySpec 双重定义是"静默覆盖丢功能"（返回舱/植物/敌基地丢失）——深挖后确认三个 applySpec 各自嵌套于 launchExpedition/buildWorld 等不同函数内, 作用域独立无覆盖; 误报源于只数函数名未查作用域边界。已存 failure 记忆防复发。
+  - 验证: sprite_meta 30/30; 全量 602/0; scenario 105/0; perf 3/0; boss 7/0; 构建 31471KB。
+  - 下一步: 继续自主扫描（后续找 bug 轮）。

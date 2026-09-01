@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -76,26 +77,62 @@ function measureFrame0(pngPath) {
   for (let y = 0; y < cell; y++) {
     let any = false;
     for (let x = 0; x < cell; x++) {
-      if (pixels[(y * width + x) * 4 + 3] > 8) { any = true; break; }
+      if (pixels[(y * width + x) * 4 + 3] > 0) { any = true; break; }
     }
     if (any) { if (top === -1) top = y; bottom = y; }
   }
   return { baseline: bottom + 1, contentH: bottom + 1 - top };
 }
 
+/* 权威测量: 调 build_sprites.py 解析其输出的 SPRITE_META JSON (与真源完全同口径) */
+function authMeta() {
+  const out = execFileSync('python3', [path.join(ROOT, 'assets', 'build_sprites.py')], { encoding: 'utf8' });
+  const idx = out.indexOf('SPRITE_META = ');
+  if (idx < 0) throw new Error('build_sprites.py 未输出 SPRITE_META');
+  return JSON.parse(out.slice(idx + 'SPRITE_META = '.length).trim());
+}
+let _authMeta = null;
+function authOf(key) {
+  if (!_authMeta) _authMeta = authMeta();
+  return _authMeta[key] || null;
+}
+
 /* 从 src/main.js 抠出 SPRITE_META 里某个键的 {baseline,h} 字面量 */
 function metaFromMainJs(key) {
   const src = fs.readFileSync(path.join(ROOT, 'src', 'main.js'), 'utf8');
-  const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\{baseline:(\\d+),h:(\\d+)\\}');
+  const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\{(?:idle:\\d+,)?baseline:(\\d+),h:(\\d+)\\}');
   const m = src.match(re);
   if (!m) throw new Error('main.js SPRITE_META 未找到键 ' + key);
   return { baseline: Number(m[1]), h: Number(m[2]) };
 }
 
+/* bl_ 建筑键: 全部 SPRITE_META 声明的 baseline/h 与实测一致 (扩自 #84 资产; 防手抄漂移) */
+const BL_SHEETS = [
+  'bl_barracks','bl_battery','bl_carpet','bl_clinic','bl_conduit','bl_dining_chair',
+  'bl_dining_table','bl_farm','bl_gate','bl_house','bl_lab','bl_lamp','bl_landing_pad',
+  'bl_mine','bl_pasture','bl_sandbag','bl_shelf','bl_solar_panel','bl_spike_trap',
+  'bl_turret','bl_tv','bl_wall','bl_warehouse','bl_wood_generator','bl_workshop',
+];
+
 const PRONE_SHEETS = [
   'player_prone', 'hum_0_nopack_prone', 'hum_1_nopack_prone',
   'hum_2_nopack_prone', 'hum_3_nopack_prone',
 ];
+
+BL_SHEETS.forEach(function(key) {
+  test('sprite_meta bl: ' + key + ' 的 main.js baseline/h 与 build_sprites.py 权威输出一致', function() {
+    const declared = metaFromMainJs(key);
+    const measured = authOf(key);
+    if (!measured) throw new Error('build_sprites.py 未覆盖键 ' + key);
+    if (declared.baseline !== measured.baseline) {
+      throw new Error(key + ' baseline declared=' + declared.baseline + ' authoritative=' + measured.baseline);
+    }
+    if (declared.h !== measured.h) {
+      throw new Error(key + ' h(contentH) declared=' + declared.h + ' authoritative=' + measured.h +
+        ' — 请把 build_sprites.py 输出的 SPRITE_META 抄回 main.js');
+    }
+  });
+});
 
 PRONE_SHEETS.forEach(function(key) {
   test('sprite_meta: ' + key + ' 的 main.js baseline/h 与实测 PNG 一致', function() {
