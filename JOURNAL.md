@@ -827,3 +827,9 @@
   - **排查误报存档**：一度以为 src/main.js 的 applySpec 双重定义是"静默覆盖丢功能"（返回舱/植物/敌基地丢失）——深挖后确认三个 applySpec 各自嵌套于 launchExpedition/buildWorld 等不同函数内, 作用域独立无覆盖; 误报源于只数函数名未查作用域边界。已存 failure 记忆防复发。
   - 验证: sprite_meta 30/30; 全量 602/0; scenario 105/0; perf 3/0; boss 7/0; 构建 31471KB。
   - 下一步: 继续自主扫描（后续找 bug 轮）。
+
+- **2026-08-31 · 自主维护轮 2**:
+  - **perf 护栏扩展**：perf.test.js 原只测 guardTrim 3 例——P1-P3 叠加后每帧逻辑（roomsOf BFS/座位分配/陷阱判定/沙袋减速）无成本护栏。新增"完整殖民地 updateResidents 240 帧 <3000ms"（8 居民+60 建筑(墙环/家具/陷阱/沙袋)）。
+  - **顺带修复：perf 桩也漏了 nav.js**（同 scenario 的坑, 之前 T9 房间逻辑在 perf 桩里静默缺席）——perf 加载列表补 weather.js/nav.js（还有 location/Image 桩）。
+  - 验证: perf 4/4; 全量 602/0; scenario 105/0; 构建 31471KB。
+  - 下一步: 继续自主扫描轮。
