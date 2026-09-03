@@ -76,7 +76,7 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','humanoid.js','save.js','opening.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();

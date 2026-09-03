@@ -149,3 +149,9 @@ test('Save.loadMeta 新档 nightDone===false; 旧档 true', () => {
   const old = Save.loadMeta();
   if(old.opening.nightDone!==true) throw new Error('旧档 nightDone true, got '+JSON.stringify(old.opening));
 });
+
+test('assetOf 无 OpeningData 回退 CFG 路径', () => {
+  const c = O.createClock();
+  const a = O.assetOf(c);
+  if(!a || a.indexOf('01_ship_break')<0) throw new Error('无 data 时应回退路径, got '+a);
+});

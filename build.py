@@ -18,6 +18,7 @@ MODULE_ORDER = [
     "humanoid.js",
     "save.js",
     "opening.js",
+    "opening_data.js",
     "planet.js",
     "llm.js",
     "colony.js",

@@ -73,8 +73,10 @@ APH.Opening = (function(){
   }
 
   function assetOf(clock){
-    var assets = cfg().assets || [];
     var i = clock && clock.shot != null ? clock.shot : 0;
+    var data = (typeof APH!=='undefined' && APH.OpeningData) || [];
+    if(data[i]) return data[i];
+    var assets = cfg().assets || [];
     return assets[i] || '';
   }
 
