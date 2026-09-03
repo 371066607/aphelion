@@ -939,6 +939,18 @@ APH.Combat = (function(){
     }
     spawnDrop(base.x, base.y, 'it_relic', 2, {jitter:8, merge:false});
     s.shake=1;
+    /* D3 远征反击联动: 摧毁敌基地重创该势力 */
+    if(s.rivalStates && window.APH.Rivals && APH.Rivals.applyBaseRaid){
+      for(var ri=0; ri<s.rivalStates.length; ri++){
+        var rItem=s.rivalStates[ri];
+        if(!rItem || !rItem.rival) continue;
+        if(rItem.rival.id===base.rivalId || rItem.rival.name===base.rivalName){
+          s.rivalStates[ri]=APH.Rivals.applyBaseRaid(rItem);
+          break;
+        }
+      }
+      try{ localStorage.setItem('aphelion_rivals_v1', JSON.stringify(s.rivalStates)); }catch(e){}
+    }
     if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
     U.emit('raidSuccess',{ rivalId:base.rivalId });
   }
@@ -1104,5 +1116,6 @@ APH.Combat = (function(){
     strikeTrap:strikeTrap, pathHasTrap:pathHasTrap, trapBreachFocus:trapBreachFocus,
     /* T5 弹道掩体 */
     segHitBox:segHitBox,
+    raidBaseSuccess:raidBaseSuccess,
   };
 })();

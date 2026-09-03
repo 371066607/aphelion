@@ -138,6 +138,12 @@
   </p>
   <div id="techMapBody" style="display:flex;gap:18px;align-items:flex-start;min-width:min-content"></div>
 </div>
+<div id="diplomacyOverlay" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:41;padding:56px 48px;overflow:auto">
+  <h2 style="color:#ff9ad0;font-size:18px;letter-spacing:4px;margin:0 0 6px">外 星 势 力 外 交</h2>
+  <p style="color:#5d6f96;font-size:11px;margin:0 0 18px">防御力 <b id="dipDefPower" style="color:#59d9ff">0</b> · 战况态势 <b id="dipWarScore" style="color:#ffc857">50</b> · [O]/[Esc] 关闭</p>
+  <div id="diplomacyBody" style="max-width:800px;display:flex;flex-direction:column;gap:16px;font-size:12px;color:#cdd9f5"></div>
+  <p style="margin-top:26px;color:#39435c;font-size:11px">按 [O] 或 [Esc] 关闭</p>
+</div>
 <div id="hud">
   <h1 id="planetTitle">APH-P1 · 前哨站</h1>
   <div class="row"><span class="lab">氧气</span><div class="track"><div class="fill" id="bO2" style="width:100%;background:#59d9ff"></div></div><span class="val" id="vO2">100</span></div>
@@ -149,7 +155,7 @@
   <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
   <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
   <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
-  <div class="row" id="rowWar" style="display:none"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span></div>
+  <div class="row" id="rowWar" style="display:none;cursor:pointer" title="点击或按 [O] 打开外交面板"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span><span style="font-size:10px;color:#5d6f96;margin-left:4px">[O]</span></div>
   <div class="row" id="rowEco"><span class="lab">经营</span><span class="val" id="vEco" style="width:auto;flex:1;text-align:left;letter-spacing:0">矿0 粮0</span></div>
 </div>
 

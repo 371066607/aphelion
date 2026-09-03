@@ -22,6 +22,7 @@ function stubEl(){
     setAttribute(){}, getAttribute(){ return null; },
     play(){ return { catch(){} }; }, pause(){},
     querySelector(){ return stubEl(); },
+    querySelectorAll(){ return []; },
     getContext(){
       const grad = { addColorStop(){} };
       return new Proxy({}, { get: function(t, k){
@@ -2377,8 +2378,11 @@ test('#94 home: 敌人寻路绕开待触发陷阱 (不踩)', () => {
     let minDist=Infinity, steppedOnTrap=false;
     for(let i=0;i<80;i++){
       window.APH.Combat.updateCombat(0.5, false);
-      const t=S.colony.buildings[0];
-      if(t.armed===false){ steppedOnTrap=true; break; }
+      const t=S.colony.buildings.find(b=>b.id==='bl_spike_trap');
+      if(t && t.armed===false){
+        steppedOnTrap=true;
+        break;
+      }
       minDist=Math.min(minDist, Math.hypot(en.x-1000, en.y-1000));
     }
     /* 核心: 绕行不踩(陷阱保持 armed) —— 敌 never 触发陷阱 */ 
@@ -2516,6 +2520,120 @@ test('#97 home: 家具可建造 (te_machining 解锁, 成本校验)', () => {
   if(p2.ok) throw new Error('无科技不可建');
   const p3=APH.Colony.canPlace([], {te_machining:true}, 'bl_carpet', window.APH.CFG.HAB.x+40, window.APH.CFG.HAB.y+40, {iron:99,wood:99,leather:99});
   A(p3.ok, '地毯应可建: '+JSON.stringify(p3));
+});
+
+/* ============ 外交与战略威慑系统 (#103~#107) ============ */
+test('#105 diplomacy: O 键打开关闭外交浮层与卡片渲染', () => {
+  const el = document.getElementById('diplomacyOverlay');
+  M.toggleDiplomacy(true);
+  A(el.style.display !== 'none', '外交面板应显示');
+  const body = document.getElementById('diplomacyBody');
+  A(body && body.innerHTML && body.innerHTML.includes('dip-card'), '外交面板应渲染势力卡片');
+  M.toggleDiplomacy(false);
+  A(el.style.display === 'none', '外交面板应关闭');
+});
+
+test('#106 diplomacy: 纳贡平息即刻袭击危机并扣减物资', () => {
+  const oldRes = JSON.stringify(S.meta.res || {});
+  try {
+    S.meta.res = { mineral: 30, food: 20, leather: 10, med: 5 };
+    S.rivalStates = [{
+      rival: { id: 'rv_test_1', name: '测试好战军', trait: 'aggressive', military: 40 },
+      relation: -40,
+      anger: 12,
+      wantRaid: true,
+      cowedTime: 0,
+      pact: false
+    }];
+    S.war.pendingWave = { count: 5 };
+    S.war.raidFrom = '测试好战军';
+
+    // 纳贡 15 矿石
+    M.doSendTribute(0, 'mineral');
+
+    A(S.meta.res.mineral === 15, '矿石应扣除 15 got ' + S.meta.res.mineral);
+    A(S.rivalStates[0].wantRaid === false, 'wantRaid 应被平息');
+    A(S.war.pendingWave === null, '即刻袭击波次应被取消');
+    A(S.rivalStates[0].relation > -40, '关系度应提升');
+    A(S.rivalStates[0].anger < 12, '怒气应消退');
+  } finally {
+    S.meta.res = JSON.parse(oldRes);
+  }
+});
+
+test('#106 diplomacy: 压倒性防御成功实施军事威慑', () => {
+  const oldBuildings = S.colony.buildings;
+  try {
+    // 5座炮塔: def = 10 + 5*12 = 70. 敌军力 30 (1.2x = 36)
+    S.colony.buildings = [
+      { id: 'bl_turret' }, { id: 'bl_turret' }, { id: 'bl_turret' },
+      { id: 'bl_turret' }, { id: 'bl_turret' }
+    ];
+    S.rivalStates = [{
+      rival: { id: 'rv_test_2', name: '测试扩张团', trait: 'expansionist', military: 30 },
+      relation: -15,
+      anger: 5,
+      wantRaid: true,
+      cowedTime: 0,
+      pact: false
+    }];
+
+    M.doDeterRival(0);
+
+    A(S.rivalStates[0].cowedTime === 300, '威慑应使敌方进入 300s 畏缩期 got ' + S.rivalStates[0].cowedTime);
+    A(S.rivalStates[0].wantRaid === false, '畏缩后袭击意向打消');
+  } finally {
+    S.colony.buildings = oldBuildings;
+  }
+});
+
+test('#106 diplomacy: 远征基地击破联动削弱敌对势力军力与怒气', () => {
+  S.rivalStates = [{
+    rival: { id: 'rv_test_base', name: '先遣据点军', trait: 'aggressive', military: 50 },
+    relation: -20,
+    anger: 10,
+    wantRaid: true,
+    cowedTime: 0,
+    pact: false
+  }];
+
+  // 模拟远征击毁敌基地
+  window.APH.Combat.raidBaseSuccess({
+    dead: false,
+    x: 500, y: 500,
+    rivalId: 'rv_test_base',
+    rivalName: '先遣据点军'
+  });
+
+  const updated = S.rivalStates[0];
+  A(updated.rival.military === 35, '军力应从 50 削减30%至 35 got ' + updated.rival.military);
+  A(updated.anger === 0, '怒气应清零');
+  A(updated.wantRaid === false, 'wantRaid 应打消');
+  A(updated.cowedTime > 0, '应获得畏缩期');
+  A(updated.relation < -20, '摧毁基地关系度应下降');
+});
+
+test('#106 diplomacy: 通商协定签署并生效', () => {
+  const oldRes = JSON.stringify(S.meta.res || {});
+  try {
+    S.meta.res = { mineral: 50, food: 20 };
+    S.rivalStates = [{
+      rival: { id: 'rv_test_trade', name: '友善商会', trait: 'trader', military: 20 },
+      relation: 10,
+      anger: 2,
+      wantRaid: false,
+      cowedTime: 0,
+      pact: false
+    }];
+
+    M.doSignTradePact(0);
+
+    A(S.meta.res.mineral === 30, '矿石应扣除 20 got ' + S.meta.res.mineral);
+    A(S.rivalStates[0].pact === true, '通商协定应置为 true');
+    A(S.rivalStates[0].relation === 20, '关系度应增加 10');
+  } finally {
+    S.meta.res = JSON.parse(oldRes);
+  }
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

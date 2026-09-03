@@ -421,11 +421,15 @@ APH.UI = (function(){
     },1000);
   }
 
+  function toggleDiplomacy(show){
+    if(window.APH.Main && APH.Main.toggleDiplomacy) APH.Main.toggleDiplomacy(show);
+  }
+
   return {
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
     setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,
     showOpening:showOpening, skipOpeningVideo:skipOpeningVideo, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
-    fatal:fatal, armProbe:armProbe,
+    fatal:fatal, armProbe:armProbe, toggleDiplomacy:toggleDiplomacy,
   };
 })();
