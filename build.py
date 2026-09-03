@@ -64,6 +64,15 @@ def main():
             sys.exit(1)
         parts.append(f"<script>\n{code}\n</script>")
         print(f"  ✓ {mod} ({len(code)//1024}KB)")
+        if mod == "opening.js":
+            vpath = os.path.join(ROOT, "assets", "opening", "opening.mp4")
+            if os.path.isfile(vpath):
+                import base64
+                raw = open(vpath, "rb").read()
+                b64 = base64.b64encode(raw).decode("ascii")
+                vjs = "window.APH=window.APH||{};APH.OpeningVideo='data:video/mp4;base64," + b64 + "';\n"
+                parts.append(f"<script>\n{vjs}\n</script>")
+                print(f"  ✓ opening.mp4 ({len(raw)//1024}KB → data URL)")
 
     out = tpl.replace("<!--SCRIPTS-->", "\n".join(parts))
 

@@ -850,3 +850,8 @@
   - Codex exec 生图 5 张 1280×720 动森风：舰裂可读「新曙光」/ 迫降申请界面 / 舱落地 / 空座位无尸体 / 空院子仅一人。JPEG 内联 `opening_data.js`，PNG 源在 assets/opening。
   - 验证: opening 17；scenario 109（#94 偶发后重跑绿）；构建 33150KB。
   - 开场短片+第一夜全链完成（#99/#100/#101/#102）。
+
+- **2026-09-03 · 开场五镜成片视频接入**:
+  - 用户提供 `新曙光_五镜成片.mp4`，H.264+AAC 压至 2.4MB 存 `assets/opening/opening.mp4`，`build.py` 编译时内联为 data URL。
+  - `#openingVideo` 叠层播放，支持点击/Enter 跳过，视频结束或跳过时显现「活下去」按钮；有视频时禁用警报音效。
+  - 验证: opening 18；run.js 620；scenario 109；perf 4；boss 7；构建 36448KB 绿。

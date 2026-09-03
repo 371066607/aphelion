@@ -25,11 +25,11 @@ test('skipToLast → shot 4, skipped, t 在最后窗口起点', () => {
   if(!O.isLast(c)) throw new Error('skip 后应为最后一镜');
 });
 
-test('shouldPlay: 新档播; played / seen兼容 / autostart 不播', () => {
-  if(O.shouldPlay({ played:false }, {}) !== true) throw new Error('played:false 应播');
-  if(O.shouldPlay({ played:true }, {}) !== false) throw new Error('played:true 不播');
-  if(O.shouldPlay({ seen:true }, {}) !== false) throw new Error('seen:true 兼容不播');
-  if(O.shouldPlay({ played:false }, { autostart:true }) !== false) throw new Error('autostart 不播');
+test('shouldPlay: 每次打开都播; 仅 autostart 不播', () => {
+  if(O.shouldPlay({ played:false }, {}) !== true) throw new Error('应播');
+  if(O.shouldPlay({ played:true }, {}) !== true) throw new Error('有存档也应播');
+  if(O.shouldPlay({ seen:true }, {}) !== true) throw new Error('seen 也应播');
+  if(O.shouldPlay({ played:true }, { autostart:true }) !== false) throw new Error('autostart 不播');
 });
 
 test('markPlayed 把 played 置 true', () => {
@@ -154,4 +154,14 @@ test('assetOf 无 OpeningData 回退 CFG 路径', () => {
   const c = O.createClock();
   const a = O.assetOf(c);
   if(!a || a.indexOf('01_ship_break')<0) throw new Error('无 data 时应回退路径, got '+a);
+});
+
+test('skipToLast 后 isLast, 无 OpeningVideo 时 t=30 也是最后一镜', () => {
+  const c = O.createClock();
+  if(O.isLast(c)) throw new Error('开场不应是最后一镜');
+  O.skipToLast(c);
+  if(!O.isLast(c)) throw new Error('skip 后应为最后');
+  const d = O.createClock();
+  O.tick(d, 30);
+  if(!O.isLast(d)) throw new Error('无视频时 t=30 应为最后');
 });

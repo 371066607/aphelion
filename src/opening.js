@@ -20,12 +20,11 @@ APH.Opening = (function(){
   function shouldPlay(opening, flags){
     flags = flags || {};
     if(flags.autostart) return false;
-    if(isPlayed(opening)) return false;
     return true;
   }
 
   function createClock(){
-    return { t: 0, shot: 0, skipped: false };
+    return { t: 0, shot: 0, skipped: false, videoEnded: false };
   }
 
   function tick(clock, dt){
@@ -50,15 +49,33 @@ APH.Opening = (function(){
     var ends = c.shotEnds || [];
     var last = c.lastIndex != null ? c.lastIndex : Math.max(0, ends.length - 1);
     clock.skipped = true;
+    clock.videoEnded = true;
     clock.shot = last;
     clock.t = (last > 0 && ends[last - 1] != null) ? ends[last - 1] : 0;
     return clock;
   }
 
+  function hasVideo(){
+    return !!(typeof APH!=='undefined' && APH.OpeningVideo);
+  }
+  function videoSrc(){
+    if(hasVideo()) return APH.OpeningVideo;
+    return (cfg().video)||'';
+  }
   function isLast(clock){
+    if(!clock) return false;
+    if(clock.skipped || clock.videoEnded) return true;
+    if(hasVideo()) return false;
     var c = cfg();
     var last = c.lastIndex != null ? c.lastIndex : 0;
-    return !!(clock && clock.shot === last);
+    return clock.shot === last;
+  }
+  function markVideoEnded(clock){
+    if(!clock) return clock;
+    clock.videoEnded = true;
+    var c = cfg();
+    clock.shot = c.lastIndex != null ? c.lastIndex : 0;
+    return clock;
   }
 
   function captionOf(clock){
@@ -129,7 +146,10 @@ APH.Opening = (function(){
     createClock: createClock,
     tick: tick,
     skipToLast: skipToLast,
+    hasVideo: hasVideo,
+    videoSrc: videoSrc,
     isLast: isLast,
+    markVideoEnded: markVideoEnded,
     captionOf: captionOf,
     audioOf: audioOf,
     assetOf: assetOf,

@@ -19,6 +19,8 @@ function stubEl(){
     },
     textContent:'', innerHTML:'',
     appendChild(){}, addEventListener(){},
+    setAttribute(){}, getAttribute(){ return null; },
+    play(){ return { catch(){} }; }, pause(){},
     querySelector(){ return stubEl(); },
     getContext(){
       const grad = { addColorStop(){} };

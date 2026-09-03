@@ -284,19 +284,63 @@ APH.UI = (function(){
 
   /* ---------- 全屏界面 ---------- */
   function hideIntro(){ $('intro').classList.add('hide'); }
+  function openingVideoEl(){ return $('openingVideo'); }
   function hideOpening(){
     var el=$('opening');
     if(el && el.classList) el.classList.add('hide');
+    var v=openingVideoEl();
+    if(v){ try{ v.pause(); }catch(e){} }
   }
   function showOpening(){
     var el=$('opening');
     if(el && el.classList) el.classList.remove('hide');
+    var v=openingVideoEl();
+    var src = window.APH.Opening && APH.Opening.videoSrc ? APH.Opening.videoSrc() : '';
+    if(v && src){
+      if(v._aphSrc!==src){
+        v._aphSrc=src;
+        v.src=src;
+        if(v.setAttribute) v.setAttribute('playsinline','');
+      }
+      v.style.display='';
+      var img=$('openingStill'); if(img) img.style.display='none';
+      var cap=$('openingCaption'); if(cap) cap.style.display='none';
+      var play=function(){
+        var p=v.play();
+        if(p && p.catch) p.catch(function(){ v.muted=true; v.play(); });
+      };
+      play();
+      v.onended=function(){
+        var st=window.APH && APH.state;
+        if(st && st.openingClock && APH.Opening.markVideoEnded){
+          APH.Opening.markVideoEnded(st.openingClock);
+          renderOpening(st.openingClock);
+        }
+      };
+    }
+  }
+  function skipOpeningVideo(){
+    var v=openingVideoEl();
+    if(!v || !v.src) return;
+    try{
+      if(v.duration && isFinite(v.duration)) v.currentTime=Math.max(0, v.duration-0.05);
+      v.pause();
+    }catch(e){}
+    var st=window.APH && APH.state;
+    if(st && st.openingClock && APH.Opening.markVideoEnded)
+      APH.Opening.markVideoEnded(st.openingClock);
   }
   function renderOpening(clock){
     if(!clock || !window.APH.Opening) return;
     var img=$('openingStill');
     var cap=$('openingCaption');
     var btn=$('openingSurvive');
+    var v=openingVideoEl();
+    var vid = APH.Opening.videoSrc && APH.Opening.videoSrc();
+    if(vid && v){
+      if(btn && btn.style) btn.style.display=APH.Opening.isLast(clock)?'':'none';
+      return;
+    }
     var src=APH.Opening.assetOf(clock)||'';
     var text=APH.Opening.captionOf(clock)||'';
     if(img){
@@ -311,7 +355,7 @@ APH.UI = (function(){
         }
       }
     }
-    if(cap) cap.textContent=text;
+    if(cap){ cap.style.display=''; cap.textContent=text; }
     if(btn && btn.style) btn.style.display=APH.Opening.isLast(clock)?'':'none';
   }
   function showDeath(reason,stats){
@@ -381,7 +425,7 @@ APH.UI = (function(){
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
     setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,
-    showOpening:showOpening, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
+    showOpening:showOpening, skipOpeningVideo:skipOpeningVideo, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
     fatal:fatal, armProbe:armProbe,
   };
 })();

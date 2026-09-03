@@ -1425,6 +1425,7 @@ window.APH = window.APH || {};
       if(APH.UI && APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
       var phase = window.APH.Opening && APH.Opening.audioOf
         ? APH.Opening.audioOf(s.openingClock) : 'silence';
+      if(window.APH.Opening && APH.Opening.hasVideo && APH.Opening.hasVideo()) phase='silence';
       if(phase==='alarm'){
         s.openingAlarmT = (s.openingAlarmT||0) - dt;
         if(s.openingAlarmT<=0){
@@ -1692,6 +1693,7 @@ window.APH = window.APH || {};
         if(s.openingClock && window.APH.Opening && !APH.Opening.isLast(s.openingClock)){
           APH.Opening.skipToLast(s.openingClock);
           s.openingAlarmT = 0;
+          if(APH.UI.skipOpeningVideo) APH.UI.skipOpeningVideo();
           if(APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
         }else if(!s.openingClock) startGame();
       }
@@ -2084,6 +2086,7 @@ window.APH = window.APH || {};
         APH.SFX.unlock();
         APH.Opening.skipToLast(st.openingClock);
         st.openingAlarmT = 0;
+        if(APH.UI.skipOpeningVideo) APH.UI.skipOpeningVideo();
         if(APH.UI.renderOpening) APH.UI.renderOpening(st.openingClock);
         return;
       }
