@@ -1,7 +1,7 @@
 /* ============================================================
    Aphelion · opening.js — 开场短片时钟 (APH.Opening seam 1)
    挂载: window.APH.Opening
-   纯函数: 静帧时钟 / shouldPlay / skip / markPlayed。零 DOM。
+   纯函数: 静帧时钟 / shouldPlay / skip / markPlayed / 第一夜目标+过客闸门。零 DOM。
    ============================================================ */
 window.APH = window.APH || {};
 
@@ -11,7 +11,7 @@ APH.Opening = (function(){
   function cfg(){ return (APH.CFG && APH.CFG.opening) || {}; }
 
   function defaults(existed){
-    return { played: !!existed };
+    return { played: !!existed, nightDone: !!existed, sleptInHouse:false, houseAt:null, firstVisitor:false };
   }
 
   function isPlayed(opening){
@@ -84,6 +84,43 @@ APH.Opening = (function(){
     return opening;
   }
 
+  function hasHouse(buildings){
+    return (buildings||[]).some(function(b){ return b && b.id==='bl_house'; });
+  }
+  function objective(opening, buildings){
+    opening = opening || {};
+    var c = cfg();
+    if(opening.nightDone) return null;
+    if(!hasHouse(buildings)) return { id:'house', text: c.objectiveHouse || '今夜之前：盖一座居住舱 [G]' };
+    if(!opening.sleptInHouse) return { id:'sleep', text: c.objectiveSleep || '走进居住舱按 [E] 睡' };
+    return null;
+  }
+  function visitorFallbackSec(){
+    var n = cfg().visitorFallback;
+    if(n!=null) return n;
+    return (APH.CFG && APH.CFG.DAY_LEN) || 210;
+  }
+  function visitorAllowed(opening, buildings, now){
+    opening = opening || {};
+    if(opening.nightDone) return true;
+    if(!hasHouse(buildings)) return false;
+    if(opening.sleptInHouse) return true;
+    if(opening.houseAt!=null && now!=null && (now - opening.houseAt) >= visitorFallbackSec())
+      return true;
+    return false;
+  }
+  function noteHouse(opening, now){
+    opening = opening || {};
+    if(opening.houseAt==null) opening.houseAt = now||0;
+    return opening;
+  }
+  function noteSleptInHouse(opening){
+    opening = opening || {};
+    opening.sleptInHouse = true;
+    opening.nightDone = true;
+    return opening;
+  }
+
   return {
     defaults: defaults,
     shouldPlay: shouldPlay,
@@ -96,5 +133,10 @@ APH.Opening = (function(){
     assetOf: assetOf,
     isPlayed: isPlayed,
     markPlayed: markPlayed,
+    hasHouse: hasHouse,
+    objective: objective,
+    visitorAllowed: visitorAllowed,
+    noteHouse: noteHouse,
+    noteSleptInHouse: noteSleptInHouse,
   };
 })();

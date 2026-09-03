@@ -153,6 +153,12 @@ test('opening: showDeath 不重播短片且不把 played 打回未播', () => {
   A(el.classList.contains('hide'), '#opening 应保持隐藏');
   A(S.meta.opening.played===true, '死亡不得把 played 打回 false');
 });
+test('T2 新档进家无过客, hint 是盖房目标', () => {
+  A(!S.entities.some(e=>e && e.type==='visitor' && !e.dead), '新档进家不应有过客');
+  const h=(document.getElementById('hint')&&document.getElementById('hint').textContent)||'';
+  A(h.indexOf('居住舱')>=0 && h.indexOf('[G]')>=0, 'hint 应为盖房目标, got '+h);
+});
+
 
 /* ---------- 场景链路 ---------- */
 test('boot 后: 出生在殖民地(home), spec=新曙光殖民地', () => {

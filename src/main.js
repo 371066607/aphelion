@@ -50,7 +50,8 @@ window.APH = window.APH || {};
     APH.Colony.buildColonyWorld(s.seed);
     APH.World.buildTerrain();
     syncResidentEntities();
-    maybeSpawnVisitor(true);
+    applyFirstNightHint();
+    tryFirstNightVisitor();
     /* 远征战利品在出发前就已结算; 回家只做补给 */
     s.o2=CFG.player.o2Max; s.hp=CFG.player.hpMax;
     /* #72 家园击倒: 返航/读档防御性清除击倒(hp 已回满, 避免 stale downed 秒死/卡昏迷) */
@@ -61,21 +62,7 @@ window.APH = window.APH || {};
     s.downed = false;
     document.getElementById('planetTitle').textContent =
       '新曙光殖民地 · 家园';
-    /* 新手引导(meta.tut 阶段标记, 持久化) */
-    var tut=APH.state.meta.tut||0;
-    var hints=[
-      '这是你的家。过客会来拜访，走近按 [E] 招募。',
-      '按 [G] 盖房、[R] 名册。缺资源再去发射台。',
-      '产出会堆在地上。走近捡起，或让人搬去仓库。饿了会走去仓库或地上的粮。',
-      '[E] 从发射台出门补给 · 矿材卸在发射台地上，晶体变研究点',
-      '袭击会抢仓库和地上的东西。炮塔和士兵守家。',
-      '人会饿、会病。盖医疗舱，工坊把矿做成药。贴身医疗舱才能回血。',
-    ];
-    APH.UI.setHint(hints[Math.min(tut,hints.length-1)]);
-    if(tut<hints.length) {
-      APH.state.meta.tut=tut+1;
-      APH.Save.saveMeta(APH.state.meta);
-    }
+    applyFirstNightHint();
   }
   function launchExpedition(){
     var s = APH.state;
@@ -716,10 +703,16 @@ window.APH = window.APH || {};
       var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
       APH.UI.setHint('[E] 登船 · '+shPad.mission);
     }else if(!s.war.raidActive && !(s.war.raidWarn>0)){
-      var hintEl=document.getElementById('hint');
-      var cur=hintEl&&hintEl.textContent||'';
-      if(cur.indexOf('[E] 登船')===0 || cur.indexOf('[E] 招募')===0)
-        APH.UI.setHint('');
+      var objH = window.APH.Opening && APH.Opening.objective
+        ? APH.Opening.objective(s.meta&&s.meta.opening, (s.colony&&s.colony.buildings)||[])
+        : null;
+      if(objH) APH.UI.setHint(objH.text);
+      else {
+        var hintEl=document.getElementById('hint');
+        var cur=hintEl&&hintEl.textContent||'';
+        if(cur.indexOf('[E] 登船')===0 || cur.indexOf('[E] 招募')===0)
+          APH.UI.setHint('');
+      }
     }
 
     /* 家园: 氧气始终补; 生命只在靠近医疗舱时缓慢回 */
@@ -837,6 +830,11 @@ window.APH = window.APH || {};
           }
         }
         saveColony();
+        if(d.bid==='bl_house' && window.APH.Opening && APH.Opening.noteHouse){
+          APH.Opening.noteHouse(firstNightOpening(), s.clock||0);
+          applyFirstNightHint();
+          try{ APH.Save.saveMeta(s.meta); }catch(eH){}
+        }
         U.emit('built',{id:d.bid});
         APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
         s.parts.push({t:'ping',x:d.x,y:d.y,life:.9,max:.9});
@@ -1741,6 +1739,12 @@ window.APH = window.APH || {};
           /* #66 床边睡眠: 靠床 E 入睡(床铺恢复), 优先于发射台, 绝不落入自动寻路分支 */
           APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
           syncPlayerSleep();
+          if(window.APH.Opening && APH.Opening.noteSleptInHouse){
+            APH.Opening.noteSleptInHouse(firstNightOpening());
+            tryFirstNightVisitor();
+            applyFirstNightHint();
+            try{ APH.Save.saveMeta(s.meta); }catch(eS){}
+          }
           APH.UI.floatText('🛌 入睡','#8fd4ff');
         }else if(s.scene==='home' && s.nearClinic && playerSick()){
           /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(医疗舱床位恢复), 绝不落入自动寻路分支 */
@@ -3423,9 +3427,45 @@ window.APH = window.APH || {};
     U.emit('visitorArrived', profile);
     return ent;
   }
+  function firstNightOpening(){
+    var s=APH.state;
+    if(!s.meta) s.meta={};
+    if(!s.meta.opening){
+      s.meta.opening = (window.APH.Opening && APH.Opening.defaults)
+        ? APH.Opening.defaults(false)
+        : { played:false, nightDone:false, sleptInHouse:false, houseAt:null, firstVisitor:false };
+    }
+    return s.meta.opening;
+  }
+  function applyFirstNightHint(){
+    if(!window.APH.Opening || !APH.Opening.objective) return;
+    var s=APH.state;
+    var o=APH.Opening.objective(firstNightOpening(), (s.colony&&s.colony.buildings)||[]);
+    if(o) APH.UI.setHint(o.text);
+  }
+  function tryFirstNightVisitor(){
+    var s=APH.state;
+    if(s.scene!=='home') return null;
+    if(!window.APH.Opening || !APH.Opening.visitorAllowed){
+      return maybeSpawnVisitor(false);
+    }
+    var op=firstNightOpening();
+    var b=(s.colony&&s.colony.buildings)||[];
+    if(!APH.Opening.visitorAllowed(op, b, s.clock||0)) return null;
+    if(!op.firstVisitor){
+      if(visitorCount()===0) spawnVisitor();
+      op.firstVisitor=true;
+      try{ APH.Save.saveMeta(s.meta); }catch(eF){}
+      return true;
+    }
+    return maybeSpawnVisitor(false);
+  }
   function maybeSpawnVisitor(force){
     var s=APH.state;
     if(s.scene!=='home') return null;
+    if(window.APH.Opening && APH.Opening.visitorAllowed &&
+       !APH.Opening.visitorAllowed(firstNightOpening(), (s.colony&&s.colony.buildings)||[], s.clock||0))
+      return null;
     var max=(CFG.visitor && CFG.visitor.max)||2;
     if(visitorCount()>=max) return null;
     if(!force && Math.random()>(CFG.visitor.arriveChance||0.45)) return null;
@@ -3909,8 +3949,8 @@ window.APH = window.APH || {};
     });
     saveMetaQuiet();
     saveColony();
-    /* 过客拜访: 不再自动入籍, 只刷流浪者 */
-    maybeSpawnVisitor(false);
+    /* 过客拜访: 第一夜闸门后再刷 */
+    tryFirstNightVisitor();
     refreshTechMapIfOpen();
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
@@ -3943,6 +3983,11 @@ window.APH = window.APH || {};
       }else if(s.scene==='home' && s.nearBed){
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
         syncPlayerSleep();
+        if(window.APH.Opening && APH.Opening.noteSleptInHouse){
+          APH.Opening.noteSleptInHouse(firstNightOpening());
+          tryFirstNightVisitor();
+          applyFirstNightHint();
+        }
       }else if(s.scene==='home' && s.nearClinic && playerSick()){
         /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(bed_med), 绝不落入自动寻路分支 */
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');

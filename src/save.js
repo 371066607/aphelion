@@ -118,8 +118,12 @@ APH.Save = (function(){
     if(!m.events.history) m.events.history = [];
     if(m.events.lastNeg==null) m.events.lastNeg = 0;
     /* ADR-0007 开场短片: 有存档不播; 兼容未提交期的 seen */
-    if(!m.opening) m.opening = { played: !!existed };
+    if(!m.opening) m.opening = { played: !!existed, nightDone: !!existed, sleptInHouse:false, houseAt:null, firstVisitor:false };
     if(m.opening.played == null) m.opening.played = !!(m.opening.seen || existed);
+    if(m.opening.nightDone == null) m.opening.nightDone = !!existed;
+    if(!m.opening.sleptInHouse) m.opening.sleptInHouse = false;
+    if(m.opening.houseAt === undefined) m.opening.houseAt = null;
+    if(!m.opening.firstVisitor) m.opening.firstVisitor = false;
     if(!m.workPrio) m.workPrio = {};
     if(!m.analyzedFlora) m.analyzedFlora = {};
     if(!m.analyzedSpecimens) m.analyzedSpecimens = {};

@@ -99,3 +99,53 @@ test('旧 seen:true 迁成 played', () => {
   const m = Save.loadMeta();
   if(!m.opening || m.opening.played !== true) throw new Error('seen:true 应迁 played, got '+JSON.stringify(m.opening));
 });
+
+
+test('缝2 无居住舱 → 目标盖房且过客不允许', () => {
+  const o = { nightDone:false, sleptInHouse:false, houseAt:null };
+  const obj = O.objective(o, []);
+  if(!obj || obj.id!=='house') throw new Error('应为 house, got '+JSON.stringify(obj));
+  if(obj.text.indexOf('居住舱')<0 || obj.text.indexOf('[G]')<0) throw new Error('文案应含居住舱 [G], got '+obj.text);
+  if(O.visitorAllowed(o, [], 0)!==false) throw new Error('无房过客不允许');
+});
+
+test('缝2 有舱未睡 → 目标去睡且过客不进场', () => {
+  const o = { nightDone:false, sleptInHouse:false, houseAt:10 };
+  const b = [{id:'bl_house',x:0,y:0}];
+  const obj = O.objective(o, b);
+  if(!obj || obj.id!=='sleep') throw new Error('应为 sleep, got '+JSON.stringify(obj));
+  if(obj.text.indexOf('[E]')<0) throw new Error('文案应含 [E]');
+  if(O.visitorAllowed(o, b, 10)!==false) throw new Error('未睡过客不进场');
+});
+
+test('缝2 舱内睡过 → 目标无且过客允许', () => {
+  const o = { nightDone:false, sleptInHouse:false, houseAt:10 };
+  O.noteSleptInHouse(o);
+  const b = [{id:'bl_house'}];
+  if(O.objective(o, b)!==null) throw new Error('睡过目标应无, got '+JSON.stringify(O.objective(o,b)));
+  if(O.visitorAllowed(o, b, 11)!==true) throw new Error('睡过过客应允许');
+});
+
+test('缝2 未睡但完工超过一天 → 过客允许, 目标仍是去睡', () => {
+  const day = CFG.DAY_LEN || 210;
+  const o = { nightDone:false, sleptInHouse:false, houseAt:0 };
+  const b = [{id:'bl_house'}];
+  if(O.visitorAllowed(o, b, day)!==true) throw new Error('满一天过客应允许');
+  const obj = O.objective(o, b);
+  if(!obj || obj.id!=='sleep') throw new Error('未睡目标仍是 sleep');
+});
+
+test('缝2 老档 nightDone → 无目标且过客允许', () => {
+  const o = O.defaults(true);
+  if(!o.nightDone) throw new Error('老档 nightDone 应为 true');
+  if(O.objective(o, [])!==null) throw new Error('老档无目标');
+  if(O.visitorAllowed(o, [], 0)!==true) throw new Error('老档过客允许');
+});
+
+test('Save.loadMeta 新档 nightDone===false; 旧档 true', () => {
+  const fresh = Save.loadMeta();
+  if(fresh.opening.nightDone!==false) throw new Error('新档 nightDone false, got '+JSON.stringify(fresh.opening));
+  localStorage.setItem('aphelion_meta', JSON.stringify({ v:1, research:0 }));
+  const old = Save.loadMeta();
+  if(old.opening.nightDone!==true) throw new Error('旧档 nightDone true, got '+JSON.stringify(old.opening));
+});

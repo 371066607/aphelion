@@ -666,6 +666,9 @@ APH.CFG = {
     button: '活下去',
     alarmUntil: 3,
     alarmPeriod: 0.85,
+    objectiveHouse: '今夜之前：盖一座居住舱 [G]',
+    objectiveSleep: '走进居住舱按 [E] 睡',
+    visitorFallback: null,   // null → DAY_LEN
     assets: [
       'assets/opening/01_ship_break.png',
       'assets/opening/02_forced_landing.png',
