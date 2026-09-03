@@ -77,3 +77,101 @@ test('raidWave: label 带战术前缀', () => {
   const w=R.raidWave({military:40,trait:'expansionist'});
   if(w.label.indexOf('围攻')!==0) throw new Error('label 应带战术前缀 got '+w.label);
 });
+
+/* ---- D1: 势力外交与战略威慑 (Issue #104) ---- */
+test('defaultRelationOf: 按 trait 分流初始好感', () => {
+  if(R.defaultRelationOf('aggressive') !== -40) throw new Error('aggressive 初始应 -40');
+  if(R.defaultRelationOf('expansionist') !== -15) throw new Error('expansionist 初始应 -15');
+  if(R.defaultRelationOf('trader') !== 20) throw new Error('trader 初始应 20');
+  if(R.defaultRelationOf('unknown') !== -20) throw new Error('未知 trait 兜底应 -20');
+});
+
+test('relationTierOf: 三级状态机划分', () => {
+  if(R.relationTierOf(-50) !== 'hostile') throw new Error('-50 应为 hostile');
+  if(R.relationTierOf(-31) !== 'hostile') throw new Error('-31 应为 hostile');
+  if(R.relationTierOf(-30) !== 'neutral') throw new Error('-30 应为 neutral');
+  if(R.relationTierOf(0) !== 'neutral') throw new Error('0 应为 neutral');
+  if(R.relationTierOf(40) !== 'neutral') throw new Error('40 应为 neutral');
+  if(R.relationTierOf(41) !== 'allied') throw new Error('41 应为 allied');
+  if(R.relationTierOf(100) !== 'allied') throw new Error('100 应为 allied');
+});
+
+test('sendTribute: 资源充足纳贡成功并平息怒气与撤销袭击', () => {
+  const rs = { rival: { trait:'aggressive', military:40 }, relation:-40, anger:10, wantRaid:true };
+  const res = R.sendTribute(rs, 'mineral', 20);
+  if(!res.success) throw new Error('纳贡应成功');
+  if(res.cost !== 15) throw new Error('矿石消耗应为 15 got '+res.cost);
+  if(res.newState.relation !== -25) throw new Error('关系度应升至 -25 got '+res.newState.relation);
+  if(res.newState.anger !== 4) throw new Error('怒气应扣减6分至4 got '+res.newState.anger);
+  if(res.newState.wantRaid !== false) throw new Error('wantRaid 应被化解');
+  if(rs.relation !== -40) throw new Error('原状态对象应保持纯函数不变');
+});
+
+test('sendTribute: 资源不足纳贡失败', () => {
+  const rs = { rival: { trait:'aggressive' }, relation:-40, anger:10 };
+  const res = R.sendTribute(rs, 'mineral', 10);
+  if(res.success) throw new Error('资源不足不应成功');
+  if(!res.reason) throw new Error('失败应有原因');
+});
+
+test('signTradePact: 关系达标签署通商协定', () => {
+  const rs = { rival: { trait:'trader' }, relation:10, pact:false };
+  const res = R.signTradePact(rs, 30);
+  if(!res.success) throw new Error('签署通商协定应成功');
+  if(!res.newState.pact) throw new Error('pact 应置为 true');
+  if(res.newState.relation !== 20) throw new Error('签署条约应加好感');
+});
+
+test('signTradePact: 负关系拒绝签署通商', () => {
+  const rs = { rival: { trait:'aggressive' }, relation:-20, pact:false };
+  const res = R.signTradePact(rs, 50);
+  if(res.success) throw new Error('负关系不应允许通商');
+});
+
+test('deterRival: 压倒性防御威慑成功', () => {
+  const rs = { rival: { military:30 }, wantRaid:true, cowedTime:0 };
+  const res = R.deterRival(rs, 40); // 40 >= 30*1.2 (36)
+  if(!res.success) throw new Error('防御超1.2倍威慑应成功');
+  if(res.newState.cowedTime <= 0) throw new Error('cowedTime 应设置');
+  if(res.newState.wantRaid !== false) throw new Error('威慑应打消 wantRaid');
+});
+
+test('deterRival: 防御不足威慑失败', () => {
+  const rs = { rival: { military:30 }, wantRaid:true };
+  const res = R.deterRival(rs, 30); // 30 < 36
+  if(res.success) throw new Error('防御不足威慑应失败');
+});
+
+test('applyBaseRaid: 远征基地击破战略重创', () => {
+  const rs = { rival: { military:50, economy:40 }, relation:-20, anger:8, wantRaid:true };
+  const next = R.applyBaseRaid(rs);
+  if(next.rival.military !== 35) throw new Error('军力应削减30%至35 got '+next.rival.military);
+  if(next.anger !== 0) throw new Error('怒气应清零');
+  if(next.wantRaid !== false) throw new Error('wantRaid 应取消');
+  if(next.cowedTime <= 0) throw new Error('应获得畏缩期');
+  if(next.relation !== -35) throw new Error('摧毁基地关系应降15点');
+});
+
+test('growthTick: 畏缩期间军力不增长', () => {
+  const r = { military:20, economy:20, trait:'aggressive' };
+  const g = R.growthTick(r, 1, 100); // cowedTime = 100
+  if(g.military !== 20) throw new Error('畏缩期军力不应增长');
+  if(g.economy <= 20) throw new Error('经济仍应增长');
+});
+
+test('shouldRaid: 盟友绝不袭击 / 畏缩期不袭击 / 中立门槛提高', () => {
+  const r = { military:80, trait:'aggressive' };
+  // 盟友
+  const dAllied = R.shouldRaid(r, 20, 99, 60, 0); // relation=60
+  if(dAllied.should) throw new Error('盟友绝不袭击');
+  // 畏缩期
+  const dCowed = R.shouldRaid(r, 20, 99, -50, 60); // cowedTime=60
+  if(dCowed.should) throw new Error('畏缩期不袭击');
+  // 中立门槛提高 (军力需要 1.5 倍)
+  // playerDef=50, 50*1.3=65, 50*1.5=75. r.military=70. 宿敌会打, 中立不打
+  const dHostile = R.shouldRaid({ military:70, trait:'aggressive' }, 50, 20, -40, 0);
+  const dNeutral = R.shouldRaid({ military:70, trait:'aggressive' }, 50, 20, 0, 0);
+  if(!dHostile.should) throw new Error('宿敌70>65应袭击');
+  if(dNeutral.should) throw new Error('中立70<75不应袭击');
+});
+

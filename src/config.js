@@ -526,6 +526,42 @@ APH.CFG = {
     siegeWalkMul: 0.35,
   },
 
+  /* 势力外交与战略威慑 (ADR-17) */
+  diplomacy: {
+    tiers: {
+      hostile: -30,       // < -30 为宿敌
+      allied: 40,         // > 40 为盟友 (之间为中立)
+    },
+    defaultRelations: {
+      aggressive: -40,
+      expansionist: -15,
+      trader: 20,
+    },
+    defaultRelationFallback: -20,
+    tributes: {
+      mineral: { cost: 15, relationGain: 15, angerCalm: 6, label: '矿石 15' },
+      food:    { cost: 10, relationGain: 20, angerCalm: 8, label: '粮食 10' },
+      med:     { cost: 2,  relationGain: 25, angerCalm: 10, label: '药品 2' },
+    },
+    tradePact: {
+      minRelation: 0,     // 需关系度 ≥ 0
+      costMineral: 20,    // 消耗20矿材
+      visitorBonus: 1.5,  // 游商到访概率倍率
+      discount: 0.1,      // 交易优惠 10%
+    },
+    deterrence: {
+      defRatio: 1.2,      // 防御力 ≥ 敌军力 × 1.2
+      duration: 300,      // 威慑持续 300 秒 (5分钟)
+    },
+    baseRaidDamage: {
+      milCut: 0.3,        // 基地被毁军力扣减 30%
+      cowedSec: 180,      // 基地被毁陷入畏缩 180 秒
+      relationPenalty: 15,// 关系度扣减 15
+    },
+    neutralRaidMul: 1.5,  // 中立势力发起袭击所需军力倍率提高至 1.5 (宿敌为1.3)
+    neutralAngerMul: 1.5, // 中立势力所需怒气累积时长倍率
+  },
+
   /* 家园天气 (ADR-15: 马尔可夫状态机; 单位: 秒; 一天=DAY_LEN) */
   weather: {
     dayLen: 210,                    // 与 DAY_LEN 同步(一天秒数)
