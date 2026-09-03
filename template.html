@@ -59,6 +59,13 @@
     display:flex;align-items:center;justify-content:center;flex-direction:column;
     text-align:center;padding:24px;transition:opacity .9s}
   .screen.hide{opacity:0;pointer-events:none}
+  #opening{z-index:21;background:#0b1018}
+  #openingStill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;
+    background:#151c28}
+  #openingCaption{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);z-index:1;
+    font-size:15px;letter-spacing:4px;line-height:1.9;color:#e8eefc;text-shadow:0 2px 16px #000;
+    white-space:pre-line;max-width:86vw}
+  #openingSurvive{position:relative;z-index:2;margin-top:36px}
   .tag{font-size:11px;letter-spacing:6px;color:#59d9ff;margin-bottom:14px}
   #intro h1{font-size:min(42px,11vw);letter-spacing:.3em;font-weight:700;margin-bottom:6px;
     text-shadow:0 0 40px rgba(89,217,255,.3)}
@@ -160,16 +167,18 @@
 <div id="stick"><div id="knob"></div></div>
 <div id="vig"></div>
 
+<div class="screen hide" id="opening">
+  <img id="openingStill" alt="">
+  <div id="openingCaption"></div>
+  <button class="bigBtn" id="openingSurvive">活下去</button>
+</div>
+
 <div class="screen" id="intro">
   <div class="tag">COLONY FRONTIER · 07</div>
   <h1>远 日 点</h1>
-  <h2>新曙光殖民地 · 家园</h2>
-  <p>这是你的家。先盖农场和住房。<br>
-     过客会来拜访——走近按 E 招募，F 请客吃饭。<br>
-     <b style="color:#ffc857">矿材用来建造</b>，研究点用来升级科技。<br>
-     缺了东西，再从发射台出门补给。</p>
-  <button class="bigBtn" id="startBtn">回 到 家 园</button>
-  <div id="ctrlHint">WASD 移动 · E 招募过客 · F 请客 · G 建造 · T 科技 · R 名册<br>触屏左下角摇杆 · 回车开始</div>
+  <h2>新曙光</h2>
+  <p></p>
+  <button class="bigBtn" id="startBtn">活下去</button>
 </div>
 
 <div class="screen" id="end">

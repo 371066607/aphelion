@@ -63,6 +63,7 @@ APH.Save = (function(){
   /* ---------- 三层接口 ---------- */
   function loadMeta(){
     var m = read(CFG.save.KEY_META);
+    var existed = !!m;
     if(!m){
       m = {
         v: CFG.save.VERSION,
@@ -116,6 +117,9 @@ APH.Save = (function(){
     if(!m.events.cooldowns) m.events.cooldowns = {};
     if(!m.events.history) m.events.history = [];
     if(m.events.lastNeg==null) m.events.lastNeg = 0;
+    /* ADR-0007 开场短片: 有存档不播; 兼容未提交期的 seen */
+    if(!m.opening) m.opening = { played: !!existed };
+    if(m.opening.played == null) m.opening.played = !!(m.opening.seen || existed);
     if(!m.workPrio) m.workPrio = {};
     if(!m.analyzedFlora) m.analyzedFlora = {};
     if(!m.analyzedSpecimens) m.analyzedSpecimens = {};

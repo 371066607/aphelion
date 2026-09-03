@@ -284,7 +284,38 @@ APH.UI = (function(){
 
   /* ---------- 全屏界面 ---------- */
   function hideIntro(){ $('intro').classList.add('hide'); }
+  function hideOpening(){
+    var el=$('opening');
+    if(el && el.classList) el.classList.add('hide');
+  }
+  function showOpening(){
+    var el=$('opening');
+    if(el && el.classList) el.classList.remove('hide');
+  }
+  function renderOpening(clock){
+    if(!clock || !window.APH.Opening) return;
+    var img=$('openingStill');
+    var cap=$('openingCaption');
+    var btn=$('openingSurvive');
+    var src=APH.Opening.assetOf(clock)||'';
+    var text=APH.Opening.captionOf(clock)||'';
+    if(img){
+      if(img._aphSrc!==src){
+        img._aphSrc=src;
+        img.onerror=function(){ if(img.style) img.style.display='none'; };
+        if(src){
+          if(img.style) img.style.display='';
+          img.src=src;
+        }else if(img.style){
+          img.style.display='none';
+        }
+      }
+    }
+    if(cap) cap.textContent=text;
+    if(btn && btn.style) btn.style.display=APH.Opening.isLast(clock)?'':'none';
+  }
   function showDeath(reason,stats){
+    hideOpening();
     var s=$('intro');
     s.querySelector('.tag').textContent='SIGNAL LOST';
     s.querySelector('h1').textContent='信 号 中 断';
@@ -349,7 +380,8 @@ APH.UI = (function(){
   return {
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
-    setActBtn:setActBtn, hideIntro:hideIntro, showDeath:showDeath, showWin:showWin,
+    setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,
+    showOpening:showOpening, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
     fatal:fatal, armProbe:armProbe,
   };
 })();

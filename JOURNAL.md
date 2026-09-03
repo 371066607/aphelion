@@ -833,3 +833,10 @@
   - **顺带修复：perf 桩也漏了 nav.js**（同 scenario 的坑, 之前 T9 房间逻辑在 perf 桩里静默缺席）——perf 加载列表补 weather.js/nav.js（还有 location/Image 桩）。
   - 验证: perf 4/4; 全量 602/0; scenario 105/0; 构建 31471KB。
   - 下一步: 继续自主扫描轮。
+
+- **2026-09-03 · T1 开场短片可玩（#101）**:
+  - `APH.Opening` 缝 1：五镜时钟 / skip 到第 5 / `played` 闸门 / 系统字锁死 / 1–3 警报 4–5 静。
+  - 新档 `#opening` 叠层；第五镜只许点「活下去」；旧档/`?autostart=1`/死亡不重播。静帧占位（T0 未到）。
+  - 存档 `meta.opening.played`（`seen` 兼容）；ADR-0007 + DESIGN ADR-16。
+  - 验证: opening 单测 + 全量单元 + scenario 开场冒烟；构建绿。未做 #100 静帧 / #102 第一夜。
+  - 下一步: T0 五张静帧 或 T2 第一夜目标+过客闸门。

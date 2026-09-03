@@ -77,6 +77,9 @@ APH.SFX = (function(){
                                 tone({type:'square',f0:f,dur:.14,vol:.07,delay:i*.1}); }); },
     died:         function(){ tone({type:'sawtooth',f0:220,f1:30,dur:.9,vol:.12}); },
     launched:     function(){ tone({type:'sawtooth',f0:80,f1:400,dur:.5,vol:.08}); },
+    openingAlarm: function(){ tone({type:'square',f0:392,dur:.12,vol:.05});
+                              tone({type:'sawtooth',f0:90,f1:48,dur:.28,vol:.06,delay:.04});
+                              noise(.08,.04,380); },
   };
 
   /* 接线事件总线 */

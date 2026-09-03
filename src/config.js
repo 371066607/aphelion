@@ -650,6 +650,31 @@ APH.CFG = {
     farmPowerMul: 0.5,                    // 农场无电减产乘子 (≠绝收, RimWorld 式半瘫痪)
   },
 
+  /* 开场短片 (ADR-10 / ADR-0007) */
+  opening: {
+    duration: 30,
+    shotCount: 5,
+    lastIndex: 4,
+    shotEnds: [3.5, 7, 11, 16, 30],
+    captions: [
+      '新曙光\n船体完整性：临界',
+      '迫降申请：已提交\n迫降申请：已接受',
+      '',
+      '其余生命信号：丢失',
+      '活下去。'
+    ],
+    button: '活下去',
+    alarmUntil: 3,
+    alarmPeriod: 0.85,
+    assets: [
+      'assets/opening/01_ship_break.png',
+      'assets/opening/02_forced_landing.png',
+      'assets/opening/03_pod_down.png',
+      'assets/opening/04_signal_lost.png',
+      'assets/opening/05_empty_yard.png'
+    ],
+  },
+
   /* 存档 */
   save: {
     PREFIX: 'aphelion_',

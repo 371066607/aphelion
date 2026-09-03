@@ -8,8 +8,15 @@ const path = require('path');
 
 /* ---------- DOM/浏览器桩 ---------- */
 function stubEl(){
+  const classes = {};
   return {
-    style:{}, classList:{ add(){}, remove(){}, toggle(){} },
+    style:{}, src:'',
+    classList:{
+      add(c){ classes[c]=true; },
+      remove(c){ classes[c]=false; },
+      toggle(c, on){ classes[c] = on==null ? !classes[c] : !!on; },
+      contains(c){ return !!classes[c]; }
+    },
     textContent:'', innerHTML:'',
     appendChild(){}, addEventListener(){},
     querySelector(){ return stubEl(); },
@@ -69,7 +76,7 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','humanoid.js','save.js','opening.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
@@ -123,6 +130,28 @@ test('#84: sprite 成功走贴图，Image onerror 后程序化回退不抛错', 
     APH.World.daylight=oldDaylight;
     APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
   }
+});
+
+/* ---------- 开场短片 (T1 #101) ---------- */
+test('opening: 新档 boot 有 intro 时钟', () => {
+  A(location.search==='', '本文件 location.search 应为空');
+  A(S.mode==='intro', 'mode 应为 intro, got '+S.mode);
+  A(S.openingClock, '应有 openingClock');
+});
+test('opening: start 后 running、played、时钟清空', () => {
+  M.start();
+  A(S.mode==='running', 'start 后应为 running, got '+S.mode);
+  A(S.meta.opening && S.meta.opening.played===true, 'start 应 markPlayed');
+  A(!S.openingClock, '时钟应清空');
+});
+test('opening: showDeath 不重播短片且不把 played 打回未播', () => {
+  const el = document.getElementById('opening');
+  el.classList.add('hide');
+  S.meta.opening = S.meta.opening || {};
+  S.meta.opening.played = true;
+  APH.UI.showDeath('测试死亡', { found:0, total:6, carry:{}, runLoot:0, survived:0 });
+  A(el.classList.contains('hide'), '#opening 应保持隐藏');
+  A(S.meta.opening.played===true, '死亡不得把 played 打回 false');
 });
 
 /* ---------- 场景链路 ---------- */

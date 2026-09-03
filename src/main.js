@@ -1422,6 +1422,23 @@ window.APH = window.APH || {};
     perfGuard(now-lastT);
     var dt=Math.min(.05,(now-lastT)/1000); lastT=now;
 
+    if(s.mode==='intro' && s.openingClock){
+      if(window.APH.Opening) APH.Opening.tick(s.openingClock, dt);
+      if(APH.UI && APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
+      var phase = window.APH.Opening && APH.Opening.audioOf
+        ? APH.Opening.audioOf(s.openingClock) : 'silence';
+      if(phase==='alarm'){
+        s.openingAlarmT = (s.openingAlarmT||0) - dt;
+        if(s.openingAlarmT<=0){
+          s.openingAlarmT = (CFG.opening && CFG.opening.alarmPeriod) || 0.85;
+          if(APH.SFX && APH.SFX.play) APH.SFX.play('openingAlarm');
+        }
+      }else{
+        s.openingAlarmT = 0;
+      }
+      return;
+    }
+
     if(s.mode!=='running'){ return; }
 
     /* 实体上限护栏 */
@@ -1673,7 +1690,13 @@ window.APH = window.APH || {};
     addEventListener('keydown',function(e){
       s.keys[e.code]=true;
       APH.SFX.unlock();
-      if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro') startGame();
+      if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro'){
+        if(s.openingClock && window.APH.Opening && !APH.Opening.isLast(s.openingClock)){
+          APH.Opening.skipToLast(s.openingClock);
+          s.openingAlarmT = 0;
+          if(APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
+        }else if(!s.openingClock) startGame();
+      }
       /* #72 家园击倒: 昏迷期间所有按键忽略(含 E — 击倒无 E 唤醒, 只等送医/倒计时) */
       if(playerDowned() && s.mode==='running') return;
       /* #66 床边睡眠: 睡着时除 E 外全部按键忽略(唤醒只走 WASD/E/受伤) */
@@ -2044,6 +2067,24 @@ window.APH = window.APH || {};
     });
 
     document.getElementById('startBtn').addEventListener('click',startGame);
+    var surviveBtn=document.getElementById('openingSurvive');
+    if(surviveBtn) surviveBtn.addEventListener('click',function(ev){
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      startGame();
+    });
+    var openingEl=document.getElementById('opening');
+    if(openingEl) openingEl.addEventListener('click',function(){
+      var st=APH.state;
+      if(st.mode!=='intro') return;
+      if(st.openingClock && window.APH.Opening && !APH.Opening.isLast(st.openingClock)){
+        APH.SFX.unlock();
+        APH.Opening.skipToLast(st.openingClock);
+        st.openingAlarmT = 0;
+        if(APH.UI.renderOpening) APH.UI.renderOpening(st.openingClock);
+        return;
+      }
+      /* 第五镜只许点「活下去」; 画面点击不开始 */
+    });
     document.getElementById('freeBtn').addEventListener('click',function(){
       APH.state.mode='running';
       document.getElementById('end').classList.remove('show');
@@ -2068,6 +2109,16 @@ window.APH = window.APH || {};
     APH.SFX.unlock();
     var s=APH.state;
     if(s.mode!=='intro') return;
+    if(!s.meta.opening){
+      s.meta.opening = (window.APH.Opening && APH.Opening.defaults)
+        ? APH.Opening.defaults(false)
+        : { played:false };
+    }
+    if(window.APH.Opening && APH.Opening.markPlayed) APH.Opening.markPlayed(s.meta.opening);
+    else s.meta.opening.played = true;
+    if(APH.UI.hideOpening) APH.UI.hideOpening();
+    s.openingClock = null;
+    s.openingAlarmT = 0;
     s.mode='running';
     APH.UI.hideIntro();
     APH.UI.armProbe();
@@ -2292,6 +2343,11 @@ window.APH = window.APH || {};
           APH.Colony.placeBuildingEntity('bl_carpet', 48*(p3x+2), 48*p3y, 1);
           document.title='AUTO: p3debug ready';
         }
+      }else if(window.APH.Opening && APH.Opening.shouldPlay(s.meta.opening, { autostart:_q.indexOf('autostart=1')>=0 })){
+        s.openingClock = APH.Opening.createClock();
+        APH.UI.hideIntro();
+        if(APH.UI.showOpening) APH.UI.showOpening();
+        if(APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
       }
       if(_q.indexOf('exp=1')>=0){
         startGame();
@@ -2311,6 +2367,7 @@ window.APH = window.APH || {};
   function newPlanet(){
     var s=APH.state;
     s.mode='intro';
+    if(APH.UI.hideOpening) APH.UI.hideOpening();
     document.getElementById('end').classList.remove('show');
     var scr=document.getElementById('intro');
     scr.classList.remove('hide');
