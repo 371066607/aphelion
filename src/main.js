@@ -594,6 +594,11 @@ window.APH = window.APH || {};
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
+    s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
+    if(s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearFood && !s.nearPad){
+      var cMode = (s.nearCooler.mode === 'freezer') ? '❄ 冷库模式 (-5°C)' : '🌤 避暑模式 (20°C)';
+      APH.UI.setHint('[E] 切换空调模式: 当前为 ' + cMode);
+    }
     s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
     s.nearAncientTerminal = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_terminal', s.px, s.py, 60) : null;
     s.nearAncientVault = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_vault', s.px, s.py, 60) : null;
@@ -1592,6 +1597,14 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
       tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene==='home' && s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
+      var curM = s.nearCooler.mode === 'freezer';
+      s.nearCooler.mode = curM ? 'comfort' : 'freezer';
+      s.nearCooler.targetTemp = curM ? 20 : -5;
+      APH.UI.floatText('❄ 空调模式切换为: ' + (curM ? '避暑空调 (20°C)' : '冷冻冷库 (-5°C)'), '#4fc3f7');
+      saveColony();
       return true;
     }
     if(s.scene==='home' && s.nearStorageContainer && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
@@ -3634,6 +3647,8 @@ window.APH = window.APH || {};
         syncPlayerSleep();
       }else if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
         tryPlayerEatNearFood();
+      }else if(s.scene==='home' && s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
+        onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearStorageContainer && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
         onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad){

@@ -763,6 +763,8 @@ APH.CFG = {
       bl_turret: { load: 10, prio: 1 },   // 防御炮塔: 保供级
       bl_clinic: { load: 6,  prio: 1 },   // 医疗舱: 保供级
       bl_lamp:   { load: 3,  prio: 2 },   // T9 路灯: 预留(本票只入优先级表)
+      bl_heater: { load: 40, prio: 3 },   // ADR-25 电暖器
+      bl_cooler: { load: 50, prio: 2 },   // ADR-25 制冷空调
     },
     wood:  { watts: 14, burnSec: 15 },    // 木柴发电机: 额定功率, 每 burnSec 秒烧 1 木材
     solar: { watts: 8 },                  // 太阳能板: 基础功率 × 天气 solarMul (仅白天)

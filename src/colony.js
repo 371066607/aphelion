@@ -84,6 +84,9 @@ APH.Colony = (function(){
     /* ADR-24 史前遗迹科技反哺 (#142) */
     bl_heavy_turret: { name:'等离子重炮', cost:0, costMineral:0, reqTech:'te_heavy_plasma', costRes:{ iron:25, alloy:5 }, size:48, max:4, buildTime:12, cells:[1,1], dispH:105, desc:'史前遗迹重炮：超长射程与高额爆破杀伤。' },
     bl_ancient_generator: { name:'史前永恒发电机', cost:0, costMineral:0, reqTech:'te_heavy_plasma', costRes:{ iron:20, wood:10 }, size:48, max:2, buildTime:15, cells:[1,1], dispH:110, desc:'由史前高能核心驱动：零燃料消耗，永久稳定提供 200W 强劲电力。' },
+    /* ADR-25 温控电器建筑 (#145) */
+    bl_heater: { name:'电暖器', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:15, wood:5 }, size:48, max:16, buildTime:6, cells:[1,1], dispH:52, desc:'消耗 40W 电力供热：自动将所在房间加热保温至 21°C。' },
+    bl_cooler: { name:'制冷空调', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:20, alloy:3 }, size:48, max:16, buildTime:8, cells:[1,1], dispH:56, desc:'消耗 50W 电力制冷：可按 [E] 切换避暑（20°C）或冷库（-5°C）模式。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
     bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
       cells:[1,1], buildTime:6, dispH:96,
@@ -323,8 +326,8 @@ APH.Colony = (function(){
       return { ok:false, why:'已达数量上限' };
     var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
     var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && GRID_STATICS[bid]);
-    /* P3 家具与收纳货架豁免离核心太近(室内件, 与墙同理) */
-    var isFurniture = (bid==='bl_tv'||bid==='bl_shelf'||bid==='bl_carpet'||bid==='bl_storage_shelf');
+    /* P3 家具与收纳货架与温控设备豁免离核心太近(室内件, 与墙同理) */
+    var isFurniture = (bid==='bl_tv'||bid==='bl_shelf'||bid==='bl_carpet'||bid==='bl_storage_shelf'||bid==='bl_heater'||bid==='bl_cooler');
     /* 墙/闸门/导线豁免离核心130px: 否则围不了家(ADR-13) */
     if(!isGrid && !isFurniture && U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     for(var i=0;i<colonyBuildings.length;i++){
@@ -1055,7 +1058,7 @@ APH.Colony = (function(){
   }
 
   /* ---------- ADR-25: 封闭房间热阻隔热与传导纯函数 ---------- */
-  function roomTemperatureTick(room, ambientTemp, dt){
+  function roomTemperatureTick(room, ambientTemp, dt, appliances){
     if(!room) return ambientTemp;
     if(room.isEnclosed === false){
       room.temp = ambientTemp;
@@ -1066,7 +1069,29 @@ APH.Colony = (function(){
     var baseRate = C.thermalTransmissionRate != null ? C.thermalTransmissionRate : 0.15;
     var step = (dt != null ? dt : 30) / 30;
     var rate = Math.max(0, Math.min(1, baseRate * step));
-    room.temp = Math.round((room.temp + (ambientTemp - room.temp) * rate) * 10) / 10;
+    
+    // 自然环境传导
+    var current = room.temp + (ambientTemp - room.temp) * rate;
+
+    // 温控设备调节
+    var list = appliances || [];
+    for(var i = 0; i < list.length; i++){
+      var app = list[i];
+      if(!app || app.powered === false) continue;
+      if(app.id === 'bl_heater' || app.bid === 'bl_heater'){
+        var hTarget = C.heaterTarget != null ? C.heaterTarget : 21;
+        if(current < hTarget){
+          current = Math.min(hTarget, current + 15 * step);
+        }
+      } else if(app.id === 'bl_cooler' || app.bid === 'bl_cooler'){
+        var cTarget = app.targetTemp != null ? app.targetTemp : (app.mode === 'freezer' ? (C.coolerTargetFreezer != null ? C.coolerTargetFreezer : -5) : (C.coolerTargetComfort != null ? C.coolerTargetComfort : 20));
+        if(current > cTarget){
+          current = Math.max(cTarget, current - 15 * step);
+        }
+      }
+    }
+
+    room.temp = Math.round(current * 10) / 10;
     return room.temp;
   }
 

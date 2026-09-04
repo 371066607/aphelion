@@ -52,3 +52,43 @@ test('temperature: roomTemperatureTick 封闭房间热阻隔热与缓慢传导',
   roomTick(openRoom, -25, 30);
   A(openRoom.temp === -25, '非封闭房间应直接与室外同温 -25°C');
 });
+
+test('temperature: BUILDINGS 注册电暖器与制冷空调', () => {
+  const heater = APH.Colony.get('bl_heater');
+  A(heater, 'bl_heater 必须注册于 BUILDINGS');
+  A(heater.cells[0] === 1 && heater.cells[1] === 1, '电暖器必须为 1x1 规格');
+
+  const cooler = APH.Colony.get('bl_cooler');
+  A(cooler, 'bl_cooler 必须注册于 BUILDINGS');
+  A(cooler.cells[0] === 1 && cooler.cells[1] === 1, '制冷空调必须为 1x1 规格');
+
+  // 电力负载配置
+  const con = APH.CFG.power.consumers;
+  A(con.bl_heater && con.bl_heater.load === 40, '电暖器负载应为 40W');
+  A(con.bl_cooler && con.bl_cooler.load === 50, '制冷空调负载应为 50W');
+});
+
+test('temperature: roomTemperatureTick 电暖器升温与空调降温控温', () => {
+  const roomTick = APH.Colony.roomTemperatureTick;
+
+  // 1. 寒潮室外 -25°C，通电电暖器将室内升温至 21°C
+  const coldRoom = { temp: 0, isEnclosed: true };
+  const heater = { id: 'bl_heater', powered: true };
+  roomTick(coldRoom, -25, 30, [heater]);
+  A(coldRoom.temp > 10, '通电电暖器应显著提高室内温度, 实际: ' + coldRoom.temp);
+
+  // 持续工作逼近 21°C
+  for (let i = 0; i < 5; i++) roomTick(coldRoom, -25, 30, [heater]);
+  A(Math.abs(coldRoom.temp - 21) <= 1, '电暖器应将室温维持在 21°C 左右, 实际: ' + coldRoom.temp);
+
+  // 2. 晴天室外 25°C，通电冷库空调将室内降温至 -5°C
+  const larderRoom = { temp: 20, isEnclosed: true };
+  const cooler = { id: 'bl_cooler', mode: 'freezer', targetTemp: -5, powered: true };
+  for (let i = 0; i < 6; i++) roomTick(larderRoom, 25, 30, [cooler]);
+  A(larderRoom.temp <= 0, '冷库空调应将室温降低至 0°C 以下, 实际: ' + larderRoom.temp);
+
+  // 3. 断电 (powered: false)：电器停机，温度衰退回向室外同化
+  cooler.powered = false;
+  roomTick(larderRoom, 25, 30, [cooler]);
+  A(larderRoom.temp > -5, '断电后室温应逐渐回暖上升, 实际: ' + larderRoom.temp);
+});

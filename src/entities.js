@@ -415,6 +415,7 @@ APH.Ent = (function(){
     bl_farm:'#7a9a4a', bl_pasture:'#c8a882', bl_house:'#b8874a', bl_workshop:'#d4a574',
     bl_crop_plot:'#81c784', bl_campfire:'#ff9800', bl_kitchen:'#cfd8dc',
     bl_storage_shelf:'#a17a4a',
+    bl_heater:'#ff8c42', bl_cooler:'#4fc3f7', bl_heavy_turret:'#b71c1c', bl_ancient_generator:'#00e5ff',
   };
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
@@ -525,6 +526,33 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* ADR-25: 电暖器与制冷空调温控电器 */
+    if(e.bid === 'bl_heater'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 6, 18, 9, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#37474f'; ctx.fillRect(-14, -20, 28, 24);
+      var heatLit = e.powered !== false;
+      ctx.fillStyle = heatLit ? 'rgba(255, 112, 67, ' + (0.6 + 0.3 * Math.sin((time||0) * 5)) + ')' : '#263238';
+      ctx.fillRect(-11, -17, 22, 18);
+      ctx.strokeStyle = '#cfd8dc'; ctx.lineWidth = 1.2; ctx.strokeRect(-14, -20, 28, 24);
+      ctx.restore();
+      return;
+    }
+    if(e.bid === 'bl_cooler'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle='rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 6, 18, 9, 0, U.TAU); ctx.fill();
+      ctx.fillStyle='#eceff1'; ctx.fillRect(-14, -22, 28, 26);
+      var coolLit = e.powered !== false;
+      var isFreezer = (e.mode === 'freezer');
+      ctx.fillStyle = coolLit ? (isFreezer ? '#00e5ff' : '#80d8ff') : '#90a4ae';
+      ctx.fillRect(-11, -12, 22, 12);
+      ctx.fillStyle = coolLit ? (isFreezer ? '#00b0ff' : '#76ff03') : '#37474f';
+      ctx.beginPath(); ctx.arc(8, -17, 2, 0, U.TAU); ctx.fill();
+      ctx.strokeStyle = '#37474f'; ctx.lineWidth = 1.2; ctx.strokeRect(-14, -22, 28, 26);
+      ctx.restore();
+      return;
+    }
+
     /* ADR-24: 远古遗迹构件渲染 */
     if(e.bid === 'ancient_wall'){
       ctx.save(); ctx.translate(e.x, e.y);
