@@ -2604,11 +2604,60 @@ window.APH = window.APH || {};
     var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
     /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
     var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
+
+    /* ADR-22 居民场上相遇与 Emoji 微气泡 */
+    s.socialCooldowns = s.socialCooldowns || {};
+    var nowSec = s.clock || 0;
+    var resEntities = s.entities.filter(function(ent){ return ent && ent.type === T.RESIDENT && !ent.dead; });
+    var encR = (CFG.social && CFG.social.encounterArriveR) || 40;
+    for(var sa = 0; sa < resEntities.length; sa++){
+      var ea = resEntities[sa];
+      var ra = residentOf(ea);
+      if(!ra || (ea.socialPauseT||0) > 0) continue;
+      for(var sb = sa + 1; sb < resEntities.length; sb++){
+        var eb = resEntities[sb];
+        var rb = residentOf(eb);
+        if(!rb || (eb.socialPauseT||0) > 0) continue;
+        var dist = U.dst(ea.x, ea.y, eb.x, eb.y);
+        if(dist >= 16 && dist < encR){
+          var onDuty = !!(ra.job && rb.job);
+          if(APH.Res.canSocialEncounter(ra, rb, s.socialCooldowns, nowSec, { raidActive: raid, dist: dist, onDuty: onDuty })){
+            var enc = APH.Res.triggerSocialEncounter(ra, rb, s.meta.bonds, s.socialCooldowns, nowSec);
+            if(enc){
+              ea.socialPauseT = enc.duration || 1.5;
+              eb.socialPauseT = enc.duration || 1.5;
+              ea.socialBubble = enc.bubbleA;
+              eb.socialBubble = enc.bubbleB;
+              ea.face = Math.atan2(eb.y - ea.y, eb.x - ea.x);
+              eb.face = Math.atan2(ea.y - eb.y, ea.x - eb.x);
+              ea.walking = false;
+              eb.walking = false;
+              if(window.APH.UI && APH.UI.floatText){
+                var col = enc.delta > 0 ? '#8fd4ff' : (enc.delta < 0 ? '#ff9a9a' : '#c8e89a');
+                APH.UI.floatText(enc.text, col);
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+
     s.entities.forEach(function(e){
       if(!e || e.type!==T.RESIDENT) return;
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
       if(e.hitFlash>0) e.hitFlash=Math.max(0,e.hitFlash-dt);
       var r=residentOf(e);
+      /* ADR-22 社交停步中 */
+      if((e.socialPauseT||0) > 0){
+        e.socialPauseT -= dt;
+        e.walking = false;
+        if(e.socialPauseT <= 0){
+          e.socialPauseT = 0;
+          e.socialBubble = null;
+        }
+        return;
+      }
       var walkCfg=CFG.walk||{};
       var sickSpeedMul=r && r.illness>walkCfg.sickAbove ? walkCfg.sickSpeedMul : 1;
       /* W3 天气室外减速: 房间内/避难所免罚; 寒潮+防寒服=免 */

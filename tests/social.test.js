@@ -157,3 +157,52 @@ test('social: roomFrictionOf 同室死敌心情惩罚', () => {
   const f2 = roomFrictionOf(r, [friend, rival], bonds);
   A(f2 === -5, '室内含宿怨惩罚应为 -5, 实际: ' + f2);
 });
+
+test('social: canSocialEncounter 验证 90s 冷却与紧急豁免', () => {
+  const canEncounter = APH.Res.canSocialEncounter;
+  A(typeof canEncounter === 'function', 'canSocialEncounter 必须为函数');
+
+  const rA = { id: 'rs_1', food: 80, mood: 70 };
+  const rB = { id: 'rs_2', food: 80, mood: 70 };
+  let cooldowns = {};
+
+  // 初始无冷却时允许
+  A(canEncounter(rA, rB, cooldowns, 100, {}) === true, '初始无冷却应允许偶遇');
+
+  // 记录冷却后，90 秒内拦截
+  cooldowns['rs_1|rs_2'] = 100;
+  A(canEncounter(rA, rB, cooldowns, 150, {}) === false, '50s 后仍处于 90s 冷却内，应拦截');
+  A(canEncounter(rA, rB, cooldowns, 190, {}) === true, '90s 到期后应放行');
+
+  // 紧急状态绝对豁免
+  A(canEncounter(rA, rB, cooldowns, 200, { raidActive: true }) === false, '袭家战斗状态必须豁免停步');
+
+  const rSick = { id: 'rs_3', food: 80, downed: true };
+  A(canEncounter(rA, rSick, cooldowns, 200, {}) === false, '击倒者必须豁免偶遇');
+
+  const rSleep = { id: 'rs_4', food: 80, isSleeping: true };
+  A(canEncounter(rA, rSleep, cooldowns, 200, {}) === false, '睡眠中必须豁免偶遇');
+
+  const rStarving = { id: 'rs_5', food: 15 };
+  A(canEncounter(rA, rStarving, cooldowns, 200, {}) === false, '严重饥饿觅食中必须豁免偶遇');
+
+  const rBroken = { id: 'rs_6', food: 80, breakType: 'wander' };
+  A(canEncounter(rA, rBroken, cooldowns, 200, {}) === false, '精神崩溃者必须豁免日常偶遇');
+});
+
+test('social: triggerSocialEncounter 结算气泡、动作描述与羁绊增减', () => {
+  const trigger = APH.Res.triggerSocialEncounter;
+  A(typeof trigger === 'function', 'triggerSocialEncounter 必须为函数');
+
+  const rA = { id: 'rs_1', name: '阿澈' };
+  const rB = { id: 'rs_2', name: '铁蛋' };
+  let bonds = { 'rs_1|rs_2': 75 }; // 好友关系
+  let cooldowns = {};
+
+  const res = trigger(rA, rB, bonds, cooldowns, 100, () => 0.1);
+  A(res && res.duration === 1.5, '偶遇停步时长应为 1.5s');
+  A(res.bubbleA && res.bubbleB, '双方均应生成表情气泡');
+  A(typeof res.text === 'string' && res.text.length > 0, '应生成动作描述文本');
+  A(cooldowns['rs_1|rs_2'] === 100, '冷却字典应被记录当前时间');
+  A(bonds['rs_1|rs_2'] >= 75, '好友偶遇后好感不应下跌');
+});

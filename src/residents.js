@@ -739,6 +739,100 @@ APH.Res = (function(){
     return 0;
   }
 
+  function canSocialEncounter(rA, rB, cooldowns, now, opts){
+    if(!rA || !rB || rA === rB || rA.id === rB.id) return false;
+    var o = opts || {};
+    if(o.raidActive) return false;
+    if(o.onDuty) return false;
+    if(o.dist != null && o.dist < 16) return false;
+    if(rA.downed || rB.downed) return false;
+    if(rA.isSleeping || rB.isSleeping) return false;
+    if(rA.medLying || rB.medLying) return false;
+    if(isBroken(rA) || isBroken(rB) || !!rA.breakType || !!rB.breakType) return false;
+    var eatBelow = (CFG.residents && CFG.residents.eatBelow != null) ? CFG.residents.eatBelow : 60;
+    if((rA.food != null && rA.food < eatBelow) || (rB.food != null && rB.food < eatBelow)) return false;
+
+    var k = bondKey(rA.id, rB.id);
+    var C = CFG.social || {};
+    var cd = C.encounterCooldown != null ? C.encounterCooldown : 90;
+    if(cooldowns && cooldowns[k] != null && (now - cooldowns[k]) < cd){
+      return false;
+    }
+    return true;
+  }
+
+  function triggerSocialEncounter(rA, rB, bonds, cooldowns, now, rng){
+    var rand = (typeof rng === 'function') ? rng : Math.random;
+    var k = bondKey(rA.id, rB.id);
+    if(cooldowns) cooldowns[k] = now;
+
+    var cur = (bonds && bonds[k] != null) ? bonds[k] : 50;
+    var tier = relationshipTierOf(cur);
+    var C = CFG.social || {};
+    var dur = C.encounterPauseTime != null ? C.encounterPauseTime : 1.5;
+
+    var delta = 0;
+    var bA = '💬', bB = '💬';
+    var text = rA.name + ' 和 ' + rB.name + ' 简单寒暄了几句';
+
+    if(tier.id === 'close_friend'){
+      delta = 2;
+      bA = '❤️'; bB = '❤️';
+      text = rA.name + ' 和 ' + rB.name + ' 开心地打了招呼，彼此更亲近了';
+    } else if(tier.id === 'friend'){
+      if(rand() < 0.8){
+        delta = 1.5;
+        bA = '😊'; bB = '😊';
+        text = rA.name + ' 和 ' + rB.name + ' 聊得很投机';
+      } else {
+        delta = 0.5;
+        bA = '💬'; bB = '💬';
+        text = rA.name + ' 和 ' + rB.name + ' 聊了聊天气';
+      }
+    } else if(tier.id === 'rival'){
+      delta = -2;
+      bA = '💢'; bB = '💢';
+      text = rA.name + ' 和 ' + rB.name + ' 互相瞪了一眼，拌了句嘴';
+    } else if(tier.id === 'disliked'){
+      if(rand() < 0.7){
+        delta = -1;
+        bA = '😒'; bB = '😒';
+        text = rA.name + ' 和 ' + rB.name + ' 擦肩而过，气氛尴尬';
+      } else {
+        delta = 0;
+        bA = '💬'; bB = '💬';
+        text = rA.name + ' 和 ' + rB.name + ' 敷衍地点了点头';
+      }
+    } else {
+      var rVal = rand();
+      if(rVal < 0.4){
+        delta = 1;
+        bA = '😊'; bB = '💬';
+        text = rA.name + ' 和 ' + rB.name + ' 闲聊了几句家常';
+      } else if(rVal < 0.7){
+        delta = 0;
+        bA = '💬'; bB = '💬';
+        text = rA.name + ' 和 ' + rB.name + ' 简单打了个招呼';
+      } else {
+        delta = -0.5;
+        bA = '❓'; bB = '💬';
+        text = rA.name + ' 和 ' + rB.name + ' 吐槽了今天的工作';
+      }
+    }
+
+    if(bonds){
+      applyBond(bonds, rA.id, rB.id, delta);
+    }
+
+    return {
+      delta: delta,
+      bubbleA: bA,
+      bubbleB: bB,
+      text: text,
+      duration: dur
+    };
+  }
+
   /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
   function lowestBondMate(r, residents, bonds){
     var best=null, bv=1e9;
@@ -1566,6 +1660,7 @@ APH.Res = (function(){
     socialTick:socialTick, applyBond:applyBond,
     bondKey:bondKey, relationshipTierOf:relationshipTierOf, keyBondsOf:keyBondsOf,
     workSynergyOf:workSynergyOf, roomFrictionOf:roomFrictionOf,
+    canSocialEncounter:canSocialEncounter, triggerSocialEncounter:triggerSocialEncounter,
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,

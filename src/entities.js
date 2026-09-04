@@ -335,6 +335,12 @@ APH.Ent = (function(){
         /* #65: sprite 分支也要画 🍽(脚底锚原点, 头顶≈baseline*sc 之上) */
         drawPlayerHungerMark(e, -((defS&&defS.baseline)||248)*sc + 4);
         drawPlayerSickMark(e, -((defS&&defS.baseline)||248)*sc + 4);
+        /* ADR-22: sprite 分支玩家社交气泡 */
+        if(e.socialBubble){
+          ctx.fillStyle='#ffffff';
+          ctx.font='16px sans-serif'; ctx.textAlign='center';
+          ctx.fillText(e.socialBubble, 0, -((defS&&defS.baseline)||248)*sc - 12);
+        }
         if(lying && e.downed) drawProneWounds(ctx);
         ctx.restore();
         return;
@@ -370,6 +376,12 @@ APH.Ent = (function(){
     drawPlayerHungerMark(e, -40+(e.moving?bobbing*0.5:0));
     /* #70 补充: 程序化分支玩家 ✚ */
     drawPlayerSickMark(e, -40+(e.moving?bobbing*0.5:0));
+    /* ADR-22: 玩家社交微气泡 */
+    if(e.socialBubble){
+      ctx.fillStyle='#ffffff';
+      ctx.font='16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(e.socialBubble, 0, -56+(e.moving?bobbing*0.5:0));
+    }
     /* T12 头顶浮动三角 + 实时屏幕坐标(诊断铁证) */
     if(!s.showMarkerOff){
       ctx.fillStyle='rgba(89,217,255,'+(0.55+0.35*Math.sin(time*4))+')';
@@ -936,6 +948,12 @@ APH.Ent = (function(){
       ctx.strokeStyle='#2a2418'; ctx.lineWidth=1;
       ctx.strokeRect(7,hy+bob,7,7);
     }
+    /* 社交微气泡 (ADR-22) */
+    if(e.socialBubble){
+      ctx.fillStyle='#ffffff';
+      ctx.font='16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(e.socialBubble, 0, iconY-14+bob);
+    }
     if(e.breaking){
       ctx.fillStyle='#ff6d7a';
       ctx.font='10px sans-serif'; ctx.textAlign='center';
@@ -1031,6 +1049,12 @@ APH.Ent = (function(){
     ctx.fillStyle='#5d6f96';
     ctx.font='8px sans-serif';
     ctx.fillText('过客', 0, 26);
+    /* 社交微气泡 (ADR-22) */
+    if(e.socialBubble){
+      ctx.fillStyle='#ffffff';
+      ctx.font='16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(e.socialBubble, 0, -50);
+    }
   }
 
   function drawVisitor(e,time){
