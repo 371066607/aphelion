@@ -236,15 +236,16 @@ APH.Colony = (function(){
   }
 
   /* ---------- 建筑实体 ---------- */
-  function placeBuildingEntity(bid, x, y, lv){
-    var s = APH.state;
+  function placeBuildingEntity(bid, x, y, lv, stateOverride){
+    var s = stateOverride || (window.APH && window.APH.state);
+    if(!s) return null;
     var def = BUILDINGS[bid];
     var rec=null;
-    (s.colony.buildings||[]).forEach(function(b){
+    ((s.colony && s.colony.buildings)||[]).forEach(function(b){
       if(b && b.id===bid && Math.abs((b.x||0)-x)<2 && Math.abs((b.y||0)-y)<2) rec=b;
     });
-    s.entities.push({
-      id:'be_'+bid+'_'+s.colony.buildings.length,
+    var ent = {
+      id:'be_'+bid+'_'+((s.colony && s.colony.buildings && s.colony.buildings.length) || 0),
       type:T.BUILDING, bid:bid, x:x, y:y, def:def, lv:lv||1,
       cd:0,
       recipe: rec && rec.recipe,
@@ -253,7 +254,9 @@ APH.Colony = (function(){
       analysisTarget: rec && rec.analysisTarget,
       analysisProgress: rec && rec.analysisProgress,
       herd: rec && rec.herd,
-    });
+    };
+    if(s.entities) s.entities.push(ent);
+    return ent;
   }
 
   /* 发射台保证存在(固定南侧位置) */
@@ -1718,6 +1721,145 @@ APH.Colony = (function(){
     return { done:false, dropItemId:null, dropCount:0 };
   }
 
+  /* ================= 建造推进高阶接缝 (ADR-21) ================= */
+  function tickConstruction(s, dt){
+    if(!s || !s.colony || !s.colony.buildQueue || !s.colony.buildQueue.length) return;
+    var bb = builderBonusOf((s.meta && s.meta.residents) || []);
+    var near = [{ x: s.px, y: s.py }];
+    var builders = {};
+    var wpB = (s.meta && s.meta.workPrio) || {};
+    var residents = (s.meta && s.meta.residents) || [];
+
+    residents.forEach(function(r){
+      if(!isBuilder(r)) return;
+      if(r.job && r.job !== 'blueprint') return;
+      if(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r)) return;
+      if(wpB[r.id] && wpB[r.id].sk_build === 0) return;
+      builders[r.id] = true;
+    });
+
+    (s.entities || []).forEach(function(en){
+      if(en.type === T.RESIDENT && builders[en.rid || en.id]) near.push({ x: en.x, y: en.y });
+    });
+
+    var qr = queueTick(s.colony.buildQueue, dt, near, bb);
+    s.colony.buildQueue = qr.queue;
+
+    /* 施工粒子: 正在施工的蓝图冒尘 */
+    if(s.parts){
+      s.colony.buildQueue.forEach(function(q){
+        if(q.building && Math.random() < dt * 6){
+          s.parts.push({ t: 'dust', x: q.x + U.rr(-20, 20), y: q.y + U.rr(-10, 10), life: .5, max: .5 });
+        }
+      });
+    }
+
+    /* 同步蓝图实体进度 */
+    s.colony.buildQueue.forEach(function(q){
+      (s.entities || []).forEach(function(en){
+        if(en.type === T.BLUEPRINT && en.bid === q.bid &&
+           Math.abs(en.x - q.x) < 2 && Math.abs(en.y - q.y) < 2){
+          en.progress = q.progress || 0;
+          en.building = q.building;
+        }
+      });
+    });
+
+    qr.done.forEach(function(d){
+      var b = { id: d.bid, x: d.x, y: d.y, lv: 1 };
+      if(d.bid === 'bl_wall' && CFG.wall && CFG.wall.hp != null) b.hp = CFG.wall.hp;
+      s.colony.buildings.push(b);
+
+      /* 移除对应蓝图实体 */
+      (s.entities || []).forEach(function(en){
+        if(en.type === T.BLUEPRINT && en.bid === d.bid &&
+           Math.abs(en.x - d.x) < 2 && Math.abs(en.y - d.y) < 2){
+          if(window.APH.Ent && APH.Ent.destroy) APH.Ent.destroy(en);
+          else en.dead = true;
+        }
+      });
+      if(window.APH.Ent && APH.Ent.sweepDead) s.entities = APH.Ent.sweepDead(s.entities);
+
+      var isGridStatic = (d.bid === 'bl_wall' || d.bid === 'bl_gate' || d.bid === 'bl_spike_trap' || d.bid === 'bl_sandbag');
+      if(!isGridStatic){
+        placeBuildingEntity(d.bid, d.x, d.y, 1, s);
+        var justBuilt = s.entities[s.entities.length - 1];
+        if(justBuilt && justBuilt.type === T.BUILDING) justBuilt.builtT = 0;
+      } else {
+        var wR = (CFG.wall || {}).collideR != null ? CFG.wall.collideR : 35;
+        if(d.bid === 'bl_wall' && Math.abs(s.px - d.x) < wR && Math.abs(s.py - d.y) < wR){
+          var dxW = s.px - d.x, dyW = s.py - d.y;
+          if(Math.abs(dxW) > Math.abs(dyW)) s.px = d.x + (dxW > 0 ? wR : -wR);
+          else s.py = d.y + (dyW > 0 ? wR : -wR);
+          s.px = U.clamp(s.px, 40, CFG.WORLD - 40);
+          s.py = U.clamp(s.py, 40, CFG.WORLD - 40);
+        }
+      }
+
+      if(window.APH.Main && APH.Main.saveColony) APH.Main.saveColony();
+      if(d.bid === 'bl_house' && window.APH.Opening && APH.Opening.noteHouse){
+        var fOpening = (window.APH.Main && APH.Main.firstNightOpening) ? APH.Main.firstNightOpening() : null;
+        if(fOpening){
+          APH.Opening.noteHouse(fOpening, s.clock || 0);
+          if(window.APH.Main && APH.Main.applyFirstNightHint) APH.Main.applyFirstNightHint();
+        }
+        try{ if(window.APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta); }catch(eH){}
+      }
+      if(U.emit) U.emit('built', { id: d.bid });
+      var bdef = get(d.bid);
+      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ ' + (bdef ? bdef.name : d.bid) + ' 建造完成', '#9fe8c8');
+      if(s.parts) s.parts.push({ t: 'ping', x: d.x, y: d.y, life: .9, max: .9 });
+    });
+  }
+
+  /* ================= 生产结算高阶接缝 (ADR-21) ================= */
+  function tickProduction(s, dt){
+    if(!s) return;
+    s.prodT = (s.prodT || 0) + dt;
+    if(s.prodT < 30) return;
+
+    s.prodT -= 30;
+    (s.colony && s.colony.buildings || []).forEach(function(b){
+      if(b.offlineT > 0) b.offlineT = Math.max(0, b.offlineT - 30);
+    });
+
+    var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
+    var powRes = powerSettle(s.colony && s.colony.buildings || [], s.meta && s.meta.res, s.power || (s.power = {}), 30, {
+      solarMul: powerSolarMulOf(s.meta),
+      isDay: isDay
+    });
+    var powState = applyPowerState(s.colony && s.colony.buildings || [], powRes.status);
+    (s.colony && s.colony.buildings || []).forEach(function(b){
+      var pk = Math.round(b.x || 0) + ',' + Math.round(b.y || 0);
+      var ps = powState[pk];
+      if(ps){ b.powered = ps.powered; b.grid = ps.grid; }
+      else if(isPowerConsumer(b.id)){ b.powered = true; b.grid = false; }
+    });
+    s.powerStatus = powRes;
+
+    var nightP = !isDay;
+    var hmods = harvestMods(s.spec && s.spec.laws, s.clock, nightP);
+    var prodWorkers = ((s.meta && s.meta.residents) || []).filter(function(r){
+      return !(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r));
+    });
+    var out = productionTick(s.meta, s.colony && s.colony.buildings || [], prodWorkers, hmods);
+    (out.piles || []).forEach(function(p){
+      if(window.APH.Combat && APH.Combat.spawnDrop){
+        APH.Combat.spawnDrop(p.x + 16, p.y + 14, p.itemId, p.n, { stock: true });
+      }
+    });
+
+    if(out.mineral || out.research){
+      if(window.APH.UI && APH.UI.floatText){
+        APH.UI.floatText('生产: ' + (out.mineral ? '矿材×' + out.mineral + '堆在地上 ' : '') + (out.research ? '+' + out.research + ' 研究点' : ''), '#9fe8c8');
+      }
+    }
+
+    if(window.APH.Main && APH.Main.tickRivals) APH.Main.tickRivals(30 / 60);
+    if(window.APH.Main && APH.Main.storyTick) APH.Main.storyTick(30 / 60);
+    if(window.APH.Main && APH.Main.residentsTick) APH.Main.residentsTick();
+  }
+
   return {
     list:list, get:get,
     TECHS:TECHS, TECH_COLUMNS:TECH_COLUMNS, canBuy:canBuy, buyTech:buyTech,
@@ -1765,5 +1907,6 @@ APH.Colony = (function(){
     specimenCodexEntries:specimenCodexEntries,
     COOK_RECIPES:COOK_RECIPES, cookingTick:cookingTick,
     equipGear:equipGear, gearBonusOf:gearBonusOf,
+    tickConstruction:tickConstruction, tickProduction:tickProduction,
   };
 })();
