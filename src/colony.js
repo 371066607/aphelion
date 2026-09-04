@@ -797,13 +797,14 @@ APH.Colony = (function(){
 
   /* ---------- U5 岗位产出(纯函数) ----------
      居民效率×主技能 → 每跳产出 */
-  function jobOutput(residentsAtJob, kind){
+  function jobOutput(residentsAtJob, kind, bonds){
     var total=0;
     residentsAtJob.forEach(function(r){
       var sk = kind==='farm'?'sk_farm':(kind==='ranch'?'sk_ranch':'sk_craft');
       var eff=APH.Res.efficiency(r);
       var lv=r.skills[sk]||0;
-      if(lv>0) total += Math.round(eff*(1+lv*0.25)*10)/10;
+      var syn=(APH.Res&&APH.Res.workSynergyOf)?APH.Res.workSynergyOf(r, residentsAtJob, bonds):1;
+      if(lv>0) total += Math.round(eff*(1+lv*0.25)*syn*10)/10;
     });
     return total;
   }
@@ -822,7 +823,8 @@ APH.Colony = (function(){
         if(!w) return;
         var craftB=1+((w.skills&&w.skills.sk_craft)||0)*0.1;
         var eff = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w) : 1;
-        var amt=Math.max(0, Math.round(mineOutput(b.lv)*eff*craftB));
+        var syn = (APH.Res && APH.Res.workSynergyOf) ? APH.Res.workSynergyOf(w, miners, meta && meta.bonds) : 1;
+        var amt=Math.max(0, Math.round(mineOutput(b.lv)*eff*craftB*syn));
         out.mineral += amt;
         if(amt>0) out.piles.push({ x:b.x||0, y:b.y||0, itemId:'it_mineral', n:amt });
       }
@@ -830,7 +832,8 @@ APH.Colony = (function(){
         var w2=labs[li++];
         if(!w2) return;
         var eff2 = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w2) : 1;
-        out.research += Math.max(0, Math.round(labOutput(b.lv)*eff2*labM));
+        var syn2 = (APH.Res && APH.Res.workSynergyOf) ? APH.Res.workSynergyOf(w2, labs, meta && meta.bonds) : 1;
+        out.research += Math.max(0, Math.round(labOutput(b.lv)*eff2*labM*syn2));
       }
     });
     meta.res = meta.res || {};

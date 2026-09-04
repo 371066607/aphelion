@@ -3036,6 +3036,21 @@ window.APH = window.APH || {};
       if(ent){
         var rmGain=APH.Res.roomMoodGain({x:ent.x,y:ent.y}, T9_rooms, s.colony.buildings);
         if(rmGain>0) r.mood=Math.min((CFG.residents&&CFG.residents.moodCap)||95, (r.mood||70)+rmGain);
+        /* ADR-22 生产岗位同室死敌避嫌心情减益 */
+        if(APH.Res && APH.Res.roomFrictionOf && APH.Nav && APH.Nav.roomAt && T9_rooms && T9_rooms.length){
+          var curRoom = APH.Nav.roomAt({x:ent.x, y:ent.y}, T9_rooms);
+          if(curRoom){
+            var roommates = (m.residents||[]).filter(function(o){
+              if(!o || o.id === r.id) return false;
+              var oEnt = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && e.id===o.id; });
+              return oEnt && APH.Nav.roomAt({x:oEnt.x, y:oEnt.y}, T9_rooms) === curRoom;
+            });
+            var fric = APH.Res.roomFrictionOf(r, roommates, m.bonds);
+            if(fric < 0){
+              r.mood = Math.max(0, (r.mood||70) + fric);
+            }
+          }
+        }
       }
       /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
       if(r.medLying && !hasClinic) r.medLying = false;

@@ -96,3 +96,64 @@ test('social: keyBondsOf 提取最亲密与最敌对关系', () => {
   A(key3.player && key3.player.bond === 50, '未互动居民与玩家应默认 50 中立');
   A(key3.player.tier.id === 'neutral', '应为 neutral');
 });
+
+test('social: workSynergyOf 好友协同增产与宿怨减产', () => {
+  const workSynergyOf = APH.Res.workSynergyOf;
+  A(typeof workSynergyOf === 'function', 'workSynergyOf 必须为函数');
+
+  const w = { id: 'rs_1', name: '阿澈' };
+  const friend = { id: 'rs_2', name: '铁蛋' };
+  const rival = { id: 'rs_3', name: '晚星' };
+  const neutral = { id: 'rs_4', name: '老周' };
+
+  const bonds = {
+    'rs_1|rs_2': 75, // 好友
+    'rs_1|rs_3': 10, // 宿怨
+    'rs_1|rs_4': 50, // 平淡
+  };
+
+  // 独自工作
+  A(workSynergyOf(w, [], bonds) === 1.0, '独自工作协同应为 1.0');
+
+  // 与好友共事 (+15%)
+  const synFriend = workSynergyOf(w, [friend], bonds);
+  A(synFriend === 1.15, '好友共事协同应为 1.15, 实际: ' + synFriend);
+
+  // 与宿怨共事 (-15%)
+  const synRival = workSynergyOf(w, [rival], bonds);
+  A(synRival === 0.85, '宿怨共事协同应为 0.85, 实际: ' + synRival);
+
+  // 与平淡同僚共事 (1.0)
+  const synNeutral = workSynergyOf(w, [neutral], bonds);
+  A(synNeutral === 1.0, '平淡同僚协同应为 1.0, 实际: ' + synNeutral);
+
+  // 一友一敌混合 (平均: (1.15 + 0.85)/2 = 1.0)
+  const synMix = workSynergyOf(w, [friend, rival], bonds);
+  A(Math.abs(synMix - 1.0) < 0.001, '一友一敌协同应相抵为 1.0, 实际: ' + synMix);
+});
+
+test('social: roomFrictionOf 同室死敌心情惩罚', () => {
+  const roomFrictionOf = APH.Res.roomFrictionOf;
+  A(typeof roomFrictionOf === 'function', 'roomFrictionOf 必须为函数');
+
+  const r = { id: 'rs_1', name: '阿澈' };
+  const friend = { id: 'rs_2', name: '铁蛋' };
+  const rival = { id: 'rs_3', name: '晚星' };
+
+  const bonds = {
+    'rs_1|rs_2': 80, // 挚友
+    'rs_1|rs_3': 10, // 宿怨
+  };
+
+  // 独居或与好友同室 (0 惩罚)
+  A(roomFrictionOf(r, [], bonds) === 0, '独居应无避嫌惩罚');
+  A(roomFrictionOf(r, [friend], bonds) === 0, '与好友同室应无避嫌惩罚');
+
+  // 与宿怨同室 (-5 惩罚)
+  const f1 = roomFrictionOf(r, [rival], bonds);
+  A(f1 === -5, '与宿怨同室惩罚应为 -5, 实际: ' + f1);
+
+  // 与好友和宿怨同室 (只要有宿怨就有惩罚)
+  const f2 = roomFrictionOf(r, [friend, rival], bonds);
+  A(f2 === -5, '室内含宿怨惩罚应为 -5, 实际: ' + f2);
+});

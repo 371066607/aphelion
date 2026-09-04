@@ -693,6 +693,52 @@ APH.Res = (function(){
     };
   }
 
+  function workSynergyOf(worker, coworkers, bonds){
+    if(!worker || !coworkers || !coworkers.length) return 1.0;
+    var list = coworkers.filter(function(c){ return c && c.id !== worker.id; });
+    if(!list.length) return 1.0;
+    var b = bonds || {};
+    var C = (CFG.social) || {};
+    var fSyn = C.friendSynergy != null ? C.friendSynergy : 1.15;
+    var rPen = C.rivalPenalty != null ? C.rivalPenalty : 0.85;
+
+    var sum = 0;
+    for(var i = 0; i < list.length; i++){
+      var c = list[i];
+      var k = bondKey(worker.id, c.id);
+      var val = (b[k] != null) ? b[k] : 50;
+      var tier = relationshipTierOf(val);
+      if(tier.id === 'friend' || tier.id === 'close_friend'){
+        sum += fSyn;
+      } else if(tier.id === 'rival' || tier.id === 'disliked'){
+        sum += rPen;
+      } else {
+        sum += 1.0;
+      }
+    }
+    return Math.round((sum / list.length) * 100) / 100;
+  }
+
+  function roomFrictionOf(resident, roommates, bonds){
+    if(!resident || !roommates || !roommates.length) return 0;
+    var list = roommates.filter(function(r){ return r && r.id !== resident.id; });
+    if(!list.length) return 0;
+    var b = bonds || {};
+    var C = (CFG.social) || {};
+    var pen = C.roomRivalMoodPenalty != null ? C.roomRivalMoodPenalty : -5;
+
+    for(var i = 0; i < list.length; i++){
+      var other = list[i];
+      var k = bondKey(resident.id, other.id);
+      var val = (b[k] != null) ? b[k] : 50;
+      var tier = relationshipTierOf(val);
+      if(tier.id === 'rival' || tier.id === 'disliked'){
+        return pen;
+      }
+    }
+    return 0;
+  }
+
   /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
   function lowestBondMate(r, residents, bonds){
     var best=null, bv=1e9;
@@ -1519,6 +1565,7 @@ APH.Res = (function(){
     hospitalityRate:hospitalityRate, tickImpression:tickImpression, offerMeal:offerMeal,
     socialTick:socialTick, applyBond:applyBond,
     bondKey:bondKey, relationshipTierOf:relationshipTierOf, keyBondsOf:keyBondsOf,
+    workSynergyOf:workSynergyOf, roomFrictionOf:roomFrictionOf,
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,

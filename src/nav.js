@@ -241,6 +241,20 @@ APH.Nav = (function(){
     return false;
   }
 
+  /* 返回点所在的房间对象或 null */
+  function roomAt(point, rooms){
+    if (!point || !rooms || !rooms.length) return null;
+    var gx = Math.floor((point.x || 0) / GRID), gy = Math.floor((point.y || 0) / GRID);
+    for (var i = 0; i < rooms.length; i++) {
+      var r = rooms[i];
+      if (gx < r.minX || gx > r.maxX || gy < r.minY || gy > r.maxY) continue;
+      for (var j = 0; j < r.cells.length; j++) {
+        if (r.cells[j].gx === gx && r.cells[j].gy === gy) return r;
+      }
+    }
+    return null;
+  }
+
   return { GRID: GRID, NC: NC, gridOf: gridOf, astar: astar, followPath: followPath,
-           roomsOf: roomsOf, inRooms: inRooms };
+           roomsOf: roomsOf, inRooms: inRooms, roomAt: roomAt };
 })();
