@@ -1100,6 +1100,227 @@ APH.Combat = (function(){
     s.entities = (APH.Ent && APH.Ent.sweepDead) ? APH.Ent.sweepDead(s.entities) : s.entities.filter(function(e){ return e.type!==T.DROPPED || !e.dead; });
   }
 
+  /* ================= 袭家防务推进高阶接缝 (ADR-21) ================= */
+
+  function startRaid(s){
+    if(!s || !s.war) return;
+    s.war.raidActive = true;
+    var buildings = (s.colony && s.colony.buildings) || [];
+    var barracks = buildings.filter(function(b){ return b.id === 'bl_barracks'; });
+    var n = soldierCount(barracks);
+
+    for(var i = 0; i < n; i++){
+      var sf = (window.APH.Planet && APH.Planet.pickRaidFaction)
+        ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
+        : null;
+      var sol = (window.APH.Ent && APH.Ent.makeEnemy)
+        ? APH.Ent.makeEnemy(sf, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60))
+        : { type: T.ENEMY, x: CFG.HAB.x, y: CFG.HAB.y };
+      sol.isSoldier = true;
+      sol.hp = CFG.soldier.hp;
+      sol.maxHp = CFG.soldier.hp;
+      sol.faction = Object.assign({}, sf || {}, { speed: CFG.soldier.speed, dmg: CFG.soldier.dmg });
+      sol.state = 'idle';
+      if(s.entities) s.entities.push(sol);
+    }
+
+    if(n > 0){
+      var eat = (window.APH.Colony && APH.Colony.takeStock)
+        ? (APH.Colony.takeStock(s.meta && s.meta.res, s.entities, 'food', n).taken || 0)
+        : 0;
+      if(window.APH.UI && APH.UI.floatText){
+        APH.UI.floatText('🛡 ' + n + ' 名士兵出动' + (eat ? ' · 口粮 -' + eat : ''), '#ffc857');
+      }
+      if(window.APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
+    }
+
+    s.war.wave = s.war.pendingWave || { count: 4 };
+    s.war.tactic = s.war.wave.tactic || 'assault';
+    s.war.spawned = 0;
+    s.war.raidSpawnT = 0;
+    s.war.casualties = 0;
+    s.war.stolen = 0;
+    s.war.routed = false;
+    s.war.escaped = false;
+    s.war.wavesLeft = Math.max(0, (s.war.wave.waves || 1) - 1);
+    s.war.betweenWaves = false;
+    s.war.nextWaveT = 0;
+    s.war.waveAngle = Math.random() * U.TAU;
+    s.war.siege = null;
+
+    if(s.war.tactic === 'siege' && window.APH.Main && APH.Main.setupSiegeCamp){
+      APH.Main.setupSiegeCamp();
+    }
+    if(window.APH.UI && APH.UI.setHint) APH.UI.setHint('');
+    var vig = typeof document !== 'undefined' ? document.getElementById('vig') : null;
+    if(vig){
+      vig.style.opacity = .5;
+      setTimeout(function(){ if(vig) vig.style.opacity = 0; }, 900);
+    }
+    if(U.emit) U.emit('raidStarted', s.war.wave);
+  }
+
+  function raidRetreat(s, msg, escaped){
+    if(!s || !s.war || s.war.routed) return;
+    var RT = CFG.raidTactics || {};
+    s.war.routed = true;
+    s.war.escaped = !!escaped;
+    s.war.wavesLeft = 0;
+    s.war.betweenWaves = false;
+    if(s.war.wave) s.war.spawned = Math.max(s.war.spawned || 0, s.war.wave.count || 0);
+
+    var dropRng = U.makeRng((((s.seed || 7) * 911) + Math.floor(s.clock || 0) * 17 + (s.war.casualties || 0) * 13) >>> 0);
+    (s.entities || []).forEach(function(e){
+      if(e.type !== T.ENEMY || e.dead || e.isSoldier) return;
+      e.retreat = true;
+      e.sieging = false;
+      if(!escaped && dropRng() < (RT.routDropChance != null ? RT.routDropChance : .5)){
+        spawnDrop(e.x, e.y, 'it_mineral', 1, { jitter: 14 });
+      }
+    });
+
+    if(window.APH.Main && APH.Main.clearSiegeCamp) APH.Main.clearSiegeCamp();
+    if(window.APH.UI && APH.UI.floatText) APH.UI.floatText(msg, escaped ? '#ffb35c' : '#ffd97a');
+  }
+
+  function tickRaid(s, dt){
+    if(!s || !s.war) return;
+
+    // 1. 预警阶段
+    if(s.war.raidWarn > 0){
+      s.war.raidWarn -= dt;
+      if(window.APH.UI && APH.UI.setHint){
+        APH.UI.setHint('⚠ ' + (s.war.raidFrom || '敌军') + '来袭! ' + Math.ceil(s.war.raidWarn) + 's — 保卫殖民地!');
+      }
+      if(s.war.raidWarn <= 0){
+        startRaid(s);
+      }
+      return;
+    }
+
+    // 2. 战斗进行中
+    if(!s.war.raidActive) return;
+
+    updateCombat(dt, false);
+
+    // 炮塔射击
+    var raidFoes = [];
+    (s.entities || []).forEach(function(e2){
+      if(e2.type === T.ENEMY && !e2.dead && !e2.isSoldier) raidFoes.push(e2);
+    });
+
+    var buildings = (s.colony && s.colony.buildings) || [];
+    buildings.forEach(function(b){
+      if(b.id !== 'bl_turret') return;
+      if(window.APH.Colony && APH.Colony.turretFireAllowed && !APH.Colony.turretFireAllowed(b)) return;
+      var tw = { x: b.x, y: b.y, lv: b.lv || 1, cd: b.cd || 0 };
+      var fired = turretStep(tw, raidFoes, dt);
+      b.cd = tw.cd;
+      if(fired && tw.lastTarget){
+        b.aimA = Math.atan2(tw.lastTarget.y - b.y, tw.lastTarget.x - b.x);
+        b.fireT = 1;
+      }
+      if(b.fireT > 0) b.fireT = Math.max(0, b.fireT - dt * 3);
+    });
+
+    var RT = CFG.raidTactics || {};
+
+    // 围攻扎营处理
+    if(window.APH.Main && APH.Main.siegeTick) APH.Main.siegeTick(dt);
+
+    // 双波间歇
+    if(s.war.betweenWaves){
+      s.war.nextWaveT -= dt;
+      if(window.APH.UI && APH.UI.setHint){
+        APH.UI.setHint('⚠ 第二波正在集结 ' + Math.ceil(Math.max(0, s.war.nextWaveT)) + 's — 方向会变!');
+      }
+      if(s.war.nextWaveT <= 0){
+        s.war.betweenWaves = false;
+        s.war.spawned = 0;
+        s.war.waveAngle = (s.war.waveAngle || 0) + (RT.wave2Angle != null ? RT.wave2Angle : 2.4);
+        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('⚠ 第二波袭击!', '#ff9a9a');
+      }
+    }
+
+    // 波次刷怪
+    s.war.raidSpawnT = (s.war.raidSpawnT || 0) - dt;
+    var aliveEnemies = 0;
+    (s.entities || []).forEach(function(e){
+      if(e.type === T.ENEMY && !e.dead && !e.isSoldier) aliveEnemies++;
+    });
+
+    var waveCount = (s.war.wave && s.war.wave.count) || 4;
+    if(!s.war.betweenWaves && !s.war.routed &&
+       aliveEnemies < waveCount && (s.war.spawned || 0) < waveCount && (s.war.raidSpawnT <= 0)){
+      s.war.raidSpawnT = .7;
+      var f = (window.APH.Planet && APH.Planet.pickRaidFaction)
+        ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
+        : null;
+      var ang = (s.war.waveAngle != null)
+        ? s.war.waveAngle + (Math.random() - .5) * .9
+        : Math.random() * U.TAU;
+
+      var vW = typeof innerWidth !== 'undefined' ? innerWidth : 1280;
+      var vH = typeof innerHeight !== 'undefined' ? innerHeight : 720;
+      var d = Math.max(vW, vH) * .62;
+      var ex, ey;
+      var camping = s.war.siege && s.war.siege.phase === 'camp';
+      if(camping){
+        ex = U.clamp(s.war.siege.cx + U.rr(-60, 60), 40, CFG.WORLD - 40);
+        ey = U.clamp(s.war.siege.cy + U.rr(-60, 60), 40, CFG.WORLD - 40);
+      } else {
+        ex = U.clamp(CFG.HAB.x + Math.cos(ang) * d, 40, CFG.WORLD - 40);
+        ey = U.clamp(CFG.HAB.y + Math.sin(ang) * d, 40, CFG.WORLD - 40);
+      }
+
+      var en = (window.APH.Ent && APH.Ent.makeEnemy) ? APH.Ent.makeEnemy(f, ex, ey) : { type: T.ENEMY, x: ex, y: ey };
+      if(camping){
+        en.sieging = true; en.campX = s.war.siege.cx; en.campY = s.war.siege.cy;
+        en.state = 'idle';
+      } else {
+        en.state = 'chase';
+      }
+      if(s.war.tactic === 'pillage') en.pillager = true;
+      if(s.entities) s.entities.push(en);
+      s.war.spawned = (s.war.spawned || 0) + 1;
+    }
+
+    // 溃退判定
+    if(!s.war.routed){
+      var totalPlanned = ((s.war.wave && s.war.wave.count) || 1) * ((s.war.wave && s.war.wave.waves) || 1);
+      var routAt = RT.routAt != null ? RT.routAt : .6;
+      if((s.war.casualties || 0) >= Math.ceil(totalPlanned * routAt)){
+        raidRetreat(s, '⚠ 伤亡过重, 敌军溃退!', false);
+      }
+    }
+
+    // 终局结算
+    if(!s.war.betweenWaves && (s.war.spawned || 0) >= waveCount){
+      var left = 0;
+      (s.entities || []).forEach(function(e){
+        if(e.type === T.ENEMY && !e.dead && !e.isSoldier) left++;
+      });
+      if(left === 0){
+        if(!s.war.routed && (s.war.wavesLeft || 0) > 0){
+          s.war.wavesLeft--;
+          s.war.betweenWaves = true;
+          s.war.nextWaveT = RT.waveGap != null ? RT.waveGap : 45;
+        } else {
+          s.war.raidActive = false;
+          if(window.APH.Main && APH.Main.clearSiegeCamp) APH.Main.clearSiegeCamp();
+          if(s.war.escaped){
+            if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('⚠ 盗掠者满载而归…下次早点拦截', '#ffb35c');
+          } else {
+            s.war.wins = (s.war.wins || 0) + 1;
+            if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 袭击被击退! 战争态势提升', '#7dffab');
+            if(U.emit) U.emit('raidDefended', {});
+          }
+          if(window.APH.Main && APH.Main.saveWar) APH.Main.saveWar();
+        }
+      }
+    }
+  }
+
   return {
     fsmStep:fsmStep, moveIntent:moveIntent, shouldSpit:shouldSpit,
     rollLoot:rollLoot, specimenDropsOf:specimenDropsOf, addToCarry:addToCarry, carryWeight:carryWeight,
@@ -1117,5 +1338,9 @@ APH.Combat = (function(){
     /* T5 弹道掩体 */
     segHitBox:segHitBox,
     raidBaseSuccess:raidBaseSuccess,
+    /* 袭家防务推进高阶接缝 (ADR-21) */
+    startRaid:startRaid,
+    raidRetreat:raidRetreat,
+    tickRaid:tickRaid,
   };
 })();
