@@ -550,6 +550,274 @@ APH.UI = (function(){
     return null;
   }
 
+  function esc(t){ return String(t==null?'':t).replace(/</g,'&lt;'); }
+
+  /* ---------- LLM 设置面板(开场画面内) ---------- */
+  function bindLLMPanel(){
+    var intro=document.getElementById('intro');
+    if(!intro) return;
+    if(document.getElementById('llmForm')) return;
+    var panel=document.createElement('div');
+    panel.style.cssText='margin-top:18px;font-size:11px;color:#5d6f96;line-height:2';
+    panel.innerHTML=
+      '<span id="llmStatus"></span> '+
+      '<a href="#" id="llmToggle" style="color:#59d9ff;text-decoration:none">AI 档案设置</a>'+
+      '<div id="llmForm" style="display:none;margin-top:8px">'+
+      '<input id="llmEp" placeholder="API endpoint (https://.../v1)" '+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px"><br>'+
+      '<input id="llmKey" type="password" placeholder="API Key"'+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
+      '<input id="llmModel" placeholder="模型名 (如 gemini-2.0-flash)"'+
+        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
+      '<button id="llmSave" style="margin-top:6px;background:none;border:1px solid #59d9ff;color:#59d9ff;'+
+        'padding:5px 16px;border-radius:12px;font-size:11px;cursor:pointer">保存</button>'+
+      '</div>';
+    intro.appendChild(panel);
+    refreshLLMStatus();
+    var toggleBtn=document.getElementById('llmToggle');
+    if(toggleBtn){
+      toggleBtn.addEventListener('click',function(e){
+        e.preventDefault();
+        var f=document.getElementById('llmForm');
+        if(f) f.style.display = f.style.display==='none' ? 'block' : 'none';
+      });
+    }
+    var saveBtn=document.getElementById('llmSave');
+    if(saveBtn){
+      saveBtn.addEventListener('click',function(){
+        if(APH.LLM && APH.LLM.setConf){
+          APH.LLM.setConf(
+            document.getElementById('llmEp').value,
+            document.getElementById('llmKey').value,
+            document.getElementById('llmModel').value);
+        }
+        refreshLLMStatus();
+        var f=document.getElementById('llmForm');
+        if(f) f.style.display='none';
+      });
+    }
+  }
+
+  function refreshLLMStatus(){
+    var el=document.getElementById('llmStatus');
+    if(!el) return;
+    if(APH.LLM && APH.LLM.quotaInfo && APH.LLM.enabled){
+      var q=APH.LLM.quotaInfo();
+      el.textContent = APH.LLM.enabled()
+        ? '● AI 档案开启 (今日余 '+q.left+')'
+        : '○ AI 未配置(程序降级)';
+    }
+  }
+
+  /* ---------- 科学图鉴 (Codex, ADR-18) ---------- */
+  function renderCodex(){
+    var s=window.APH && window.APH.state;
+    if(!s) return;
+    var body=document.getElementById('codexBody');
+    if(!body) return;
+    var T = (APH.CFG && APH.CFG.entType) || {};
+    var html='';
+    var b=s.spec && s.spec.biome;
+    if(b){
+      html+='<div style="background:rgba(89,217,255,.12);border:1px solid #59d9ff;border-radius:8px;padding:8px 12px;margin-bottom:12px">'+
+        '<b style="color:#59d9ff;font-size:13px">【生态群系】'+esc(b.name)+'</b>'+
+        '<div style="color:#cdd9f5;font-size:11px;margin-top:2px">'+esc(b.desc)+'</div>'+
+        '</div>';
+    }
+    if(s.spec){
+      html+='<div style="color:#59d9ff;margin-bottom:4px">'+esc(s.spec.name)+' · '+
+            esc(s.spec.paletteName)+' · 难度 '+'★'.repeat(s.spec.tier||1)+'</div>';
+    }
+    /* 科学图鉴: 已化验标本解剖档案 (Science #55) */
+    if(APH.Colony && APH.Colony.specimenCodexEntries && s.meta){
+      var specEntries=APH.Colony.specimenCodexEntries(s.meta);
+      var analyzedN=0;
+      specEntries.forEach(function(en){ if(en.analyzed) analyzedN++; });
+      html+='<div style="margin-top:14px;color:#ffc857">科学图鉴 ('+analyzedN+'/'+specEntries.length+')</div>';
+      specEntries.forEach(function(en){
+        if(en.analyzed){
+          html+='<div style="color:#9fe8c8">◈ '+esc(en.name)+' — '+esc(en.analysisName)+
+            '<br><span style="color:#5d6f96">'+esc(en.desc)+'</span></div>';
+        }else{
+          html+='<div style="color:#39435c">◇ 未解析 · 待化验</div>';
+        }
+      });
+    }
+    /* 已录入异常 */
+    html+='<div style="margin-top:14px;color:#ffc857">已录入异常 ('+(s.found||0)+'/'+(s.totalBeacons||0)+')</div>';
+    (s.entities||[]).forEach(function(e){
+      if(e.type!==T.BEACON) return;
+      if(e.done) html+='<div style="color:#9fe8c8">◈ '+esc(e.name)+' — '+esc((e.lore||'').slice(0,60))+'…</div>';
+      else       html+='<div style="color:#39435c">◇ 未扫描</div>';
+    });
+    /* 已知生物 */
+    html+='<div style="margin-top:14px;color:#ffc857">已知生物</div>';
+    if(s.spec && s.spec.enemies && s.spec.enemies.factions){
+      s.spec.enemies.factions.forEach(function(f){
+        html+='<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;'+
+              'background:hsl('+f.gene.hue+',62%,52%);margin-right:6px"></span>'+
+              '<b>'+esc(f.name)+'</b> <span style="color:#8fa3cc">'+esc(f.behavior)+
+              ' · HP '+f.hp+'</span><br><span style="color:#5d6f96">'+esc(f.lore||'')+'</span></div>';
+      });
+    }
+    /* 环境法则 */
+    if(s.spec && s.spec.laws && s.spec.laws.length){
+      html+='<div style="margin-top:14px;color:#ffc857">环境法则</div>';
+      s.spec.laws.forEach(function(l){
+        html+='<div style="color:#8fa3cc">· <b style="color:#cdd9f5">'+esc(l.name||l.id)+'</b> '+esc(l.fact||'')+'</div>';
+      });
+    }
+    body.innerHTML=html;
+    var subEl = document.getElementById('codexSub');
+    if(subEl) subEl.textContent='殖民地数据库 · 远征档案实时同步';
+  }
+
+  /* ---------- 科技树地图 (TechTree, ADR-18) ---------- */
+  function visibleTechIds(){
+    var cols=(APH.Colony && APH.Colony.TECH_COLUMNS)||[];
+    var ids=[];
+    cols.forEach(function(c){ (c.ids||[]).forEach(function(id){ ids.push(id); }); });
+    return ids;
+  }
+
+  function ensureTechSel(){
+    var s=window.APH && window.APH.state;
+    if(!s) return;
+    var ids=visibleTechIds();
+    if(!ids.length) return;
+    if(ids.indexOf(s.techSel)<0) s.techSel=ids[0];
+  }
+
+  function moveTechSel(code){
+    var s=window.APH && window.APH.state;
+    if(!s) return;
+    var cols=(APH.Colony && APH.Colony.TECH_COLUMNS)||[];
+    if(!cols.length) return;
+    ensureTechSel();
+    var col=0, row=0, i, j;
+    for(i=0;i<cols.length;i++){
+      j=(cols[i].ids||[]).indexOf(s.techSel);
+      if(j>=0){ col=i; row=j; break; }
+    }
+    if(code==='ArrowLeft') col=(col+cols.length-1)%cols.length;
+    if(code==='ArrowRight') col=(col+1)%cols.length;
+    var ids=cols[col].ids||[];
+    if(!ids.length) return;
+    if(code==='ArrowUp') row=(row+ids.length-1)%ids.length;
+    else if(code==='ArrowDown') row=(row+1)%ids.length;
+    else row=Math.min(row, ids.length-1);
+    s.techSel=ids[row];
+    renderTechMap();
+  }
+
+  function setTechMapMsg(txt, col){
+    var el=document.getElementById('techMapMsg');
+    if(el){ el.textContent=txt||''; el.style.color=col||'#ffc857'; }
+    if(txt) floatText(txt, 400, 300, col||'#ffc857');
+  }
+
+  function tryBuySelectedTech(){
+    var s=window.APH && window.APH.state;
+    if(!s || !s.techSel || !s.meta) return;
+    var tdef=APH.Colony && APH.Colony.TECHS && APH.Colony.TECHS[s.techSel];
+    if(!tdef) return;
+    if(tdef.assayKey){
+      var st=APH.Colony.techNodeStatus(s.meta, s.techSel, s.meta.tech||{});
+      setTechMapMsg(st.why||'已研发', st.state==='owned'?'#59d9ff':'#ffc857');
+      return;
+    }
+    var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
+    if(r2.ok){
+      s.meta.tech=r2.owned;
+      if(APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
+      if(window.APH.Main && APH.Main.applyTech){
+        APH.Main.applyTech(s.meta, s.techSel);
+        (r2.granted||[]).forEach(function(id){ APH.Main.applyTech(s.meta, id); });
+      }
+      var okMsg='✔ 研发成功: '+tdef.name;
+      if(r2.granted && r2.granted.length){
+        r2.granted.forEach(function(id){
+          var g=APH.Colony.TECHS[id];
+          if(g) okMsg+=' · 化验钥匙点亮 '+g.name;
+        });
+      }
+      renderTechMap();
+      setTechMapMsg(okMsg, '#59d9ff');
+    }else{
+      setTechMapMsg('✕ '+(r2.why||'无法研发'), '#ff9a9a');
+    }
+  }
+
+  function renderTechMap(){
+    var s=window.APH && window.APH.state;
+    if(!s) return;
+    var el=document.getElementById('techMap');
+    var body=document.getElementById('techMapBody');
+    var pts=document.getElementById('techMapPts');
+    if(!el || !body) return;
+    ensureTechSel();
+    if(pts) pts.textContent='研究点 '+((s.meta && s.meta.research)||0);
+    var cols=(APH.Colony && APH.Colony.TECH_COLUMNS)||[];
+    var html='';
+    cols.forEach(function(col){
+      html+='<div class="techCol"><h3>'+esc(col.name)+'</h3>';
+      (col.ids||[]).forEach(function(id){
+        var t=APH.Colony.TECHS[id]; if(!t) return;
+        var st=APH.Colony.techNodeStatus(s.meta, id, s.meta.tech||{});
+        var depth=APH.Colony.techDepth(id);
+        var sel=s.techSel===id;
+        var border=sel?'#ffc857':(st.state==='owned'?'#19c8b9':(st.state==='available'?'#c8e89a':(st.state==='assay'?'#59d9ff':'#3d4a5c')));
+        var bg=st.state==='owned'?'rgba(25,200,185,.16)':(st.state==='available'?'rgba(247,243,223,.12)':'rgba(16,24,40,.55)');
+        var dim=(st.state==='locked'||st.state==='unaffordable')?'opacity:.62;':'';
+        var pips='';
+        if(st.max>1){
+          var i;
+          for(i=0;i<st.max;i++) pips+=(i<st.lv?'●':'○');
+        }
+        var costLine='';
+        if(t.assayKey) costLine='化验钥匙';
+        else if(st.state==='owned') costLine='已研发'+(pips?' '+pips:'');
+        else costLine=t.cost+' 研究点'+(pips?' '+pips:'');
+        var why=st.why && st.state!=='owned' && st.state!=='available' ? '<div class="techWhy">'+esc(st.why)+'</div>' : '';
+        var desc=t.desc ? '<div class="techDesc">'+esc(t.desc)+'</div>' : '';
+        var act='';
+        if(sel){
+          if(st.state==='available') act='<div class="techAct">再点一次或 Enter 研发</div>';
+          else if(st.state==='owned') act='<div class="techAct">已研发</div>';
+          else if(st.state==='unaffordable'||st.state==='locked'||st.state==='assay')
+            act='<div class="techAct">'+esc(st.why||'')+'</div>';
+        }
+        html+='<div class="techNode" data-tech="'+id+'" style="margin-left:'+(depth*16)+'px;border-color:'+border+';background:'+bg+';'+dim+
+          (sel?'box-shadow:0 0 0 1px #ffc857;':'')+'">'+
+          '<b>'+esc(t.name)+'</b>'+
+          '<span class="techCost">'+esc(costLine)+'</span>'+
+          desc+why+act+'</div>';
+      });
+      html+='</div>';
+    });
+    body.innerHTML=html;
+    if(!el._techClickBound){
+      el._techClickBound=true;
+      el.addEventListener('click', function(ev){
+        var n=ev.target;
+        while(n && n!==el){
+          if(n.getAttribute && n.getAttribute('data-tech')){
+            var id=n.getAttribute('data-tech');
+            if(APH.state.techSel===id){ tryBuySelectedTech(); return; }
+            APH.state.techSel=id;
+            renderTechMap();
+            return;
+          }
+          n=n.parentNode;
+        }
+      });
+    }
+  }
+
+  /* 默认面板注册 */
+  registerModal('codex', { elId: 'codex', isOverlay: true, render: renderCodex });
+  registerModal('techMap', { elId: 'techMap', isOverlay: true, render: renderTechMap, onOpen: ensureTechSel });
+
   function toggleDiplomacy(show){
     if(modals['diplomacy']){
       if(show !== undefined){
@@ -567,6 +835,8 @@ APH.UI = (function(){
     showOpening:showOpening, skipOpeningVideo:skipOpeningVideo, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
     fatal:fatal, armProbe:armProbe, toggleDiplomacy:toggleDiplomacy,
     registerModal:registerModal, open:open, close:close, toggle:toggle, isOpen:isOpen,
-    closeActive:closeActive, hasActiveModal:hasActiveModal, getActiveModal:getActiveModal
+    closeActive:closeActive, hasActiveModal:hasActiveModal, getActiveModal:getActiveModal,
+    renderCodex:renderCodex, renderTechMap:renderTechMap, tryBuySelectedTech:tryBuySelectedTech,
+    moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus
   };
 })();

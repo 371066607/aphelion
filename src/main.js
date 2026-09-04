@@ -2416,52 +2416,14 @@ window.APH = window.APH || {};
     }, 600);
   }
 
-  /* ================= LLM 设置面板(开场画面内) ================= */
-  function bindLLMPanel(){
-    var intro=document.getElementById('intro');
-    var panel=document.createElement('div');
-    panel.style.cssText='margin-top:18px;font-size:11px;color:#5d6f96;line-height:2';
-    panel.innerHTML=
-      '<span id="llmStatus"></span> '+
-      '<a href="#" id="llmToggle" style="color:#59d9ff;text-decoration:none">AI 档案设置</a>'+
-      '<div id="llmForm" style="display:none;margin-top:8px">'+
-      '<input id="llmEp" placeholder="API endpoint (https://.../v1)" '+
-        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px"><br>'+
-      '<input id="llmKey" type="password" placeholder="API Key"'+
-        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
-      '<input id="llmModel" placeholder="模型名 (如 gemini-2.0-flash)"'+
-        'style="width:240px;background:#0c1220;border:1px solid #223252;color:#cdd9f5;padding:6px 10px;border-radius:8px;font-size:11px;margin-top:4px"><br>'+
-      '<button id="llmSave" style="margin-top:6px;background:none;border:1px solid #59d9ff;color:#59d9ff;'+
-        'padding:5px 16px;border-radius:12px;font-size:11px;cursor:pointer">保存</button>'+
-      '</div>';
-    intro.appendChild(panel);
-    refreshLLMStatus();
-    document.getElementById('llmToggle').addEventListener('click',function(e){
-      e.preventDefault();
-      var f=document.getElementById('llmForm');
-      f.style.display = f.style.display==='none' ? 'block' : 'none';
-    });
-    document.getElementById('llmSave').addEventListener('click',function(){
-      APH.LLM.setConf(
-        document.getElementById('llmEp').value,
-        document.getElementById('llmKey').value,
-        document.getElementById('llmModel').value);
-      refreshLLMStatus();
-      document.getElementById('llmForm').style.display='none';
-    });
-  }
-  function refreshLLMStatus(){
-    var el=document.getElementById('llmStatus');
-    if(!el) return;
-    var q=APH.LLM.quotaInfo();
-    el.textContent = APH.LLM.enabled()
-      ? '● AI 档案开启 (今日余 '+q.left+')'
-      : '○ AI 未配置(程序降级)';
-  }
+  /* ================= LLM 设置面板(开场画面内，委托 APH.UI) ================= */
+  function bindLLMPanel(){ if(APH.UI && APH.UI.bindLLMPanel) APH.UI.bindLLMPanel(); }
+  function refreshLLMStatus(){ if(APH.UI && APH.UI.refreshLLMStatus) APH.UI.refreshLLMStatus(); }
   boot();
   requestAnimationFrame(frame);
 
-  /* ================= T5 图鉴 ================= */
+  /* ================= T5 图鉴与科技树 (委托 APH.UI 深模块, ADR-18) ================= */
+  function esc(t){ return String(t==null?'':t).replace(/</g,'&lt;'); }
   function overlayClosed(el){
     if(!el) return true;
     return el.style.display==='none' || el.style.display==null || el.style.display===undefined;
@@ -2485,214 +2447,46 @@ window.APH = window.APH || {};
     }
   }
   function techMapOpen(){
-    return !overlayClosed(document.getElementById('techMap'));
+    return APH.UI && APH.UI.isOpen ? APH.UI.isOpen('techMap') : !overlayClosed(document.getElementById('techMap'));
   }
-  function toggleCodex(){
+  function toggleCodex(show){
+    if(APH.UI && APH.UI.toggle){
+      if(show !== undefined) return show ? APH.UI.open('codex') : APH.UI.close('codex');
+      return APH.UI.toggle('codex');
+    }
     var el=document.getElementById('codex');
     if(!el) return;
-    var show = overlayClosed(el);
-    if(show) closeColonyOverlays('codex');
-    el.style.display = show ? '' : 'none';
-    if(show) renderCodex();
-  }
-  function visibleTechIds(){
-    var cols=APH.Colony.TECH_COLUMNS||[];
-    var ids=[];
-    cols.forEach(function(c){ (c.ids||[]).forEach(function(id){ ids.push(id); }); });
-    return ids;
-  }
-  function ensureTechSel(){
-    var s=APH.state;
-    var ids=visibleTechIds();
-    if(!ids.length) return;
-    if(ids.indexOf(s.techSel)<0) s.techSel=ids[0];
+    var s = (show!==undefined)?!!show:overlayClosed(el);
+    if(s) closeColonyOverlays('codex');
+    el.style.display = s ? '' : 'none';
+    if(s && APH.UI && APH.UI.renderCodex) APH.UI.renderCodex();
   }
   function toggleTechMap(force){
+    if(APH.UI && APH.UI.toggle){
+      if(force !== undefined) return force ? APH.UI.open('techMap') : APH.UI.close('techMap');
+      return APH.UI.toggle('techMap');
+    }
     var el=document.getElementById('techMap');
     if(!el) return;
     var show = (force===true) ? true : (force===false) ? false : overlayClosed(el);
     if(show) closeColonyOverlays('techMap');
     el.style.display = show ? '' : 'none';
-    if(show){
-      ensureTechSel();
-      renderTechMap();
-    }
+    if(show && APH.UI && APH.UI.renderTechMap) APH.UI.renderTechMap();
   }
   function refreshTechMapIfOpen(){
-    if(techMapOpen()) renderTechMap();
+    if(techMapOpen() && APH.UI && APH.UI.renderTechMap) APH.UI.renderTechMap();
   }
   function moveTechSel(code){
-    var s=APH.state;
-    var cols=APH.Colony.TECH_COLUMNS||[];
-    if(!cols.length) return;
-    ensureTechSel();
-    var col=0, row=0, i, j;
-    for(i=0;i<cols.length;i++){
-      j=(cols[i].ids||[]).indexOf(s.techSel);
-      if(j>=0){ col=i; row=j; break; }
-    }
-    if(code==='ArrowLeft') col=(col+cols.length-1)%cols.length;
-    if(code==='ArrowRight') col=(col+1)%cols.length;
-    var ids=cols[col].ids||[];
-    if(!ids.length) return;
-    if(code==='ArrowUp') row=(row+ids.length-1)%ids.length;
-    else if(code==='ArrowDown') row=(row+1)%ids.length;
-    else row=Math.min(row, ids.length-1);
-    s.techSel=ids[row];
-    renderTechMap();
-  }
-  function setTechMapMsg(txt, col){
-    var el=document.getElementById('techMapMsg');
-    if(el){ el.textContent=txt||''; el.style.color=col||'#ffc857'; }
-    if(txt) APH.UI.floatText(txt, col||'#ffc857');
+    if(APH.UI && APH.UI.moveTechSel) return APH.UI.moveTechSel(code);
   }
   function tryBuySelectedTech(){
-    var s=APH.state;
-    if(!s.techSel) return;
-    var tdef=APH.Colony.TECHS[s.techSel];
-    if(!tdef) return;
-    if(tdef.assayKey){
-      var st=APH.Colony.techNodeStatus(s.meta, s.techSel, s.meta.tech||{});
-      setTechMapMsg(st.why||'已研发', st.state==='owned'?'#59d9ff':'#ffc857');
-      return;
-    }
-    var r2=APH.Colony.buyTech(s.meta,s.techSel,s.meta.tech||{});
-    if(r2.ok){
-      s.meta.tech=r2.owned;
-      APH.Save.saveMeta(s.meta);
-      applyTech(s.meta,s.techSel);
-      (r2.granted||[]).forEach(function(id){ applyTech(s.meta,id); });
-      var okMsg='✔ 研发成功: '+tdef.name;
-      if(r2.granted && r2.granted.length){
-        r2.granted.forEach(function(id){
-          var g=APH.Colony.TECHS[id];
-          if(g) okMsg+=' · 化验钥匙点亮 '+g.name;
-        });
-      }
-      renderTechMap();
-      setTechMapMsg(okMsg, '#59d9ff');
-    }else{
-      setTechMapMsg('✕ '+(r2.why||'无法研发'), '#ff9a9a');
-    }
+    if(APH.UI && APH.UI.tryBuySelectedTech) return APH.UI.tryBuySelectedTech();
   }
   function renderTechMap(){
-    var s=APH.state;
-    var el=document.getElementById('techMap');
-    var body=document.getElementById('techMapBody');
-    var pts=document.getElementById('techMapPts');
-    if(!el || !body) return;
-    ensureTechSel();
-    if(pts) pts.textContent='研究点 '+(s.meta.research||0);
-    var cols=APH.Colony.TECH_COLUMNS||[];
-    var html='';
-    cols.forEach(function(col){
-      html+='<div class="techCol"><h3>'+esc(col.name)+'</h3>';
-      (col.ids||[]).forEach(function(id){
-        var t=APH.Colony.TECHS[id]; if(!t) return;
-        var st=APH.Colony.techNodeStatus(s.meta, id, s.meta.tech||{});
-        var depth=APH.Colony.techDepth(id);
-        var sel=s.techSel===id;
-        var border=sel?'#ffc857':(st.state==='owned'?'#19c8b9':(st.state==='available'?'#c8e89a':(st.state==='assay'?'#59d9ff':'#3d4a5c')));
-        var bg=st.state==='owned'?'rgba(25,200,185,.16)':(st.state==='available'?'rgba(247,243,223,.12)':'rgba(16,24,40,.55)');
-        var dim=(st.state==='locked'||st.state==='unaffordable')?'opacity:.62;':'';
-        var pips='';
-        if(st.max>1){
-          var i;
-          for(i=0;i<st.max;i++) pips+=(i<st.lv?'●':'○');
-        }
-        var costLine='';
-        if(t.assayKey) costLine='化验钥匙';
-        else if(st.state==='owned') costLine='已研发'+(pips?' '+pips:'');
-        else costLine=t.cost+' 研究点'+(pips?' '+pips:'');
-        var why=st.why && st.state!=='owned' && st.state!=='available' ? '<div class="techWhy">'+esc(st.why)+'</div>' : '';
-        var desc=t.desc ? '<div class="techDesc">'+esc(t.desc)+'</div>' : '';
-        var act='';
-        if(sel){
-          if(st.state==='available') act='<div class="techAct">再点一次或 Enter 研发</div>';
-          else if(st.state==='owned') act='<div class="techAct">已研发</div>';
-          else if(st.state==='unaffordable'||st.state==='locked'||st.state==='assay')
-            act='<div class="techAct">'+esc(st.why||'')+'</div>';
-        }
-        html+='<div class="techNode" data-tech="'+id+'" style="margin-left:'+(depth*16)+'px;border-color:'+border+';background:'+bg+';'+dim+
-          (sel?'box-shadow:0 0 0 1px #ffc857;':'')+'">'+
-          '<b>'+esc(t.name)+'</b>'+
-          '<span class="techCost">'+esc(costLine)+'</span>'+
-          desc+why+act+'</div>';
-      });
-      html+='</div>';
-    });
-    body.innerHTML=html;
-    if(!el._techClickBound){
-      el._techClickBound=true;
-      el.addEventListener('click', function(ev){
-        var n=ev.target;
-        while(n && n!==el){
-          if(n.getAttribute && n.getAttribute('data-tech')){
-            var id=n.getAttribute('data-tech');
-            if(APH.state.techSel===id){ tryBuySelectedTech(); return; }
-            APH.state.techSel=id;
-            renderTechMap();
-            return;
-          }
-          n=n.parentNode;
-        }
-      });
-    }
+    if(APH.UI && APH.UI.renderTechMap) return APH.UI.renderTechMap();
   }
-  function esc(t){ return String(t).replace(/</g,'&lt;'); }
   function renderCodex(){
-    var s=APH.state, body=document.getElementById('codexBody');
-    if(!body) return;
-    var html='';
-    var b=s.spec.biome;
-    if(b){
-      html+='<div style="background:rgba(89,217,255,.12);border:1px solid #59d9ff;border-radius:8px;padding:8px 12px;margin-bottom:12px">'+
-        '<b style="color:#59d9ff;font-size:13px">【生态群系】'+esc(b.name)+'</b>'+
-        '<div style="color:#cdd9f5;font-size:11px;margin-top:2px">'+esc(b.desc)+'</div>'+
-        '</div>';
-    }
-    html+='<div style="color:#59d9ff;margin-bottom:4px">'+esc(s.spec.name)+' · '+
-          esc(s.spec.paletteName)+' · 难度 '+'★'.repeat(s.spec.tier||1)+'</div>';
-    /* 科学图鉴: 已化验标本解剖档案 (Science #55) */
-    if(APH.Colony.specimenCodexEntries){
-      var specEntries=APH.Colony.specimenCodexEntries(s.meta);
-      var analyzedN=0;
-      specEntries.forEach(function(en){ if(en.analyzed) analyzedN++; });
-      html+='<div style="margin-top:14px;color:#ffc857">科学图鉴 ('+analyzedN+'/'+specEntries.length+')</div>';
-      specEntries.forEach(function(en){
-        if(en.analyzed){
-          html+='<div style="color:#9fe8c8">◈ '+esc(en.name)+' — '+esc(en.analysisName)+
-            '<br><span style="color:#5d6f96">'+esc(en.desc)+'</span></div>';
-        }else{
-          html+='<div style="color:#39435c">◇ 未解析 · 待化验</div>';
-        }
-      });
-    }
-    /* 已录入异常 */
-    html+='<div style="margin-top:14px;color:#ffc857">已录入异常 ('+s.found+'/'+s.totalBeacons+')</div>';
-    s.entities.forEach(function(e){
-      if(e.type!==T.BEACON) return;
-      if(e.done) html+='<div style="color:#9fe8c8">◈ '+esc(e.name)+' — '+esc((e.lore||'').slice(0,60))+'…</div>';
-      else       html+='<div style="color:#39435c">◇ 未扫描</div>';
-    });
-    /* 已知生物 */
-    html+='<div style="margin-top:14px;color:#ffc857">已知生物</div>';
-    (s.spec.enemies.factions||[]).forEach(function(f){
-      html+='<div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;'+
-            'background:hsl('+f.gene.hue+',62%,52%);margin-right:6px"></span>'+
-            '<b>'+esc(f.name)+'</b> <span style="color:#8fa3cc">'+esc(f.behavior)+
-            ' · HP '+f.hp+'</span><br><span style="color:#5d6f96">'+esc(f.lore||'')+'</span></div>';
-    });
-    /* 环境法则 */
-    if(s.spec.laws && s.spec.laws.length){
-      html+='<div style="margin-top:14px;color:#ffc857">环境法则</div>';
-      s.spec.laws.forEach(function(l){
-        html+='<div style="color:#8fa3cc">· <b style="color:#cdd9f5">'+esc(l.name||l.id)+'</b> '+esc(l.fact||'')+'</div>';
-      });
-    }
-    body.innerHTML=html;
-    document.getElementById('codexSub').textContent=
-      '殖民地数据库 · 远征档案实时同步';
+    if(APH.UI && APH.UI.renderCodex) return APH.UI.renderCodex();
   }
 
   /* ================= 势力外交面板 (ADR-17) ================= */
@@ -4241,6 +4035,7 @@ window.APH = window.APH || {};
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
     guardTrim:guardTrim,
+    applyTech:applyTech,
     toggleCodex:toggleCodex,
     toggleTechMap:toggleTechMap,
     renderTechMap:renderTechMap,
