@@ -111,6 +111,14 @@ APH.Planet = (function(){
       lore:'矿物的甲壳、生物的心跳。子弹会在它身上弹开一半。' },
   ];
 
+  /* ADR-24: 遗迹专属机械族守卫阵营 */
+  var AUTOMATON_FACTION = {
+    id:'fx_automaton', name:'远古哨兵机械体', behavior:'sentry_automaton',
+    gene:{hue:190,sides:8,limbs:4,size:1.3,spikes:0,eyes:1},
+    hp:50, maxHp:50, shield:40, maxShield:40, speed:50, dmg:16, nightBoost:1.0,
+    lore:'史前文明遗留的自律防御机械，能量护盾未击破前刀枪不入。'
+  };
+
   /* ---------- 希腊字母信标命名 ---------- */
   var GREEK = ['α','β','γ','δ','ε','ζ','η','θ'];
 
@@ -409,5 +417,6 @@ APH.Planet = (function(){
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
            generateExpeditionFlora:generateExpeditionFlora,
            generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,
+           AUTOMATON_FACTION:AUTOMATON_FACTION,
            BIOMES:BIOMES, biomeOf:biomeOf, particleTypeOf:particleTypeOf };
 })();

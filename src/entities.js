@@ -53,6 +53,8 @@ APH.Ent = (function(){
       faction:faction,
       x:x, y:y,
       hp:faction.hp * (0.9+Math.random()*.2),
+      shield:faction.shield || 0,
+      maxShield:faction.maxShield || faction.shield || 0,
       state:'idle',
       wanderA:Math.random()*U.TAU,
       atkCd:Math.random(),
@@ -76,6 +78,13 @@ APH.Ent = (function(){
 
     ctx.save();
     ctx.translate(e.x, e.y);
+    if(e.shield && e.shield > 0){
+      ctx.strokeStyle = 'rgba(0, 229, 255, ' + (0.5 + 0.3 * Math.sin((time||0) * 5)) + ')';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, s + 6, 0, U.TAU);
+      ctx.stroke();
+    }
     if (e.isSoldier && window.APH.Humanoid) {
       /* #1: 士兵仍是程序化小人，缩放到与玩家 drawH 等高 */
       s = (CFG.humanoid && CFG.humanoid.chibiBodyR) || 21.5;

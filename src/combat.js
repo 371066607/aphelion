@@ -92,7 +92,7 @@ APH.Combat = (function(){
     return { id: LOOT_TABLE[0].id, n: 1 };
   }
 
-  /* 击杀掉落实物标本 (Science #53): 酸吐者腺囊 / 硅壳甲壳 / Boss 古代芯片 */
+  /* 击杀掉落实物标本 (Science #53): 酸吐者腺囊 / 硅壳甲壳 / Boss 古代芯片 / 机械哨兵核心 */
   function specimenDropsOf(en){
     var out=[];
     if(!en) return out;
@@ -101,7 +101,51 @@ APH.Combat = (function(){
     var beh=(en.faction && en.faction.behavior) || '';
     if(fid==='fx_spit' || beh==='spitter') out.push({ id:'specimen_acid_gland', n:1 });
     else if(fid==='fx_bulwark' || beh==='tank') out.push({ id:'specimen_chitin', n:1 });
+    else if(fid==='fx_automaton' || beh==='sentry_automaton') out.push({ id:'it_ancient_core', n:1 });
     return out;
+  }
+
+  /* ---------- ADR-24: 机械族护盾伤害结算纯函数 ---------- */
+  function applyDamageWithShield(target, dmg){
+    if(!target) return { absorbed:0, hpDamage:0, shieldBroken:false, targetDead:false };
+    var d = dmg != null ? dmg : 0;
+    target.lastHitTime = 0;
+    var curShield = target.shield || 0;
+    if(curShield > 0){
+      var absorbed = Math.min(curShield, d);
+      target.shield -= absorbed;
+      var remain = d - absorbed;
+      if(remain > 0){
+        target.hp = Math.max(0, (target.hp || 0) - remain);
+      }
+      return {
+        absorbed: absorbed,
+        hpDamage: remain,
+        shieldBroken: target.shield <= 0,
+        targetDead: (target.hp || 0) <= 0
+      };
+    } else {
+      target.hp = Math.max(0, (target.hp || 0) - d);
+      return {
+        absorbed: 0,
+        hpDamage: d,
+        shieldBroken: false,
+        targetDead: (target.hp || 0) <= 0
+      };
+    }
+  }
+
+  function shieldRechargeTick(target, dt, rechargeRate, delaySec){
+    if(!target) return { recharged:false, shield:0 };
+    var delay = delaySec != null ? delaySec : 4;
+    var rate = rechargeRate != null ? rechargeRate : 8;
+    var step = (dt != null ? dt : 0.016);
+    target.lastHitTime = (target.lastHitTime || 0) + step;
+    if(target.lastHitTime >= delay && target.maxShield && (target.shield || 0) < target.maxShield){
+      target.shield = Math.min(target.maxShield, Math.round(((target.shield || 0) + rate * step) * 10) / 10);
+      return { recharged:true, shield:target.shield };
+    }
+    return { recharged:false, shield:target.shield || 0 };
   }
 
   /* 背包操作(纯函数): 返回 {ok, carry, overflow}
@@ -766,13 +810,27 @@ APH.Combat = (function(){
             }
             break;
           }
+          if(en.type === T.BUILDING && en.bid === 'ancient_gate' && !en.dead && (!en.gate || !en.gate.broken)){
+            if(segDist(segX0,segY0,p.x,p.y,en.x,en.y) < 32){
+              p.dead = true;
+              var gRes = APH.Planet.damageAncientGate(en.gate || en, p.dmg);
+              s.shake = Math.min(1, s.shake + 0.15);
+              if(gRes.breached){
+                if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 远古能量闸门已被摧毁！', '#00e5ff');
+              }
+              break;
+            }
+          }
           if(en.type !== T.ENEMY || en.dead || en.isSoldier) continue;
           var r = 14 * en.faction.gene.size * (en.isBoss?1.9:1);
           if(segDist(segX0,segY0,p.x,p.y,en.x,en.y) < r){
             p.dead = true;
-            en.hp -= p.dmg;
+            var dRes = applyDamageWithShield(en, p.dmg);
             s.shake = Math.min(1, s.shake+.12);
             U.emit('enemyHit', en);
+            if(dRes.shieldBroken && s.parts){
+              for(var k=0;k<8;k++) s.parts.push({t:'shard',x:en.x,y:en.y,vx:U.rr(-60,60),vy:U.rr(-60,60),life:0.4,max:0.4,hue:190});
+            }
             if(en.hp <= 0) killEnemy(en);
             break;
           }
@@ -1324,6 +1382,7 @@ APH.Combat = (function(){
   return {
     fsmStep:fsmStep, moveIntent:moveIntent, shouldSpit:shouldSpit,
     rollLoot:rollLoot, specimenDropsOf:specimenDropsOf, addToCarry:addToCarry, carryWeight:carryWeight,
+    applyDamageWithShield:applyDamageWithShield, shieldRechargeTick:shieldRechargeTick,
     updateCombat:updateCombat, updateDropped:updateDropped,
     firePlasma:firePlasma, makeProj:makeProj,
     turretStep:turretStep, soldierCount:soldierCount, turretDamage:turretDamage,

@@ -49,3 +49,50 @@ test('ruins: 能量闸门可被伤害击破或按 E 解除', () => {
   A(gate.broken === true, '击穿后 broken 应为 true');
   A(r2.breached === true, '击穿返回值 breached 应为 true');
 });
+
+test('ruins: applyDamageWithShield 能量护盾吸收与穿透', () => {
+  const applyDmg = APH.Combat.applyDamageWithShield;
+  A(typeof applyDmg === 'function', 'applyDamageWithShield 必须为函数');
+
+  const sentry = { hp: 50, maxHp: 50, shield: 40, maxShield: 40 };
+
+  // 1. 伤害 25 被护盾完全吸收，HP 不掉
+  const r1 = applyDmg(sentry, 25);
+  A(sentry.shield === 15, '护盾应吸收 25 剩余 15, 实际: ' + sentry.shield);
+  A(sentry.hp === 50, '本体 HP 不应受损');
+  A(r1.absorbed === 25, '吸收量应为 25');
+  A(r1.shieldBroken === false, '护盾尚未破损');
+
+  // 2. 伤害 30 破盾且溢出穿透到本体 HP (15 削盾 + 15 扣血)
+  const r2 = applyDmg(sentry, 30);
+  A(sentry.shield === 0, '护盾应被击破归零');
+  A(sentry.hp === 35, '本体 HP 应扣除 15 剩余 35, 实际: ' + sentry.hp);
+  A(r2.shieldBroken === true, 'shieldBroken 应为 true');
+
+  // 3. 破盾后直接扣本体 HP
+  const r3 = applyDmg(sentry, 20);
+  A(sentry.hp === 15, '本体 HP 应剩余 15');
+});
+
+test('ruins: shieldRechargeTick 脱战4s后护盾回充', () => {
+  const rechargeTick = APH.Combat.shieldRechargeTick;
+  A(typeof rechargeTick === 'function', 'shieldRechargeTick 必须为函数');
+
+  const sentry = { hp: 35, shield: 0, maxShield: 40, lastHitTime: 0 };
+
+  // 2s 未达到 4s 延迟，不回充
+  rechargeTick(sentry, 2.0);
+  A(sentry.shield === 0, '未达 4s 延迟不应回充');
+
+  // 再过 1.5s 累计 3.5s 仍不回充
+  rechargeTick(sentry, 1.5);
+  A(sentry.shield === 0, '累计 3.5s 仍不回充');
+
+  // 再过 0.5s (累计 4.0s >= 4s)，开始回充 (8/s * 0.5s = 4 护盾)
+  rechargeTick(sentry, 0.5);
+  A(sentry.shield === 4, '脱战 4s 后应回充 4 护盾, 实际: ' + sentry.shield);
+
+  // 持续回充至 maxShield (40) 封顶
+  rechargeTick(sentry, 10.0);
+  A(sentry.shield === 40, '护盾回充应封顶 maxShield 40, 实际: ' + sentry.shield);
+});
