@@ -409,6 +409,32 @@ APH.CFG = {
     bulkHaulMaxCount: 50,         // 搬运工单次携带最大单位数
   },
 
+  /* 微环境温度与冷热控制 (ADR-25 / Spec #143) */
+  temperature: {
+    weatherBaseTemp: {
+      wx_clear:       { day: 22, night: 10 },
+      wx_fog:         { day: 16, night: 8 },
+      wx_rain:        { day: 15, night: 8 },
+      wx_rain_heavy:  { day: 12, night: 6 },
+      wx_snow:        { day: -5, night: -12 },
+      wx_blizzard:    { day: -15, night: -22 },
+      wx_storm:       { day: 14, night: 7 },
+      wx_cold:        { day: -25, night: -32 },
+      wx_heat:        { day: 42, night: 30 },
+      wx_acid:        { day: 16, night: 9 },
+      wx_aurora:      { day: 12, night: 4 },
+    },
+    comfortMin: 10,
+    comfortMax: 35,
+    thermalTransmissionRate: 0.15, // 30s 热阻传导率 (15%)
+    heaterTarget: 21,
+    coolerTargetComfort: 20,
+    coolerTargetFreezer: -5,
+    hypothermiaColdThreshold: 10,
+    heatstrokeHeatThreshold: 35,
+    cryoSuitColdFloor: -35,
+  },
+
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
   workshop: {
     mineralCost: 2,

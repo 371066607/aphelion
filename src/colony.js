@@ -1054,6 +1054,22 @@ APH.Colony = (function(){
     return { found: false };
   }
 
+  /* ---------- ADR-25: 封闭房间热阻隔热与传导纯函数 ---------- */
+  function roomTemperatureTick(room, ambientTemp, dt){
+    if(!room) return ambientTemp;
+    if(room.isEnclosed === false){
+      room.temp = ambientTemp;
+      return ambientTemp;
+    }
+    if(room.temp == null) room.temp = 21;
+    var C = (CFG.temperature) || {};
+    var baseRate = C.thermalTransmissionRate != null ? C.thermalTransmissionRate : 0.15;
+    var step = (dt != null ? dt : 30) / 30;
+    var rate = Math.max(0, Math.min(1, baseRate * step));
+    room.temp = Math.round((room.temp + (ambientTemp - room.temp) * rate) * 10) / 10;
+    return room.temp;
+  }
+
   function serializeGround(entities){
     var g=[];
     (entities||[]).forEach(function(e){
@@ -2106,6 +2122,7 @@ APH.Colony = (function(){
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
     findNearbySourcedItem:findNearbySourcedItem,
+    roomTemperatureTick:roomTemperatureTick,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,

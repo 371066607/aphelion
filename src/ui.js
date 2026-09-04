@@ -140,7 +140,13 @@ APH.UI = (function(){
               wxTomorrow=' · 明日依旧 '+ (wxIcons[wxNext]||'')+' '+(wxNames[wxNext]||wxNext);
             }
           }catch(e3){ /* 预报失败静默, 不影响主行 */ }
-          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+' · 预计 '+wxDurTxt+wxTomorrow;
+          /* ADR-25: 实时环境气温与室内温度展示 */
+          var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
+          var outTemp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxIdNow, isDay) : 22;
+          var curRoomTemp = (s.currentRoom && s.currentRoom.temp != null) ? s.currentRoom.temp : null;
+          var tempTxt = ' · ' + Math.round(outTemp) + '°C' + (curRoomTemp != null ? ' (室内 ' + Math.round(curRoomTemp) + '°C)' : '');
+
+          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+tempTxt+' · 预计 '+wxDurTxt+wxTomorrow;
           wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
         }catch(e){ /* HUD 只读展示, 失败静默 */ }
         /* P1b 玩家暴露条: 第六生存条 (>50 红色警示; 0 隐藏) */

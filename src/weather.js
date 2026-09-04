@@ -178,6 +178,13 @@ APH.Weather = (function(){
     return Math.max(0, Math.min(n, cap));
   }
 
+  /* ---------- ADR-25: 环境气温推导纯函数 ---------- */
+  function ambientTemperatureOf(weatherId, isDay){
+    var C = (CFG.temperature && CFG.temperature.weatherBaseTemp) || {};
+    var w = C[weatherId] || C.wx_clear || { day: 22, night: 10 };
+    return isDay !== false ? w.day : w.night;
+  }
+
   return {
     weatherDefs: weatherDefs,
     defaultWeather: defaultWeather,
@@ -187,6 +194,7 @@ APH.Weather = (function(){
     expectDur: expectDur,
     expectRemain: expectRemain,
     forecast: forecast,
+    ambientTemperatureOf: ambientTemperatureOf,
     /* W4 视觉 (程序化粒子/天色) */
     fxParams: fxParams,
     rgbaOf: rgbaOf,
