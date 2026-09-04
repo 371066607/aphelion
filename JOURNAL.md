@@ -911,3 +911,12 @@
   - **车间与就餐 120px 就近取料**：`findNearbySourcedItem` 纯函数支持优先检索 120px 范围内的食材/药品货架；货架格内轻量绘制物品陈列微缩图标与当前分类符号；大幅消灭跨基地跑图内耗。
   - **验证**：编写 `tests/storage_logistics.test.js`（8 个纯单元测试入 `run.js`，总单元测试集增至 661 绿）；`ui_modals.test.js` 42 绿；`scenario.test.js` 增至 117 场景全绿；`perf` 4 绿；`boss` 7 绿；全量自动化测试总数达 **831 项 100% 绿灯**；`python3 build.py` 构建单文件 `game.html` 成功。
   - **关闭票据**：Issue #134 (L1), #135 (L2), #136 (L3), #137 (L4), #133 (Spec) 全部完成并闭环。
+
+- **2026-09-04 · 远征探险与异星古代遗迹系统全链条上线（Spec #138 / ADR-24 / #139~#142）**:
+  - **ADR-0015 / ADR-24 落盘**：升级远征副本体验，将单一的刷怪捡矿循环推进为具有石室解谜、高威胁机械护盾战与终极科技突破的深度探险系统。
+  - **古代遗迹确定性生成（`generateAncientRuins`）**：T2/T3 星球必刷、T1 概率刷出密封史前遗迹；包含远古石壁（`ancient_wall`）、能量力场闸门（`ancient_gate`）、古代数据终端（`ancient_terminal`）与远古遗物箱（`ancient_vault`）；踏入遗迹区域触发镜头震屏与室内除雾反馈。
+  - **机械族远古哨兵（`fx_automaton`）与能量护盾系统**：引入机械族守卫，具备 `shield: 40, maxShield: 40`；实现纯函数 `applyDamageWithShield` 与 `shieldRechargeTick`，先削盾后扣血，脱战 4 秒后回充；击毁哨兵必定掉落稀世「史前高能核心 `it_ancient_core`」。
+  - **古代数据终端学识破译（`hackTerminal`）**：玩家靠近数据终端按 `[E]` 破译，基于学识技能（`sk_lore`）与随机掷骰；破译成功安全解除能量闸门锁定并瘫痪机械守卫 8 秒；破译失败触发声光警报并激怒守卫狂暴追击。
+  - **远古遗物箱与终极科技反哺**：开启遗物箱获取「古代蓝图残卷 `it_ancient_blueprint`」与史前核心；带回家园科研站化验流水线尤里卡突破终极科技 `te_heavy_plasma`（等离子重炮与史前能源）；解锁建造等离子重炮（`bl_heavy_turret`）与 200W 零燃料史前永恒发电机（`bl_ancient_generator`）。
+  - **验证**：编写 `tests/ruins.test.js`（7 个纯单元测试入 `run.js`，总单元测试集增至 668 绿）；`ui_modals.test.js` 42 绿；`scenario.test.js` 增至 118 场景全绿；`perf` 4 绿；`boss` 7 绿；全量自动化测试总数达 **839 项 100% 绿灯**；`python3 build.py` 构建单文件 `game.html` 成功。
+  - **关闭票据**：Issue #139 (R1), #140 (R2), #141 (R3), #142 (R4), #138 (Spec) 全部完成并闭环。
