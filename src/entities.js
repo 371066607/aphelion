@@ -405,6 +405,7 @@ APH.Ent = (function(){
     bl_barracks:'#ff8c42', bl_turret:'#ff6d7a', bl_clinic:'#7dffab',
     bl_farm:'#7a9a4a', bl_pasture:'#c8a882', bl_house:'#b8874a', bl_workshop:'#d4a574',
     bl_crop_plot:'#81c784', bl_campfire:'#ff9800', bl_kitchen:'#cfd8dc',
+    bl_storage_shelf:'#a17a4a',
   };
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
@@ -515,6 +516,50 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* ADR-23: 置物货架(bl_storage_shelf) - 1x1 木质货架 + 陈列物品微缩图标/品类符号 */
+    if(e.bid==='bl_storage_shelf'){
+      ctx.save(); ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(0,0,0,.32)';
+      ctx.beginPath(); ctx.ellipse(2,8,20,9,0,0,U.TAU); ctx.fill();
+      ctx.fillStyle='#8d6e63';
+      ctx.fillRect(-18,-24,36,28);
+      ctx.fillStyle='#5d4037';
+      ctx.fillRect(-16,-22,32,10);
+      ctx.fillRect(-16,-9,32,11);
+      ctx.fillStyle='#3e2723';
+      ctx.fillRect(-18,-24,4,30);
+      ctx.fillRect(14,-24,4,30);
+      ctx.strokeStyle='#d7ccc8'; ctx.lineWidth=1;
+      ctx.strokeRect(-18,-24,36,30);
+
+      var sObj = window.APH && window.APH.state;
+      var curFilter = e.filter || 'all';
+      var topDrop = null;
+      if(sObj && sObj.entities){
+        for(var di=0; di<sObj.entities.length; di++){
+          var de = sObj.entities[di];
+          if(de && !de.dead && de.type===T.DROPPED && de.itemId){
+            if(U.dst(e.x, e.y, de.x, de.y) <= 24){ topDrop = de; break; }
+          }
+        }
+      }
+      ctx.textAlign='center';
+      if(topDrop){
+        var itemDef = (CFG.items && CFG.items[topDrop.itemId]) || {};
+        ctx.fillStyle = itemDef.tint || '#ffd54f';
+        ctx.beginPath(); ctx.arc(0, -15, 5.5, 0, U.TAU); ctx.fill();
+        ctx.strokeStyle = '#26170f'; ctx.lineWidth = 1; ctx.stroke();
+      } else {
+        var presetsList = (CFG.storage && CFG.storage.presets) || [];
+        var pIcon = '📦';
+        for(var pi=0; pi<presetsList.length; pi++){ if(presetsList[pi].id === curFilter){ pIcon = presetsList[pi].icon; break; } }
+        ctx.font = '11px sans-serif';
+        ctx.fillText(pIcon, 0, -12);
+      }
+      ctx.restore();
+      return;
+    }
+
     /* M1: 有序列帧的建筑优先 sprite 渲染 */
     if (window.APH.Sprites && APH.Sprites.isReady(e.bid)){
       /* 占位格→地台尺寸; dispH/内容高→显示缩放(治"建筑比人物矮") */

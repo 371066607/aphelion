@@ -892,6 +892,7 @@ APH.Colony = (function(){
   /* ---------- ADR-23: 仓储品类过滤纯函数 ---------- */
   function storageFilterMatches(containerFilter, itemId){
     if(!containerFilter || containerFilter === 'all') return true;
+    if(containerFilter === itemId) return true;
     var it = (CFG.items && CFG.items[itemId]) || {};
     var store = it.store;
     if(containerFilter === 'food'){
@@ -1006,6 +1007,47 @@ APH.Colony = (function(){
     }
     var fallback = stockpileSpot(bList);
     return { x: fallback.x, y: fallback.y, container: null };
+  }
+
+  function findNearbySourcedItem(category, centerPos, maxRadius, buildings, entities, meta){
+    if(!category || !centerPos) return { found: false };
+    var rMax = maxRadius != null ? maxRadius : ((CFG.storage && CFG.storage.sourcingRadius) || 120);
+    var bList = buildings || [];
+    var eList = entities || [];
+
+    var matchingContainers = [];
+    for(var i = 0; i < bList.length; i++){
+      var b = bList[i];
+      if(!b || (b.id !== 'bl_storage_shelf' && b.id !== 'bl_warehouse')) continue;
+      if(storageFilterMatches(b.filter, category)){
+        var d = U.dst(centerPos.x, centerPos.y, b.x, b.y);
+        if(d <= rMax){
+          matchingContainers.push({ building: b, distance: d });
+        }
+      }
+    }
+
+    matchingContainers.sort(function(a, b){ return a.distance - b.distance; });
+
+    for(var j = 0; j < matchingContainers.length; j++){
+      var c = matchingContainers[j];
+      for(var k = 0; k < eList.length; k++){
+        var item = eList[k];
+        if(!item || item.dead || (item.type && item.type !== T.DROPPED) || !item.itemId) continue;
+        if(storageFilterMatches(category, item.itemId)){
+          if(U.dst(c.building.x, c.building.y, item.x, item.y) <= 32){
+            return {
+              found: true,
+              shelf: c.building,
+              drop: item,
+              distance: c.distance
+            };
+          }
+        }
+      }
+    }
+
+    return { found: false };
   }
 
   function serializeGround(entities){
@@ -2054,6 +2096,7 @@ APH.Colony = (function(){
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
+    findNearbySourcedItem:findNearbySourcedItem,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,

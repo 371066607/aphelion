@@ -159,3 +159,28 @@ test('storage: findBestStorageSpot 寻找最近兼容品类的仓储点', () => 
   const spotOther = findSpot('it_alien_unknown', [{ id: 'bl_landing_pad', x: 1100, y: 1100 }], [], { x: 0, y: 0 });
   A(spotOther && typeof spotOther.x === 'number', '未知物品应回退兜底点');
 });
+
+test('storage: findNearbySourcedItem 120px 范围内就近货架优先取料', () => {
+  const source = APH.Colony.findNearbySourcedItem;
+  A(typeof source === 'function', 'findNearbySourcedItem 必须为函数');
+
+  const kitchenPos = { x: 500, y: 500 };
+  const nearbyFoodShelf = { id: 'bl_storage_shelf', x: 540, y: 500, filter: 'food' }; // 距离 40px < 120px
+  const distantWarehouse = { id: 'bl_warehouse', x: 1000, y: 1000, filter: 'food' }; // 距离 707px > 120px
+  const buildings = [nearbyFoodShelf, distantWarehouse];
+
+  const nearbyDrop = { id: 'dp_food_1', itemId: 'it_food', n: 10, x: 540, y: 500, dead: false };
+  const distantDrop = { id: 'dp_food_2', itemId: 'it_food', n: 10, x: 1000, y: 1000, dead: false };
+  const entities = [nearbyDrop, distantDrop];
+
+  // 检索食材：应优先从 40px 的食物货架上取料
+  const res = source('food', kitchenPos, 120, buildings, entities);
+  A(res && res.found === true, '应成功就近取料');
+  A(res.shelf && res.shelf === nearbyFoodShelf, '应匹配近处食物货架');
+  A(res.drop && res.drop.id === 'dp_food_1', '应取到货架上的食物堆');
+  A(res.distance === 40, '取料距离应为 40px');
+
+  // 若无对应品类货架，found 为 false
+  const resMed = source('medical', kitchenPos, 120, buildings, entities);
+  A(resMed && resMed.found === false, '无药品货架时应返回 found: false');
+});

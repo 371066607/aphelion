@@ -2686,5 +2686,32 @@ test('#132 social: 靠近崩溃居民按 E 安抚情绪解除崩溃', () => {
   }
 });
 
+test('#137 storage: 走近置物货架按 E 循环品类且就近取料', () => {
+  const oldScene = S.scene, oldBuildings = S.colony.buildings, oldEntities = S.entities;
+  try {
+    S.scene = 'home'; S.mode = 'running';
+    APH.Res.ensurePlayerNeeds(S.meta);
+    S.meta.playerNeeds.isSleeping = false;
+    S.meta.playerNeeds.downed = false;
+    const shelf = { type: T.BUILDING, id: 'bl_storage_shelf', bid: 'bl_storage_shelf', x: S.px + 20, y: S.py, filter: 'all' };
+    S.colony.buildings = [shelf];
+    S.entities = [shelf];
+    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false; S.nearResident = null; S.nearBrokenResident = null;
+    M.updateHome(0.016);
+    A(S.nearStorageContainer, '走近置物货架应判定 nearStorageContainer');
+    M.debugPressE();
+    A(shelf.filter === 'food', '按 E 后品类应切换为 food, 实际: ' + shelf.filter);
+
+    // 放置食材在货架上，测试 120px 内就近取料
+    const drop = { id: 'dp_sh_1', type: T.DROPPED, itemId: 'it_roasted_meat', n: 5, x: S.px + 20, y: S.py, dead: false };
+    S.entities.push(drop);
+    const sourced = APH.Colony.findNearbySourcedItem('food', { x: S.px, y: S.py }, 120, S.colony.buildings, S.entities);
+    A(sourced && sourced.found === true, '就近取料应成功检索到食材');
+    A(sourced.drop && sourced.drop.id === 'dp_sh_1', '取料对象应为货架上的熟食');
+  } finally {
+    S.scene = oldScene; S.colony.buildings = oldBuildings; S.entities = oldEntities;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);

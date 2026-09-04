@@ -2572,6 +2572,14 @@ window.APH = window.APH || {};
       }
     });
     if(bestCooked) return bestCooked;
+    /* ADR-23 就近货架取料: 优先检测 120px 范围内的食物货架 */
+    if(APH.Colony && APH.Colony.findNearbySourcedItem){
+      var nearFoodShelf = APH.Colony.findNearbySourcedItem('food', e, (CFG.storage&&CFG.storage.sourcingRadius)||120, s.colony && s.colony.buildings, s.entities);
+      if(nearFoodShelf && nearFoodShelf.found && nearFoodShelf.drop){
+        var dropIt = CFG.items && CFG.items[nearFoodShelf.drop.itemId];
+        return { kind:'pile', drop:nearFoodShelf.drop, x:nearFoodShelf.drop.x, y:nearFoodShelf.drop.y, itemId:nearFoodShelf.drop.itemId, isCooked:!!(dropIt&&dropIt.isCooked) };
+      }
+    }
     if((s.meta.res&&s.meta.res.food||0)>0){
       var st=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
       var d=U.dst(e.x,e.y,st.x,st.y);
