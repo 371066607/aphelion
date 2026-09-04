@@ -574,6 +574,7 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
+    s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     updateVisitors(dt);
     /* C: 游商走了/离远了自动收面板 */
     var tpO=document.getElementById('tradePanel');
@@ -1544,6 +1545,12 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
       tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene==='home' && s.nearStorageContainer && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
+      var nxt = APH.Colony.cycleStorageFilter(s.nearStorageContainer);
+      APH.UI.floatText('📦 仓储品类切换为: ' + nxt.icon + ' ' + nxt.name, '#59d9ff');
+      saveColony();
       return true;
     }
     if(s.scene==='home' && s.nearResident && !s.nearBrokenResident && !s.nearBed && !s.nearClinic && !s.nearPad){
@@ -3501,6 +3508,8 @@ window.APH = window.APH || {};
         syncPlayerSleep();
       }else if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
         tryPlayerEatNearFood();
+      }else if(s.scene==='home' && s.nearStorageContainer && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad && (playerFood() >= foodEatBelow() || !s.nearFood)){
+        onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad){
         onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearFood){

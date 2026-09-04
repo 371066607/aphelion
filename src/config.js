@@ -376,6 +376,37 @@ APH.CFG = {
     interventionMaxChance: 0.90,  // 安抚成功率封顶上限 (90%)
   },
 
+  /* 精细化仓储与智能物流 (ADR-23 / Spec #133) */
+  storage: {
+    presets: [
+      { id: 'all', name: '全部允许', icon: '📦' },
+      { id: 'food', name: '仅食材熟食', icon: '🍞' },
+      { id: 'materials', name: '仅工业建材', icon: '🧱' },
+      { id: 'medical', name: '仅医疗药品', icon: '💊' },
+      { id: 'specimens_gear', name: '仅标本装备', icon: '🔬' },
+    ],
+    decayHpMax: 100,
+    decayPerishableBase: 1.5,     // 易腐品基础损耗 /跳 (30s)
+    decayNormalBase: 0.5,         // 药品装备基础损耗 /跳
+    weatherDecayMul: {
+      wx_clear: 1,
+      wx_fog: 1,
+      wx_heat: 1.5,
+      wx_cold: 1.5,
+      wx_rain: 2,
+      wx_rain_heavy: 2.5,
+      wx_snow: 2,
+      wx_blizzard: 2.5,
+      wx_storm: 2,
+      wx_acid: 4,
+      wx_aurora: 1,
+    },
+    sourcingRadius: 120,          // 车间与就餐就近取料优先半径 (px)
+    bulkHaulRadius: 48,           // 搬运工多堆相邻拾取吸附半径 (px)
+    bulkHaulMaxPiles: 3,          // 搬运工单次携带最大堆数
+    bulkHaulMaxCount: 50,         // 搬运工单次携带最大单位数
+  },
+
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
   workshop: {
     mineralCost: 2,

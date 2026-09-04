@@ -77,6 +77,10 @@ APH.Colony = (function(){
     bl_carpet: { name:'地毯', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ leather:4 }, size:48, max:12, buildTime:8,
       cells:[1,1], dispH:55,
       desc:'房间内的软装家具：房屋心情 +1（电视/书架/地毯各 +1，可叠加）。' },
+    /* ADR-23 精细化仓储与置物货架 (#134) */
+    bl_storage_shelf: { name:'置物货架', cost:0, costMineral:0, costRes:{ wood:6 }, size:48, max:24, buildTime:4,
+      cells:[1,1], dispH:48,
+      desc:'1×1 轻量置物货架。可按 [E] 自由切换允许存放的品类；架上物品完全免疫露天风化腐烂。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
     bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
       cells:[1,1], buildTime:6, dispH:96,
@@ -316,8 +320,8 @@ APH.Colony = (function(){
       return { ok:false, why:'已达数量上限' };
     var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
     var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && GRID_STATICS[bid]);
-    /* P3 家具豁免离核心太近(室内件, 与墙同理) */
-    var isFurniture = (bid==='bl_tv'||bid==='bl_shelf'||bid==='bl_carpet');
+    /* P3 家具与收纳货架豁免离核心太近(室内件, 与墙同理) */
+    var isFurniture = (bid==='bl_tv'||bid==='bl_shelf'||bid==='bl_carpet'||bid==='bl_storage_shelf');
     /* 墙/闸门/导线豁免离核心130px: 否则围不了家(ADR-13) */
     if(!isGrid && !isFurniture && U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     for(var i=0;i<colonyBuildings.length;i++){
@@ -883,6 +887,45 @@ APH.Colony = (function(){
     if(b) return { x:b.x, y:(b.y||0)+18 };
     var H=CFG.HAB||{x:1100,y:1100};
     return { x:H.x, y:H.y+110 };
+  }
+
+  /* ---------- ADR-23: 仓储品类过滤纯函数 ---------- */
+  function storageFilterMatches(containerFilter, itemId){
+    if(!containerFilter || containerFilter === 'all') return true;
+    var it = (CFG.items && CFG.items[itemId]) || {};
+    var store = it.store;
+    if(containerFilter === 'food'){
+      return store === 'food' || it.isCooked || itemId.indexOf('seed') >= 0 || itemId.indexOf('crop') >= 0;
+    }
+    if(containerFilter === 'materials'){
+      return store === 'mineral' || store === 'iron' || store === 'stone' || store === 'wood' || store === 'leather' || store === 'alloy';
+    }
+    if(containerFilter === 'medical'){
+      return store === 'med' || store === 'herb' || itemId === 'it_reagent';
+    }
+    if(containerFilter === 'specimens_gear'){
+      return itemId.indexOf('specimen_') === 0 || itemId.indexOf('gear_') === 0 || store === 'gear';
+    }
+    return true;
+  }
+
+  function cycleStorageFilter(container){
+    if(!container) return { id:'all', name:'全部允许', icon:'📦' };
+    var presets = (CFG.storage && CFG.storage.presets) || [
+      { id: 'all', name: '全部允许', icon: '📦' },
+      { id: 'food', name: '仅食材熟食', icon: '🍞' },
+      { id: 'materials', name: '仅工业建材', icon: '🧱' },
+      { id: 'medical', name: '仅医疗药品', icon: '💊' },
+      { id: 'specimens_gear', name: '仅标本装备', icon: '🔬' },
+    ];
+    var cur = container.filter || 'all';
+    var idx = 0;
+    for(var i = 0; i < presets.length; i++){
+      if(presets[i].id === cur){ idx = i; break; }
+    }
+    var next = presets[(idx + 1) % presets.length];
+    container.filter = next.id;
+    return next;
   }
 
   function serializeGround(entities){
@@ -1894,6 +1937,7 @@ APH.Colony = (function(){
     mineOutput:mineOutput, labOutput:labOutput,
     shortageBrief:shortageBrief, cycleJob:cycleJob, JOB_CYCLE:JOB_CYCLE,
     stockItem:stockItem, collectHome:collectHome, stockpileSpot:stockpileSpot,
+    storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
