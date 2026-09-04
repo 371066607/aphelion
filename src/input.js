@@ -12,6 +12,9 @@ APH.Input = (function(){
   var keyState = {}; // code -> boolean
 
   function currentContext(){
+    if(contextStack.length === 1 && window.APH && window.APH.state && window.APH.state.mode === 'intro'){
+      return 'intro';
+    }
     return contextStack[contextStack.length - 1] || 'game';
   }
 
@@ -50,6 +53,13 @@ APH.Input = (function(){
     if(!actionName || typeof handler !== 'function') return;
     actionHandlers[actionName] = actionHandlers[actionName] || [];
     actionHandlers[actionName].push(handler);
+  }
+
+  function registerActions(map){
+    if(!map) return;
+    Object.keys(map).forEach(function(act){
+      onAction(act, map[act]);
+    });
   }
 
   function offAction(actionName, handler){
@@ -147,6 +157,7 @@ APH.Input = (function(){
     hasContext: hasContext,
     getContextStack: getContextStack,
     onAction: onAction,
+    registerActions: registerActions,
     offAction: offAction,
     dispatchAction: dispatchAction,
     resolveAction: resolveAction,

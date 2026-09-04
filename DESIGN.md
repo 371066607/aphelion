@@ -46,6 +46,7 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 | ADR-16 | 开场起源 | 家园是末舰新曙光的迫降点（不拆殖民地优先）；进门前五张静帧；进门后一条当前目标。详见 `docs/adr/0007-opening-origin.md` | 2026-09-02 grilling：不知为何在此、不知干什么 |
 | ADR-17 | 势力外交与威慑 | 敌对势力三级关系度（宿敌/中立/盟友，-100~+100）；怒气与袭击关系耦合；纯函数外交动作（纳贡平息、通商协定、军事威慑）；远征破袭战略联动（摧毁敌基地重创该势力）；O 键外交浮层。详见 `docs/adr/0008-diplomacy-and-deterrence.md` | 2026-09-03 殖民地外交与反制闭环 |
 | ADR-18 | UI 模态接缝深化 | 将散落 main.js 的 6 大浮层（外交/名册/游商/图鉴/科技树/建造）收拢进 `src/ui.js`；统一 APH.UI 接口（open/close/toggle/closeActive）；全屏模态自动挂起主循环；单例容器+惰性渲染。详见 `docs/adr/0009-modal-management-seam.md` | 2026-09-04 架构防腐与深模块深化（消除 1400 行 main.js 赘肉） |
+| ADR-19 | 输入分发与上下文栈 | 建立 `src/input.js`（APH.Input）；键位映射进 `CFG.keybindings`；引入上下文栈（game/modal:*）解决按键踩踏与模态独占；业务通过语义动作（Action）解耦按键分支。详见 `docs/adr/0010-input-dispatcher-and-context-stack.md` | 2026-09-04 架构防腐第二期（解开 450 行按键逻辑缠绕） |
 
 **暂缓决策**（改动成本不随时间增长）：渲染特效、UI 布局、平衡数值、敌人行为参数、音频、瞄准方式。
 

@@ -743,6 +743,7 @@ APH.CFG = {
       KeyU: 'UPGRADE_NEAREST',
       KeyX: 'DEMOLISH_NEAREST',
       KeyH: 'TOGGLE_MARKER',
+      KeyK: 'DEBUG_SPAWN',
       KeyC: 'TOGGLE_CAMERA_LOCK',
       KeyM: 'TOGGLE_MUTE',
       KeyO: 'TOGGLE_DIPLOMACY',

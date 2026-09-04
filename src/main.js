@@ -1700,182 +1700,253 @@ window.APH = window.APH || {};
     return { buildings:[], builtAt:Date.now(), ground:[] };
   }
 
-  /* ================= 输入 ================= */
-  function bindInput(){
+  /* ================= 输入动作处理器 (委托 APH.Input 深模块, ADR-19) ================= */
+  function onPlayerInteract(ignoreMode){
     var s=APH.state;
-    addEventListener('keydown',function(e){
-      s.keys[e.code]=true;
-      APH.SFX.unlock();
-      if((e.code==='Enter'||e.code==='Space')&&s.mode==='intro'){
+    if(!ignoreMode && s.mode!=="running") return false;
+    var s=APH.state;
+    if(playerDowned() && s.mode==='running') return false;
+    
+    if(playerSleeping()){
+      APH.Res.playerWake(s.meta.playerNeeds);
+      syncPlayerSleep();
+      APH.UI.floatText('😊 醒来','#8fd4ff');
+      return true;
+    }
+    if(s.scene==='expedition' && s.nearFlora){
+      var loadW=APH.Combat.carryWeight(s.carry);
+      var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
+      var seedIt = s.nearFlora.seedItem || 'specimen_flora_glow';
+      var rPick = APH.Combat.addToCarry(s.carry, seedIt, 1, capNow);
+      if(rPick.ok){
+        s.carry = rPick.carry;
+        s.nearFlora.dead = true;
+        var itName = (CFG.items[seedIt]&&CFG.items[seedIt].name) ? CFG.items[seedIt].name : seedIt;
+        APH.UI.floatText('✔ 获得 '+itName, '#59d9ff');
+      }else{
+        APH.UI.floatText('✕ 背包已满', '#ff9a9a');
+      }
+      return true;
+    }
+    if(s.scene==='home' && s.nearFlora){
+      var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6} }, 15);
+      if(resW.done && resW.dropItemId){
+        APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
+        var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
+        APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
+      }else{
+        APH.UI.floatText('采收中...', '#8fd4ff');
+      }
+      return true;
+    }
+    if(s.scene==='home' && s.nearVisitor){
+      if(s.nearVisitor.trade){
+        closeColonyOverlays('trade');
+        toggleTradePanel();
+      }else{
+        tryRecruit(s.nearVisitor);
+      }
+      return true;
+    }
+    if(s.scene==='home' && s.nearBed){
+      APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
+      syncPlayerSleep();
+      if(window.APH.Opening && APH.Opening.noteSleptInHouse){
+        APH.Opening.noteSleptInHouse(firstNightOpening());
+        tryFirstNightVisitor();
+        applyFirstNightHint();
+        try{ APH.Save.saveMeta(s.meta); }catch(eS){}
+      }
+      APH.UI.floatText('😴 入睡','#8fd4ff');
+      return true;
+    }
+    if(s.scene==='home' && s.nearClinic && playerSick()){
+      APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
+      syncPlayerSleep();
+      APH.UI.floatText('🏥 躺进医疗舱','#8fd4ff');
+      return true;
+    }
+    if(s.scene==='home' && s.nearFood){
+      tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.nearPad){
+      if(s.scene==='home') launchExpedition();
+      else if(s.scene==='expedition') returnHome();
+      return true;
+    }
+    var padE=s.entities.find(function(en){return en.type===T.BUILDING&&en.pad;});
+    if(padE){
+      s.target={x:padE.x,y:padE.y+40};
+      s.parts.push({t:'ping',x:padE.x,y:padE.y,life:.9,max:.9});
+      APH.UI.setHint('前往发射台…到达后按 [E]');
+      return true;
+    }
+    return false;
+  }
+
+  function onSecondaryInteract(){
+    var s=APH.state;
+    if(s.mode!=='running' || s.scene!=='home' || playerDowned() || playerSleeping()) return false;
+    if(s.nearVisitor){
+      tryOfferMeal(s.nearVisitor);
+      return true;
+    }
+    if(s.nearLab){
+      var nextSpec=APH.Colony.cycleAnalysisTarget(s.nearLab.analysisTarget || 'specimen_flora_glow');
+      setBuildingField(s.nearLab, 'analysisTarget', nextSpec);
+      setBuildingField(s.nearLab, 'analysisProgress', 0);
+      var specDef=APH.Colony.SPECIMEN_ANALYSIS[nextSpec];
+      APH.UI.floatText('🔬 化验队列: '+(specDef && specDef.name || nextSpec), '#59d9ff');
+      saveColony();
+      return true;
+    }
+    if(s.nearCropPlot){
+      var nextCrop=APH.Colony.cycleAnalyzedCrop(s.nearCropPlot.crop, s.meta.analyzedFlora);
+      if(!nextCrop){
+        APH.UI.floatText('🌱 需先在科研站化验异星标本', '#ff9a9a');
+      }else{
+        setBuildingField(s.nearCropPlot, 'crop', nextCrop);
+        setBuildingField(s.nearCropPlot, 'plot', { stage:0, t:0 });
+        var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
+        APH.UI.floatText('🌱 切换为: '+cropName, '#7dffab');
+        saveColony();
+      }
+      return true;
+    }
+    if(s.nearWorkshop){
+      var recipes=Object.keys(APH.Colony.CRAFT_RECIPES);
+      var curRIdx=recipes.indexOf(s.nearWorkshop.recipe||'it_pickaxe');
+      var nextRec=recipes[(curRIdx+1)%recipes.length];
+      setBuildingField(s.nearWorkshop, 'recipe', nextRec);
+      s.nearWorkshop.craftProgress=0;
+      var recName=APH.Colony.CRAFT_RECIPES[nextRec].name;
+      APH.UI.floatText('🔨 工坊生产调整为: '+recName, '#59d9ff');
+      saveColony();
+      return true;
+    }
+    if(s.nearKitchen || s.nearCampfire){
+      var targetBldg=s.nearKitchen || s.nearCampfire;
+      var bId=targetBldg.bid || targetBldg.id;
+      var validRecipes=Object.keys(APH.Colony.COOK_RECIPES).filter(function(k){
+        var r=APH.Colony.COOK_RECIPES[k];
+        var allowed=r.bldgs || r.bldg || ['bl_kitchen', 'bl_campfire'];
+        return allowed.indexOf(bId) >= 0;
+      });
+      if(validRecipes.length > 0){
+        var curKIdx=validRecipes.indexOf(targetBldg.recipe || validRecipes[0]);
+        var nextKRec=validRecipes[(curKIdx + 1) % validRecipes.length];
+        setBuildingField(targetBldg, 'recipe', nextKRec);
+        targetBldg.cookProgress=0;
+        var recKName=APH.Colony.COOK_RECIPES[nextKRec].name;
+        APH.UI.floatText('🍳 烹饪菜谱调整为: ' + recKName, '#ffca28');
+        saveColony();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function onFirePlasma(){
+    var s=APH.state;
+    if(s.mode!=='running' || playerDowned() || playerSleeping()) return false;
+    if(APH.UI && APH.UI.hasActiveModal && APH.UI.hasActiveModal()) return false;
+    APH.Combat.firePlasma();
+    return true;
+  }
+
+  function onUpgradeNearest(){
+    var s=APH.state;
+    if(s.mode!=='running'||s.scene!=='home'||playerDowned()||playerSleeping()) return false;
+    var best=null,bd=1e9;
+    s.colony.buildings.forEach(function(b){
+      if(b.id==='bl_landing_pad') return;
+      var d=U.dst(s.px,s.py,b.x,b.y);
+      if(d<bd){bd=d;best=b;}
+    });
+    if(!best){ APH.UI.floatText('附近没有可升级的建筑','#8fa3cc'); }
+    else{
+      var def2=APH.Colony.get(best.id);
+      var r3=APH.Colony.canUpgrade(best,def2,s.meta.research, haveStock('leather'));
+      if(r3.ok){
+        if(r3.costRes==='leather'){
+          if(!APH.Colony.takeStock(s.meta.res, s.entities, 'leather', r3.cost).ok){
+            APH.UI.floatText('✕ 皮革不足','#ff9a9a'); return true;
+          }
+        }else s.meta.research-=r3.cost;
+        best.lv=(best.lv||1)+1;
+        s.entities.forEach(function(en){
+          if(en.type===T.BUILDING&&en.bid===best.id&&U.dst(en.x,en.y,best.x,best.y)<5) en.lv=best.lv;
+        });
+        APH.Save.saveMeta(s.meta); saveColony();
+        APH.UI.floatText('★ '+def2.name+' 升级为 Lv.'+best.lv,'#ffc857');
+        U.emit('upgraded',{id:best.id,lv:best.lv});
+      }else{
+        APH.UI.floatText('✕ '+r3.why,'#ff9a9a');
+      }
+    }
+    return true;
+  }
+
+  function onDemolishNearest(){
+    var s=APH.state;
+    if(s.mode!=='running'||s.scene!=='home'||playerDowned()||playerSleeping()) return false;
+    var bestX=null,bdX=1e9;
+    s.colony.buildings.forEach(function(b,idx){
+      if(b.id==='bl_landing_pad') return;
+      var d=U.dst(s.px,s.py,b.x,b.y);
+      if(d<bdX){bdX=d;bestX={b:b,idx:idx};}
+    });
+    if(!bestX){ APH.UI.floatText('附近没有可拆除的建筑','#8fa3cc'); }
+    else{
+      var def3=APH.Colony.get(bestX.b.id);
+      var refundR=APH.Colony.refundResOf(def3);
+      var refund=APH.Colony.refundOf(def3);
+      var refundM=APH.Colony.refundMineralOf(def3);
+      var refundMsg;
+      if(refundR){
+        s.meta.res=s.meta.res||{ mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
+        var rParts=[];
+        for(var rk in refundR){
+          if(refundR[rk]>0){ s.meta.res[rk]=(s.meta.res[rk]||0)+refundR[rk]; rParts.push(((CFG.items[rk]&&CFG.items[rk].name)||rk)+' +'+refundR[rk]); }
+        }
+        refundMsg='🗑 '+def3.name+' 已拆除 ('+rParts.join(' ')+')';
+      }else{
+        s.meta.research+=refund;
+        s.meta.res.mineral=(s.meta.res.mineral||0)+refundM;
+        refundMsg='🗑 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)';
+      }
+      s.colony.buildings.splice(bestX.idx,1);
+      s.entities=s.entities.filter(function(en){
+        return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
+      });
+      APH.Save.saveMeta(s.meta); saveColony();
+      APH.UI.floatText(refundMsg,'#ffc857');
+      U.emit('demolished',{id:bestX.b.id});
+    }
+    return true;
+  }
+
+  function initInputActions(){
+    if(!APH.Input || !APH.Input.registerActions) return;
+    APH.Input.registerActions({
+      INTRO_CONFIRM: function(){
+        var s=APH.state;
+        if(s.mode!=='intro') return false;
         if(s.openingClock && window.APH.Opening && !APH.Opening.isLast(s.openingClock)){
           APH.Opening.skipToLast(s.openingClock);
           s.openingAlarmT = 0;
           if(APH.UI.skipOpeningVideo) APH.UI.skipOpeningVideo();
           if(APH.UI.renderOpening) APH.UI.renderOpening(s.openingClock);
         }else if(!s.openingClock) startGame();
-      }
-      /* #72 家园击倒: 昏迷期间所有按键忽略(含 E — 击倒无 E 唤醒, 只等送医/倒计时) */
-      if(playerDowned() && s.mode==='running') return;
-      /* #66 床边睡眠: 睡着时除 E 外全部按键忽略(唤醒只走 WASD/E/受伤) */
-      if(playerSleeping() && s.mode==='running' && e.code!=='KeyE') return;
-      /* E=发射台/自然资源交互 */
-      if(e.code==='KeyE'&&s.mode==='running'){
-        if(playerSleeping()){
-          /* E 再按 = 唤醒, 跳过其余所有交互分支 */
-          APH.Res.playerWake(s.meta.playerNeeds);
-          syncPlayerSleep();
-          APH.UI.floatText('🌅 醒来','#8fd4ff');
-        }else if(s.scene==='expedition' && s.nearFlora){
-          var loadW=APH.Combat.carryWeight(s.carry);
-          var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
-          var seedIt = s.nearFlora.seedItem || 'specimen_flora_glow';
-          var rPick = APH.Combat.addToCarry(s.carry, seedIt, 1, capNow);
-          if(rPick.ok){
-            s.carry = rPick.carry;
-            s.nearFlora.dead = true;
-            var itName = (CFG.items[seedIt]&&CFG.items[seedIt].name) ? CFG.items[seedIt].name : seedIt;
-            APH.UI.floatText('✔ 获得 '+itName, '#59d9ff');
-          }else{
-            APH.UI.floatText('✕ 背包已满', '#ff9a9a');
-          }
-        }else if(s.scene==='home' && s.nearFlora){
-          var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6} }, 15);
-          if(resW.done && resW.dropItemId){
-            APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
-            var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
-            APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
-          }else{
-            APH.UI.floatText('采收中...', '#8fd4ff');
-          }
-        }else if(s.scene==='home' && s.nearVisitor){
-          if(s.nearVisitor.trade){
-            closeColonyOverlays('trade');
-            toggleTradePanel();
-          }else{
-            tryRecruit(s.nearVisitor);
-          }
-        }else if(s.scene==='home' && s.nearBed){
-          /* #66 床边睡眠: 靠床 E 入睡(床铺恢复), 优先于发射台, 绝不落入自动寻路分支 */
-          APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
-          syncPlayerSleep();
-          if(window.APH.Opening && APH.Opening.noteSleptInHouse){
-            APH.Opening.noteSleptInHouse(firstNightOpening());
-            tryFirstNightVisitor();
-            applyFirstNightHint();
-            try{ APH.Save.saveMeta(s.meta); }catch(eS){}
-          }
-          APH.UI.floatText('🛌 入睡','#8fd4ff');
-        }else if(s.scene==='home' && s.nearClinic && playerSick()){
-          /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(医疗舱床位恢复), 绝不落入自动寻路分支 */
-          APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
-          syncPlayerSleep();
-          APH.UI.floatText('🛌 躺进医疗舱','#8fd4ff');
-        }else if(s.scene==='home' && s.nearFood){
-          /* #65 走到粮边吃: 靠粮按 E 吃一口(内部自拦「不饿/没粮」), 绝不落入兜底自动寻路分支 */
-          tryPlayerEatNearFood();
-        }else if(s.nearPad){
-          if(s.scene==='home') launchExpedition();
-          else if(s.scene==='expedition') returnHome();
-        }else{
-          var padE=s.entities.find(function(en){return en.type===T.BUILDING&&en.pad;});
-          if(padE){
-            s.target={x:padE.x,y:padE.y+40};
-            s.parts.push({t:'ping',x:padE.x,y:padE.y,life:.9,max:.9});
-            APH.UI.setHint('前往发射台…到达后按 [E]');
-          }
-        }
-      }
-      if(e.code==='KeyF'&&s.mode==='running'&&s.scene==='home'){
-        if(s.nearVisitor){
-          tryOfferMeal(s.nearVisitor);
-        }else if(s.nearLab){
-          var nextSpec=APH.Colony.cycleAnalysisTarget(s.nearLab.analysisTarget || 'specimen_flora_glow');
-          setBuildingField(s.nearLab, 'analysisTarget', nextSpec);
-          setBuildingField(s.nearLab, 'analysisProgress', 0);
-          var specDef=APH.Colony.SPECIMEN_ANALYSIS[nextSpec];
-          APH.UI.floatText('🔬 化验队列: '+(specDef && specDef.name || nextSpec), '#59d9ff');
-          saveColony();
-        }else if(s.nearCropPlot){
-          var nextCrop=APH.Colony.cycleAnalyzedCrop(s.nearCropPlot.crop, s.meta.analyzedFlora);
-          if(!nextCrop){
-            APH.UI.floatText('🔒 需先在科研站化验异星标本', '#ff9a9a');
-          }else{
-            setBuildingField(s.nearCropPlot, 'crop', nextCrop);
-            setBuildingField(s.nearCropPlot, 'plot', { stage:0, t:0 });
-            var cropName=APH.Colony.ALIEN_CROPS[nextCrop].name;
-            APH.UI.floatText('🌿 切换为: '+cropName, '#7dffab');
-            saveColony();
-          }
-        }else if(s.nearWorkshop){
-          var recipes=Object.keys(APH.Colony.CRAFT_RECIPES);
-          var curRIdx=recipes.indexOf(s.nearWorkshop.recipe||'it_pickaxe');
-          var nextRec=recipes[(curRIdx+1)%recipes.length];
-          setBuildingField(s.nearWorkshop, 'recipe', nextRec);
-          s.nearWorkshop.craftProgress=0;
-          var recName=APH.Colony.CRAFT_RECIPES[nextRec].name;
-          APH.UI.floatText('🔨 工坊生产调整为: '+recName, '#59d9ff');
-          saveColony();
-        }else if(s.nearKitchen || s.nearCampfire){
-          var targetBldg=s.nearKitchen || s.nearCampfire;
-          var bId=targetBldg.bid || targetBldg.id;
-          var validRecipes=Object.keys(APH.Colony.COOK_RECIPES).filter(function(k){
-            var r=APH.Colony.COOK_RECIPES[k];
-            var allowed=r.bldgs || r.bldg || ['bl_kitchen', 'bl_campfire'];
-            return allowed.indexOf(bId) >= 0;
-          });
-          if(validRecipes.length > 0){
-            var curKIdx=validRecipes.indexOf(targetBldg.recipe || validRecipes[0]);
-            var nextKRec=validRecipes[(curKIdx + 1) % validRecipes.length];
-            setBuildingField(targetBldg, 'recipe', nextKRec);
-            targetBldg.cookProgress=0;
-            var recKName=APH.Colony.COOK_RECIPES[nextKRec].name;
-            APH.UI.floatText('🍲 烹饪菜谱调整为: ' + recKName, '#ffca28');
-            saveColony();
-          }
-        }
-      }
-      /* 调试热键(自动化验证协议, 仅 ?autostart=1 / ?debugkeys=1 通道生效——
-         曾与正式键位冲突: 按G开建造面板的同时被传送600px):
-         T=传送到最近未扫描信标并启动真实扫描管线
-         G=向东传送600px, 触发舱外耗氧路径
-         K=在视野边缘生成一只敌人(战斗管线验证) */
-      if(e.code==='KeyJ' && s.mode==='running'){
-        var rp=document.getElementById('resPanel');
-        if(rp && rp.style.display!=='none'){ /* 名册打开时 J 不射击 */ }
-        else APH.Combat.firePlasma();
-      }
-      if(e.code==='KeyP'&&s.mode==='running'&&s.scene==='home'){
-        cycleSelectedJob();
-      }
-      if(s.mode==='running'&&s.scene==='home' && /^Digit[0-9]$/.test(e.code)){
-        var tp2=document.getElementById('tradePanel');
-        var rp2=document.getElementById('resPanel');
-        if(tp2 && tp2.style.display!=='none' && e.code!=='Digit0'){
-          doTradeRow(parseInt(e.code.slice(5),10)-1);
-        }else if(rp2 && rp2.style.display!=='none' && /^Digit[0-3]$/.test(e.code)){
-          setPrioAtCursor(parseInt(e.code.slice(5),10));   // D: 设优先级
-        }
-      }
-      if(s.mode==='running'&&s.scene==='home' &&
-         /^Arrow(Up|Down|Left|Right)$/.test(e.code)){
-        var tpA=document.getElementById('tradePanel');
-        var rpA=document.getElementById('resPanel');
-        if(techMapOpen()){
-          moveTechSel(e.code);
-          s.keys[e.code]=false;
-          if(e.preventDefault) e.preventDefault();
-        }else if(tpA && tpA.style.display!=='none' && /^Arrow(Up|Down)$/.test(e.code)){
-          moveTradeSel(e.code);
-          s.keys[e.code]=false;
-          if(e.preventDefault) e.preventDefault();
-        }else if(rpA && rpA.style.display!=='none'){
-          movePrioCursor(e.code);
-          s.keys[e.code]=false;
-          if(e.preventDefault) e.preventDefault();
-        }
-      }
-      /* B=建造模式(仅殖民地): 循环选择建筑, 点地放置, 右键/Esc取消 */
-      if(e.code==='KeyB'&&s.mode==='running'&&s.scene==='home'){
+        return true;
+      },
+      INTERACT: onPlayerInteract,
+      SECONDARY_INTERACT: onSecondaryInteract,
+      FIRE_PLASMA: onFirePlasma,
+      TOGGLE_BUILD_MODE: function(){
+        var s=APH.state;
+        if(s.mode!=='running'||s.scene!=='home'||playerDowned()||playerSleeping()) return false;
         var ids=Object.keys(APH.Colony.list()).filter(function(id){return id!=='bl_landing_pad';});
         var cur=ids.indexOf(s.buildMode);
         s.buildMode = ids[(cur+1) % (ids.length+1)] || null;
@@ -1883,134 +1954,152 @@ window.APH = window.APH || {};
           ? '建造: '+APH.Colony.get(s.buildMode).name+' · 点击空地放置 ('+
             APH.Colony.get(s.buildMode).cost+'研 / '+(APH.Colony.get(s.buildMode).costMineral||0)+'矿)'
           : '建造模式关闭');
-      }
-      if(e.code==='Escape'){
-        if(s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
-        if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return;
-      }
-      if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
-        APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
-      if(e.code==='KeyH'){ s.showMarker=!s.showMarker;
-        APH.UI.floatText(s.showMarker?'角色标记: 开':'角色标记: 关','#8fa3cc'); }
-      /* U=升级最近的已建成建筑 */
-      if(e.code==='KeyU'&&s.mode==='running'&&s.scene==='home'){
-        var best=null,bd=1e9;
-        s.colony.buildings.forEach(function(b){
-          if(b.id==='bl_landing_pad') return;
-          var d=U.dst(s.px,s.py,b.x,b.y);
-          if(d<bd){bd=d;best=b;}
-        });
-        if(!best){ APH.UI.floatText('附近没有可升级的建筑','#8fa3cc'); }
-        else{
-          var def2=APH.Colony.get(best.id);
-          var r3=APH.Colony.canUpgrade(best,def2,s.meta.research, haveStock('leather'));
-          if(r3.ok){
-            if(r3.costRes==='leather'){
-              if(!APH.Colony.takeStock(s.meta.res, s.entities, 'leather', r3.cost).ok){
-                APH.UI.floatText('✕ 皮革不足','#ff9a9a'); return;
-              }
-            }else s.meta.research-=r3.cost;
-            best.lv=(best.lv||1)+1;
-            /* 同步实体lv: 炮塔伤害/等级徽点读实体, 不同步则升级当场不生效 */
-            s.entities.forEach(function(en){
-              if(en.type===T.BUILDING&&en.bid===best.id&&
-                 U.dst(en.x,en.y,best.x,best.y)<5) en.lv=best.lv;
-            });
-            APH.Save.saveMeta(s.meta); saveColony();
-            APH.UI.floatText('⬆ '+def2.name+' → Lv'+best.lv,'#59d9ff');
-            U.emit('upgraded',{id:best.id,lv:best.lv});
-          }else{
-            APH.UI.floatText('✕ '+r3.why,'#ff9a9a');
-          }
-        }
-      }
-      /* X=拆除最近建筑(半价退款, 发射台不可拆) */
-      if(e.code==='KeyX'&&s.mode==='running'&&s.scene==='home'){
-        var bestX=null,bdX=120;
-        s.colony.buildings.forEach(function(b,idx){
-          if(b.id==='bl_landing_pad') return;
-          var d=U.dst(s.px,s.py,b.x,b.y);
-          if(d<bdX){bdX=d;bestX={b:b,idx:idx};}
-        });
-        if(!bestX){ APH.UI.floatText('附近没有可拆除的建筑','#8fa3cc'); }
-        else{
-          var def3=APH.Colony.get(bestX.b.id);
-          var refundR=APH.Colony.refundResOf(def3);   // T2: 素材建筑(墙/门)退建材
-          var refund=APH.Colony.refundOf(def3);
-          var refundM=APH.Colony.refundMineralOf(def3);
-          var refundMsg;
-          if(refundR){
-            s.meta.res=s.meta.res||{ mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
-            var rParts=[];
-            for(var rk in refundR){
-              if(refundR[rk]>0){ s.meta.res[rk]=(s.meta.res[rk]||0)+refundR[rk]; rParts.push((CFG.items[rk]&&CFG.items[rk].name||rk)+' +'+refundR[rk]); }
-            }
-            refundMsg='🧨 '+def3.name+' 已拆除 ('+rParts.join(' ')+')';
-          }else{
-            s.meta.research+=refund;
-            s.meta.res.mineral=(s.meta.res.mineral||0)+refundM;
-            refundMsg='🧨 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)';
-          }
-          s.colony.buildings.splice(bestX.idx,1);
-          s.entities=s.entities.filter(function(en){
-            return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
+        return true;
+      },
+      CYCLE_JOB: function(){
+        var s=APH.state;
+        if(s.mode!=='running'||s.scene!=='home'||playerDowned()||playerSleeping()) return false;
+        cycleSelectedJob();
+        return true;
+      },
+      UPGRADE_NEAREST: onUpgradeNearest,
+      DEMOLISH_NEAREST: onDemolishNearest,
+      TOGGLE_CAMERA_LOCK: function(){
+        var s=APH.state;
+        s.strictCam=!s.strictCam;
+        APH.UI.floatText(s.strictCam?'🔒 相机锁定(角色恒居中)':'🔓 相机平滑跟随','#59d9ff');
+        return true;
+      },
+      TOGGLE_MUTE: function(){
+        var m=APH.SFX.toggleMute();
+        APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc');
+        return true;
+      },
+      TOGGLE_MARKER: function(){
+        var s=APH.state;
+        s.showMarker=!s.showMarker;
+        APH.UI.floatText(s.showMarker?'角色标记: 开':'角色标记: 关','#8fa3cc');
+        return true;
+      },
+      TOGGLE_DIPLOMACY: function(){
+        if(APH.state.mode==='running') toggleDiplomacy();
+        return true;
+      },
+      TOGGLE_ROSTER: function(){
+        if(APH.state.mode==='running'&&APH.state.scene==='home') toggleResPanel();
+        return true;
+      },
+      TOGGLE_TECH: function(){
+        var s=APH.state;
+        if(s.debugKeys && s.scene!=='home' && !techMapOpen()){
+          var nb=null,bd=1e9;
+          s.entities.forEach(function(en){
+            if(en.type!==T.BEACON||en.done) return;
+            var d=U.dst(en.x,en.y,s.px,s.py);
+            if(d<bd){bd=d;nb=en;}
           });
-          APH.Save.saveMeta(s.meta); saveColony();
-          APH.UI.floatText(refundMsg,'#ffc857');
-          U.emit('demolished',{id:bestX.b.id});
+          if(nb){
+            s.px=nb.x-50; s.py=nb.y; s.target=null;
+            s.camX=s.px; s.camY=s.py;
+            s.scanning=nb; s.scanT=0;
+            APH.UI.showScanRing();
+            document.title='DBG 已传送到 '+nb.name.slice(0,10);
+          }else document.title='DBG 无未扫描信标';
+          return true;
         }
-      }
-      /* C=相机锁定: 角色永远钉在屏幕正中(关闭lookAhead平滑) */
-      if(e.code==='KeyC'){ s.strictCam=!s.strictCam;
-        APH.UI.floatText(s.strictCam?'📷 相机锁定(角色恒居中)':'📷 相机平滑跟随','#59d9ff'); }
-      /* L=图鉴(家园科学图鉴 + 远征档案), R=居民名册(家), O=外星势力外交 */
-      if(e.code==='KeyL'&&s.mode==='running'){ toggleCodex(); }
-      if(e.code==='KeyR'&&s.mode==='running'&&s.scene==='home'){ toggleResPanel(); }
-      if(e.code==='KeyO'&&s.mode==='running'){ toggleDiplomacy(); }
-      /* G=建造目录(左侧按钮/底部row) */
-      if(e.code==='KeyG'&&s.mode==='running'&&s.scene==='home'){ toggleBuildRow(); }
-      /* T=全屏科技图(家园打开; 开着时任意场景可关) */
-      if(e.code==='KeyT'&&s.mode==='running'){
         if(techMapOpen()) toggleTechMap(false);
-        else if(s.scene==='home') toggleTechMap();
-      }
-      if((e.code==='Enter'||e.code==='NumpadEnter'||e.key==='Enter')&&
-         !e.isComposing&&s.mode==='running'&&s.scene==='home'){
-        var tpEnt=document.getElementById('tradePanel');
-        if(tpEnt && tpEnt.style.display!=='none' && currentTrader()){
-          doTradeRow(s.tradeSel||0);
-        }else if(techMapOpen()){
-          if(e.preventDefault) e.preventDefault();
-          tryBuySelectedTech();
+        else if(s.scene==='home'&&s.mode==='running') toggleTechMap();
+        return true;
+      },
+      TOGGLE_CODEX: function(){
+        if(APH.state.mode==='running') toggleCodex();
+        return true;
+      },
+      TOGGLE_BUILD_ROW: function(){
+        var s=APH.state;
+        if(s.debugKeys){
+          s.px=U.clamp(s.px+600,40,CFG.WORLD-40);
+          s.camX=s.px; s.target=null;
+          document.title='DBG 已东移600px';
+          return true;
         }
-      }
-      if(e.code==='KeyK'&&s.mode==='running'&&s.debugKeys){
-        var f=s.spec.enemies.factions[0];
-        s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
-        document.title='DBG 已生成 '+f.name;
-      }
-      if(e.code==='KeyT'&&s.mode==='running'&&s.debugKeys&&s.scene!=='home'&&!techMapOpen()){
-        var nb=null,bd=1e9;
-        s.entities.forEach(function(en){
-          if(en.type!==T.BEACON||en.done) return;
-          var d=U.dst(en.x,en.y,s.px,s.py);
-          if(d<bd){bd=d;nb=en;}
-        });
-        if(nb){
-          s.px=nb.x-50; s.py=nb.y; s.target=null;
-          s.camX=s.px; s.camY=s.py;
-          s.scanning=nb; s.scanT=0;
-          APH.UI.showScanRing();
-          document.title='DBG 已传送到 '+nb.name.slice(0,10);
-        }else document.title='DBG 无未扫描信标';
-      }
-      if(e.code==='KeyG'&&s.mode==='running'&&s.debugKeys){
-        s.px=U.clamp(s.px+600,40,CFG.WORLD-40);
-        s.camX=s.px; s.target=null;
-        document.title='DBG 已东移600px';
-      }
+        if(s.mode==='running'&&s.scene==='home') toggleBuildRow();
+        return true;
+      },
+      DEBUG_SPAWN: function(){
+        var s=APH.state;
+        if(s.mode==='running'&&s.debugKeys){
+          var f=s.spec.enemies.factions[0];
+          s.entities.push(APH.Ent.makeEnemy(f, s.px+180, s.py));
+          document.title='DBG 已生成 '+f.name;
+          return true;
+        }
+      },
+      CANCEL_OR_CLOSE: function(){
+        var s=APH.state;
+        if(s.buildMode){ s.buildMode=null; APH.UI.setHint(''); return true; }
+        if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return true;
+        return false;
+      },
+      CLOSE_MODAL: function(){
+        if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return true;
+        return false;
+      },
+      NAV_UP: function(){
+        if(techMapOpen()) moveTechSel('ArrowUp');
+        else if(APH.UI && APH.UI.isOpen('trade')) moveTradeSel('ArrowUp');
+        else if(APH.UI && APH.UI.isOpen('roster')) movePrioCursor('ArrowUp');
+        return true;
+      },
+      NAV_DOWN: function(){
+        if(techMapOpen()) moveTechSel('ArrowDown');
+        else if(APH.UI && APH.UI.isOpen('trade')) moveTradeSel('ArrowDown');
+        else if(APH.UI && APH.UI.isOpen('roster')) movePrioCursor('ArrowDown');
+        return true;
+      },
+      NAV_LEFT: function(){
+        if(techMapOpen()) moveTechSel('ArrowLeft');
+        else if(APH.UI && APH.UI.isOpen('roster')) movePrioCursor('ArrowLeft');
+        return true;
+      },
+      NAV_RIGHT: function(){
+        if(techMapOpen()) moveTechSel('ArrowRight');
+        else if(APH.UI && APH.UI.isOpen('roster')) movePrioCursor('ArrowRight');
+        return true;
+      },
+      BUY_TECH: function(){
+        if(techMapOpen()){ tryBuySelectedTech(); return true; }
+        return false;
+      },
+      CONFIRM_TRADE: function(){
+        var s=APH.state;
+        if(APH.UI && APH.UI.isOpen('trade') && currentTrader()){
+          doTradeRow(s.tradeSel||0);
+          return true;
+        }
+        return false;
+      },
+      SET_PRIO_0: function(){ setPrioAtCursor(0); return true; },
+      SET_PRIO_1: function(){ setPrioAtCursor(1); return true; },
+      SET_PRIO_2: function(){ setPrioAtCursor(2); return true; },
+      SET_PRIO_3: function(){ setPrioAtCursor(3); return true; },
+      TRADE_ROW_1: function(){ doTradeRow(0); return true; },
+      TRADE_ROW_2: function(){ doTradeRow(1); return true; },
+      TRADE_ROW_3: function(){ doTradeRow(2); return true; },
+      TRADE_ROW_4: function(){ doTradeRow(3); return true; },
+      TRADE_ROW_5: function(){ doTradeRow(4); return true; },
+      TRADE_ROW_6: function(){ doTradeRow(5); return true; },
+      TRADE_ROW_7: function(){ doTradeRow(6); return true; },
+      TRADE_ROW_8: function(){ doTradeRow(7); return true; },
+      TRADE_ROW_9: function(){ doTradeRow(8); return true; }
     });
-    addEventListener('keyup',function(e){ s.keys[e.code]=false; });
+  }
+
+  /* ================= 输入 ================= */
+  function bindInput(){
+    var s=APH.state;
+    initInputActions();
+    if(APH.Input && APH.Input.bind) APH.Input.bind();
 
     var stickEl=document.getElementById('stick'), knob=document.getElementById('knob');
     stickEl.addEventListener('pointerdown',function(e){
@@ -3513,9 +3602,7 @@ window.APH = window.APH || {};
     },
     debugPressE:function(){
       var s=APH.state;
-      /* #72 家园击倒: 昏迷中调试 E 一律忽略(镜像真实 E, 无 E 唤醒) */
       if(playerDowned()) return;
-      /* #66 床边睡眠: 镜像真实 E 键逻辑(先醒后睡, 绝不自动寻路) */
       if(playerSleeping()){
         APH.Res.playerWake(s.meta.playerNeeds);
         syncPlayerSleep();
@@ -3528,14 +3615,13 @@ window.APH = window.APH || {};
           applyFirstNightHint();
         }
       }else if(s.scene==='home' && s.nearClinic && playerSick()){
-        /* #70 医疗舱躺下: 生病玩家靠舱 E 躺入(bed_med), 绝不落入自动寻路分支 */
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
         syncPlayerSleep();
       }else if(s.scene==='home' && s.nearFood){
-        /* #65 走到粮边吃: 靠粮按 E 吃一口(内部自拦「不饿/没粮」) */
         tryPlayerEatNearFood();
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
+      else onPlayerInteract(true);
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
     guardTrim:guardTrim,

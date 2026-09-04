@@ -234,4 +234,13 @@ _Avoid_: 浮动窗口, 底部栏
 `APH.UI` 提供的统一模态生命周期控制接口（`open`, `close`, `toggle`, `closeActive`, `hasActiveModal`），负责互斥调度、自动暂停不变量与 Esc 统一拦截。
 _Avoid_: UI事件总线, DOM管理器
 
+**Input Context Stack / 输入上下文栈**：
+系统维护的按键消费优先级栈（如 `['game', 'modal:roster']`），栈顶优先捕获按键并阻断下层透传，解决弹窗与游戏底层的按键冲突。
+_Avoid_: 全局按键开关, 按键优先级锁
+
+**Semantic Action / 语义动作**：
+脱离物理按键码（`e.code`）的游戏意图标号（如 `INTERACT`, `TOGGLE_DIPLOMACY`, `FIRE_PLASMA`），物理键通过配置表映射为此标号并派发。
+_Avoid_: 快捷键事件, 键盘宏
+
+
 
