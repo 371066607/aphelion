@@ -2809,22 +2809,37 @@ window.APH = window.APH || {};
           if(meal){ e.tx=meal.x; e.ty=meal.y; }
         }
       }else if(!raid){
-        if(e.haulCarry && e.haulCarry.itemId){
-          e.tx=stock.x; e.ty=stock.y;
-          if(U.dst(e.x,e.y,stock.x,stock.y)<dumpR){
-            APH.Colony.collectHome(s.meta, e.haulCarry.itemId, e.haulCarry.n||1);
-            var it=(CFG.items&&CFG.items[e.haulCarry.itemId])||{};
-            APH.UI.floatText((e.name||'居民')+' 入库 '+(it.name||'')+'×'+(e.haulCarry.n||1),'#9fe8c8');
-            e.haulCarry=null;
+        if(e.haulCarry){
+          var carryPiles = Array.isArray(e.haulCarry) ? e.haulCarry : [e.haulCarry];
+          var firstItem = carryPiles[0];
+          if(firstItem && firstItem.itemId){
+            var targetSpot = (APH.Colony && APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(firstItem.itemId, s.colony && s.colony.buildings, rooms, e) : stock;
+            e.tx = targetSpot.x; e.ty = targetSpot.y;
+            if(U.dst(e.x, e.y, targetSpot.x, targetSpot.y) < dumpR){
+              carryPiles.forEach(function(cp){
+                APH.Colony.collectHome(s.meta, cp.itemId, cp.n || 1);
+                var it = (CFG.items && CFG.items[cp.itemId]) || {};
+                APH.UI.floatText((e.name||'居民')+' 入库 '+(it.name||'')+'×'+(cp.n||1),'#9fe8c8');
+              });
+              e.haulCarry = null;
+            }
+          } else {
+            e.haulCarry = null;
           }
         }else{
-          var reach=e.job?pickR:seekR;
-          var drop=nearestDrop(e, reach);
+          var reach = e.job ? pickR : ((CFG.haul && CFG.haul.seekR) || 1200);
+          var drop = nearestDrop(e, reach);
           if(drop){
-            e.tx=drop.x; e.ty=drop.y;
-            if(U.dst(e.x,e.y,drop.x,drop.y)<grabR){
-              e.haulCarry={ itemId:drop.itemId, n:drop.n||1 };
-              drop.dead=true;
+            e.tx = drop.x; e.ty = drop.y;
+            if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
+              var dropsPool = s.entities.filter(function(x){ return x && x.type === T.DROPPED && !x.dead; });
+              var candidates = (APH.Colony && APH.Colony.bulkHaulCandidates) ? APH.Colony.bulkHaulCandidates(drop, dropsPool) : [drop];
+              var bundle = [];
+              candidates.forEach(function(c){
+                bundle.push({ itemId: c.itemId, n: c.n || 1 });
+                c.dead = true;
+              });
+              e.haulCarry = bundle;
             }
           }else if(!e.job && r && (r.recreation||80)<70){
             var campfire = (s.colony&&s.colony.buildings||[]).find(function(b){ return b.id==='bl_campfire'; });

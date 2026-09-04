@@ -116,3 +116,46 @@ test('storage: deteriorationTick 露天天气劣化与避难豁免', () => {
   A(dyingDrop.decayHp === 0, '耐久应归零');
   A(rDying.decayed === true, '耐久归零后 decayed 应为 true');
 });
+
+test('storage: bulkHaulCandidates 48px 范围内相邻多堆聚类抓取', () => {
+  const bulk = APH.Colony.bulkHaulCandidates;
+  A(typeof bulk === 'function', 'bulkHaulCandidates 必须为函数');
+
+  const primary = { id: 'dp_1', itemId: 'it_wood', n: 10, x: 500, y: 500 };
+  const near1 = { id: 'dp_2', itemId: 'it_wood', n: 15, x: 520, y: 510 }; // 距 22px < 48px
+  const near2 = { id: 'dp_3', itemId: 'it_wood', n: 12, x: 480, y: 510 }; // 距 22px < 48px
+  const far = { id: 'dp_4', itemId: 'it_wood', n: 10, x: 600, y: 500 };   // 距 100px > 48px
+  const all = [primary, near1, near2, far];
+
+  const picked = bulk(primary, all, 48, 3, 50);
+  A(Array.isArray(picked), '返回结果应为数组');
+  A(picked.length === 3, '应最多包含 3 堆 (包含 primary), 实际: ' + picked.length);
+  A(picked[0].id === 'dp_1', '首个必须为 primary');
+  A(picked.some(p => p.id === 'dp_2'), '应包含相距 22px 的 near1');
+  A(picked.some(p => p.id === 'dp_3'), '应包含相距 22px 的 near2');
+  A(!picked.some(p => p.id === 'dp_4'), '不应包含距离 100px 的远端物品');
+});
+
+test('storage: findBestStorageSpot 寻找最近兼容品类的仓储点', () => {
+  const findSpot = APH.Colony.findBestStorageSpot;
+  A(typeof findSpot === 'function', 'findBestStorageSpot 必须为函数');
+
+  const buildings = [
+    { id: 'bl_warehouse', x: 1000, y: 1000, filter: 'materials' }, // 仅建材
+    { id: 'bl_storage_shelf', x: 500, y: 500, filter: 'food' },      // 仅食材货架
+    { id: 'bl_storage_shelf', x: 200, y: 200, filter: 'medical' },   // 仅药品货架
+  ];
+
+  // 1. 食物应送往 500, 500 的食物货架
+  const spotFood = findSpot('it_food', buildings, [], { x: 510, y: 510 });
+  A(spotFood && spotFood.x === 500 && spotFood.y === 500, '食物应找到 food 货架');
+  A(spotFood.container && spotFood.container.filter === 'food', '对应容器应为 food 过滤');
+
+  // 2. 矿石应送往 1000, 1000 的建材仓库
+  const spotOre = findSpot('it_mineral', buildings, [], { x: 510, y: 510 });
+  A(spotOre && spotOre.x === 1000 && spotOre.y === 1000, '矿石应找到 materials 仓库');
+
+  // 3. 无专门货架时回退大本营或综合点
+  const spotOther = findSpot('it_alien_unknown', [{ id: 'bl_landing_pad', x: 1100, y: 1100 }], [], { x: 0, y: 0 });
+  A(spotOther && typeof spotOther.x === 'number', '未知物品应回退兜底点');
+});

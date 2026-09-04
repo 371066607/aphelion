@@ -959,6 +959,55 @@ APH.Colony = (function(){
     };
   }
 
+  function bulkHaulCandidates(primaryDrop, allDrops, maxRadius, maxPiles, maxCount){
+    if(!primaryDrop) return [];
+    var list = allDrops || [];
+    var rMax = maxRadius != null ? maxRadius : ((CFG.storage && CFG.storage.bulkHaulRadius) || 48);
+    var pMax = maxPiles != null ? maxPiles : ((CFG.storage && CFG.storage.bulkHaulMaxPiles) || 3);
+    var cMax = maxCount != null ? maxCount : ((CFG.storage && CFG.storage.bulkHaulMaxCount) || 50);
+
+    var res = [primaryDrop];
+    var curCount = primaryDrop.n || 1;
+
+    for(var i = 0; i < list.length; i++){
+      if(res.length >= pMax || curCount >= cMax) break;
+      var d = list[i];
+      if(!d || d.dead || d.id === primaryDrop.id) continue;
+      var dist = U.dst(primaryDrop.x, primaryDrop.y, d.x, d.y);
+      if(dist <= rMax){
+        var n = d.n || 1;
+        if(curCount + n <= cMax || res.length < 2){
+          res.push(d);
+          curCount += n;
+        }
+      }
+    }
+    return res;
+  }
+
+  function findBestStorageSpot(itemId, buildings, rooms, fromPos){
+    var bList = buildings || [];
+    var best = null, bestDist = 1e9;
+
+    for(var i = 0; i < bList.length; i++){
+      var b = bList[i];
+      if(!b || (b.id !== 'bl_storage_shelf' && b.id !== 'bl_warehouse')) continue;
+      if(storageFilterMatches(b.filter, itemId)){
+        var d = fromPos ? U.dst(fromPos.x, fromPos.y, b.x, b.y) : 0;
+        if(d < bestDist){
+          bestDist = d;
+          best = b;
+        }
+      }
+    }
+
+    if(best){
+      return { x: best.x, y: best.y, container: best };
+    }
+    var fallback = stockpileSpot(bList);
+    return { x: fallback.x, y: fallback.y, container: null };
+  }
+
   function serializeGround(entities){
     var g=[];
     (entities||[]).forEach(function(e){
@@ -2004,6 +2053,7 @@ APH.Colony = (function(){
     stockItem:stockItem, collectHome:collectHome, stockpileSpot:stockpileSpot,
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
+    bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
