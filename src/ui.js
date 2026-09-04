@@ -421,7 +421,142 @@ APH.UI = (function(){
     },1000);
   }
 
+  /* ---------- 统一模态管理器 (Modal Manager, ADR-18) ---------- */
+  var modals = {};
+  var activeOverlay = null;
+  var prevMode = null;
+
+  function registerModal(id, def){
+    if(!id || !def) return;
+    modals[id] = {
+      elId: def.elId,
+      isOverlay: def.isOverlay !== false,
+      render: typeof def.render === 'function' ? def.render : null,
+      onOpen: typeof def.onOpen === 'function' ? def.onOpen : null,
+      onClose: typeof def.onClose === 'function' ? def.onClose : null
+    };
+  }
+
+  function getModalEl(def){
+    if(!def || !def.elId) return null;
+    return (typeof document !== 'undefined' && document.getElementById) ? document.getElementById(def.elId) : null;
+  }
+
+  function isOpen(id){
+    var def = modals[id];
+    if(!def) return false;
+    var el = getModalEl(def);
+    if(!el) return false;
+    return el.style.display !== 'none' && el.style.display != null && el.style.display !== undefined;
+  }
+
+  function open(id, opts){
+    var def = modals[id];
+    if(!def) return false;
+    var el = getModalEl(def);
+    if(!el) return false;
+
+    var s = window.APH && window.APH.state;
+    if(def.isOverlay){
+      // 互斥关闭其它全屏模态
+      for(var mId in modals){
+        if(mId !== id && modals[mId].isOverlay && isOpen(mId)){
+          var otherEl = getModalEl(modals[mId]);
+          if(otherEl) otherEl.style.display = 'none';
+          if(modals[mId].onClose) modals[mId].onClose();
+        }
+      }
+      // 保存前序 mode 并挂起游戏
+      if(s){
+        if(s.mode !== 'paused' && prevMode === null){
+          prevMode = s.mode;
+        }
+        s.mode = 'paused';
+      }
+      activeOverlay = id;
+    }
+
+    if(def.render && s) def.render(s, opts);
+    if(def.onOpen) def.onOpen(opts);
+    el.style.display = '';
+    return true;
+  }
+
+  function close(id){
+    if(!id){
+      id = activeOverlay;
+    }
+    var def = modals[id];
+    if(!def) return false;
+    var el = getModalEl(def);
+    if(el) el.style.display = 'none';
+    if(def.onClose) def.onClose();
+
+    if(def.isOverlay){
+      if(activeOverlay === id) activeOverlay = null;
+      // 检查是否还有其它全屏模态开着
+      var anyOverlayLeft = false;
+      for(var mId in modals){
+        if(modals[mId].isOverlay && isOpen(mId)){
+          anyOverlayLeft = true;
+          activeOverlay = mId;
+          break;
+        }
+      }
+      if(!anyOverlayLeft){
+        var s = window.APH && window.APH.state;
+        if(s && prevMode !== null){
+          s.mode = prevMode;
+          prevMode = null;
+        }
+      }
+    }
+    return true;
+  }
+
+  function toggle(id, opts){
+    if(isOpen(id)){
+      close(id);
+      return false;
+    } else {
+      return open(id, opts);
+    }
+  }
+
+  function closeActive(){
+    if(activeOverlay && isOpen(activeOverlay)){
+      close(activeOverlay);
+      return true;
+    }
+    for(var mId in modals){
+      if(isOpen(mId)){
+        close(mId);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function hasActiveModal(){
+    if(activeOverlay && isOpen(activeOverlay)) return true;
+    for(var mId in modals){
+      if(modals[mId].isOverlay && isOpen(mId)) return true;
+    }
+    return false;
+  }
+
+  function getActiveModal(){
+    if(activeOverlay && isOpen(activeOverlay)) return activeOverlay;
+    return null;
+  }
+
   function toggleDiplomacy(show){
+    if(modals['diplomacy']){
+      if(show !== undefined){
+        return show ? open('diplomacy') : close('diplomacy');
+      }
+      return toggle('diplomacy');
+    }
     if(window.APH.Main && APH.Main.toggleDiplomacy) APH.Main.toggleDiplomacy(show);
   }
 
@@ -431,5 +566,7 @@ APH.UI = (function(){
     setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,
     showOpening:showOpening, skipOpeningVideo:skipOpeningVideo, renderOpening:renderOpening, showDeath:showDeath, showWin:showWin,
     fatal:fatal, armProbe:armProbe, toggleDiplomacy:toggleDiplomacy,
+    registerModal:registerModal, open:open, close:close, toggle:toggle, isOpen:isOpen,
+    closeActive:closeActive, hasActiveModal:hasActiveModal, getActiveModal:getActiveModal
   };
 })();
