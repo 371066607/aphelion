@@ -75,3 +75,44 @@ test('storage: cycleStorageFilter 容器分类单键轮转', () => {
   A(cycle(container).id === 'specimens_gear', 'medical 后下一个为 specimens_gear');
   A(cycle(container).id === 'all', 'specimens_gear 后回到 all 闭环');
 });
+
+test('storage: deteriorationTick 露天天气劣化与避难豁免', () => {
+  const decayTick = APH.Colony.deteriorationTick;
+  A(typeof decayTick === 'function', 'deteriorationTick 必须为函数');
+
+  // 1. 易腐品晴天室外损耗 (1.5 HP / 30s)
+  const foodDrop = { itemId: 'it_food', decayHp: 100 };
+  const r1 = decayTick(foodDrop, 'wx_clear', false, 30);
+  A(foodDrop.decayHp === 98.5, '晴天易腐品损耗 1.5, 实际: ' + foodDrop.decayHp);
+  A(r1.decayed === false, '未归零前 decayed 应为 false');
+
+  // 2. 雨天室外损耗翻倍 (1.5 * 2 = 3.0 HP / 30s)
+  const steakDrop = { itemId: 'it_roasted_meat', decayHp: 100 };
+  decayTick(steakDrop, 'wx_rain', false, 30);
+  A(steakDrop.decayHp === 97, '雨天损耗翻倍为 3.0, 实际: ' + steakDrop.decayHp);
+
+  // 3. 酸雨室外损耗 4 倍 (1.5 * 4 = 6.0 HP / 30s)
+  const berryDrop = { itemId: 'it_berry', decayHp: 100 };
+  decayTick(berryDrop, 'wx_acid', false, 30);
+  A(berryDrop.decayHp === 94, '酸雨损耗4倍为 6.0, 实际: ' + berryDrop.decayHp);
+
+  // 4. 工业矿石建材完全免疫
+  const ironDrop = { itemId: 'it_iron', decayHp: 100 };
+  decayTick(ironDrop, 'wx_acid', false, 30);
+  A(ironDrop.decayHp === 100, '工业铁料应免疫腐烂');
+
+  const mineralDrop = { itemId: 'it_mineral', decayHp: 100 };
+  decayTick(mineralDrop, 'wx_rain', false, 30);
+  A(mineralDrop.decayHp === 100, '矿料应免疫腐烂');
+
+  // 5. 室内或货架避难保护完全免疫
+  const shelteredFood = { itemId: 'it_food', decayHp: 100 };
+  decayTick(shelteredFood, 'wx_acid', true, 30);
+  A(shelteredFood.decayHp === 100, '受避难保护物资在酸雨下也不损耗');
+
+  // 6. 耐久归零标记 decayed === true
+  const dyingDrop = { itemId: 'it_food', decayHp: 1 };
+  const rDying = decayTick(dyingDrop, 'wx_clear', false, 30);
+  A(dyingDrop.decayHp === 0, '耐久应归零');
+  A(rDying.decayed === true, '耐久归零后 decayed 应为 true');
+});

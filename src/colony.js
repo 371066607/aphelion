@@ -928,6 +928,37 @@ APH.Colony = (function(){
     return next;
   }
 
+  function deteriorationTick(drop, weatherId, isSheltered, dt){
+    if(!drop || !drop.itemId) return { loss: 0, decayed: false, decayHp: 100 };
+    if(isSheltered) return { loss: 0, decayed: false, decayHp: drop.decayHp != null ? drop.decayHp : 100 };
+
+    var it = (CFG.items && CFG.items[drop.itemId]) || {};
+    // 工业矿石与建材免疫
+    if(it.decayImmune || it.store === 'mineral' || it.store === 'iron' || it.store === 'stone' || it.store === 'wood' || it.store === 'alloy'){
+      return { loss: 0, decayed: false, decayHp: drop.decayHp != null ? drop.decayHp : 100 };
+    }
+
+    var C = (CFG.storage) || {};
+    var wxTable = C.weatherDecayMul || {};
+    var wxMul = (weatherId && wxTable[weatherId] != null) ? wxTable[weatherId] : 1;
+
+    var isPerishable = (it.store === 'food' || it.isCooked || it.store === 'herb' || drop.itemId.indexOf('berry') >= 0 || drop.itemId.indexOf('crop') >= 0);
+    var baseRate = isPerishable ? (C.decayPerishableBase || 1.5) : (C.decayNormalBase || 0.5);
+
+    var step = (dt != null ? dt : 30) / 30;
+    var loss = Math.round(baseRate * wxMul * step * 10) / 10;
+
+    var cur = (drop.decayHp != null) ? drop.decayHp : (C.decayHpMax || 100);
+    var next = Math.max(0, Math.round((cur - loss) * 10) / 10);
+    drop.decayHp = next;
+
+    return {
+      loss: loss,
+      decayed: next <= 0,
+      decayHp: next
+    };
+  }
+
   function serializeGround(entities){
     var g=[];
     (entities||[]).forEach(function(e){
@@ -1901,6 +1932,40 @@ APH.Colony = (function(){
       }
     }
 
+    /* ADR-23 掉落物露天天气劣化与腐烂判定 */
+    var wxId = (window.APH.Weather && APH.Weather.currentId) ? APH.Weather.currentId(s.meta) : 'wx_clear';
+    var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(s.colony && s.colony.buildings) : [];
+    var shelters = (s.colony && s.colony.buildings || []).filter(function(b){
+      return b && (b.id === 'bl_storage_shelf' || b.id === 'bl_warehouse');
+    });
+    (s.entities || []).forEach(function(e){
+      if(!e || e.dead || e.type !== T.DROPPED) return;
+      var isSheltered = false;
+      if(window.APH.Nav && APH.Nav.inRooms && APH.Nav.inRooms({x:e.x, y:e.y}, rooms)){
+        isSheltered = true;
+      } else {
+        for(var si = 0; si < shelters.length; si++){
+          if(U.dst(e.x, e.y, shelters[si].x, shelters[si].y) <= 32){
+            isSheltered = true; break;
+          }
+        }
+      }
+      var dRes = deteriorationTick(e, wxId, isSheltered, 30);
+      if(dRes.decayed){
+        if(window.APH.Ent && APH.Ent.destroy) APH.Ent.destroy(e);
+        else e.dead = true;
+        if(s.parts){
+          for(var pi=0; pi<6; pi++){
+            s.parts.push({ t:'crumb', x:e.x, y:e.y, vx:U.rr(-20,20), vy:U.rr(-30,-10), life:0.6, max:0.6 });
+          }
+        }
+        var itDef = (CFG.items && CFG.items[e.itemId]) || {};
+        if(window.APH.UI && APH.UI.floatText){
+          APH.UI.floatText('⚠️ ' + (itDef.name || '物资') + ' 在室外腐烂损毁了', '#ff6d7a');
+        }
+      }
+    });
+
     if(window.APH.Main && APH.Main.tickRivals) APH.Main.tickRivals(30 / 60);
     if(window.APH.Main && APH.Main.storyTick) APH.Main.storyTick(30 / 60);
     if(window.APH.Main && APH.Main.residentsTick) APH.Main.residentsTick();
@@ -1938,6 +2003,7 @@ APH.Colony = (function(){
     shortageBrief:shortageBrief, cycleJob:cycleJob, JOB_CYCLE:JOB_CYCLE,
     stockItem:stockItem, collectHome:collectHome, stockpileSpot:stockpileSpot,
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
+    deteriorationTick:deteriorationTick,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
