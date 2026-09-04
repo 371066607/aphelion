@@ -547,81 +547,32 @@ window.APH = window.APH || {};
     APH.Ent.updatePlayer(dt);
     updateCamera(dt);
 
-    /* 发射台 / 过客接近检测 */
-    var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
-    s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
+    /* 发射台 / 过客接近检测 (委托 APH.Ent 空间检索接缝, ADR-20) */
+    var pad = APH.Ent.findNearestBuilding(s.entities, 'bl_landing_pad', s.px, s.py, 90) ||
+              s.entities.find(function(e){ return e.type===T.BUILDING && e.pad && U.dst(s.px,s.py,e.x,e.y)<90; });
+    s.nearPad = !!pad;
     s.nearVisitor = nearestVisitor(s);
-    var nearPlot = s.entities.find(function(e){
-      return (e.type===T.BUILDING && (e.bid==='bl_crop_plot'||e.bid==='bl_farm') && U.dst(s.px,s.py,e.x,e.y)<60);
-    });
-    s.nearCropPlot = nearPlot || null;
-    var nearShop = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_workshop' && U.dst(s.px,s.py,e.x,e.y)<60);
-    });
-    s.nearWorkshop = nearShop || null;
-    var nearKitchen = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_kitchen' && U.dst(s.px,s.py,e.x,e.y)<60);
-    });
-    s.nearKitchen = nearKitchen || null;
-    var nearCampfire = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_campfire' && U.dst(s.px,s.py,e.x,e.y)<50);
-    });
-    s.nearCampfire = nearCampfire || null;
-    var nearLab = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_lab' && U.dst(s.px,s.py,e.x,e.y)<60);
-    });
-    s.nearLab = nearLab || null;
-    /* #66 床边睡眠: 靠近居住舱即可 E 入睡(只置 nearBed, 绝不 s.target=自动寻路) */
-    var nearBed = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_house' &&
-              U.dst(s.px,s.py,e.x,e.y) < (CFG.player.bedSleepRadius!=null?CFG.player.bedSleepRadius:60));
-    });
-    s.nearBed = nearBed || null;
-    /* #70 医疗舱躺下: 靠近医疗舱即可 E 躺下(只置 nearClinic, 绝不 s.target=自动寻路) */
-    var nearClinic = s.entities.find(function(e){
-      return (e.type===T.BUILDING && e.bid==='bl_clinic' &&
-              U.dst(s.px,s.py,e.x,e.y) < (CFG.player.clinicSleepRadius!=null?CFG.player.clinicSleepRadius:60));
-    });
-    s.nearClinic = nearClinic || null;
-    /* #65 走到粮边吃: 近处粮堆(熟食优先→最近)或仓库(兜底, 仓有粮才提示)。
-       只置 s.nearFood, 绝不写 s.target 自动寻路(铁律) */
-    var nearFood=null;
-    var eatR65=(CFG.player&&CFG.player.foodEatRadius!=null)?CFG.player.foodEatRadius:60;
-    var bestPile=null, bestCooked=null, bestPileD=eatR65, bestCookedD=eatR65;
-    (s.entities||[]).forEach(function(p){
-      if(!p || p.dead || p.type!==T.DROPPED) return;
-      var it=CFG.items&&CFG.items[p.itemId];
-      if(!it || it.store!=='food') return;
-      var dist=U.dst(s.px,s.py,p.x,p.y);
-      if(it.isCooked && dist<bestCookedD){
-        bestCookedD=dist; bestCooked={ entity:p, itemId:p.itemId, isCooked:true };
-      }
-      if(dist<bestPileD){
-        bestPileD=dist; bestPile={ entity:p, itemId:p.itemId, isCooked:!!it.isCooked };
-      }
-    });
-    if(bestCooked) nearFood=bestCooked;
-    else if(bestPile) nearFood=bestPile;
-    else{
-      /* 仓库兜底: 仅当仓有粮(meta.res.food>0)才提示(空仓不提示) */
-      var wh65=null;
-      (s.entities||[]).forEach(function(b){
-        if(!wh65 && b && b.type===T.BUILDING && b.bid==='bl_warehouse' && !b.dead) wh65=b;
-      });
-      var st65=wh65 ? {x:wh65.x, y:(wh65.y||0)+18} : APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
-      if((s.meta.res && s.meta.res.food>0) && U.dst(s.px,s.py,st65.x,st65.y)<eatR65){
-        nearFood={ isWarehouse:true };
-      }
-    }
-    s.nearFood = nearFood || null;
+    s.nearCropPlot = APH.Ent.findNearestBuilding(s.entities, ['bl_crop_plot', 'bl_farm'], s.px, s.py, 60);
+    s.nearWorkshop = APH.Ent.findNearestBuilding(s.entities, 'bl_workshop', s.px, s.py, 60);
+    s.nearKitchen = APH.Ent.findNearestBuilding(s.entities, 'bl_kitchen', s.px, s.py, 60);
+    s.nearCampfire = APH.Ent.findNearestBuilding(s.entities, 'bl_campfire', s.px, s.py, 50);
+    s.nearLab = APH.Ent.findNearestBuilding(s.entities, 'bl_lab', s.px, s.py, 60);
+    /* #66 床边睡眠 */
+    var bedR = (CFG.player && CFG.player.bedSleepRadius != null) ? CFG.player.bedSleepRadius : 60;
+    s.nearBed = APH.Ent.findNearestBuilding(s.entities, 'bl_house', s.px, s.py, bedR);
+    /* #70 医疗舱躺下 */
+    var clinicR = (CFG.player && CFG.player.clinicSleepRadius != null) ? CFG.player.clinicSleepRadius : 60;
+    s.nearClinic = APH.Ent.findNearestBuilding(s.entities, 'bl_clinic', s.px, s.py, clinicR);
+    /* #65 走到粮边吃: 熟食优先/粮堆/仓库兜底 (委托 APH.Ent, ADR-20) */
+    var eatR65 = (CFG.player && CFG.player.foodEatRadius != null) ? CFG.player.foodEatRadius : 60;
+    var stockFood = (s.meta && s.meta.res && s.meta.res.food) || 0;
+    var stockpile = APH.Colony.stockpileSpot(s.colony && s.colony.buildings);
+    s.nearFood = APH.Ent.findNearestFood(s.entities, s.px, s.py, eatR65, stockFood, stockpile);
     syncPlayerSleep();
     /* #72 家园击倒: s.downed 运行时镜像(读自 meta 真源, 供 drawPlayer 俯卧) */
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
-    var nearFlora = s.entities.find(function(e){
-      return (e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<48);
-    });
-    s.nearFlora = nearFlora || null;
+    s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
     updateVisitors(dt);
     /* C: 游商走了/离远了自动收面板 */
     var tpO=document.getElementById('tradePanel');
@@ -1354,13 +1305,11 @@ window.APH = window.APH || {};
     updateSpawner(dt, night);
     APH.Combat.updateCombat(dt, night);
     APH.Combat.updateDropped(dt);
-    /* 返回舱接近检测(玩家出生点旁) */
-    var pad = s.entities.find(function(e){ return e.type===T.BUILDING && e.pad; });
-    s.nearPad = pad ? U.dst(s.px,s.py,pad.x,pad.y) < 90 : false;
-    var nearExpFlora = s.entities.find(function(e){
-      return e.type===T.FLORA && !e.dead && U.dst(s.px,s.py,e.x,e.y)<50;
-    });
-    s.nearFlora = nearExpFlora || null;
+    /* 返回舱接近检测(玩家出生点旁, 委托 APH.Ent, ADR-20) */
+    var pad = APH.Ent.findNearestBuilding(s.entities, 'bl_landing_pad', s.px, s.py, 90) ||
+              s.entities.find(function(e){ return e.type===T.BUILDING && e.pad && U.dst(s.px,s.py,e.x,e.y)<90; });
+    s.nearPad = !!pad;
+    s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 50);
     if(s.nearFlora && !s.nearPad && !s.nearBeacon){
       var seedName = (CFG.items[s.nearFlora.seedItem]&&CFG.items[s.nearFlora.seedItem].name)||'种子';
       APH.UI.setHint('[E] 采集异星样本 ('+seedName+')');
@@ -3005,21 +2954,11 @@ window.APH = window.APH || {};
   }
 
   function visitorCount(){
-    var n=0;
-    (APH.state.entities||[]).forEach(function(e){
-      if(e && e.type===T.VISITOR && !e.dead) n++;
-    });
-    return n;
+    return APH.Ent.findAll(APH.state.entities, T.VISITOR).length;
   }
   function nearestVisitor(s){
     var r=(CFG.visitor && CFG.visitor.recruitR)||54;
-    var best=null, bd=r;
-    (s.entities||[]).forEach(function(e){
-      if(!e || e.type!==T.VISITOR || e.dead) return;
-      var d=U.dst(s.px,s.py,e.x,e.y);
-      if(d<bd){ bd=d; best=e; }
-    });
-    return best;
+    return APH.Ent.findNearest(s.entities, T.VISITOR, s.px, s.py, r);
   }
   function spawnVisitor(at, over){
     var s=APH.state;
