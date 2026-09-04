@@ -182,6 +182,7 @@ APH.CFG = {
     specimen_acid_gland:    { name: '强酸活体腺囊', w: 1, v: 22, tint:'#b8e986', isSpecimen:true, store:'specimen_acid_gland' },
     specimen_ancient_chip:  { name: '未解密古代芯片', w: 1, v: 50, tint:'#ffc857', isSpecimen:true, store:'specimen_ancient_chip' },
     it_ancient_core:        { name: '史前高能核心', w: 4, v: 50, tint:'#00e5ff', store:'specimens_gear', desc:'古代哨兵的永恒能量核心，可作为无尽能源或化验突破终极科技' },
+    it_ancient_blueprint:   { name: '古代蓝图残卷', w: 1, v: 80, tint:'#ffc857', store:'specimens_gear', desc:'记载着史前失落科技的破损蓝图，可在科研站化验突破终极科技' },
     it_reagent:             { name: '精纯试剂', w: 1, v: 8, tint:'#b8e986', store:'it_reagent', desc:'由强酸腺体提炼的高能催化试剂' },
     it_crystal_ore:   { name: '晶体矿',   w: 2, v: 2, tint:'#ff9ad0' },
     it_mineral:       { name: '矿材',     w: 3, v: 4, tint:'#8fa3cc', store:'mineral' },

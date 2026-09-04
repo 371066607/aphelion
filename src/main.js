@@ -596,7 +596,15 @@ window.APH = window.APH || {};
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
     s.nearAncientTerminal = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_terminal', s.px, s.py, 60) : null;
-    if(s.nearAncientTerminal){
+    s.nearAncientVault = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_vault', s.px, s.py, 60) : null;
+    if(s.nearAncientVault){
+      var vObj = s.nearAncientVault.vault || s.nearAncientVault;
+      if(vObj.opened){
+        APH.UI.setHint('远古遗物箱 · 已开启');
+      } else {
+        APH.UI.setHint('[E] 开启远古遗物箱');
+      }
+    } else if(s.nearAncientTerminal){
       var tObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
       if(tObj.hacked){
         APH.UI.setHint('古代数据终端 · 破译完成 [系统已接管]');
@@ -1615,6 +1623,22 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearFood){
       tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene === 'expedition' && s.nearAncientVault){
+      var vObj = s.nearAncientVault.vault || s.nearAncientVault;
+      if(!vObj.opened){
+        var oRes = APH.Planet.openArtifactVault(vObj);
+        if(oRes.opened){
+          (oRes.drops || []).forEach(function(d, di){
+            APH.Combat.spawnDrop(s.nearAncientVault.x + (di * 16 - 8), s.nearAncientVault.y + 20, d.id, d.n || 1);
+          });
+          s.shake = Math.min(1, s.shake + 0.25);
+          APH.UI.floatText('✨ 开启远古遗物箱！获得古代蓝图残卷与史前高能核心', '#ffd54f');
+        }
+      } else {
+        APH.UI.floatText('遗物箱已被搜刮一空', '#8fa3cc');
+      }
       return true;
     }
     if(s.scene === 'expedition' && s.nearAncientTerminal){
@@ -3616,6 +3640,8 @@ window.APH = window.APH || {};
         onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearFood){
         tryPlayerEatNearFood();
+      }else if(s.scene === 'expedition' && s.nearAncientVault){
+        onPlayerInteract(true);
       }else if(s.scene === 'expedition' && s.nearAncientTerminal){
         onPlayerInteract(true);
       }else if(s.scene === 'expedition' && s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){

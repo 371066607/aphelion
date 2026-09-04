@@ -413,10 +413,23 @@ APH.Planet = (function(){
     return { breached: false, gate: gate };
   }
 
+  function openArtifactVault(vault){
+    if(!vault || vault.opened) return { opened: false, drops: [] };
+    vault.opened = true;
+    return {
+      opened: true,
+      drops: [
+        { id: 'it_ancient_blueprint', n: 1 },
+        { id: 'it_ancient_core', n: 1 }
+      ]
+    };
+  }
+
   return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
            generateExpeditionFlora:generateExpeditionFlora,
            generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,
+           openArtifactVault:openArtifactVault,
            AUTOMATON_FACTION:AUTOMATON_FACTION,
            BIOMES:BIOMES, biomeOf:biomeOf, particleTypeOf:particleTypeOf };
 })();

@@ -81,6 +81,9 @@ APH.Colony = (function(){
     bl_storage_shelf: { name:'置物货架', cost:0, costMineral:0, costRes:{ wood:6 }, size:48, max:24, buildTime:4,
       cells:[1,1], dispH:48,
       desc:'1×1 轻量置物货架。可按 [E] 自由切换允许存放的品类；架上物品完全免疫露天风化腐烂。' },
+    /* ADR-24 史前遗迹科技反哺 (#142) */
+    bl_heavy_turret: { name:'等离子重炮', cost:0, costMineral:0, reqTech:'te_heavy_plasma', costRes:{ iron:25, alloy:5 }, size:48, max:4, buildTime:12, cells:[1,1], dispH:105, desc:'史前遗迹重炮：超长射程与高额爆破杀伤。' },
+    bl_ancient_generator: { name:'史前永恒发电机', cost:0, costMineral:0, reqTech:'te_heavy_plasma', costRes:{ iron:20, wood:10 }, size:48, max:2, buildTime:15, cells:[1,1], dispH:110, desc:'由史前高能核心驱动：零燃料消耗，永久稳定提供 200W 强劲电力。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
     bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
       cells:[1,1], buildTime:6, dispH:96,
@@ -386,7 +389,7 @@ APH.Colony = (function(){
   var GRID = CFG.GRID;   // 电网段局部格网引用 (ADR-4)
   function powerRole(b){
     if(!b || !b.id) return null;
-    if(b.id==='bl_wood_generator') return 'woodgen';
+    if(b.id==='bl_wood_generator'||b.id==='bl_ancient_generator') return 'woodgen';
     if(b.id==='bl_solar_panel') return 'solar';
     if(b.id==='bl_battery') return 'battery';
     if((CFG.power && CFG.power.consumers && CFG.power.consumers[b.id])) return 'consumer';
@@ -555,7 +558,7 @@ APH.Colony = (function(){
     var out = { active:false, prodW:0, loadW:0, status:{}, groups:[], shed:[] };
     var anyGen = false;
     (buildings || []).forEach(function(b){
-      if(b && (b.id === 'bl_wood_generator' || b.id === 'bl_solar_panel')) anyGen = true;
+      if(b && (b.id === 'bl_wood_generator' || b.id === 'bl_solar_panel' || b.id === 'bl_ancient_generator')) anyGen = true;
     });
     if(!anyGen){
       /* 零发电机 = 电网未激活: 所有耗电建筑默认通电 (老档不崩) */
@@ -574,6 +577,7 @@ APH.Colony = (function(){
       g.gens.forEach(function(b){
         if(b.id === 'bl_wood_generator') prod += powerWoodOutput(b, res, dtS);
         else if(b.id === 'bl_solar_panel') prod += powerSolarOutput(b, isDay, solarMul);
+        else if(b.id === 'bl_ancient_generator') prod += 200;
       });
       g.cons.forEach(function(b){ load += (CON[b.id] && CON[b.id].load) || 0; });
       rec.prod = prod; rec.load = load;
@@ -1354,6 +1358,8 @@ APH.Colony = (function(){
                           desc:'解锁防御炮塔' },
     te_plasma_grid:     { name:'等离子电网重炮', cost:200, max:1, requires:['te_turret_tech'],
                           desc:'' },
+    te_heavy_plasma:    { name:'等离子重炮与史前能源', cost:100, max:1, requires:['te_ballistics'],
+                          desc:'史前遗迹科技：解锁等离子重炮与史前永恒发电机' },
 
     te_o2tank:          { name:'氧气罐扩容', cost:40, max:3, requires:[],
                           desc:'氧气上限 +25', effect:{ o2Max:+25 } },
@@ -1368,7 +1374,7 @@ APH.Colony = (function(){
     { name:'农业', ids:['te_basic_farming','te_hydroponics','te_bio_adaptation','te_alien_culinary'] },
     { name:'工业', ids:['te_stonecutting','te_machining','te_deep_drilling','te_exosuit'] },
     { name:'医学', ids:['te_herbal_remedies','te_medicine','te_bionics'] },
-    { name:'安防', ids:['te_o2tank','te_ballistics','te_turret_tech','te_plasma_grid','te_radar'] },
+    { name:'安防', ids:['te_o2tank','te_ballistics','te_turret_tech','te_plasma_grid','te_heavy_plasma','te_radar'] },
   ];
 
   function techDepth(techId){
@@ -1476,6 +1482,7 @@ APH.Colony = (function(){
     specimen_chitin:        { name:'硅壳装甲解剖', craftTime:20, unlockTech:'te_bio_adaptation', eurekaResearch:50, desc:'突破外星生态适应与防酸装甲' },
     specimen_acid_gland:    { name:'强酸生化提炼', craftTime:16, reagentOutput:'it_reagent', reagentCount:2, eurekaResearch:45, desc:'提炼高能催化试剂' },
     specimen_ancient_chip:  { name:'古代逻辑逆向', craftTime:25, eurekaResearch:120, desc:'古代科学数据全盘注入' },
+    it_ancient_blueprint:   { name:'古代蓝图破译', craftTime:20, unlockTech:'te_heavy_plasma', eurekaResearch:100, desc:'破译古代超空间蓝图，解锁等离子重炮与史前永恒发电机' },
   };
 
   /* 科研站实物标本化验推进(纯函数) (Science #52) */
@@ -1562,7 +1569,9 @@ APH.Colony = (function(){
   function specimenCodexEntries(meta){
     var analyzed = (meta && meta.analyzedSpecimens) || {};
     var items = CFG.items || {};
-    return Object.keys(SPECIMEN_ANALYSIS).map(function(id){
+    return Object.keys(SPECIMEN_ANALYSIS).filter(function(id){
+      return id.indexOf('specimen_') === 0;
+    }).map(function(id){
       var def = SPECIMEN_ANALYSIS[id] || {};
       var it = items[id] || {};
       return {

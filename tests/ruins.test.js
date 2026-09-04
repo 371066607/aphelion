@@ -123,3 +123,36 @@ test('ruins: hackTerminal 学识技能加成与成功/警报分支', () => {
   const rScholarChance = hack({ hacked: false }, scholar, () => 0).chance;
   A(rScholarChance > rNoviceChance, '高学识成功率必须大于低学识');
 });
+
+test('ruins: openArtifactVault 开箱产出古代蓝图与史前核心', () => {
+  const openVault = APH.Planet.openArtifactVault;
+  A(typeof openVault === 'function', 'openArtifactVault 必须为函数');
+
+  const vault = { type: 'ancient_vault', opened: false };
+  const res = openVault(vault);
+
+  A(res && res.opened === true, '开箱应成功');
+  A(vault.opened === true, '遗物箱状态应置为 opened');
+  A(Array.isArray(res.drops), '应产出掉落物数组');
+  A(res.drops.some(d => d.id === 'it_ancient_blueprint'), '必须掉落古代蓝图残卷');
+  A(res.drops.some(d => d.id === 'it_ancient_core'), '必须掉落史前高能核心');
+
+  // 再次开启无效
+  const r2 = openVault(vault);
+  A(r2 && r2.opened === false, '已开启的遗物箱不可再次开箱');
+});
+
+test('ruins: 终极科技与史前永恒发电机零燃料200W发电', () => {
+  const bldg = APH.Colony.get('bl_ancient_generator');
+  A(bldg, 'bl_ancient_generator 必须注册于 BUILDINGS');
+  A(bldg.reqTech === 'te_heavy_plasma', '应依赖 te_heavy_plasma 终极科技');
+
+  // 电网结算测试: 孤立的发电机并网产生 200W 电力
+  const buildings = [
+    { id: 'bl_ancient_generator', x: 500, y: 500, dead: false },
+    { id: 'bl_conduit', x: 548, y: 500 },
+    { id: 'bl_turret', x: 596, y: 500 }
+  ];
+  const powerRes = APH.Colony.powerSettle(buildings, {}, {}, 30);
+  A(powerRes && powerRes.prodW >= 200, '史前永恒发电机应提供至少 200W 电力, 实际: ' + (powerRes && powerRes.prodW));
+});

@@ -2713,5 +2713,27 @@ test('#137 storage: 走近置物货架按 E 循环品类且就近取料', () => 
   }
 });
 
+test('#142 ruins: 开启远古遗物箱获得古代蓝图与高能核心', () => {
+  const oldScene = S.scene, oldEntities = S.entities;
+  try {
+    S.scene = 'expedition'; S.mode = 'running';
+    APH.Res.ensurePlayerNeeds(S.meta);
+    S.meta.playerNeeds.isSleeping = false;
+    S.meta.playerNeeds.downed = false;
+    const vault = { type: T.BUILDING, id: 'ancient_vault', bid: 'ancient_vault', x: S.px + 20, y: S.py, opened: false };
+    S.entities = [vault];
+    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
+    M.updateHome(0.016);
+    A(S.nearAncientVault, '靠近遗物箱应判定 nearAncientVault');
+    M.debugPressE();
+    A(vault.opened === true, '按 E 后遗物箱应被开启');
+    const drops = S.entities.filter(e => e && e.type === T.DROPPED);
+    A(drops.some(d => d.itemId === 'it_ancient_blueprint'), '箱内必定喷出古代蓝图残卷');
+    A(drops.some(d => d.itemId === 'it_ancient_core'), '箱内必定喷出史前高能核心');
+  } finally {
+    S.scene = oldScene; S.entities = oldEntities;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);
