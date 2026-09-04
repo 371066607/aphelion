@@ -818,6 +818,356 @@ APH.UI = (function(){
   registerModal('codex', { elId: 'codex', isOverlay: true, render: renderCodex });
   registerModal('techMap', { elId: 'techMap', isOverlay: true, render: renderTechMap, onOpen: ensureTechSel });
 
+  /* ---------- 外星势力外交面板 (Diplomacy, ADR-17, ADR-18) ---------- */
+  function getPlayerDefPower(){
+    if(window.APH.Main && APH.Main.playerDefPower) return APH.Main.playerDefPower();
+    var s = window.APH && window.APH.state;
+    if(!s || !s.colony || !s.colony.buildings) return 10;
+    var turrets = s.colony.buildings.filter(function(b){ return b.id === 'bl_turret'; }).length;
+    var plasmaLv = (APH.Colony && APH.Colony.plasmaTechLevel) ? APH.Colony.plasmaTechLevel(s.meta && s.meta.tech) : 0;
+    return 10 + turrets * 12 + plasmaLv * 5;
+  }
+
+  function getStock(key){
+    if(window.APH.Main && APH.Main.haveStock) return APH.Main.haveStock(key);
+    var s = window.APH && window.APH.state;
+    if(!s || !s.meta) return 0;
+    if(APH.Colony && APH.Colony.stockOf) return APH.Colony.stockOf(s.meta.res, s.entities, key);
+    return (s.meta.res && s.meta.res[key]) || 0;
+  }
+
+  function renderDiplomacy(){
+    var s = window.APH && window.APH.state;
+    if(!s) return;
+    var body = document.getElementById('diplomacyBody');
+    if(!body) return;
+    if(!s.rivalStates && window.APH.Main && APH.Main.loadRivals) APH.Main.loadRivals();
+
+    var def = getPlayerDefPower();
+    var defEl = document.getElementById('dipDefPower');
+    if(defEl) defEl.textContent = def;
+
+    var topMil = 1;
+    (s.rivalStates || []).forEach(function(r){
+      if(r.rival && r.rival.military > topMil) topMil = r.rival.military;
+    });
+    var war = s.war || {};
+    var ws = (APH.Rivals && APH.Rivals.warScore) ? APH.Rivals.warScore(topMil, def, war.wins, war.raids) : 50;
+    var wsEl = document.getElementById('dipWarScore');
+    if(wsEl) wsEl.textContent = ws;
+
+    var minStock = getStock('mineral');
+    var foodStock = getStock('food');
+    var medStock = getStock('med');
+
+    var D = (APH.CFG && APH.CFG.diplomacy) || {};
+    var tributes = D.tributes || {};
+    var minCost = (tributes.mineral && tributes.mineral.cost) || 15;
+    var foodCost = (tributes.food && tributes.food.cost) || 10;
+    var medCost = (tributes.med && tributes.med.cost) || 2;
+    var pactDef = D.tradePact || { minRelation: 0, costMineral: 20 };
+    var detDef = D.deterrence || { defRatio: 1.2, duration: 300 };
+
+    var TRAIT_NAMES = {
+      aggressive: '好战掠夺',
+      expansionist: '领地扩张',
+      trader: '互利商贸'
+    };
+
+    var html = '';
+    (s.rivalStates || []).forEach(function(rs, idx){
+      var rv = rs.rival || {};
+      var rel = (rs.relation != null) ? rs.relation : ((APH.Rivals && APH.Rivals.defaultRelationOf) ? APH.Rivals.defaultRelationOf(rv.trait) : -40);
+      var tier = (APH.Rivals && APH.Rivals.relationTierOf) ? APH.Rivals.relationTierOf(rel) : 'hostile';
+      var traitName = TRAIT_NAMES[rv.trait] || rv.trait || '未知';
+      var rColor = rv.color || '#ff6d4a';
+
+      var tierBadge = '';
+      if(tier === 'allied'){
+        tierBadge = '<span style="background:#2ed573;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">盟友 (' + rel + ')</span>';
+      }else if(tier === 'neutral'){
+        tierBadge = '<span style="background:#ffc857;color:#1a1a1a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">中立 (' + rel + ')</span>';
+      }else{
+        tierBadge = '<span style="background:#ff4757;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">宿敌 (' + rel + ')</span>';
+      }
+
+      var statusHtml = '';
+      if(rs.cowedTime > 0){
+        statusHtml = '<span style="color:#8fd4ff">⚡ 畏缩防御中 (剩余 ' + Math.ceil(rs.cowedTime) + 's)</span>';
+      }else if(rs.wantRaid){
+        statusHtml = '<span style="color:#ff4757;font-weight:700">⚠ 备战突击中 (时机成熟)</span>';
+      }else if(rs.pact){
+        statusHtml = '<span style="color:#7dffab"> 通商协定生效中 (享折扣)</span>';
+      }else{
+        statusHtml = '<span style="color:#8fa3cc">怒气 ' + Math.round(rs.anger || 0) + ' 分钟</span>';
+      }
+
+      var milVal = Math.round(rv.military || 10);
+      var milBarW = Math.min(100, Math.round(milVal / Math.max(1, def + milVal) * 100));
+      var defBarW = 100 - milBarW;
+
+      var relBarW = Math.max(2, Math.min(100, Math.round((rel + 100) / 2)));
+      var relColor = rel > 40 ? '#2ed573' : (rel >= -30 ? '#ffc857' : '#ff4757');
+
+      var needDef = Math.ceil(milVal * detDef.defRatio);
+      var canDeter = (rs.cowedTime <= 0) && (def >= needDef);
+      var deterReason = (rs.cowedTime > 0) ? '已处于畏缩' : ('需防御 ≥ ' + needDef);
+
+      var canPact = !rs.pact && (rel >= pactDef.minRelation) && (minStock >= pactDef.costMineral);
+      var pactReason = rs.pact ? '已签署' : (rel < pactDef.minRelation ? '需关系 ≥ ' + pactDef.minRelation : '需矿石 ' + pactDef.costMineral);
+
+      html += '<div class="dip-card" style="background:rgba(20,28,48,.75);border:1px solid rgba(89,217,255,.2);border-radius:8px;padding:16px;position:relative">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<div>' +
+            '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + rColor + ';margin-right:8px;vertical-align:middle"></span>' +
+            '<b style="font-size:15px;color:#cdd9f5">' + esc(rv.name || '未知势力') + '</b>' +
+            '<span style="margin-left:8px;color:#8fa3cc;font-size:11px">[' + traitName + ']</span>' +
+          '</div>' +
+          '<div>' + tierBadge + ' ' + statusHtml + '</div>' +
+        '</div>' +
+
+        '<div style="margin-bottom:12px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:11px;color:#8fa3cc;margin-bottom:3px">' +
+            '<span>仇视 (-100)</span><span>关系度: ' + rel + '</span><span>崇敬 (+100)</span>' +
+          '</div>' +
+          '<div style="height:6px;background:#101726;border-radius:3px;overflow:hidden">' +
+            '<div style="height:100%;width:' + relBarW + '%;background:' + relColor + ';border-radius:3px;transition:width .3s"></div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="margin-bottom:14px;background:rgba(10,15,30,.5);padding:8px 12px;border-radius:6px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">' +
+            '<span style="color:#59d9ff">我方防御: ' + def + '</span>' +
+            '<span style="color:#ff6d4a">敌方军力: ' + milVal + '</span>' +
+          '</div>' +
+          '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#101726">' +
+            '<div style="height:100%;width:' + defBarW + '%;background:#59d9ff"></div>' +
+            '<div style="height:100%;width:' + milBarW + '%;background:#ff6d4a"></div>' +
+          '</div>' +
+        '</div>' +
+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+          '<span style="color:#ffc857;font-size:11px;font-weight:700">外交行动:</span>' +
+          '<button class="dip-btn" data-act="tribute" data-idx="' + idx + '" data-res="mineral" ' + (minStock >= minCost ? '' : 'disabled style="opacity:.45;cursor:not-allowed"') + '>' +
+            ' 纳贡矿石 (' + minCost + '矿 / 余' + minStock + ')' +
+          '</button>' +
+          '<button class="dip-btn" data-act="tribute" data-idx="' + idx + '" data-res="food" ' + (foodStock >= foodCost ? '' : 'disabled style="opacity:.45;cursor:not-allowed"') + '>' +
+            ' 纳贡粮食 (' + foodCost + '粮 / 余' + foodStock + ')' +
+          '</button>' +
+          '<button class="dip-btn" data-act="tribute" data-idx="' + idx + '" data-res="med" ' + (medStock >= medCost ? '' : 'disabled style="opacity:.45;cursor:not-allowed"') + '>' +
+            ' 纳贡药品 (' + medCost + '药 / 余' + medStock + ')' +
+          '</button>' +
+          '<button class="dip-btn" data-act="pact" data-idx="' + idx + '" ' + (canPact ? '' : 'disabled style="opacity:.45;cursor:not-allowed"') + '>' +
+            (rs.pact ? '✔ 通商协定已签署' : ' 签署通商 (' + pactReason + ')') +
+          '</button>' +
+          '<button class="dip-btn" data-act="deter" data-idx="' + idx + '" ' + (canDeter ? '' : 'disabled style="opacity:.45;cursor:not-allowed"') + '>' +
+            '⚡ 军事威慑 (' + (canDeter ? '有效' : deterReason) + ')' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    });
+
+    body.innerHTML = html;
+
+    var btns = body.querySelectorAll ? body.querySelectorAll('.dip-btn') : [];
+    for(var bi = 0; bi < btns.length; bi++){
+      btns[bi].onclick = function(){
+        if(this.disabled) return;
+        var act = this.getAttribute('data-act');
+        var rIdx = parseInt(this.getAttribute('data-idx'), 10);
+        if(act === 'tribute'){
+          var resType = this.getAttribute('data-res');
+          doSendTribute(rIdx, resType);
+        }else if(act === 'pact'){
+          doSignTradePact(rIdx);
+        }else if(act === 'deter'){
+          doDeterRival(rIdx);
+        }
+      };
+    }
+  }
+
+  function doSendTribute(rIdx, resType){
+    var s = window.APH && window.APH.state;
+    if(!s || !s.rivalStates || !s.rivalStates[rIdx]) return;
+    var rs = s.rivalStates[rIdx];
+    var stock = getStock(resType);
+    var res = APH.Rivals.sendTribute(rs, resType, stock);
+    if(!res.success){
+      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      return;
+    }
+    if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, resType, res.cost);
+    s.rivalStates[rIdx] = res.newState;
+    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
+    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    if(s.war && s.war.pendingWave && s.war.raidFrom === rs.rival.name){
+      s.war.pendingWave = null;
+      s.war.raidWarn = 0;
+    }
+    floatText(' 向 ' + rs.rival.name + ' 纳贡成功，怒气平息！', 400, 300, '#7dffab');
+    renderDiplomacy();
+  }
+
+  function doSignTradePact(rIdx){
+    var s = window.APH && window.APH.state;
+    if(!s || !s.rivalStates || !s.rivalStates[rIdx]) return;
+    var rs = s.rivalStates[rIdx];
+    var stock = getStock('mineral');
+    var res = APH.Rivals.signTradePact(rs, stock);
+    if(!res.success){
+      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      return;
+    }
+    if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, 'mineral', res.cost);
+    s.rivalStates[rIdx] = res.newState;
+    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
+    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    floatText(' 与 ' + rs.rival.name + ' 签署通商协定！', 400, 300, '#59d9ff');
+    renderDiplomacy();
+  }
+
+  function doDeterRival(rIdx){
+    var s = window.APH && window.APH.state;
+    if(!s || !s.rivalStates || !s.rivalStates[rIdx]) return;
+    var rs = s.rivalStates[rIdx];
+    var def = getPlayerDefPower();
+    var res = APH.Rivals.deterRival(rs, def);
+    if(!res.success){
+      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      return;
+    }
+    s.rivalStates[rIdx] = res.newState;
+    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
+    floatText('⚡ 成功威慑 ' + rs.rival.name + '！敌方陷入畏缩。', 400, 300, '#ffc857');
+    renderDiplomacy();
+  }
+
+  registerModal('diplomacy', { elId: 'diplomacyOverlay', isOverlay: true, render: renderDiplomacy });
+
+  /* ---------- 游商交易面板 (Trader, ADR-18) ---------- */
+  var RES_LABEL = { mineral:'矿材', food:'食物', leather:'皮革', med:'药品', alloy:'合金', crystal:'晶体矿' };
+
+  function ensureTradePanel(){
+    var el = document.getElementById('tradePanel');
+    if(el) return el;
+    if(typeof document === 'undefined' || !document.createElement) return null;
+    el = document.createElement('div');
+    el.id = 'tradePanel';
+    el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;' +
+      'background:rgba(10,14,24,.96);border:1px solid #223252;border-radius:14px;' +
+      'padding:18px 22px;min-width:340px;max-height:70vh;overflow:auto;color:#cdd9f5;' +
+      'font-size:12px;line-height:1.9;display:none';
+    if(document.body && document.body.appendChild) document.body.appendChild(el);
+    return el;
+  }
+
+  function currentTrader(){
+    var s = window.APH && window.APH.state;
+    if(!s) return null;
+    return (s.nearVisitor && s.nearVisitor.trade && !s.nearVisitor.dead) ? s.nearVisitor : null;
+  }
+
+  function tradeRowCount(tr){
+    if(!tr || !tr.trade) return 0;
+    return (tr.trade.sells || []).length + (tr.trade.buys || []).length;
+  }
+
+  function moveTradeSel(code){
+    var s = window.APH && window.APH.state;
+    if(!s) return;
+    var tr = currentTrader();
+    if(!tr) return;
+    var max = tradeRowCount(tr);
+    if(max <= 0) return;
+    if(s.tradeSel == null) s.tradeSel = 0;
+    if(code === 'ArrowUp') s.tradeSel = (s.tradeSel - 1 + max) % max;
+    else if(code === 'ArrowDown') s.tradeSel = (s.tradeSel + 1) % max;
+    renderTradePanel();
+  }
+
+  function tradeMulNow(){
+    var s = window.APH && window.APH.state;
+    if(!s || !s.meta) return 0;
+    var gb = (APH.Res && APH.Res.globalBonuses) ? APH.Res.globalBonuses(s.meta.residents || []) : {};
+    var pactBonus = ((s.rivalStates || []).some(function(r){ return r.pact; })) ? 0.1 : 0;
+    return (gb.tradeMul || 0) + pactBonus;
+  }
+
+  function renderTradePanel(){
+    var s = window.APH && window.APH.state;
+    if(!s) return;
+    var el = ensureTradePanel();
+    if(!el) return;
+    var tr = currentTrader();
+    if(!tr){ el.style.display = 'none'; return; }
+    var mul = tradeMulNow();
+    var stock = tr.trade || { sells: [], buys: [] };
+    var html = '<b style="color:#ffc857;font-size:13px">游商 · ' + esc(tr.name || '') + '</b>' +
+      '<span style="float:right;color:#8fa3cc">矿材 ' +
+      (APH.Colony && APH.Colony.stockOf ? APH.Colony.stockOf(s.meta && s.meta.res, s.entities, 'mineral') : 0) + '</span><br>' +
+      (mul > 0 ? '<span style="color:#8fd4ff">社交议价 ' + Math.round(mul * 100) + '%</span><br>' : '');
+    var row = 1;
+    html += '<div style="margin-top:8px;color:#9fe8c8">买入(扣矿材)</div>';
+    (stock.sells || []).forEach(function(it, i){
+      var cost = Math.max(1, Math.round(it.price * (1 - mul)));
+      var sel = (s.tradeSel || 0) === i;
+      html += '<div style="color:' + ((it.n || 0) > 0 ? '#cdd9f5' : '#39435c') +
+        (sel ? ';background:#1a2838;border-radius:4px;padding:0 6px' : '') + '">' +
+        (sel ? '▸ ' : '[' + row + '] ') +
+        (RES_LABEL[it.key] || it.key) + ' ×' + (it.n || 0) + ' · ' + cost + '矿/件</div>';
+      row++;
+    });
+    html += '<div style="margin-top:8px;color:#ffc857">卖出(得矿材)</div>';
+    (stock.buys || []).forEach(function(of, i){
+      var gain = Math.max(1, Math.round(of.price * (1 + mul)));
+      var idx = (stock.sells || []).length + i;
+      var sel = (s.tradeSel || 0) === idx;
+      html += '<div style="color:' + ((of.n || 0) > 0 ? '#cdd9f5' : '#39435c') +
+        (sel ? ';background:#1a2838;border-radius:4px;padding:0 6px' : '') + '">' +
+        (sel ? '▸ ' : '[' + row + '] ') +
+        (RES_LABEL[of.key] || of.key) + ' (还收' + (of.n || 0) + ') · ' + gain + '矿/件 · 库存 ' +
+        (of.key === 'crystal'
+          ? (APH.Colony && APH.Colony.itemCount ? APH.Colony.itemCount(s.entities, 'it_crystal_ore') : 0)
+          : (APH.Colony && APH.Colony.stockOf ? APH.Colony.stockOf(s.meta && s.meta.res, s.entities, of.key === 'alloy' ? 'mineral' : of.key) : 0)) +
+        '</div>';
+      row++;
+    });
+    html += '<div style="margin-top:10px;color:#5d6f96">↑↓选 · Enter成交 · 数字键也可 · [Esc] 关闭</div>';
+    el.innerHTML = html;
+  }
+
+  function doTradeRow(i){
+    var s = window.APH && window.APH.state;
+    if(!s) return;
+    var tr = currentTrader();
+    if(!tr) { close('trade'); return; }
+    var stock = tr.trade || { sells: [], buys: [] };
+    var kind, idx;
+    if(i < (stock.sells || []).length){ kind = 'buy'; idx = i; }
+    else { kind = 'sell'; idx = i - (stock.sells || []).length; }
+    var r = (APH.Res && APH.Res.tradeOnce) ? APH.Res.tradeOnce(s.meta, s.entities, stock, kind, idx, tradeMulNow()) : { ok: false, why: '未实现' };
+    if(!r.ok){ floatText('✕ ' + r.why, 400, 300, '#ff9a9a'); renderTradePanel(); return; }
+    if(r.kind === 'buy')
+      floatText(' 买入 ' + (RES_LABEL[r.key] || r.key) + ' -' + r.cost + '矿', 400, 300, '#9fe8c8');
+    else
+      floatText(' 卖出 ' + (RES_LABEL[r.key] || r.key) + ' +' + r.gain + '矿', 400, 300, '#ffe28a');
+    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    if(window.APH.Main && APH.Main.saveColony) APH.Main.saveColony();
+    renderTradePanel();
+    if(APH.U && APH.U.emit) APH.U.emit('traded', r);
+  }
+
+  registerModal('trade', {
+    elId: 'tradePanel',
+    isOverlay: true,
+    render: renderTradePanel,
+    onOpen: function(){
+      ensureTradePanel();
+      if(window.APH && window.APH.state) window.APH.state.tradeSel = 0;
+    }
+  });
+
   function toggleDiplomacy(show){
     if(modals['diplomacy']){
       if(show !== undefined){
@@ -837,6 +1187,8 @@ APH.UI = (function(){
     registerModal:registerModal, open:open, close:close, toggle:toggle, isOpen:isOpen,
     closeActive:closeActive, hasActiveModal:hasActiveModal, getActiveModal:getActiveModal,
     renderCodex:renderCodex, renderTechMap:renderTechMap, tryBuySelectedTech:tryBuySelectedTech,
-    moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus
+    moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus,
+    renderDiplomacy:renderDiplomacy, doSendTribute:doSendTribute, doSignTradePact:doSignTradePact, doDeterRival:doDeterRival,
+    renderTradePanel:renderTradePanel, doTradeRow:doTradeRow, moveTradeSel:moveTradeSel
   };
 })();
