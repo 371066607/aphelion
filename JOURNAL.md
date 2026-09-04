@@ -870,3 +870,11 @@
   - **main.js 深度瘦身**：`src/main.js` 从 4,305 行削减至 3,610 行（物理净减约 700 行），消灭了大量重复内联 DOM 代码，各面板均改走高阶语义接缝。
   - **验证**：编写独立测试 `tests/ui_modals.test.js`（40 个生命周期与不变量测试全部通过）；`tests/run.js` 631 单元测试全绿；`tests/scenario.test.js` 114 场景全链路全绿；`perf.test.js` 4 绿；`boss.test.js` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
   - **关闭票据**：Issue #109 (M1), #110 (M2), #111 (M3), #112 (M4), #108 (Spec) 全部完成交付。
+
+- **2026-09-04 · 架构深模块重构第二期：统一输入动作分发器与活动上下文栈（#113~#117）**:
+  - **ADR-0010 / ADR-19 落盘**：解决 `src/main.js` 中 450 行按键 switch-case/if-else 监听器混乱、弹窗与底层按键互相踩踏的问题。
+  - **活动上下文栈（Input Context Stack）**：建立 `src/input.js`（`APH.Input` 深模块），维护 `contextStack`；模态打开自动推入 `modal:<id>` 栈顶，关闭自动弹出；栈顶上下文拥有绝对优先按键消费权，彻底消除打开名册/交易弹窗时底层移动或误射击等按键踩踏隐患。
+  - **键位映射与数据分离（ADR-10）**：物理按键码全部移入 `src/config.js` 的 `CFG.keybindings`，按上下文隔离；主模块 `main.js` 通过语义动作（Action: `INTERACT`, `SECONDARY_INTERACT`, `FIRE_PLASMA`, `TOGGLE_BUILD_MODE`, `CYCLE_JOB` 等）声明式订阅响应。
+  - **main.js 进一步瘦身**：消灭了 300 余行基于 `e.code` 的嵌套分支，并统一了 `debugPressE` 调试接口。
+  - **验证**：`tests/input.test.js` 4 个纯单元测试通过（入 `run.js`，全量 635 绿）；`ui_modals.test.js` 增至 42 绿；`scenario.test.js` 114 场景全绿；`perf` 4 绿；`boss` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
+  - **关闭票据**：Issue #114 (I1), #115 (I2), #116 (I3), #117 (I4), #113 (Spec) 全部交付验收。
