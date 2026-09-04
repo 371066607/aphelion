@@ -252,6 +252,17 @@ _Avoid_: 范围碰撞器, 物理广播
 在帧末尾由 `APH.Ent.sweepDead` 单点执行的死亡实体过滤机制，避免在中间遍历阶段直接 `splice` 产生下标跳位。
 _Avoid_: 垃圾回收, 析构器
 
+### 子系统推进与仿真调度
+
+**Simulation Seam / 仿真推进接缝**：
+各领域模块对外提供的粗粒度推进接口（如 `Colony.tickConstruction`, `Colony.tickProduction`, `Combat.tickRaid`），封装领域内部的状态依赖与多步调用，避免泄漏至主循环。
+_Avoid_: 逐帧更新, 钩子
+
+**Phase Orchestration / 阶段时序调度**：
+主循环 `updateHome` 仅按固定依赖拓扑依次调用各子系统的推进接缝，自身不承载任何具体领域状态突变。
+_Avoid_: 上帝循环, 全局轮询
+
+
 
 
 

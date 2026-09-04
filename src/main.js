@@ -720,227 +720,16 @@ window.APH = window.APH || {};
     var bb=document.getElementById('buildBtn');
     if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
 
-    /* Task2v2: 建造队列——玩家或建造岗居民走到蓝图旁才施工 */
+    /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
-    if(s.colony.buildQueue && s.colony.buildQueue.length){
-      var bb=APH.Colony.builderBonusOf(s.meta.residents||[]);
-      var near=[{x:s.px,y:s.py}];
-      var builders={};
-      var wpB=s.meta.workPrio||{};
-      (s.meta.residents||[]).forEach(function(r){
-        if(!APH.Colony.isBuilder(r)) return;
-        if(r.job && r.job!=='blueprint') return;
-        if(APH.Res.isBroken && APH.Res.isBroken(r)) return;   // 崩溃者不施工
-        if(wpB[r.id] && wpB[r.id].sk_build===0) return;       // D: 建造被禁止
-        builders[r.id]=true;
-      });
-      s.entities.forEach(function(en){
-        if(en.type===T.RESIDENT && builders[en.rid||en.id]) near.push({x:en.x,y:en.y});
-      });
-      var qr=APH.Colony.queueTick(s.colony.buildQueue, dt, near, bb);
-      s.colony.buildQueue=qr.queue;
-      /* 施工粒子: 正在施工的蓝图冒尘 */
-      s.colony.buildQueue.forEach(function(q){
-        if(q.building && Math.random()<dt*6){
-          s.parts.push({t:'dust',x:q.x+U.rr(-20,20),y:q.y+U.rr(-10,10),life:.5,max:.5});
-        }
-      });
-      /* 同步蓝图实体进度 */
-      s.colony.buildQueue.forEach(function(q){
-        s.entities.forEach(function(en){
-          if(en.type===T.BLUEPRINT && en.bid===q.bid &&
-             Math.abs(en.x-q.x)<2 && Math.abs(en.y-q.y)<2){
-            en.progress=q.progress||0; en.building=q.building;
-          }
-        });
-      });
-      qr.done.forEach(function(d){
-        var b={id:d.bid,x:d.x,y:d.y,lv:1};
-        /* T4 破墙: 墙块记录带耐久(旧存档缺 hp 由 Combat.wallHp 兜底) */
-        if(d.bid==='bl_wall' && CFG.wall && CFG.wall.hp!=null) b.hp=CFG.wall.hp;
-        s.colony.buildings.push(b);
-        /* 移除对应蓝图实体 (委托 APH.Ent, ADR-20) */
-        s.entities.forEach(function(en){
-          if(en.type===T.BLUEPRINT&&en.bid===d.bid&&
-             Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2){
-            APH.Ent.destroy(en);
-          }
-        });
-        s.entities=APH.Ent.sweepDead(s.entities);
-        /* ADR-13: 墙/闸门/陷阱/沙袋=格上静态物, 不入 entities[](防爆实体预算); 渲染走 walls 层 */
-        var isGridStatic=(d.bid==='bl_wall'||d.bid==='bl_gate'||d.bid==='bl_spike_trap'||d.bid==='bl_sandbag');
-        if(!isGridStatic){
-          APH.Colony.placeBuildingEntity(d.bid,d.x,d.y,1);
-          var justBuilt=s.entities[s.entities.length-1];
-          if(justBuilt.type===T.BUILDING) justBuilt.builtT=0;   // 金色脉冲
-        }else{
-          /* M3 修复: 墙建成时若玩家在碰撞盒内, 沿最近轴推出(防被自己的墙钉死) */
-          var wR=(CFG.wall||{}).collideR!=null ? CFG.wall.collideR : 35;
-          if(d.bid==='bl_wall' && Math.abs(s.px-d.x)<wR && Math.abs(s.py-d.y)<wR){
-            var dxW=s.px-d.x, dyW=s.py-d.y;
-            if(Math.abs(dxW)>Math.abs(dyW)) s.px=d.x+(dxW>0?wR:-wR);
-            else s.py=d.y+(dyW>0?wR:-wR);
-            s.px=U.clamp(s.px,40,CFG.WORLD-40); s.py=U.clamp(s.py,40,CFG.WORLD-40);
-          }
-        }
-        saveColony();
-        if(d.bid==='bl_house' && window.APH.Opening && APH.Opening.noteHouse){
-          APH.Opening.noteHouse(firstNightOpening(), s.clock||0);
-          applyFirstNightHint();
-          try{ APH.Save.saveMeta(s.meta); }catch(eH){}
-        }
-        U.emit('built',{id:d.bid});
-        APH.UI.floatText('✔ '+APH.Colony.get(d.bid).name+' 建造完成','#9fe8c8');
-        s.parts.push({t:'ping',x:d.x,y:d.y,life:.9,max:.9});
-      });
-    }
+    if(APH.Colony && APH.Colony.tickConstruction) APH.Colony.tickConstruction(s, dt);
 
-    /* 生产 tick: 每30游戏秒结算一次采矿机/科研站 (ADR-6 固定tick) */
-    s.prodT=(s.prodT||0)+dt;
-    if(s.prodT>=30){
-      s.prodT-=30;
-      (s.colony.buildings||[]).forEach(function(b){
-        if(b.offlineT>0) b.offlineT=Math.max(0, b.offlineT-30);
-      });
-      /* T7 电网结算: powerSettle → 状态写入各建筑 b.powered/grid */
-      var powRes=APH.Colony.powerSettle(s.colony.buildings, s.meta.res, s.power||(s.power={}), 30,
-        { solarMul: APH.Colony.powerSolarMulOf(s.meta), isDay: APH.World.daylight()>=.5 });
-      var powState=APH.Colony.applyPowerState(s.colony.buildings, powRes.status);
-      (s.colony.buildings||[]).forEach(function(b){
-        var pk=Math.round(b.x||0)+','+Math.round(b.y||0);
-        var ps=powState[pk];
-        if(ps){ b.powered=ps.powered; b.grid=ps.grid; }
-        else if(APH.Colony.isPowerConsumer(b.id)){ b.powered=true; b.grid=false; }  // 未激活默认通电
-      });
-      s.powerStatus=powRes;
-      var nightP=APH.World.daylight()<.5;
-      var hmods=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightP);
-      var prodWorkers=(s.meta.residents||[]).filter(function(r){
-        return !(APH.Res.isBroken && APH.Res.isBroken(r));   // 崩溃者缺勤
-      });
-      var out=APH.Colony.productionTick(s.meta, s.colony.buildings, prodWorkers, hmods);
-      (out.piles||[]).forEach(function(p){
-        APH.Combat.spawnDrop(p.x+16, p.y+14, p.itemId, p.n, {stock:true});
-      });
-      if(out.mineral||out.research)
-        APH.UI.floatText('生产: '+(out.mineral?'矿材×'+out.mineral+'堆在地上 ':'')+(out.research?'+'+out.research+' 研究点':''),'#9fe8c8');
-      /* AI殖民地同步成长(同拍) */
-      tickRivals(30/60);
-      storyTick(30/60);                           // ADR-12 先于居民跳, 兽群本跳×3 才吃得到
-      residentsTick();                            // P6-U2/U4/U7
-    }
+    /* 30s 生产时钟周期 (委托 APH.Colony, ADR-21) */
+    if(APH.Colony && APH.Colony.tickProduction) APH.Colony.tickProduction(s, dt);
 
-    /* 战争系统: 袭击预警与进行中 */
-    if(s.war.raidWarn>0){
-      s.war.raidWarn-=dt;
-      APH.UI.setHint('⚠ '+s.war.raidFrom+'来袭! '+Math.ceil(s.war.raidWarn)+'s — 保卫殖民地!');
-      if(s.war.raidWarn<=0) startRaid();
-    }else if(s.war.raidActive){
-      APH.Combat.updateCombat(dt, false);
-      /* Task4: 炮塔开火(对射程内最近敌人; 士兵是友军) */
-      var raidFoes=[];
-      s.entities.forEach(function(e2){
-        if(e2.type===T.ENEMY&&!e2.dead&&!e2.isSoldier) raidFoes.push(e2);
-      });
-      s.colony.buildings.forEach(function(b){
-        if(b.id!=='bl_turret') return;
-        if(!APH.Colony.turretFireAllowed(b)) return;   // T7 无电/耀斑停机
-        var tw={x:b.x,y:b.y,lv:b.lv||1,cd:b.cd};
-        var fired=APH.Combat.turretStep(tw,raidFoes,dt);
-        b.cd=tw.cd;
-        /* 视觉: 炮管指向目标 + 开火后坐动画 */
-        if(fired && tw.lastTarget){
-          b.aimA=Math.atan2(tw.lastTarget.y-b.y, tw.lastTarget.x-b.x);
-          b.fireT=1;
-        }
-        if(b.fireT>0) b.fireT=Math.max(0,b.fireT-dt*3);
-      });
+    /* 战争防务与波次推进 (委托 APH.Combat, ADR-21) */
+    if(APH.Combat && APH.Combat.tickRaid) APH.Combat.tickRaid(s, dt);
 
-      var RT=CFG.raidTactics||{};
-
-      /* 阶段E: 围攻扎营期(炮击/倒计时/拆营判定) */
-      siegeTick(dt);
-
-      /* 阶段E: 双波间歇 */
-      if(s.war.betweenWaves){
-        s.war.nextWaveT-=dt;
-        APH.UI.setHint('⚠ 第二波正在集结 '+Math.ceil(Math.max(0,s.war.nextWaveT))+'s — 方向会变!');
-        if(s.war.nextWaveT<=0){
-          s.war.betweenWaves=false;
-          s.war.spawned=0;
-          s.war.waveAngle=(s.war.waveAngle||0)+(RT.wave2Angle!=null?RT.wave2Angle:2.4);
-          APH.UI.floatText('⚠ 第二波袭击!','#ff9a9a');
-        }
-      }
-
-      /* 波次刷怪(袭击敌人从地图边缘冲基地; 围攻则刷在营地旁) */
-      s.war.raidSpawnT=(s.war.raidSpawnT||0)-dt;
-      var aliveEnemies=0;
-      s.entities.forEach(function(e){
-        if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) aliveEnemies++;
-      });
-      if(!s.war.betweenWaves && !s.war.routed &&
-         aliveEnemies < s.war.wave.count && s.war.spawned<s.war.wave.count && s.war.raidSpawnT<=0){
-        s.war.raidSpawnT=.7;
-        var f=APH.Planet.pickRaidFaction(s.lastExpedition, s.seed);
-        var ang=(s.war.waveAngle!=null)
-          ? s.war.waveAngle+(Math.random()-.5)*.9
-          : Math.random()*U.TAU;
-        var d=Math.max(vpW(),vpH())*.62;
-        var ex,ey;
-        var camping=s.war.siege && s.war.siege.phase==='camp';
-        if(camping){
-          ex=U.clamp(s.war.siege.cx+U.rr(-60,60),40,CFG.WORLD-40);
-          ey=U.clamp(s.war.siege.cy+U.rr(-60,60),40,CFG.WORLD-40);
-        }else{
-          ex=U.clamp(CFG.HAB.x+Math.cos(ang)*d,40,CFG.WORLD-40);
-          ey=U.clamp(CFG.HAB.y+Math.sin(ang)*d,40,CFG.WORLD-40);
-        }
-        var en=APH.Ent.makeEnemy(f,ex,ey);
-        if(camping){
-          en.sieging=true; en.campX=s.war.siege.cx; en.campY=s.war.siege.cy;
-          en.state='idle';
-        }else{
-          en.state='chase';                     // 直接冲基地
-        }
-        if(s.war.tactic==='pillage') en.pillager=true;
-        s.entities.push(en);
-        s.war.spawned++;
-      }
-
-      /* 阶段E: 溃退判定——伤亡比例达阈值全体撤退 */
-      if(!s.war.routed){
-        var totalPlanned=(s.war.wave.count||1)*((s.war.wave.waves||1));
-        var routAt=RT.routAt!=null?RT.routAt:.6;
-        if((s.war.casualties||0) >= Math.ceil(totalPlanned*routAt))
-          raidRetreat('⚠ 伤亡过重, 敌军溃退!', false);
-      }
-
-      if(!s.war.betweenWaves && s.war.spawned>=s.war.wave.count){
-        var left=0;
-        s.entities.forEach(function(e){
-          if(e.type===T.ENEMY&&!e.dead&&!e.isSoldier) left++;
-        });
-        if(left===0){
-          if(!s.war.routed && (s.war.wavesLeft||0)>0){
-            s.war.wavesLeft--;
-            s.war.betweenWaves=true;
-            s.war.nextWaveT=RT.waveGap!=null?RT.waveGap:45;
-          }else{
-            s.war.raidActive=false;
-            clearSiegeCamp();
-            if(s.war.escaped){
-              APH.UI.floatText('⚠ 盗掠者满载而归…下次早点拦截','#ffb35c');
-            }else{
-              s.war.wins++;
-              APH.UI.floatText('✔ 袭击被击退! 战争态势提升','#7dffab');
-              U.emit('raidDefended',{});
-            }
-            saveWar();
-          }
-        }
-      }
-    }
     /* 掉落拾取不绑袭击: 末波击杀当帧清 raid 后地上战利品仍能捡 */
     APH.Combat.updateDropped(dt);
     if(!s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
@@ -3565,6 +3354,12 @@ window.APH = window.APH || {};
     },
     guardTrim:guardTrim,
     applyTech:applyTech,
+    setupSiegeCamp:setupSiegeCamp,
+    siegeTick:siegeTick,
+    clearSiegeCamp:clearSiegeCamp,
+    saveWar:saveWar,
+    firstNightOpening:firstNightOpening,
+    applyFirstNightHint:applyFirstNightHint,
     loadRivals:loadRivals,
     saveRivals:saveRivals,
     saveMetaQuiet:saveMetaQuiet,
