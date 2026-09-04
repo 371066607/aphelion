@@ -3252,6 +3252,35 @@ window.APH = window.APH || {};
     m.residents.forEach(function(r){
       APH.Res.needsTick(r, false);
     });
+
+    /* ADR-25 温度与体温失调结算 */
+    var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
+    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxId, isDay) : 22;
+    var campfire = (s.colony && s.colony.buildings || []).find(function(b){ return b && (b.id==='bl_campfire'||b.bid==='bl_campfire'); });
+    m.residents.forEach(function(r){
+      var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
+      var rTemp = ambT;
+      if(ent && window.APH.Nav && APH.Nav.roomAt){
+        var cRoom = APH.Nav.roomAt({x:ent.x, y:ent.y}, T9_rooms);
+        if(cRoom && cRoom.temp != null) rTemp = cRoom.temp;
+      }
+      var nearFire = (ent && campfire && U.dst(ent.x, ent.y, campfire.x, campfire.y) <= 50);
+      var suitIt = (r.gear && r.gear.suit) ? (CFG.items && CFG.items[r.gear.suit]) : null;
+      var tRes = APH.Res.thermalStressTick(r, rTemp, suitIt, 30, nearFire);
+      if(tRes.downed && !r.downed){
+        r.downed = true;
+        r.isSleeping = false;
+        APH.UI.floatText('❄ ' + r.name + ' 因极端体温失调虚脱击倒了！', '#ff6d7a');
+      }
+    });
+
+    if(m.playerNeeds && s.scene === 'home'){
+      var pRoom = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:s.px, y:s.py}, T9_rooms) : null;
+      var pTemp = (pRoom && pRoom.temp != null) ? pRoom.temp : ambT;
+      var pNearFire = (campfire && U.dst(s.px, s.py, campfire.x, campfire.y) <= 50);
+      var pSuit = (s.carry && s.carry.suit) ? (CFG.items && CFG.items[s.carry.suit]) : null;
+      APH.Res.thermalStressTick(m.playerNeeds, pTemp, pSuit, 30, pNearFire);
+    }
     if(APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(m);
     if(APH.Res.homeFoodTick && m.playerNeeds){
       m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);

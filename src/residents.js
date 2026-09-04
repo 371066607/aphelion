@@ -1535,6 +1535,57 @@ APH.Res = (function(){
     return sheltered ? 1 : mul;
   }
 
+  /* ADR-25: 极端温度生理失调 (失温/中暑) 纯函数 */
+  function thermalStressTick(entity, envTemp, suitItem, dt, nearWarmth){
+    if(!entity) return { hypothermia:0, heatstroke:0, speedMul:1, downed:false };
+    var temp = envTemp != null ? envTemp : 22;
+    var C = (CFG.temperature) || {};
+    var minT = C.comfortMin != null ? C.comfortMin : 10;
+    var maxT = C.comfortMax != null ? C.comfortMax : 35;
+
+    if(suitItem && suitItem.cryoResist){
+      minT = C.cryoSuitColdFloor != null ? C.cryoSuitColdFloor : -35;
+    }
+    if(suitItem && suitItem.acidResist){
+      maxT = 45;
+    }
+
+    var step = (dt != null ? dt : 30) / 30;
+    var hypo = entity.hypothermia || 0;
+    var heat = entity.heatstroke || 0;
+
+    if(temp < minT){
+      if(nearWarmth){
+        hypo = Math.max(0, hypo - 15 * step);
+      } else {
+        var coldDelta = minT - temp;
+        var gain = Math.min(25, coldDelta * 0.5 * step);
+        hypo = Math.min(100, hypo + gain);
+      }
+    } else if(temp > maxT){
+      var heatDelta = temp - maxT;
+      var hGain = Math.min(25, heatDelta * 0.5 * step);
+      heat = Math.min(100, heat + hGain);
+    } else {
+      hypo = Math.max(0, hypo - 15 * step);
+      heat = Math.max(0, heat - 15 * step);
+    }
+
+    entity.hypothermia = Math.round(hypo * 10) / 10;
+    entity.heatstroke = Math.round(heat * 10) / 10;
+
+    var speedMul = 1.0;
+    if(entity.hypothermia > 40 || entity.heatstroke > 40) speedMul = 0.70;
+    var downed = (entity.hypothermia >= 100 || entity.heatstroke >= 100);
+
+    return {
+      hypothermia: entity.hypothermia,
+      heatstroke: entity.heatstroke,
+      speedMul: speedMul,
+      downed: downed
+    };
+  }
+
   /* 气候暴露与急性伤病转化(纯函数): 极端天气室外累积、避难所消退、>80 转化伤病 (Survival #19) */
   function exposureTick(r, sheltered, hasExtremeWeather, weatherType){
     if(!r) return r;
@@ -1719,6 +1770,7 @@ APH.Res = (function(){
     roomShelter:roomShelter, shelteredFor:shelteredFor, roomMoodGain:roomMoodGain,
     playerExposureTick:playerExposureTick,
     suitResistOf:suitResistOf, weatherMoveMul:weatherMoveMul,
+    thermalStressTick:thermalStressTick,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,

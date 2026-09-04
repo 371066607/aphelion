@@ -131,3 +131,36 @@ test('temperature: cropThermalGrowthMul 作物适温生长与极寒冻害', () =
   A(cropThermal(5) === 0.5, '5°C 应减速生长 0.5');
   A(cropThermal(38) === 0.5, '38°C 酷热应减速生长 0.5');
 });
+
+test('temperature: thermalStressTick 极寒失温、防寒服抵抗与击倒', () => {
+  const stressTick = APH.Res.thermalStressTick;
+  A(typeof stressTick === 'function', 'thermalStressTick 必须为函数');
+
+  // 1. 无防寒服暴露在 -25°C 极寒下，累积失温
+  const coldPerson = { hypothermia: 0, heatstroke: 0 };
+  const r1 = stressTick(coldPerson, -25, null, 30);
+  A(coldPerson.hypothermia > 10, '极寒暴露 30s 应显著累积失温, 实际: ' + coldPerson.hypothermia);
+  A(r1.downed === false, '初始不应立即击倒');
+
+  // 2. 穿着极地防寒羽绒 (cryoResist: 0.8) 抵抗极寒
+  const protectedPerson = { hypothermia: 0, heatstroke: 0 };
+  const parka = { cryoResist: 0.8 };
+  stressTick(protectedPerson, -25, parka, 30);
+  A(protectedPerson.hypothermia === 0, '穿着极地防寒羽绒在 -25°C 下应完全免疫失温');
+
+  // 3. 严重失温 (>40) 触发 30% 移速减速
+  const severeCold = { hypothermia: 50 };
+  const rSevere = stressTick(severeCold, -25, null, 30);
+  A(rSevere.speedMul === 0.70, '严重失温移速乘子应为 0.70');
+
+  // 4. 失温达到 100% 触发虚脱昏迷击倒
+  const dyingCold = { hypothermia: 98 };
+  const rDown = stressTick(dyingCold, -25, null, 30);
+  A(dyingCold.hypothermia === 100, '失温应封顶 100%');
+  A(rDown.downed === true, '满值失温应触发虚脱击倒');
+
+  // 5. 靠近篝火或进入适温房间 (21°C) 快速消退回暖
+  const thawingPerson = { hypothermia: 50 };
+  stressTick(thawingPerson, 21, null, 30);
+  A(thawingPerson.hypothermia < 40, '进入 21°C 房间应快速消退失温, 实际: ' + thawingPerson.hypothermia);
+});
