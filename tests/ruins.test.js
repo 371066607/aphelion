@@ -96,3 +96,30 @@ test('ruins: shieldRechargeTick 脱战4s后护盾回充', () => {
   rechargeTick(sentry, 10.0);
   A(sentry.shield === 40, '护盾回充应封顶 maxShield 40, 实际: ' + sentry.shield);
 });
+
+test('ruins: hackTerminal 学识技能加成与成功/警报分支', () => {
+  const hack = APH.Res.hackTerminal;
+  A(typeof hack === 'function', 'hackTerminal 必须为函数');
+
+  const terminal = { type: 'ancient_terminal', hacked: false };
+  const scholar = { id: 'player', name: '学者指挥官', skills: { sk_lore: 6 } };
+
+  // 1. 成功分支 (rng = 0.1)
+  const r1 = hack(terminal, scholar, () => 0.1);
+  A(r1 && r1.success === true, '高学识+低随机值应破译成功');
+  A(terminal.hacked === true, '破译成功后 hacked 应为 true');
+  A(terminal.alarm === false, '成功后 alarm 应为 false');
+
+  // 2. 失败分支与警报触发 (rng = 0.99)
+  const unhackedTerm = { type: 'ancient_terminal', hacked: false };
+  const novice = { id: 'player', name: '新手', skills: { sk_lore: 1 } };
+  const r2 = hack(unhackedTerm, novice, () => 0.99);
+  A(r2.success === false, '高随机值应破译失败');
+  A(r2.alarm === true, '破译失败应触发警报');
+  A(unhackedTerm.alarm === true, '终端 alarm 属性应置为 true');
+
+  // 3. 成功率随 sk_lore 提升
+  const rNoviceChance = hack({ hacked: false }, novice, () => 0).chance;
+  const rScholarChance = hack({ hacked: false }, scholar, () => 0).chance;
+  A(rScholarChance > rNoviceChance, '高学识成功率必须大于低学识');
+});

@@ -595,6 +595,18 @@ window.APH = window.APH || {};
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
+    s.nearAncientTerminal = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_terminal', s.px, s.py, 60) : null;
+    if(s.nearAncientTerminal){
+      var tObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
+      if(tObj.hacked){
+        APH.UI.setHint('古代数据终端 · 破译完成 [系统已接管]');
+      } else {
+        var loreLv = (s.meta && s.meta.loreSkill) || 3;
+        APH.UI.setHint('[E] 破译古代终端 (学识 Lv' + loreLv + ')');
+      }
+    } else if(s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
+      APH.UI.setHint('[E] 破译能量闸门 (亦可用等离子枪轰击破门)');
+    }
     if(s.scene === 'expedition' && s.ruins && !s.ruins.revealed){
       if(U.dst(s.px, s.py, s.ruins.cx, s.ruins.cy) < 140){
         s.ruins.revealed = true;
@@ -1603,6 +1615,37 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearFood){
       tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene === 'expedition' && s.nearAncientTerminal){
+      var termObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
+      if(!termObj.hacked){
+        var loreSkill = (s.meta && s.meta.loreSkill) || 3;
+        var hacker = { id:'player', name:'指挥官', skills:{ sk_lore: loreSkill } };
+        var hRes = APH.Res.hackTerminal(termObj, hacker, s._hackRng || Math.random);
+        if(hRes.success){
+          if(s.ruins && s.ruins.gate){
+            s.ruins.gate.locked = false;
+            s.ruins.gate.broken = true;
+          }
+          s.entities.forEach(function(en){
+            if(en.type === T.ENEMY && en.faction && en.faction.id === 'fx_automaton'){
+              en.stunT = 8;
+            }
+          });
+          APH.UI.floatText('✔ ' + hRes.text, '#7dffab');
+        } else {
+          s.shake = Math.min(1, s.shake + 0.3);
+          APH.UI.floatText('🚨 ' + hRes.text, '#ff4d5e');
+          s.entities.forEach(function(en){
+            if(en.type === T.ENEMY && en.faction && en.faction.id === 'fx_automaton'){
+              en.state = 'chase';
+            }
+          });
+        }
+      } else {
+        APH.UI.floatText('该终端系统已处于接管状态', '#8fa3cc');
+      }
       return true;
     }
     if(s.scene === 'expedition' && s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
@@ -3573,6 +3616,8 @@ window.APH = window.APH || {};
         onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearFood){
         tryPlayerEatNearFood();
+      }else if(s.scene === 'expedition' && s.nearAncientTerminal){
+        onPlayerInteract(true);
       }else if(s.scene === 'expedition' && s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
         onPlayerInteract(true);
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();

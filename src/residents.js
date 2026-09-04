@@ -878,6 +878,36 @@ APH.Res = (function(){
     }
   }
 
+  function hackTerminal(terminal, hacker, rng){
+    if(!terminal) return { success:false };
+    if(terminal.hacked) return { success:true, alreadyHacked:true };
+    var rand = (typeof rng === 'function') ? rng : Math.random;
+
+    var base = 0.45;
+    var sk = (hacker && hacker.skills && hacker.skills.sk_lore) || 0;
+    var chance = Math.max(0.20, Math.min(0.90, base + sk * 0.08));
+
+    var success = rand() < chance;
+    if(success){
+      terminal.hacked = true;
+      terminal.alarm = false;
+      return {
+        success: true,
+        chance: chance,
+        unlocked: true,
+        text: '终端破译成功！能量门禁已解除'
+      };
+    } else {
+      terminal.alarm = true;
+      return {
+        success: false,
+        chance: chance,
+        alarm: true,
+        text: '破译触发安全协议！警报惊醒了守卫！'
+      };
+    }
+  }
+
   /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
   function lowestBondMate(r, residents, bonds){
     var best=null, bv=1e9;
@@ -1706,7 +1736,7 @@ APH.Res = (function(){
     bondKey:bondKey, relationshipTierOf:relationshipTierOf, keyBondsOf:keyBondsOf,
     workSynergyOf:workSynergyOf, roomFrictionOf:roomFrictionOf,
     canSocialEncounter:canSocialEncounter, triggerSocialEncounter:triggerSocialEncounter,
-    attemptIntervention:attemptIntervention,
+    attemptIntervention:attemptIntervention, hackTerminal:hackTerminal,
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,
