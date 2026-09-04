@@ -637,12 +637,68 @@ APH.Res = (function(){
     r.breakT=lo+Math.floor(rand()*(hi-lo+1));
     return { started:r.breakType, ticks:r.breakT };
   }
+  function bondKey(aId, bId){
+    if(aId === 'player') return 'player|' + bId;
+    if(bId === 'player') return 'player|' + aId;
+    return aId < bId ? aId + '|' + bId : bId + '|' + aId;
+  }
+
+  function relationshipTierOf(bond){
+    var v = (bond != null && !isNaN(bond)) ? bond : 50;
+    var tiers = (CFG.social && CFG.social.tiers) || [
+      { id:'rival', name:'宿怨', min:0, max:20, icon:'⚡', color:'#ff6b6b' },
+      { id:'disliked', name:'不和', min:20, max:40, icon:'😒', color:'#ffa07a' },
+      { id:'neutral', name:'平淡', min:40, max:60, icon:'😐', color:'#dcdcdc' },
+      { id:'friend', name:'朋友', min:60, max:80, icon:'😊', color:'#8fd4ff' },
+      { id:'close_friend', name:'挚友', min:80, max:100.01, icon:'❤️', color:'#ff85c0' },
+    ];
+    for(var i = 0; i < tiers.length; i++){
+      var t = tiers[i];
+      if(v >= t.min && v < t.max){
+        return t;
+      }
+    }
+    return tiers[tiers.length - 1];
+  }
+
+  function keyBondsOf(residentId, allResidents, bonds){
+    var b = bonds || {};
+    var rList = allResidents || [];
+    var closest = null, maxBond = -1;
+    var worst = null, minBond = 101;
+
+    for(var i = 0; i < rList.length; i++){
+      var other = rList[i];
+      if(!other || other.id === residentId) continue;
+      var k = bondKey(residentId, other.id);
+      var val = (b[k] != null) ? b[k] : 50;
+      if(val > maxBond){
+        maxBond = val;
+        closest = { otherId: other.id, name: other.name, bond: val, tier: relationshipTierOf(val) };
+      }
+      if(val < minBond){
+        minBond = val;
+        worst = { otherId: other.id, name: other.name, bond: val, tier: relationshipTierOf(val) };
+      }
+    }
+
+    var pk = bondKey(residentId, 'player');
+    var pVal = (b[pk] != null) ? b[pk] : 50;
+    var playerRel = { bond: pVal, tier: relationshipTierOf(pVal) };
+
+    return {
+      closest: closest,
+      worst: worst,
+      player: playerRel
+    };
+  }
+
   /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
   function lowestBondMate(r, residents, bonds){
     var best=null, bv=1e9;
     (residents||[]).forEach(function(o){
       if(!o || o===r || o.id===r.id) return;
-      var k=r.id<o.id ? r.id+'|'+o.id : o.id+'|'+r.id;
+      var k=bondKey(r.id, o.id);
       var v=(bonds && bonds[k]!=null) ? bonds[k] : 50;
       if(v<bv){ bv=v; best=o; }
     });
@@ -662,9 +718,9 @@ APH.Res = (function(){
     });
   }
   function applyBond(bonds, aId, bId, delta){
-    var k=aId<bId? aId+'|'+bId : bId+'|'+aId;
-    bonds[k]=(bonds[k]||50)+delta;                            // 初始50, 范围0~100
-    bonds[k]=Math.max(0,Math.min(100,bonds[k]));
+    var k=bondKey(aId, bId);
+    var cur=(bonds[k]!=null)? bonds[k] : 50;
+    bonds[k]=Math.max(0,Math.min(100, cur + delta));
     return bonds;
   }
 
@@ -1462,6 +1518,7 @@ APH.Res = (function(){
     chanceLabel:chanceLabel, recruitGate:recruitGate,
     hospitalityRate:hospitalityRate, tickImpression:tickImpression, offerMeal:offerMeal,
     socialTick:socialTick, applyBond:applyBond,
+    bondKey:bondKey, relationshipTierOf:relationshipTierOf, keyBondsOf:keyBondsOf,
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,

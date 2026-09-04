@@ -49,6 +49,7 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 | ADR-19 | 输入分发与上下文栈 | 建立 `src/input.js`（APH.Input）；键位映射进 `CFG.keybindings`；引入上下文栈（game/modal:*）解决按键踩踏与模态独占；业务通过语义动作（Action）解耦按键分支。详见 `docs/adr/0010-input-dispatcher-and-context-stack.md` | 2026-09-04 架构防腐第二期（解开 450 行按键逻辑缠绕） |
 | ADR-20 | 实体集合与空间检索深化 | 在 APH.Ent 中收拢空间检索（findNearest/findNearestBuilding/findNearestFood）与安全销毁清洗（destroy/sweepDead）；恪守 ADR-3 契约同时消灭 8 处手写扫描与 9 处裸 filter。详见 `docs/adr/0011-entity-collection-and-spatial-queries.md` | 2026-09-04 架构防腐第三期（根除遍历 splice 位移与重复空间轮询） |
 | ADR-21 | 殖民地子系统推进接缝深化 | 将 410 行 updateHome 上帝循环收拢为三大深模块接缝：Colony.tickConstruction、Colony.tickProduction、Combat.tickRaid；主循环蜕变为纯高层时序调度。详见 `docs/adr/0012-colony-subsystem-simulation-seams.md` | 2026-09-04 架构防腐终章第四期（上帝循环彻底解耦） |
+| ADR-22 | 居民人际网络与动态社交 | 好感度五级离散状态机（宿怨/不和/平淡/朋友/挚友）；场上偶遇停步 1.5s 转向+Emoji 微气泡与极简动作浮字（杜绝文字聊天框）；好友同岗协同（+15%效率）/宿怨同室避嫌（睡眠心情减益）；精神崩溃玩家与好友靠近按 E 劝导安抚（社交技能+好感综合掷骰，狂躁失败转火反噬）；玩家入网沉淀羁绊。详见 `docs/adr/0013-resident-social-network.md` | 2026-09-04 深度生存：殖民地社区活化与危机调解闭环 |
 
 **暂缓决策**（改动成本不随时间增长）：渲染特效、UI 布局、平衡数值、敌人行为参数、音频、瞄准方式。
 

@@ -350,6 +350,32 @@ APH.CFG = {
     mealImpressCooked: 35,     // 熟食款待过客好感增益
   },
 
+  /* 居民动态社交与人际网络 (ADR-22 / Spec #128) */
+  social: {
+    tiers: [
+      { id: 'rival', name: '宿怨', min: 0, max: 20, icon: '⚡', color: '#ff6b6b' },
+      { id: 'disliked', name: '不和', min: 20, max: 40, icon: '😒', color: '#ffa07a' },
+      { id: 'neutral', name: '平淡', min: 40, max: 60, icon: '😐', color: '#dcdcdc' },
+      { id: 'friend', name: '朋友', min: 60, max: 80, icon: '😊', color: '#8fd4ff' },
+      { id: 'close_friend', name: '挚友', min: 80, max: 100.01, icon: '❤️', color: '#ff85c0' },
+    ],
+    friendSynergy: 1.15,          // 好友同岗产出协同乘子 (+15%)
+    rivalPenalty: 0.85,           // 宿怨同岗产出惩罚乘子 (-15%)
+    roomRivalMoodPenalty: -5,     // 同室死敌夜间避嫌心情减益
+    encounterCooldown: 90,        // 同对居民场上停步偶遇冷却 (s)
+    encounterArriveR: 40,         // 偶遇触发判定距离 (px)
+    encounterPauseTime: 1.5,      // 偶遇停步时长 (s)
+    greetCooldown: 60,            // 玩家靠近按 E 打招呼冷却 (s)
+    greetBondGain: 2,             // 玩家打招呼好感增量
+    calmComfortMood: 10,          // 安抚成功心情增益
+    calmComfortDur: 120,          // 开导心情增益持续时间 (s)
+    interventionBaseChance: 0.40, // 崩溃安抚基础成功率 (40%)
+    interventionSkillScale: 0.06, // 每点社交技能提供 +6% 成功率
+    interventionBondScale: 0.005, // 好感偏离中值增益 (每点 +0.5%)
+    interventionMinChance: 0.15,  // 安抚成功率保底下限 (15%)
+    interventionMaxChance: 0.90,  // 安抚成功率封顶上限 (90%)
+  },
+
   /* 工坊: 矿材→殖民地药品(给医疗舱用, 不是远征消耗品) */
   workshop: {
     mineralCost: 2,

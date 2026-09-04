@@ -1411,24 +1411,42 @@ APH.UI = (function(){
         '</div>' +
         (function(){
           var cap = (APH.Res && APH.Res.capacitiesOf) ? APH.Res.capacitiesOf(r) : { moving: 1, manipulation: 1, consciousness: 1 };
+          var kb = (APH.Res && APH.Res.keyBondsOf) ? APH.Res.keyBondsOf(r.id, m.residents, m.bonds) : null;
+          var socHtml = '';
+          if(kb){
+            var parts = [];
+            if(kb.player){
+              parts.push('领袖: <span style="color:' + kb.player.tier.color + '">' + kb.player.tier.icon + ' ' + kb.player.tier.name + '(' + Math.round(kb.player.bond) + ')</span>');
+            }
+            if(kb.closest && kb.closest.bond >= 60){
+              parts.push('好友: <span style="color:' + kb.closest.tier.color + '">' + kb.closest.tier.icon + ' ' + kb.closest.name + '(' + Math.round(kb.closest.bond) + ')</span>');
+            }
+            if(kb.worst && kb.worst.bond < 40){
+              parts.push('不睦: <span style="color:' + kb.worst.tier.color + '">' + kb.worst.tier.icon + ' ' + kb.worst.name + '(' + Math.round(kb.worst.bond) + ')</span>');
+            }
+            if(!parts.length) parts.push('<span style="color:#5d6f96">中立平和</span>');
+            socHtml = ' · 羁绊[' + parts.join(' · ') + ']';
+          }
           return '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">' +
             '机能: 移动 ' + Math.round(cap.moving * 100) + '% · 操作 ' + Math.round(cap.manipulation * 100) + '% · 认知 ' + Math.round(cap.consciousness * 100) + '%' +
             (r.bedId ? (' · <span style="color:#7dffab">床位[' + r.bedId + ']</span>') : ' · <span style="color:#ffb35c">露宿打地铺</span>') +
+            socHtml +
             '</div>';
         })() +
         '</div>';
     });
     if(m.bonds && Object.keys(m.bonds).length){
-      html += '<div style="margin-top:14px;color:#ffc857">人际关系</div>';
+      html += '<div style="margin-top:14px;color:#ffc857;font-size:12px;font-weight:700">殖民地人际羁绊网络</div>';
       Object.keys(m.bonds).forEach(function(k){
         var v = Math.round(m.bonds[k]);
+        var tier = (APH.Res && APH.Res.relationshipTierOf) ? APH.Res.relationshipTierOf(v) : { name:'平淡', icon:'😐', color:'#8fa3cc' };
         var names = k.split('|').map(function(id){
+          if(id === 'player') return '指挥官(你)';
           var r = (m.residents || []).find(function(x){ return x.id === id; });
-          return r ? r.name : '?';
+          return r ? r.name : id;
         });
-        var tag = v >= 70 ? '挚友' : (v >= 55 ? '友好' : (v >= 40 ? '平淡' : (v >= 25 ? '疏远' : '敌视')));
-        var col = v >= 70 ? '#7dffab' : (v >= 40 ? '#8fa3cc' : '#ff6d7a');
-        html += '<div style="color:' + col + '">' + names[0] + ' ↔ ' + names[1] + ' : ' + tag + ' (' + v + ')</div>';
+        html += '<div style="font-size:11px;margin-top:2px;color:' + tier.color + '">' +
+          tier.icon + ' ' + names[0] + ' ↔ ' + names[1] + ' : ' + tier.name + ' (' + v + ')</div>';
       });
     }
     body.innerHTML = html;
