@@ -885,3 +885,11 @@
   - **安全销毁与帧尾清洗**：对外提供 `destroy(entity)`（打标 `dead = true`，杜绝遍历即时 splice 产生下标跳位隐患）与 `sweepDead(entities)`（单点收拢帧尾安全过滤，强制保护玩家实体永不被清除）。
   - **验证**：`tests/entities.test.js` 4 个空间与生命周期纯单元测试通过（入 `run.js`，全量 639 绿）；`ui_modals.test.js` 42 绿；`scenario.test.js` 114 场景全绿；`perf` 4 绿；`boss` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
   - **关闭票据**：Issue #119 (E1), #120 (E2), #121 (E3), #122 (E4), #118 (Spec) 全部交付验收。
+
+- **2026-09-04 · 架构深模块重构第四期：殖民地子系统推进接缝深化与上帝函数收拢（#123~#127）**:
+  - **ADR-0012 / ADR-21 落盘**：解决 `src/main.js` 中 `updateHome` 长达 410 行的上帝循环问题，解构混杂在主循环内的建造、电网、生产、防务与波次刷怪逻辑。
+  - **经济与建造推进接缝（`APH.Colony`）**：建立 `tickConstruction`（推进建造队列、同步蓝图实体、施工粒子、防卡墙位移）与 `tickProduction`（30 秒大时钟供电 BFS、天气法则影响、多岗位产出与战利品掉落分发）。
+  - **防务与战争推进接缝（`APH.Combat`）**：建立 `tickRaid`（袭击预警倒计时、炮塔索敌开火与炮管后坐转向动画、围攻扎营、多波次刷怪、伤亡溃退与胜利结算）。
+  - **main.js 极简蜕变**：`updateHome` 从 410 行上帝过程缩减至 ~25 行高层阶段时序调度器（Phase Orchestrator）；`src/main.js` 体积由 4,305 行最终回落至 3,430 行（累计瘦身 875 行代码，消灭大量架构坏味道）。
+  - **验证**：新增 `colony_subsystem.test.js` (+2) 与 `combat_subsystem.test.js` (+2)，单元测试集扩充至 643 全绿；`ui_modals.test.js` 42 绿；`scenario.test.js` 114 场景全绿（彻底根除 #94 偶发抖动）；`perf` 4 绿；`boss` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
+  - **关闭票据**：Issue #124 (S1), #125 (S2), #126 (S3), #127 (S4), #123 (Spec) 全部交付验收。
