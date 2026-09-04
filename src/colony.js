@@ -936,9 +936,15 @@ APH.Colony = (function(){
     return next;
   }
 
-  function deteriorationTick(drop, weatherId, isSheltered, dt){
+  function deteriorationTick(drop, weatherId, isSheltered, dt, roomTemp){
     if(!drop || !drop.itemId) return { loss: 0, decayed: false, decayHp: 100 };
-    if(isSheltered) return { loss: 0, decayed: false, decayHp: drop.decayHp != null ? drop.decayHp : 100 };
+    // 冷冻库环境 (<0°C): 彻底永久保鲜！
+    if(roomTemp != null && roomTemp < 0){
+      return { loss: 0, decayed: false, decayHp: drop.decayHp != null ? drop.decayHp : 100, frozen: true };
+    }
+    if(isSheltered && (roomTemp == null || (roomTemp >= 0 && roomTemp <= 25))) {
+      return { loss: 0, decayed: false, decayHp: drop.decayHp != null ? drop.decayHp : 100 };
+    }
 
     var it = (CFG.items && CFG.items[drop.itemId]) || {};
     // 工业矿石与建材免疫
@@ -953,8 +959,13 @@ APH.Colony = (function(){
     var isPerishable = (it.store === 'food' || it.isCooked || it.store === 'herb' || drop.itemId.indexOf('berry') >= 0 || drop.itemId.indexOf('crop') >= 0);
     var baseRate = isPerishable ? (C.decayPerishableBase || 1.5) : (C.decayNormalBase || 0.5);
 
+    var tempMul = 1.0;
+    if(roomTemp != null && roomTemp >= 0 && roomTemp <= 10){
+      tempMul = 0.3; // 冷藏减缓 70%
+    }
+
     var step = (dt != null ? dt : 30) / 30;
-    var loss = Math.round(baseRate * wxMul * step * 10) / 10;
+    var loss = Math.round(baseRate * wxMul * tempMul * step * 10) / 10;
 
     var cur = (drop.decayHp != null) ? drop.decayHp : (C.decayHpMax || 100);
     var next = Math.max(0, Math.round((cur - loss) * 10) / 10);
@@ -965,6 +976,13 @@ APH.Colony = (function(){
       decayed: next <= 0,
       decayHp: next
     };
+  }
+
+  function cropThermalGrowthMul(envTemp){
+    var t = envTemp != null ? envTemp : 20;
+    if(t < 0) return 0;
+    if(t >= 10 && t <= 35) return 1.0;
+    return 0.5;
   }
 
   function bulkHaulCandidates(primaryDrop, allDrops, maxRadius, maxPiles, maxCount){
@@ -2073,16 +2091,29 @@ APH.Colony = (function(){
       }
     }
 
-    /* ADR-23 掉落物露天天气劣化与腐烂判定 */
+    /* ADR-25: 推进封闭房间室内气温与温控电器结算 */
     var wxId = (window.APH.Weather && APH.Weather.currentId) ? APH.Weather.currentId(s.meta) : 'wx_clear';
-    var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(s.colony && s.colony.buildings) : [];
-    var shelters = (s.colony && s.colony.buildings || []).filter(function(b){
+    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxId, isDay) : 22;
+    var allBlds = s.colony && s.colony.buildings || [];
+    var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(allBlds) : [];
+    rooms.forEach(function(rm){
+      var appliances = allBlds.filter(function(b){
+        return b && (b.id === 'bl_heater' || b.id === 'bl_cooler') &&
+               b.x >= rm.minX * 48 && b.x <= rm.maxX * 48 &&
+               b.y >= rm.minY * 48 && b.y <= rm.maxY * 48;
+      });
+      roomTemperatureTick(rm, ambT, 30, appliances);
+    });
+
+    /* ADR-23/25 掉落物露天天气劣化与冷库保鲜判定 */
+    var shelters = allBlds.filter(function(b){
       return b && (b.id === 'bl_storage_shelf' || b.id === 'bl_warehouse');
     });
     (s.entities || []).forEach(function(e){
       if(!e || e.dead || e.type !== T.DROPPED) return;
       var isSheltered = false;
-      if(window.APH.Nav && APH.Nav.inRooms && APH.Nav.inRooms({x:e.x, y:e.y}, rooms)){
+      var curRoom = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:e.x, y:e.y}, rooms) : null;
+      if(curRoom){
         isSheltered = true;
       } else {
         for(var si = 0; si < shelters.length; si++){
@@ -2091,7 +2122,8 @@ APH.Colony = (function(){
           }
         }
       }
-      var dRes = deteriorationTick(e, wxId, isSheltered, 30);
+      var rTemp = curRoom ? curRoom.temp : null;
+      var dRes = deteriorationTick(e, wxId, isSheltered, 30, rTemp);
       if(dRes.decayed){
         if(window.APH.Ent && APH.Ent.destroy) APH.Ent.destroy(e);
         else e.dead = true;
@@ -2147,7 +2179,7 @@ APH.Colony = (function(){
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
     findNearbySourcedItem:findNearbySourcedItem,
-    roomTemperatureTick:roomTemperatureTick,
+    roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,

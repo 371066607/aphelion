@@ -92,3 +92,42 @@ test('temperature: roomTemperatureTick 电暖器升温与空调降温控温', ()
   roomTick(larderRoom, 25, 30, [cooler]);
   A(larderRoom.temp > -5, '断电后室温应逐渐回暖上升, 实际: ' + larderRoom.temp);
 });
+
+test('temperature: deteriorationTick 冷冻库(<0°C)永久保鲜与冷藏减缓', () => {
+  const decayTick = APH.Colony.deteriorationTick;
+
+  // 1. 冷冻库 -5°C：生肉与熟食损耗彻底为 0 (永久保鲜)
+  const frozenSteak = { itemId: 'it_roasted_meat', decayHp: 100 };
+  const rFrozen = decayTick(frozenSteak, 'wx_clear', true, 30, -5);
+  A(frozenSteak.decayHp === 100, '冷库内熟食耐久应分毫不减');
+  A(rFrozen.loss === 0, '冷库损耗量应为 0');
+
+  // 2. 冷藏室 4°C：损耗削减 70% (仅剩 30%)
+  const chilledBerry = { itemId: 'it_berry', decayHp: 100 };
+  // 晴天室外原本损耗 1.5，冷藏室削减 70% 变为 1.5 * 0.3 = 0.45 -> 约 0.5
+  decayTick(chilledBerry, 'wx_clear', false, 30, 4);
+  A(chilledBerry.decayHp > 99, '冷藏室应大幅减缓损耗, 实际: ' + chilledBerry.decayHp);
+
+  // 3. 常温室内 22°C 受庇护免受天气雨雪加成
+  const roomMeal = { itemId: 'it_food', decayHp: 100 };
+  decayTick(roomMeal, 'wx_acid', true, 30, 22);
+  A(roomMeal.decayHp === 100, '室内避难免受酸雨加成');
+});
+
+test('temperature: cropThermalGrowthMul 作物适温生长与极寒冻害', () => {
+  const cropThermal = APH.Colony.cropThermalGrowthMul;
+  A(typeof cropThermal === 'function', 'cropThermalGrowthMul 必须为函数');
+
+  // 极寒 < 0°C：生长完全冻结
+  A(cropThermal(-10) === 0, '零下生长乘子应为 0');
+  A(cropThermal(-0.1) === 0, '零下微冷生长乘子应为 0');
+
+  // 适温区间 10°C~35°C：全速 1.0
+  A(cropThermal(22) === 1.0, '22°C 适温应为 1.0');
+  A(cropThermal(15) === 1.0, '15°C 适温应为 1.0');
+  A(cropThermal(30) === 1.0, '30°C 适温应为 1.0');
+
+  // 边缘区间 (0~10°C / >35°C) 减速生长
+  A(cropThermal(5) === 0.5, '5°C 应减速生长 0.5');
+  A(cropThermal(38) === 0.5, '38°C 酷热应减速生长 0.5');
+});
