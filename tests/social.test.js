@@ -206,3 +206,41 @@ test('social: triggerSocialEncounter 结算气泡、动作描述与羁绊增减'
   A(cooldowns['rs_1|rs_2'] === 100, '冷却字典应被记录当前时间');
   A(bonds['rs_1|rs_2'] >= 75, '好友偶遇后好感不应下跌');
 });
+
+test('social: attemptIntervention 成功安抚平息精神崩溃', () => {
+  const intervene = APH.Res.attemptIntervention;
+  A(typeof intervene === 'function', 'attemptIntervention 必须为函数');
+
+  const counselor = { id: 'player', name: '指挥官', skills: { sk_social: 5 } };
+  const target = { id: 'rs_1', name: '阿澈', mood: 20, breakType: 'wander', breakT: 2 };
+  let bonds = { 'player|rs_1': 60 };
+
+  // rng 返回 0.1 -> 必成功
+  const res = intervene(target, counselor, () => 0.1, bonds);
+  A(res && res.success === true, '低随机值应安抚成功');
+  A(target.breakType === null, '成功后 breakType 应清空');
+  A(target.breakT === 0, '成功后 breakT 应归零');
+  A(target.mood === 30, '成功后心情应 +10, 实际: ' + target.mood);
+  A(bonds['player|rs_1'] === 66, '成功后好感应 +6, 实际: ' + bonds['player|rs_1']);
+});
+
+test('social: attemptIntervention 失败分支与暴力转火反噬', () => {
+  const intervene = APH.Res.attemptIntervention;
+
+  const counselor = { id: 'player', name: '指挥官', skills: { sk_social: 1 } };
+  const wanderer = { id: 'rs_1', name: '阿澈', mood: 20, breakType: 'wander', breakT: 2 };
+  let bonds = { 'player|rs_1': 50, 'player|rs_2': 50 };
+
+  // 游荡失败 (rng = 0.99) -> 普通失败无反噬
+  const res1 = intervene(wanderer, counselor, () => 0.99, bonds);
+  A(res1.success === false, '高随机值应失败');
+  A(res1.retaliate === false, '游荡崩溃失败不应反噬');
+  A(wanderer.breakType === 'wander', '失败后保持游荡崩溃');
+
+  // 斗殴失败 (rng = 0.99) -> 暴力转火反噬
+  const brawler = { id: 'rs_2', name: '铁蛋', mood: 15, breakType: 'brawl', breakT: 2 };
+  const res2 = intervene(brawler, counselor, () => 0.99, bonds);
+  A(res2.success === false, '高随机值应失败');
+  A(res2.retaliate === true, '斗殴崩溃安抚失败应触发暴躁转火反噬');
+  A(bonds['player|rs_2'] === 45, '激怒反噬好感应扣减 5, 实际: ' + bonds['player|rs_2']);
+});

@@ -833,6 +833,51 @@ APH.Res = (function(){
     };
   }
 
+  function attemptIntervention(target, counselor, rng, bonds){
+    if(!target || !counselor) return { success:false };
+    var rand = (typeof rng === 'function') ? rng : Math.random;
+    var C = CFG.social || {};
+    var base = C.interventionBaseChance != null ? C.interventionBaseChance : 0.40;
+    var sk = (counselor.skills && counselor.skills.sk_social) || 0;
+    var skScale = C.interventionSkillScale != null ? C.interventionSkillScale : 0.06;
+    var bondScale = C.interventionBondScale != null ? C.interventionBondScale : 0.005;
+    var minChance = C.interventionMinChance != null ? C.interventionMinChance : 0.15;
+    var maxChance = C.interventionMaxChance != null ? C.interventionMaxChance : 0.90;
+
+    var k = bondKey(target.id, counselor.id);
+    var curBond = (bonds && bonds[k] != null) ? bonds[k] : 50;
+
+    var chance = base + sk * skScale + (curBond - 50) * bondScale;
+    chance = Math.max(minChance, Math.min(maxChance, chance));
+
+    var success = rand() < chance;
+    if(success){
+      target.breakType = null;
+      target.breakT = 0;
+      var moodGain = C.calmComfortMood != null ? C.calmComfortMood : 10;
+      target.mood = Math.min(100, (target.mood || 50) + moodGain);
+      if(bonds) applyBond(bonds, target.id, counselor.id, 6);
+      return {
+        success: true,
+        chance: chance,
+        text: (counselor.name || '安抚者') + ' 成功安抚了 ' + target.name + ' 的情绪'
+      };
+    } else {
+      var isViolent = (target.breakType === 'brawl' || target.breakType === 'tantrum');
+      if(isViolent && bonds){
+        applyBond(bonds, target.id, counselor.id, -5);
+      }
+      return {
+        success: false,
+        chance: chance,
+        retaliate: isViolent,
+        text: isViolent
+          ? target.name + ' 被激怒了，转火攻击了劝解者！'
+          : target.name + ' 沉浸在情绪中，劝解无果'
+      };
+    }
+  }
+
   /* 斗殴对象: 好感最低的同事(无记录按 50 算) */
   function lowestBondMate(r, residents, bonds){
     var best=null, bv=1e9;
@@ -1661,6 +1706,7 @@ APH.Res = (function(){
     bondKey:bondKey, relationshipTierOf:relationshipTierOf, keyBondsOf:keyBondsOf,
     workSynergyOf:workSynergyOf, roomFrictionOf:roomFrictionOf,
     canSocialEncounter:canSocialEncounter, triggerSocialEncounter:triggerSocialEncounter,
+    attemptIntervention:attemptIntervention,
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,

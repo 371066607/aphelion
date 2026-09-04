@@ -552,6 +552,7 @@ window.APH = window.APH || {};
               s.entities.find(function(e){ return e.type===T.BUILDING && e.pad && U.dst(s.px,s.py,e.x,e.y)<90; });
     s.nearPad = !!pad;
     s.nearVisitor = nearestVisitor(s);
+    s.nearResident = nearestResident(s);
     s.nearCropPlot = APH.Ent.findNearestBuilding(s.entities, ['bl_crop_plot', 'bl_farm'], s.px, s.py, 60);
     s.nearWorkshop = APH.Ent.findNearestBuilding(s.entities, 'bl_workshop', s.px, s.py, 60);
     s.nearKitchen = APH.Ent.findNearestBuilding(s.entities, 'bl_kitchen', s.px, s.py, 60);
@@ -603,6 +604,16 @@ window.APH = window.APH || {};
           (vp.name||'过客')+' · '+tag+
           (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
           (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit);
+      }
+    }else if(s.nearResident){
+      var rProfile = residentOf(s.nearResident);
+      if(rProfile && APH.Res && APH.Res.isBroken && APH.Res.isBroken(rProfile)){
+        s.nearBrokenResident = { entity: s.nearResident, resident: rProfile };
+        APH.UI.setHint('[E] 安抚情绪 (' + (rProfile.name || '居民') + ' 正在 ' + (APH.Res.BREAK_NAMES[rProfile.breakType] || rProfile.breakType) + ')');
+      } else if(rProfile){
+        s.nearBrokenResident = null;
+        var rTier = (APH.Res && APH.Res.relationshipTierOf) ? APH.Res.relationshipTierOf((s.meta && s.meta.bonds && s.meta.bonds['player|' + rProfile.id]) || 50) : { name:'平淡', icon:'😐' };
+        APH.UI.setHint('[E] 打招呼  [F] 请客 · ' + (rProfile.name || '居民') + ' (' + rTier.icon + ' ' + rTier.name + ')');
       }
     }else if(s.nearBed){
       /* #66 床边睡眠: 优先于发射台提示 */
@@ -1508,6 +1519,54 @@ window.APH = window.APH || {};
       APH.UI.floatText('🏥 躺进医疗舱','#8fd4ff');
       return true;
     }
+    if(s.scene==='home' && s.nearBrokenResident){
+      var targetRes = s.nearBrokenResident.resident;
+      var counselor = { id:'player', name:'指挥官', skills:{ sk_social: 4 } };
+      var rngFn = (s._interventionRng) || Math.random;
+      var bRes = APH.Res.attemptIntervention(targetRes, counselor, rngFn, s.meta.bonds);
+      if(bRes.success){
+        s.nearBrokenResident.entity.socialBubble = '❤️';
+        var pe = APH.Ent.findPlayer();
+        if(pe) pe.socialBubble = '😊';
+        APH.UI.floatText('✔ ' + bRes.text, '#7dffab');
+      } else if(bRes.retaliate){
+        s.nearBrokenResident.entity.socialBubble = '💢';
+        var pe2 = APH.Ent.findPlayer();
+        if(pe2) pe2.socialBubble = '⚡';
+        s.hp = Math.max(1, s.hp - 8);
+        APH.UI.floatText('⚡ ' + bRes.text + ' (生命 -8)', '#ff6d7a');
+      } else {
+        s.nearBrokenResident.entity.socialBubble = '💬';
+        APH.UI.floatText(bRes.text, '#8fa3cc');
+      }
+      saveMetaQuiet();
+      return true;
+    }
+    if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
+      tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene==='home' && s.nearResident && !s.nearBrokenResident && !s.nearBed && !s.nearClinic && !s.nearPad){
+      var normRes = residentOf(s.nearResident);
+      if(normRes){
+        s.greetCooldowns = s.greetCooldowns || {};
+        var nowS = s.clock || 0;
+        var lastGreet = s.greetCooldowns[normRes.id] || 0;
+        var greetCd = (CFG.social && CFG.social.greetCooldown) || 60;
+        if(nowS - lastGreet < greetCd){
+          APH.UI.floatText('刚刚才向 ' + normRes.name + ' 打过招呼', '#8fa3cc');
+        } else {
+          s.greetCooldowns[normRes.id] = nowS;
+          APH.Res.applyBond(s.meta.bonds || (s.meta.bonds={}), 'player', normRes.id, (CFG.social && CFG.social.greetBondGain) || 2);
+          s.nearResident.socialBubble = '😊';
+          var peG = APH.Ent.findPlayer();
+          if(peG) peG.socialBubble = '😊';
+          APH.UI.floatText('向 ' + normRes.name + ' 热情地打了招呼 (+好感)', '#8fd4ff');
+          saveMetaQuiet();
+        }
+        return true;
+      }
+    }
     if(s.scene==='home' && s.nearFood){
       tryPlayerEatNearFood();
       return true;
@@ -1530,6 +1589,10 @@ window.APH = window.APH || {};
   function onSecondaryInteract(){
     var s=APH.state;
     if(s.mode!=='running' || s.scene!=='home' || playerDowned() || playerSleeping()) return false;
+    if(s.nearResident){
+      tryOfferMealToResident(s.nearResident);
+      return true;
+    }
     if(s.nearVisitor){
       tryOfferMeal(s.nearVisitor);
       return true;
@@ -2799,6 +2862,10 @@ window.APH = window.APH || {};
     var r=(CFG.visitor && CFG.visitor.recruitR)||54;
     return APH.Ent.findNearest(s.entities, T.VISITOR, s.px, s.py, r);
   }
+  function nearestResident(s){
+    var r=(CFG.visitor && CFG.visitor.recruitR)||54;
+    return APH.Ent.findNearest(s.entities, T.RESIDENT, s.px, s.py, r);
+  }
   function spawnVisitor(at, over){
     var s=APH.state;
     s.meta.residentSeq=(s.meta.residentSeq||0)+1;
@@ -2889,6 +2956,27 @@ window.APH = window.APH || {};
       impression: vis && vis.impression!=null ? vis.impression : start
     };
   }
+  function tryOfferMealToResident(ent){
+    var s=APH.state;
+    if(!ent || ent.dead) return false;
+    var r = residentOf(ent);
+    if(!r) return false;
+    var need = (CFG.recruit && CFG.recruit.mealCost) || 2;
+    if(haveStock('food') < need){
+      APH.UI.floatText('✕ 粮食不足，无法请客', '#ff9a9a');
+      return false;
+    }
+    APH.Colony.takeStock(s.meta.res, s.entities, 'food', need);
+    APH.Res.applyBond(s.meta.bonds || (s.meta.bonds={}), 'player', r.id, 8);
+    r.mood = Math.min(100, (r.mood || 70) + 12);
+    ent.socialBubble = '❤️';
+    var pe = APH.Ent.findPlayer();
+    if(pe) pe.socialBubble = '😊';
+    APH.UI.floatText('请 ' + r.name + ' 吃了顿便饭 (-' + need + '粮 · +好感 +心情)', '#ffd54f');
+    saveMetaQuiet();
+    return true;
+  }
+
   function tryOfferMeal(ent){
     var s=APH.state;
     if(!ent || ent.dead) return false;
@@ -3398,6 +3486,8 @@ window.APH = window.APH || {};
       if(playerSleeping()){
         APH.Res.playerWake(s.meta.playerNeeds);
         syncPlayerSleep();
+      }else if(s.scene==='home' && s.nearBrokenResident){
+        onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearBed){
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
         syncPlayerSleep();
@@ -3409,11 +3499,17 @@ window.APH = window.APH || {};
       }else if(s.scene==='home' && s.nearClinic && playerSick()){
         APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true, 'bed_med');
         syncPlayerSleep();
+      }else if(s.scene==='home' && s.nearFood && playerFood() < foodEatBelow()){
+        tryPlayerEatNearFood();
+      }else if(s.scene==='home' && s.nearResident && !s.nearBed && !s.nearClinic && !s.nearPad){
+        onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearFood){
         tryPlayerEatNearFood();
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
-      else onPlayerInteract(true);
+      else if(s.scene==='home' && s.nearResident && !s.nearFood && !s.nearBed && !s.nearClinic && !s.nearPad){
+        onPlayerInteract(true);
+      }else onPlayerInteract(true);
       document.title='DBG E@'+s.scene+' nearPad='+s.nearPad;
     },
     guardTrim:guardTrim,

@@ -2638,5 +2638,53 @@ test('#106 diplomacy: 通商协定签署并生效', () => {
   }
 });
 
+test('#132 social: 靠近正常居民按 E 热情打招呼', () => {
+  const oldScene = S.scene, oldResidents = S.meta.residents, oldEntities = S.entities;
+  try {
+    S.scene = 'home'; S.mode = 'running';
+    APH.Res.ensurePlayerNeeds(S.meta);
+    S.meta.playerNeeds.isSleeping = false;
+    S.meta.playerNeeds.downed = false;
+    S.meta.residents = [{ id: 'rs_g1', name: '小满', skills: {}, mood: 70, food: 80 }];
+    S.meta.bonds = {};
+    S.greetCooldowns = {};
+    S.entities = [{ type: T.RESIDENT, id: 'rs_g1', x: S.px + 20, y: S.py, dead: false }];
+    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
+    M.updateHome(0.016);
+    A(S.nearResident, '走近居民应判定 nearResident');
+    A(!S.nearBrokenResident, '正常居民不应判定 nearBrokenResident');
+    M.debugPressE();
+    A(S.meta.bonds['player|rs_g1'] === 52, '打招呼应 +2 好感, got ' + S.meta.bonds['player|rs_g1']);
+    A(S.entities[0].socialBubble === '😊', '居民头顶应浮现微笑微气泡');
+  } finally {
+    S.scene = oldScene; S.meta.residents = oldResidents; S.entities = oldEntities;
+  }
+});
+
+test('#132 social: 靠近崩溃居民按 E 安抚情绪解除崩溃', () => {
+  const oldScene = S.scene, oldResidents = S.meta.residents, oldEntities = S.entities;
+  try {
+    S.scene = 'home'; S.mode = 'running';
+    APH.Res.ensurePlayerNeeds(S.meta);
+    S.meta.playerNeeds.isSleeping = false;
+    S.meta.playerNeeds.downed = false;
+    S._interventionRng = () => 0.1;
+    S.meta.residents = [{ id: 'rs_brk1', name: '暴躁阿岚', skills: {}, mood: 20, food: 80, breakType: 'wander', breakT: 2 }];
+    S.meta.bonds = { 'player|rs_brk1': 60 };
+    S.entities = [{ type: T.RESIDENT, id: 'rs_brk1', x: S.px + 20, y: S.py, dead: false }];
+    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
+    M.updateHome(0.016);
+    A(S.nearBrokenResident, '靠近崩溃居民应判定 nearBrokenResident');
+    M.debugPressE();
+    A(S.meta.residents[0].breakType === null, '安抚后 breakType 应清空');
+    A(S.meta.residents[0].breakT === 0, '安抚后 breakT 应归零');
+    A(S.meta.residents[0].mood >= 30, '安抚后心情应获得开导增益, got ' + S.meta.residents[0].mood);
+    A(S.meta.bonds['player|rs_brk1'] === 66, '安抚后好感应 +6, got ' + S.meta.bonds['player|rs_brk1']);
+  } finally {
+    delete S._interventionRng;
+    S.scene = oldScene; S.meta.residents = oldResidents; S.entities = oldEntities;
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 process.exit(fail?1:0);
