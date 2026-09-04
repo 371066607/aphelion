@@ -863,3 +863,10 @@
   - **远征破袭联动**：`combat.js: raidBaseSuccess` 真正对归属敌对势力施加战略重创并写盘。
   - **验证**：`rivals.test.js` 新增 11 个外交纯函数单元测试（全量 631 绿）；`scenario.test.js` 新增 5 个外交链路场景测试（全量 114 绿）；`perf` 4 绿；`boss` 7 绿；构建 36466KB 成功。
   - **关闭票据**：Issue #104 (D1), #105 (D2), #106 (D3), #107 (D4), #103 (Spec) 全部完成。
+
+- **2026-09-04 · 架构深模块重构第一期：UI 模态生命周期收拢至深 UI 模块（#108~#112）**:
+  - **ADR-0009 / ADR-18 落盘**：解决 `src/main.js` 高达 4,305 行的膨胀问题，将 6 大全屏与抽屉面板（图鉴、科技树、LLM设置、外星势力外交、游商交易、居民名册、建造目录）的 DOM 渲染、状态控制与按键拦截全部收拢至 `src/ui.js`（`APH.UI` 深模块）。
+  - **核心接缝与状态机不变量（`APH.UI`）**：对外提供 `registerModal`, `open`, `close`, `toggle`, `closeActive`, `hasActiveModal`, `getActiveModal`；全屏阻断型模态（`isOverlay: true`）自动保存前序 `state.mode` 并挂起游戏主循环（`paused`），关闭时自动恢复，防止弹窗期间基地被偷；抽屉型模态（`buildCatalog`）不阻断主循环；Esc 键全局统一为一行 `APH.UI.closeActive()`，根除 20 余行级联判空。
+  - **main.js 深度瘦身**：`src/main.js` 从 4,305 行削减至 3,610 行（物理净减约 700 行），消灭了大量重复内联 DOM 代码，各面板均改走高阶语义接缝。
+  - **验证**：编写独立测试 `tests/ui_modals.test.js`（40 个生命周期与不变量测试全部通过）；`tests/run.js` 631 单元测试全绿；`tests/scenario.test.js` 114 场景全链路全绿；`perf.test.js` 4 绿；`boss.test.js` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
+  - **关闭票据**：Issue #109 (M1), #110 (M2), #111 (M3), #112 (M4), #108 (Spec) 全部完成交付。

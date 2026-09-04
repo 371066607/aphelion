@@ -243,6 +243,13 @@
 - JOURNAL 追加（时间戳/做了什么/验证证据/下一步）
 - BACKLOG 勾选 + GitHub issue 认领（如开票）
 
+## 架构深模块重构 · 第一期（2026-09-04，Spec #108 / ADR-18）
+
+- [x] **M1** 建立 APH.UI 模态管理器与通用生命周期接缝 (#109)：`registerModal, open, close, toggle, closeActive, hasActiveModal` + 自动暂停/恢复 + 35 个单测通过
+- [x] **M2** 图鉴、科技树与设置面板迁移至 APH.UI (#110)：`codex`, `techMap`, `llmSettings` 迁移，`main.js` 改走高阶接缝
+- [x] **M3** 势力外交与游商交易面板迁移至 APH.UI (#111)：`diplomacy`, `trade` 迁移，纳贡/通商/威慑/买卖逻辑内聚
+- [x] **M4** 居民名册与建造抽屉迁移 + main.js 深度瘦身与全量回归 (#112)：`roster`, `buildCatalog` 迁移，Esc 键收敛为一行 `APH.UI.closeActive()`，`main.js` 削减 700 行代码，全量测试 100% 绿灯
+
 ## 已知不做（用户红线）
 
 - 不做文字聊天型玩法、不回退 3D、不引入"重生"叙事

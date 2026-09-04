@@ -1884,13 +1884,9 @@ window.APH = window.APH || {};
             APH.Colony.get(s.buildMode).cost+'研 / '+(APH.Colony.get(s.buildMode).costMineral||0)+'矿)'
           : '建造模式关闭');
       }
-      if(e.code==='Escape'&&s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
       if(e.code==='Escape'){
-        if(techMapOpen()) toggleTechMap(false);
-        var tpE=document.getElementById('tradePanel');
-        if(tpE && tpE.style.display!=='none') toggleTradePanel(false);
-        var dipE=document.getElementById('diplomacyOverlay');
-        if(dipE && dipE.style.display!=='none') toggleDiplomacy(false);
+        if(s.buildMode){ s.buildMode=null; APH.UI.setHint(''); }
+        if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return;
       }
       if(e.code==='KeyM'){ var m=APH.SFX.toggleMute();
         APH.UI.floatText(m?'🔇 静音':'🔊 音效开启','#8fa3cc'); }
@@ -2433,18 +2429,17 @@ window.APH = window.APH || {};
     if(el) el.style.display='none';
   }
   function closeColonyOverlays(keep){
+    if(APH.UI && APH.UI.close && APH.UI.isOpen){
+      ['techMap', 'codex', 'roster', 'diplomacy', 'trade', 'buildCatalog'].forEach(function(mId){
+        if(mId !== keep && APH.UI.isOpen(mId)) APH.UI.close(mId);
+      });
+      return;
+    }
     if(keep!=='techMap') hideOverlay('techMap');
     if(keep!=='codex') hideOverlay('codex');
     if(keep!=='resPanel') hideOverlay('resPanel');
     if(keep!=='diplomacy') hideOverlay('diplomacyOverlay');
-    if(keep!=='buildRow'){
-      var row=document.getElementById('buildRow');
-      if(row) row.style.display='none';
-    }
-    if(keep!=='trade'){
-      var tp=document.getElementById('tradePanel');
-      if(tp && tp.style.display!=='none') toggleTradePanel(false);
-    }
+    if(keep!=='buildRow') hideOverlay('buildRow');
   }
   function techMapOpen(){
     return APH.UI && APH.UI.isOpen ? APH.UI.isOpen('techMap') : !overlayClosed(document.getElementById('techMap'));
@@ -2509,78 +2504,22 @@ window.APH = window.APH || {};
     if(APH.UI && APH.UI.doDeterRival) return APH.UI.doDeterRival(rIdx);
   }
 
-  /* ================= Task6: 建造目录(左入口+底部row) ================= */
+  /* ================= Task6: 建造目录 (委托 APH.UI 深模块, ADR-18) ================= */
   function toggleBuildRow(force){
-    var btn=document.getElementById('buildBtn');
-    var row=document.getElementById('buildRow');
-    if(!btn||!row) return;
-    var willShow = (force===true) ? true : (force===false) ? false : overlayClosed(row);
-    if(willShow) closeColonyOverlays('buildRow');
-    row.style.display = willShow?'':'none';
-    if(willShow) renderBuildRow();
+    if(APH.UI && APH.UI.toggle){
+      if(force !== undefined) return force ? APH.UI.open('buildCatalog') : APH.UI.close('buildCatalog');
+      return APH.UI.toggle('buildCatalog');
+    }
   }
   function renderBuildRow(){
-    var s=APH.state;
-    document.getElementById('brResearch').textContent='研究点 '+s.meta.research;
-    var bm=document.getElementById('brMineral');
-    if(bm){
-      var r=s.meta.res||{};
-      bm.textContent='木 '+(r.wood||0)+' · 铁 '+(r.iron||r.mineral||0)+' · 石 '+(r.stone||0);
-    }
-    var qEl=document.getElementById('brQueue');
-    if(s.colony.buildQueue&&s.colony.buildQueue.length){
-      var q0=s.colony.buildQueue[0];
-      var remain=Math.ceil((q0.total||0)*(1-(q0.progress||0)));
-      qEl.textContent='施工中 '+s.colony.buildQueue.length+' 项 · '+remain+'s';
-    }else qEl.textContent='';
-    var grid=document.getElementById('brCards');
-    grid.innerHTML='';
-    var colors=['#82d5bb','#f7cd67','#e59266','#889df0','#fc736d','#8ac68a','#b77dee','#d1da49','#e18c6f'];
-    var i=0;
-    Object.keys(APH.Colony.list()).forEach(function(bid){
-      if(bid==='bl_landing_pad') return;
-      var def=APH.Colony.get(bid);
-      var nBuilt=s.colony.buildings.filter(function(b){return b.id===bid;}).length;
-      var nQueued=(s.colony.buildQueue||[]).filter(function(q){return q.bid===bid;}).length;
-      var n=nBuilt+nQueued;
-      var check=APH.Colony.canPlace(s.colony.buildings, s.meta.tech, bid, s.px, s.py, s.meta.res);
-      var ok=check.ok && n<def.max;
-      var costRes=def.costRes||{};
-      var costPills=Object.keys(costRes).map(function(k){
-        var itName=(CFG.items[k]&&CFG.items[k].name)?CFG.items[k].name:k;
-        return '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;'+
-          'padding:1px 7px;font-size:10px;margin-right:3px">'+costRes[k]+itName+'</span>';
-      }).join('');
-      var reqTag=def.reqTech&&(!s.meta.tech||!s.meta.tech[def.reqTech])
-        ? '<div style="color:#ff6d7a;font-size:10px;margin-top:2px">[需研: '+(APH.Colony.TECHS[def.reqTech]?APH.Colony.TECHS[def.reqTech].name:def.reqTech)+']</div>'
-        : '';
-      var card=document.createElement('div');
-      card.style.cssText='flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:'+
-        (ok?'pointer':'not-allowed')+';opacity:'+(ok?1:.55)+';background:'+colors[i%colors.length]+
-        ';border:2px solid #fff;box-shadow:0 3px 8px rgba(61,52,40,.12);transition:transform .25s cubic-bezier(.4,0,.2,1)';
-      card.innerHTML='<b style="color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(61,52,40,.35)">'+
-        def.name+'</b><span style="float:right;color:#fff;font-size:10px">'+n+'/'+def.max+'</span><br>'+
-        '<div style="margin-top:4px">'+costPills+'</div>'+
-        reqTag+
-        '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;'+
-        'padding:1px 8px;font-size:10px;margin-top:4px">'+def.buildTime+'s</span>'+
-        ((def.cells&&def.cells[0]>1)?'<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;'+
-          'border-radius:50px;padding:1px 7px;font-size:10px;margin-left:3px">'+def.cells[0]+'×'+def.cells[1]+'</span>':'');
-      if(ok){
-        card.addEventListener('click',function(){
-          s.buildMode=bid;
-          toggleBuildRow(false);                 // 收起row, 进入放置
-          APH.UI.setHint('建造: '+def.name+' — 点击空地放置');
-        });
-        card.addEventListener('mouseover',function(){card.style.transform='translateY(-2px)';});
-        card.addEventListener('mouseout',function(){card.style.transform='';});
-      }
-      grid.appendChild(card);
-      i++;
-    });
+    if(APH.UI && APH.UI.renderBuildRow) return APH.UI.renderBuildRow();
   }
 
   /* ================= C: 游商交易面板 (委托 APH.UI 深模块, ADR-18) ================= */
+  function currentTrader(){
+    var s=APH.state;
+    return (s && s.nearVisitor && s.nearVisitor.trade && !s.nearVisitor.dead) ? s.nearVisitor : null;
+  }
   function toggleTradePanel(force){
     if(APH.UI && APH.UI.toggle){
       if(force !== undefined) return force ? APH.UI.open('trade') : APH.UI.close('trade');
@@ -2597,174 +2536,21 @@ window.APH = window.APH || {};
     if(APH.UI && APH.UI.moveTradeSel) return APH.UI.moveTradeSel(code);
   }
 
-  /* ================= U8 居民名册 ================= */
-  function toggleResPanel(){
-    var el=document.getElementById('resPanel');
-    if(!el) return;
-    var show=overlayClosed(el);
-    if(show) closeColonyOverlays('resPanel');
-    el.style.display=show?'':'none';
-    if(show) renderResPanel();
+  /* ================= U8 居民名册 (委托 APH.UI 深模块, ADR-18) ================= */
+  function toggleResPanel(show){
+    if(APH.UI && APH.UI.toggle){
+      if(show !== undefined) return show ? APH.UI.open('roster') : APH.UI.close('roster');
+      return APH.UI.toggle('roster');
+    }
   }
-  function moodFace(m){
-    return m>=75?'😊':(m>=50?'😐':(m>=30?'😟':'😭'));
-  }
-  function foodBar(f){
-    var col=f>=60?'#7dffab':(f>=35?'#ffc857':'#ff6d7a');
-    return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;'+
-           'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
-           Math.max(0,Math.min(100,f))+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f||0);
-  }
-  function sickBar(f){
-    f=f||0;
-    var col=f>=50?'#ff6d7a':(f>=20?'#ffc857':'#7dffab');
-    return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;'+
-           'border-radius:3px;vertical-align:middle"><span style="display:block;height:100%;width:'+
-           Math.max(0,Math.min(100,f))+'%;background:'+col+';border-radius:3px"></span></span> '+Math.round(f);
-  }
-  /* ---- D: 工作优先级网格(方向键选格 / 0~3 设值) ---- */
-  function prioCursor(){
-    var s=APH.state;
-    if(!s.prioSel) s.prioSel={r:0,c:0};
-    return s.prioSel;
+  function renderResPanel(){
+    if(APH.UI && APH.UI.renderResPanel) return APH.UI.renderResPanel();
   }
   function movePrioCursor(code){
-    var s=APH.state, m=s.meta;
-    var cur=prioCursor();
-    var rows=(m.residents||[]).length, cols=APH.Res.SKILLS.length;
-    if(!rows) return;
-    cur.r=Math.min(cur.r, rows-1);
-    if(code==='ArrowUp') cur.r=(cur.r+rows-1)%rows;
-    if(code==='ArrowDown') cur.r=(cur.r+1)%rows;
-    if(code==='ArrowLeft') cur.c=(cur.c+cols-1)%cols;
-    if(code==='ArrowRight') cur.c=(cur.c+1)%cols;
-    s.resSel=cur.r;
-    renderResPanel();
+    if(APH.UI && APH.UI.movePrioCursor) return APH.UI.movePrioCursor(code);
   }
   function setPrioAtCursor(v){
-    var s=APH.state, m=s.meta;
-    var cur=prioCursor();
-    var r=(m.residents||[])[cur.r];
-    if(!r) return;
-    m.workPrio=m.workPrio||{};
-    if(!m.workPrio[r.id]) m.workPrio[r.id]=APH.Res.defaultPrio(r);
-    var sk=APH.Res.SKILLS[cur.c];
-    m.workPrio[r.id][sk]=U.clamp(v,0,3);
-    r.jobLocked=false;                     // 改优先级 = 交还自动调度
-    saveMetaQuiet();
-    renderResPanel();
-    APH.UI.floatText(r.name+' · '+APH.Res.SKILL_NAMES[sk]+' 优先级 → '+v,'#8fd4ff');
-  }
-  var PRIO_COLOR=['#39435c','#ffc857','#cdd9f5','#5d6f96'];
-  var PRIO_LABEL=['禁','优','普','闲'];
-  function prioGridHtml(m){
-    var s=APH.state;
-    var cur=prioCursor();
-    var wp=m.workPrio||{};
-    var html='<div style="margin-bottom:14px">'+
-      '<div style="color:#ffc857;margin-bottom:4px">工作优先级 · 方向键选格, 数字 0~3 设值 '+
-      '<span style="color:#5d6f96">(0禁止 1优先 2普通 3闲时; 列头亮=技能高)</span></div>'+
-      '<table style="border-collapse:collapse;font-size:11px"><tr><td></td>';
-    APH.Res.SKILLS.forEach(function(sk){
-      html+='<td style="padding:2px 7px;color:#8fa3cc">'+APH.Res.SKILL_NAMES[sk]+'</td>';
-    });
-    html+='</tr>';
-    (m.residents||[]).forEach(function(r, ri){
-      html+='<tr><td style="padding:2px 7px;color:'+((s.resSel||0)===ri?'#ffc857':'#cdd9f5')+'">'+
-        esc(r.name)+'</td>';
-      var p=wp[r.id]||APH.Res.defaultPrio(r);
-      APH.Res.SKILLS.forEach(function(sk, ci){
-        var v=p[sk]!=null?p[sk]:2;
-        var lv=(r.skills&&r.skills[sk])||0;
-        var isCur=(cur.r===ri && cur.c===ci);
-        var bg=lv>=6?'rgba(125,255,171,.16)':(lv>=3?'rgba(125,255,171,.07)':'transparent');
-        html+='<td style="padding:2px 0;text-align:center"><span style="display:inline-block;'+
-          'width:30px;border-radius:4px;padding:1px 0;background:'+bg+';color:'+PRIO_COLOR[v]+';'+
-          'border:1px solid '+(isCur?'#ffc857':'#1a2334')+';'+
-          (v===0?'text-decoration:line-through;':'')+'">'+
-          v+PRIO_LABEL[v]+'</span></td>';
-      });
-      html+='</tr>';
-    });
-    html+='</table></div>';
-    return html;
-  }
-
-  function renderResPanel(){
-    var s=APH.state, m=s.meta;
-    var body=document.getElementById('resBody'); if(!body) return;
-    document.getElementById('resFood').textContent=panelStock('food');
-    var rm=document.getElementById('resMineral');
-    if(rm) rm.textContent=panelStock('mineral');
-    document.getElementById('resLeather').textContent=panelStock('leather');
-    var rmd=document.getElementById('resMed');
-    if(rmd) rmd.textContent=panelStock('med');
-    document.getElementById('resPop').textContent=m.residents.length+'/'+housingCap();
-    if(!m.residents.length){
-      body.innerHTML='<div style="color:#39435c;margin-top:40px;text-align:center">'+
-        '殖民地还没有居民。<br>过客会来拜访家园，走近他们按 [E] 招募。</div>';
-      return;
-    }
-    var html=prioGridHtml(m);
-    m.residents.forEach(function(r, idx){
-      var skHtml = APH.Res.SKILLS.map(function(sk){
-        var v=(r.skills&&r.skills[sk])||0;
-        var col = sk===r.mainSkill?'#ffc857':(sk===r.subSkill?'#8fd4ff':'#39435c');
-        return '<span style="color:'+col+'">'+APH.Res.SKILL_NAMES[sk]+v+'</span>';
-      }).join(' · ');
-      var jobTxt=r.job?(APH.Colony.get(r.job)||{}).name||r.job:(r.mainSkill==='sk_farm'?'待岗(适合务农)':'闲居');
-      var sel=(s.resSel||0)===idx;
-      var brkTag=(APH.Res.isBroken&&APH.Res.isBroken(r))
-        ? ' <span style="color:#ff6d7a;font-weight:700">[崩溃·'+
-          (APH.Res.BREAK_NAMES[r.breakType]||r.breakType)+']</span>' : '';
-      html+='<div style="border:1px solid '+(sel?'#ffc857':'#1a2334')+';border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#0c1220">'+
-        '<b style="font-size:13px">'+(idx+1)+'. '+r.name+'</b>'+brkTag+
-        ' <span style="color:#8fa3cc;font-size:11px">'+moodFace(r.mood)+' '+r.trait+
-        ' · '+r.origin+(r.job?' · <span style="color:#8fd4ff">'+jobTxt+' (效率'+APH.Res.efficiency(r)+')</span>'
-         :' · '+jobTxt)+'</span><br>'+
-        '<span style="color:#5d6f96;font-size:11px">'+skHtml+'</span><br>'+
-        (r.bio?'<div style="color:#6f83ad;font-size:11px;margin-top:4px;border-left:2px solid #1a2334;padding-left:8px">'+esc(r.bio)+'</div>':'')+
-        '<div style="margin-top:4px;font-size:11px">'+
-        '心情 '+foodBar(r.mood)+'&nbsp;&nbsp;饱食 '+foodBar(r.food)+
-        '&nbsp;&nbsp;精力 '+foodBar(r.rest!=null?r.rest:100)+(r.isSleeping?' <span style="color:#8fd4ff">💤[睡眠]</span>':'')+
-        '&nbsp;&nbsp;娱乐 '+foodBar(r.recreation!=null?r.recreation:80)+
-        (r.exposure>0 ? ('&nbsp;&nbsp;<span style="color:#ffb35c">暴露 '+sickBar(r.exposure)+'</span>') : '')+
-        '&nbsp;&nbsp;病情 '+sickBar(r.illness||0)+
-        /* 深度生存: 击倒状态与三维机能 */
-        (r.downed ? ' <span style="color:#ff4757;font-weight:700">[🚨 击倒 · 濒死 '+Math.max(0,Math.round(r.bleedOutTimer||0))+'s]</span>' : '')+
-        /* F: 病症分型标签(疫病红/感染橙/外伤灰) */
-        (r.ailments&&r.ailments.length
-          ? ' <span style="font-size:11px">'+r.ailments.map(function(a){
-              var col=a.type==='plague'?'#ff6d7a':(a.type==='infection'?'#ffb35c':'#8fa3cc');
-              return '<span style="color:'+col+'">['+
-                (APH.Res.AILMENT_NAMES[a.type]||a.type)+' '+Math.round(a.sev)+']</span>';
-            }).join(' ')+'</span>'
-          : '')+
-        '</div>'+
-        (function(){
-          var cap=APH.Res.capacitiesOf(r);
-          return '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">'+
-            '机能: 移动 '+Math.round(cap.moving*100)+'% · 操作 '+Math.round(cap.manipulation*100)+'% · 认知 '+Math.round(cap.consciousness*100)+'%'+
-            (r.bedId ? (' · <span style="color:#7dffab">床位['+r.bedId+']</span>') : ' · <span style="color:#ffb35c">露宿打地铺</span>')+
-            '</div>';
-        })()+
-        '</div>';
-    });
-    /* 关系摘要 */
-    if(m.bonds && Object.keys(m.bonds).length){
-      html+='<div style="margin-top:14px;color:#ffc857">人际关系</div>';
-      Object.keys(m.bonds).forEach(function(k){
-        var v=Math.round(m.bonds[k]);
-        var names=k.split('|').map(function(id){
-          var r=m.residents.find(function(x){return x.id===id;});
-          return r?r.name:'?';
-        });
-        var tag=v>=70?'挚友':(v>=55?'友好':(v>=40?'平淡':(v>=25?'疏远':'敌视')));
-        var col=v>=70?'#7dffab':(v>=40?'#8fa3cc':'#ff6d7a');
-        html+='<div style="color:'+col+'">'+names[0]+' ↔ '+names[1]+' : '+tag+' ('+v+')</div>';
-      });
-    }
-    body.innerHTML=html;
+    if(APH.UI && APH.UI.setPrioAtCursor) return APH.UI.setPrioAtCursor(v);
   }
 
   function cycleSelectedJob(){

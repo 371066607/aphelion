@@ -148,5 +148,23 @@ assert('关闭未知模态返回 false 且不崩溃', UI.close('unknown_modal') 
 UI.registerModal('missingDomModal', { elId: 'nonExistentId', isOverlay: true });
 assert('DOM 节点不存在时 open 安全返回 false', UI.open('missingDomModal') === false);
 
+// 9. 默认 6 大核心模态注册就绪
+createStubElement('codex');
+createStubElement('techMap');
+createStubElement('diplomacyOverlay');
+createStubElement('buildRow');
+createStubElement('resPanel');
+
+assert('codex 默认已注册并能打开', UI.open('codex') === true);
+UI.close('codex');
+assert('techMap 默认已注册并能打开', UI.open('techMap') === true);
+UI.close('techMap');
+assert('diplomacy 默认已注册并能打开', UI.open('diplomacy') === true);
+UI.close('diplomacy');
+assert('buildCatalog 默认已注册并能打开', UI.open('buildCatalog') === true);
+UI.close('buildCatalog');
+assert('roster 默认已注册并能打开', UI.open('roster') === true);
+UI.close('roster');
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);
