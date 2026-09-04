@@ -1165,8 +1165,145 @@ APH.Ent = (function(){
     });
   }
 
+  /* ================= 空间检索与生命周期接缝 (ADR-20) ================= */
+  function getEntitiesList(list){
+    if(list && Array.isArray(list)) return list;
+    if(window.APH && window.APH.state && Array.isArray(window.APH.state.entities)){
+      return window.APH.state.entities;
+    }
+    return [];
+  }
+
+  function findNearest(entities, type, x, y, maxRadius, predicate){
+    var list = getEntitiesList(entities);
+    var best = null;
+    var bestDist = (maxRadius != null && maxRadius > 0) ? maxRadius : Infinity;
+
+    for(var i = 0; i < list.length; i++){
+      var e = list[i];
+      if(!e || e.dead) continue;
+      if(type && e.type !== type) continue;
+      var d = U.dst(x, y, e.x, e.y);
+      if(d < bestDist){
+        if(!predicate || predicate(e, d)){
+          bestDist = d;
+          best = e;
+        }
+      }
+    }
+    return best;
+  }
+
+  function findNearestBuilding(entities, bid, x, y, maxRadius, predicate){
+    var list = getEntitiesList(entities);
+    var isArr = Array.isArray(bid);
+    return findNearest(list, T.BUILDING, x, y, maxRadius, function(e, d){
+      if(!e.bid) return false;
+      if(isArr){
+        if(bid.indexOf(e.bid) < 0) return false;
+      } else {
+        if(e.bid !== bid) return false;
+      }
+      return !predicate || predicate(e, d);
+    });
+  }
+
+  function findNearestFood(entities, x, y, maxRadius, warehouseFoodStock, stockpileSpot){
+    var list = getEntitiesList(entities);
+    var rMax = (maxRadius != null && maxRadius > 0) ? maxRadius : 60;
+    var bestCooked = null, bestCookedD = rMax;
+    var bestRaw = null, bestRawD = rMax;
+
+    var items = (CFG && CFG.items) || {};
+
+    for(var i = 0; i < list.length; i++){
+      var p = list[i];
+      if(!p || p.dead || p.type !== T.DROPPED) continue;
+      var it = items[p.itemId];
+      if(!it || it.store !== 'food') continue;
+      var d = U.dst(x, y, p.x, p.y);
+      if(d < rMax){
+        if(it.isCooked){
+          if(d < bestCookedD){
+            bestCookedD = d;
+            bestCooked = { entity: p, itemId: p.itemId, isCooked: true };
+          }
+        } else {
+          if(d < bestRawD){
+            bestRawD = d;
+            bestRaw = { entity: p, itemId: p.itemId, isCooked: false };
+          }
+        }
+      }
+    }
+
+    if(bestCooked) return bestCooked;
+    if(bestRaw) return bestRaw;
+
+    // 仓库兜底判定
+    if(warehouseFoodStock && warehouseFoodStock > 0){
+      var wh = null;
+      for(var j = 0; j < list.length; j++){
+        var b = list[j];
+        if(b && !b.dead && b.type === T.BUILDING && b.bid === 'bl_warehouse'){
+          wh = b;
+          break;
+        }
+      }
+      var targetSpot = wh ? { x: wh.x, y: (wh.y || 0) + 18 } : stockpileSpot;
+      if(targetSpot && U.dst(x, y, targetSpot.x, targetSpot.y) < rMax){
+        return { isWarehouse: true };
+      }
+    }
+
+    return null;
+  }
+
+  function findAll(entities, type, predicate){
+    var list = getEntitiesList(entities);
+    var res = [];
+    for(var i = 0; i < list.length; i++){
+      var e = list[i];
+      if(!e || e.dead) continue;
+      if(type && e.type !== type) continue;
+      if(!predicate || predicate(e)){
+        res.push(e);
+      }
+    }
+    return res;
+  }
+
+  function destroy(entity){
+    if(!entity) return false;
+    if(typeof entity === 'string'){
+      var list = getEntitiesList();
+      for(var i = 0; i < list.length; i++){
+        if(list[i] && list[i].id === entity){
+          list[i].dead = true;
+          return true;
+        }
+      }
+      return false;
+    }
+    entity.dead = true;
+    return true;
+  }
+
+  function sweepDead(entities){
+    var list = getEntitiesList(entities);
+    var out = [];
+    for(var i = 0; i < list.length; i++){
+      var e = list[i];
+      if(!e) continue;
+      if(!e.dead || e.type === T.PLAYER){
+        out.push(e);
+      }
+    }
+    return out;
+  }
+
   /* 建筑绘制(殖民地/远征通用) */
-    return {
+  return {
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
@@ -1175,5 +1312,11 @@ APH.Ent = (function(){
     drawBuilding:drawBuilding, drawFlora:drawFlora,
     drawWalls:drawWalls,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
+    findNearest:findNearest,
+    findNearestBuilding:findNearestBuilding,
+    findNearestFood:findNearestFood,
+    findAll:findAll,
+    destroy:destroy,
+    sweepDead:sweepDead
   };
 })();

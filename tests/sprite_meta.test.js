@@ -86,7 +86,8 @@ function measureFrame0(pngPath) {
 
 /* 权威测量: 调 build_sprites.py 解析其输出的 SPRITE_META JSON (与真源完全同口径) */
 function authMeta() {
-  const out = execFileSync('python3', [path.join(ROOT, 'assets', 'build_sprites.py')], { encoding: 'utf8' });
+  const py = fs.existsSync('/usr/bin/python3') ? '/usr/bin/python3' : 'python3';
+  const out = execFileSync(py, [path.join(ROOT, 'assets', 'build_sprites.py')], { encoding: 'utf8' });
   const idx = out.indexOf('SPRITE_META = ');
   if (idx < 0) throw new Error('build_sprites.py 未输出 SPRITE_META');
   return JSON.parse(out.slice(idx + 'SPRITE_META = '.length).trim());
