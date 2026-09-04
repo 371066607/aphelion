@@ -242,5 +242,16 @@ _Avoid_: 全局按键开关, 按键优先级锁
 脱离物理按键码（`e.code`）的游戏意图标号（如 `INTERACT`, `TOGGLE_DIPLOMACY`, `FIRE_PLASMA`），物理键通过配置表映射为此标号并派发。
 _Avoid_: 快捷键事件, 键盘宏
 
+### 实体与空间管理
+
+**Spatial Query / 空间检索**：
+通过 `APH.Ent` 提供的就近范围查找接口（如 `findNearest`, `findNearestBuilding`），以平面几何距离过滤并返回最近实体。
+_Avoid_: 范围碰撞器, 物理广播
+
+**Frame Sweep / 帧尾清洗**：
+在帧末尾由 `APH.Ent.sweepDead` 单点执行的死亡实体过滤机制，避免在中间遍历阶段直接 `splice` 产生下标跳位。
+_Avoid_: 垃圾回收, 析构器
+
+
 
 

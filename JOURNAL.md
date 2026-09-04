@@ -878,3 +878,10 @@
   - **main.js 进一步瘦身**：消灭了 300 余行基于 `e.code` 的嵌套分支，并统一了 `debugPressE` 调试接口。
   - **验证**：`tests/input.test.js` 4 个纯单元测试通过（入 `run.js`，全量 635 绿）；`ui_modals.test.js` 增至 42 绿；`scenario.test.js` 114 场景全绿；`perf` 4 绿；`boss` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
   - **关闭票据**：Issue #114 (I1), #115 (I2), #116 (I3), #117 (I4), #113 (Spec) 全部交付验收。
+
+- **2026-09-04 · 架构深模块重构第三期：深化实体集合与空间检索接缝（#118~#122）**:
+  - **ADR-0011 / ADR-20 落盘**：解决 `state.entities` 原生裸数组导致的 15+ 处重复手写距离计算与 9 处散落的裸 `filter/splice` 问题。
+  - **空间检索接缝（`APH.Ent`）**：对外提供 `findNearest`, `findNearestBuilding`, `findNearestFood`, `findAll`；主循环 `updateHome` 内部手写的 8 处建筑（工坊、农田、厨房、篝火、科研站、居住舱、医疗舱、发射台）及食物挑拣（熟食优先/粮堆/仓库兜底）全部收拢为一行接口调用。
+  - **安全销毁与帧尾清洗**：对外提供 `destroy(entity)`（打标 `dead = true`，杜绝遍历即时 splice 产生下标跳位隐患）与 `sweepDead(entities)`（单点收拢帧尾安全过滤，强制保护玩家实体永不被清除）。
+  - **验证**：`tests/entities.test.js` 4 个空间与生命周期纯单元测试通过（入 `run.js`，全量 639 绿）；`ui_modals.test.js` 42 绿；`scenario.test.js` 114 场景全绿；`perf` 4 绿；`boss` 7 绿；`python3 build.py` 构建自包含单文件 `game.html` 成功。
+  - **关闭票据**：Issue #119 (E1), #120 (E2), #121 (E3), #122 (E4), #118 (Spec) 全部交付验收。
