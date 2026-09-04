@@ -815,8 +815,8 @@ APH.Combat = (function(){
     /* 枪声衰减 */
     if(s.noiseT > 0) s.noiseT -= dt;
 
-    /* 清尸 */
-    s.entities = s.entities.filter(function(e){ return !e.dead || e.type===T.PLAYER; });
+    /* 清尸 (委托 APH.Ent, ADR-20) */
+    s.entities = (APH.Ent && APH.Ent.sweepDead) ? APH.Ent.sweepDead(s.entities) : s.entities.filter(function(e){ return !e.dead || e.type===T.PLAYER; });
   }
 
   function makeProj(x,y,vx,vy,side,dmg){
@@ -1097,7 +1097,7 @@ APH.Combat = (function(){
         if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
       }
     });
-    s.entities = s.entities.filter(function(e){ return e.type!==T.DROPPED || !e.dead; });
+    s.entities = (APH.Ent && APH.Ent.sweepDead) ? APH.Ent.sweepDead(s.entities) : s.entities.filter(function(e){ return e.type!==T.DROPPED || !e.dead; });
   }
 
   return {

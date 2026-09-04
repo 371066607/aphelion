@@ -2368,7 +2368,8 @@ test('#94 home: 敌人寻路绕开待触发陷阱 (不踩)', () => {
     S.colony.buildings=[{id:'bl_spike_trap', x:1000, y:1000, armed:true}];
     S.entities=[];
     /* 构造敌人在陷阱上方, 目标下方 (直线会穿过陷阱格) */
-    const en=window.APH.Ent.makeEnemy(S.spec.enemies.factions[0], 1000, 940);
+    const f0 = S.spec.enemies.factions[0] || { id:'fx_melee_test', name:'测试近战怪', behavior:'melee_swarm', gene:{hue:285,sides:5,limbs:6,size:1.0,spikes:3,eyes:2}, hp:30, speed:96, dmg:8, nightBoost:1 };
+    const en=window.APH.Ent.makeEnemy(f0, 1000, 940);
     en.hp=en.faction.hp;
     S.entities.push(en);
     /* 直接调 planChase 内部接口不可达(未导出), 用 updateCombat 驱动多帧观察是否绕行 */
@@ -2384,6 +2385,7 @@ test('#94 home: 敌人寻路绕开待触发陷阱 (不踩)', () => {
         break;
       }
       minDist=Math.min(minDist, Math.hypot(en.x-1000, en.y-1000));
+      if(Math.hypot(en.x-S.px, en.y-S.py) <= 45) break;   // 已绕过陷阱到达目标玩家身边
     }
     /* 核心: 绕行不踩(陷阱保持 armed) —— 敌 never 触发陷阱 */ 
     A(!steppedOnTrap, '绕行应不触发陷阱');

@@ -759,11 +759,14 @@ window.APH = window.APH || {};
         /* T4 破墙: 墙块记录带耐久(旧存档缺 hp 由 Combat.wallHp 兜底) */
         if(d.bid==='bl_wall' && CFG.wall && CFG.wall.hp!=null) b.hp=CFG.wall.hp;
         s.colony.buildings.push(b);
-        /* 移除对应蓝图实体 */
-        s.entities=s.entities.filter(function(en){
-          return !(en.type===T.BLUEPRINT&&en.bid===d.bid&&
-                   Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2);
+        /* 移除对应蓝图实体 (委托 APH.Ent, ADR-20) */
+        s.entities.forEach(function(en){
+          if(en.type===T.BLUEPRINT&&en.bid===d.bid&&
+             Math.abs(en.x-d.x)<2&&Math.abs(en.y-d.y)<2){
+            APH.Ent.destroy(en);
+          }
         });
+        s.entities=APH.Ent.sweepDead(s.entities);
         /* ADR-13: 墙/闸门/陷阱/沙袋=格上静态物, 不入 entities[](防爆实体预算); 渲染走 walls 层 */
         var isGridStatic=(d.bid==='bl_wall'||d.bid==='bl_gate'||d.bid==='bl_spike_trap'||d.bid==='bl_sandbag');
         if(!isGridStatic){
@@ -1406,11 +1409,12 @@ window.APH = window.APH || {};
 
     if(s.mode!=='running'){ return; }
 
-    /* 实体上限护栏 */
+    /* 实体上限护栏 (委托 APH.Ent, ADR-20) */
     var over=guardTrim(s.entities,s.px,s.py,CFG.caps.entitiesHard);
     if(over.length){
       var kill=new Set(over);
-      s.entities=s.entities.filter(function(e){return !kill.has(e.id);});
+      s.entities.forEach(function(e){ if(kill.has(e.id)) APH.Ent.destroy(e); });
+      s.entities=APH.Ent.sweepDead(s.entities);
     }
 
     s.clock+=dt;
@@ -1866,9 +1870,12 @@ window.APH = window.APH || {};
         refundMsg='🗑 '+def3.name+' 已拆除 (+'+refund+'研究 +'+refundM+'矿)';
       }
       s.colony.buildings.splice(bestX.idx,1);
-      s.entities=s.entities.filter(function(en){
-        return !(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5);
+      s.entities.forEach(function(en){
+        if(en.type===T.BUILDING&&en.bid===bestX.b.id&&U.dst(en.x,en.y,bestX.b.x,bestX.b.y)<5){
+          APH.Ent.destroy(en);
+        }
       });
+      s.entities=APH.Ent.sweepDead(s.entities);
       APH.Save.saveMeta(s.meta); saveColony();
       APH.UI.floatText(refundMsg,'#ffc857');
       U.emit('demolished',{id:bestX.b.id});
@@ -2663,9 +2670,10 @@ window.APH = window.APH || {};
       e.tx=tgt.x; e.ty=tgt.y;
       keep[r.id]=true;
     });
-    s.entities=s.entities.filter(function(e){
-      return e.type!==T.RESIDENT || keep[e.rid||e.id];
+    s.entities.forEach(function(e){
+      if(e.type===T.RESIDENT && !keep[e.rid||e.id]) APH.Ent.destroy(e);
     });
+    s.entities=APH.Ent.sweepDead(s.entities);
   }
 
   function dropStore(d){
@@ -2673,14 +2681,7 @@ window.APH = window.APH || {};
     return it.store||null;
   }
   function nearestDrop(from, r, pred){
-    var s=APH.state, best=null, bd=r;
-    (s.entities||[]).forEach(function(d){
-      if(!d || d.dead || d.type!==T.DROPPED) return;
-      if(pred && !pred(d)) return;
-      var dist=U.dst(from.x,from.y,d.x,d.y);
-      if(dist<bd){ bd=dist; best=d; }
-    });
-    return best;
+    return APH.Ent.findNearest(APH.state.entities, T.DROPPED, from.x, from.y, r, pred);
   }
   function nibblePile(drop, n){
     var take=Math.min(drop.n||1, n||1);
@@ -3102,9 +3103,9 @@ window.APH = window.APH || {};
       }
       return false;
     }
-    ent.dead=true;
+    APH.Ent.destroy(ent);
     var sx=ent.x, sy=ent.y, rid=r.resident.id;
-    s.entities=s.entities.filter(function(e){ return e!==ent; });
+    s.entities=APH.Ent.sweepDead(s.entities);
     APH.Res.enrichBio(r.resident);
     saveMetaQuiet();
     syncResidentEntities();
@@ -3145,9 +3146,7 @@ window.APH = window.APH || {};
       }
       APH.Res.wanderStep(e, dt, CFG.HAB, yard);
     });
-    s.entities=s.entities.filter(function(e){
-      return !(e.type===T.VISITOR && e.dead);
-    });
+    s.entities=APH.Ent.sweepDead(s.entities);
   }
 
   /* ================= P6 居民系统 ================= */
@@ -3471,9 +3470,10 @@ window.APH = window.APH || {};
         APH.UI.floatText('🔥 居民们在篝火旁围炉夜话 (+羁绊 +心情)', '#ffc857');
       }
     }
-    s.entities=s.entities.filter(function(e){
-      return !(e.type===T.DROPPED && (e.dead || (e.n||0)<=0));
+    s.entities.forEach(function(e){
+      if(e.type===T.DROPPED && (e.dead || (e.n||0)<=0)) APH.Ent.destroy(e);
     });
+    s.entities=APH.Ent.sweepDead(s.entities);
 
     /* V1 全局专长加成 */
     var gb=APH.Res.globalBonuses(m.residents);
