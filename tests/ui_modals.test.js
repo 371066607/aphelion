@@ -34,7 +34,7 @@ global.document = {
 
 /* ---------- 加载被测模块 ---------- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'ui.js']) {
+for (const f of ['config.js', 'utils.js', 'input.js', 'ui.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 
@@ -100,6 +100,7 @@ assert('diplomacy 触发了 render', renderedDip === 1);
 assert('活动模态为 diplomacy', UI.getActiveModal() === 'diplomacy');
 assert('hasActiveModal 为 true', UI.hasActiveModal() === true);
 assert('全屏模态打开自动将 state.mode 挂起为 paused', window.APH.state.mode === 'paused');
+assert('模态打开自动同步 APH.Input 上下文栈', window.APH.Input.currentContext() === 'modal:diplomacy');
 
 // 3. 全屏模态互斥打开另一个全屏模态 (roster)
 const openRoster = UI.open('roster');
@@ -116,6 +117,7 @@ assert('roster DOM 隐藏', elements.mockRoster.style.display === 'none');
 assert('活动模态清空为 null', UI.getActiveModal() === null);
 assert('hasActiveModal 回到 false', UI.hasActiveModal() === false);
 assert('所有全屏模态关闭后，state.mode 自动恢复为 running', window.APH.state.mode === 'running');
+assert('所有模态关闭后，APH.Input 上下文栈回到 game', window.APH.Input.currentContext() === 'game');
 
 // 5. 抽屉式模态 (buildCatalog, isOverlay: false)
 UI.open('buildCatalog');

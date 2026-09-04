@@ -464,6 +464,9 @@ APH.UI = (function(){
           var otherEl = getModalEl(modals[mId]);
           if(otherEl) otherEl.style.display = 'none';
           if(modals[mId].onClose) modals[mId].onClose();
+          if(window.APH && window.APH.Input && window.APH.Input.popContext){
+            window.APH.Input.popContext('modal:' + mId);
+          }
         }
       }
       // 保存前序 mode 并挂起游戏
@@ -478,6 +481,9 @@ APH.UI = (function(){
 
     if(def.render && s) def.render(s, opts);
     if(def.onOpen) def.onOpen(opts);
+    if(window.APH && window.APH.Input && window.APH.Input.pushContext){
+      window.APH.Input.pushContext('modal:' + id);
+    }
     el.style.display = '';
     return true;
   }
@@ -491,6 +497,9 @@ APH.UI = (function(){
     var el = getModalEl(def);
     if(el) el.style.display = 'none';
     if(def.onClose) def.onClose();
+    if(window.APH && window.APH.Input && window.APH.Input.popContext){
+      window.APH.Input.popContext('modal:' + id);
+    }
 
     if(def.isOverlay){
       if(activeOverlay === id) activeOverlay = null;
