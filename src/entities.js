@@ -516,6 +516,55 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* ADR-24: 远古遗迹构件渲染 */
+    if(e.bid === 'ancient_wall'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle = '#2d3748'; ctx.fillRect(-22, -22, 44, 44);
+      ctx.fillStyle = '#1a202c'; ctx.fillRect(-18, -18, 36, 36);
+      ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 2; ctx.strokeRect(-22, -22, 44, 44);
+      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.moveTo(0, -10); ctx.lineTo(0, 10); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    if(e.bid === 'ancient_gate'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      var gObj = e.gate || e;
+      var isBroken = !!gObj.broken;
+      ctx.fillStyle = '#1a202c'; ctx.fillRect(-22, -22, 44, 44);
+      if(!isBroken){
+        ctx.fillStyle = 'rgba(0, 229, 255, ' + (0.4 + 0.3 * Math.sin((time||0) * 4)) + ')';
+        ctx.fillRect(-18, -18, 36, 36);
+        ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2; ctx.strokeRect(-18, -18, 36, 36);
+      } else {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fillRect(-16, -16, 32, 32);
+      }
+      ctx.restore();
+      return;
+    }
+    if(e.bid === 'ancient_terminal'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 4, 16, 8, 0, 0, U.TAU); ctx.fill();
+      ctx.fillStyle = '#2d3748'; ctx.fillRect(-12, -20, 24, 24);
+      var termObj = e.terminal || e;
+      var scrCol = termObj.hacked ? '#7dffab' : '#00e5ff';
+      ctx.fillStyle = scrCol; ctx.fillRect(-9, -17, 18, 12);
+      ctx.restore();
+      return;
+    }
+    if(e.bid === 'ancient_vault'){
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(0, 6, 20, 10, 0, 0, U.TAU); ctx.fill();
+      ctx.fillStyle = '#b7791f'; ctx.fillRect(-16, -18, 32, 24);
+      ctx.strokeStyle = '#ecc94b'; ctx.lineWidth = 1.5; ctx.strokeRect(-16, -18, 32, 24);
+      var vObj = e.vault || e;
+      if(!vObj.opened){
+        ctx.fillStyle = '#00e5ff'; ctx.beginPath(); ctx.arc(0, -6, 4, 0, U.TAU); ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+
     /* ADR-23: 置物货架(bl_storage_shelf) - 1x1 木质货架 + 陈列物品微缩图标/品类符号 */
     if(e.bid==='bl_storage_shelf'){
       ctx.save(); ctx.translate(e.x,e.y);

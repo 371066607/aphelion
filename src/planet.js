@@ -9,7 +9,7 @@ window.APH = window.APH || {};
 
 APH.Planet = (function(){
   'use strict';
-  var U = APH.U;
+  var U = APH.U, CFG = APH.CFG;
 
   /* ---------- 4 大异星奇幻生态群系 (ADR-9 biome_ 前缀) ---------- */
   var BIOMES = {
@@ -333,8 +333,81 @@ APH.Planet = (function(){
     return 'spore';
   }
 
+  /* ---------- ADR-24: 远征古代遗迹确定性生成 ---------- */
+  function generateAncientRuins(spec, seed){
+    var s = seed != null ? seed : ((spec && spec.seed) || 1234);
+    var tier = (spec && spec.tier != null) ? spec.tier : 1;
+    var rng = U.makeRng((s ^ 0xA5C3) >>> 0);
+
+    // T2/T3 必生成，T1 30% 概率生成
+    if(tier < 2 && rng() > 0.30) return null;
+
+    var G = CFG.GRID || 48;
+    // 遗迹中心点放置在 [400, 1800] 区域内，远离中心着陆点 (1100, 1100) 至少 300px
+    var cx = 0, cy = 0, tries = 0;
+    while(tries++ < 50){
+      cx = Math.floor(400 + rng() * 1400);
+      cy = Math.floor(400 + rng() * 1400);
+      cx = Math.floor(cx / G) * G;
+      cy = Math.floor(cy / G) * G;
+      if(U.dst(cx, cy, 1100, 1100) >= 300) break;
+    }
+
+    var walls = [];
+    var gate = null;
+    for(var dx = -2; dx <= 2; dx++){
+      for(var dy = -2; dy <= 2; dy++){
+        var isEdge = (dx === -2 || dx === 2 || dy === -2 || dy === 2);
+        if(!isEdge) continue;
+        var wx = cx + dx * G, wy = cy + dy * G;
+        if(dx === 0 && dy === 2){
+          gate = { type: 'ancient_gate', x: wx, y: wy, hp: 80, maxHp: 80, locked: true, broken: false };
+        } else {
+          walls.push({ type: 'ancient_wall', x: wx, y: wy });
+        }
+      }
+    }
+
+    var vault = { type: 'ancient_vault', x: cx, y: cy - G, opened: false };
+    var terminal = { type: 'ancient_terminal', x: cx + G, y: cy, hacked: false };
+
+    var sentryCount = tier >= 3 ? 2 : 1;
+    var sentries = [];
+    for(var si = 0; si < sentryCount; si++){
+      var sx = cx + (si === 0 ? -G : G);
+      var sy = cy + (si === 0 ? 0 : -G);
+      sentries.push({ x: sx, y: sy, factionId: 'fx_automaton' });
+    }
+
+    return {
+      cx: cx,
+      cy: cy,
+      w: 5 * G,
+      h: 5 * G,
+      walls: walls,
+      gate: gate,
+      terminal: terminal,
+      vault: vault,
+      sentries: sentries,
+      revealed: false
+    };
+  }
+
+  function damageAncientGate(gate, dmg){
+    if(!gate) return { breached: false };
+    var d = dmg != null ? dmg : 25;
+    gate.hp = Math.max(0, (gate.hp != null ? gate.hp : 80) - d);
+    if(gate.hp <= 0){
+      gate.locked = false;
+      gate.broken = true;
+      return { breached: true, gate: gate };
+    }
+    return { breached: false, gate: gate };
+  }
+
   return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
            generateExpeditionFlora:generateExpeditionFlora,
+           generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,
            BIOMES:BIOMES, biomeOf:biomeOf, particleTypeOf:particleTypeOf };
 })();

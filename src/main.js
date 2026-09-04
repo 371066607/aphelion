@@ -136,6 +136,25 @@ window.APH = window.APH || {};
         var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
         expFlora.forEach(function(f){ s.entities.push(f); });
       }
+      /* ADR-24: 远征远古遗迹生成 */
+      if(APH.Planet && APH.Planet.generateAncientRuins){
+        var ruins = APH.Planet.generateAncientRuins(p, p.seed);
+        s.ruins = ruins;
+        if(ruins){
+          (ruins.walls || []).forEach(function(w, wi){
+            s.entities.push({ id:'rw_' + wi, type: T.BUILDING, bid:'ancient_wall', x:w.x, y:w.y });
+          });
+          if(ruins.gate){
+            s.entities.push({ id:'rg_0', type: T.BUILDING, bid:'ancient_gate', x:ruins.gate.x, y:ruins.gate.y, gate:ruins.gate });
+          }
+          if(ruins.terminal){
+            s.entities.push({ id:'rt_0', type: T.BUILDING, bid:'ancient_terminal', x:ruins.terminal.x, y:ruins.terminal.y, terminal:ruins.terminal });
+          }
+          if(ruins.vault){
+            s.entities.push({ id:'rv_0', type: T.BUILDING, bid:'ancient_vault', x:ruins.vault.x, y:ruins.vault.y, vault:ruins.vault });
+          }
+        }
+      }
       /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
       if(p.rivals && p.rivals.length){
         var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
@@ -575,6 +594,14 @@ window.APH = window.APH || {};
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
+    s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
+    if(s.scene === 'expedition' && s.ruins && !s.ruins.revealed){
+      if(U.dst(s.px, s.py, s.ruins.cx, s.ruins.cy) < 140){
+        s.ruins.revealed = true;
+        s.shake = Math.min(1, s.shake + 0.35);
+        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('🏛️ 发现异星史前遗迹复合体！', '#ffd54f');
+      }
+    }
     updateVisitors(dt);
     /* C: 游商走了/离远了自动收面板 */
     var tpO=document.getElementById('tradePanel');
@@ -1576,6 +1603,15 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearFood){
       tryPlayerEatNearFood();
+      return true;
+    }
+    if(s.scene === 'expedition' && s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
+      var gRes = APH.Planet.damageAncientGate(s.nearAncientGate.gate, 40);
+      if(gRes.breached){
+        APH.UI.floatText('💥 远古能量闸门已被解除破开！', '#00e5ff');
+      } else {
+        APH.UI.floatText('⚡ 能量阻断降低: ' + s.nearAncientGate.gate.hp + '/80', '#59d9ff');
+      }
       return true;
     }
     if(s.nearPad){
@@ -3537,6 +3573,8 @@ window.APH = window.APH || {};
         onPlayerInteract(true);
       }else if(s.scene==='home' && s.nearFood){
         tryPlayerEatNearFood();
+      }else if(s.scene === 'expedition' && s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
+        onPlayerInteract(true);
       }else if(s.scene==='home'&&s.nearPad) launchExpedition();
       else if(s.scene==='expedition'&&s.nearPad) returnHome();
       else if(s.scene==='home' && s.nearResident && !s.nearFood && !s.nearBed && !s.nearClinic && !s.nearPad){
