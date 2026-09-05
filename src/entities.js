@@ -311,6 +311,11 @@ APH.Ent = (function(){
     /* #59: 俯卧触发(玩家暂无状态, 今日常 false → 惰性; 后续累塌/床边E接入) */
     var lying = !!(s.downed || e.downed || e.isSleeping);
     ctx.save(); ctx.translate(e.x,e.y);
+    var chopping = !!(s.gathering || e.gathering) && !lying;
+    if(chopping){
+      var chopBob = Math.sin(time * 16);
+      ctx.translate(chopBob * 1.6, Math.abs(chopBob) * 2.2);
+    }
     var sprOk = (window.APH.Sprites &&
                  (APH.Sprites.isReady('player_walk') || APH.Sprites.isReady('player_idle') ||
                   (lying && APH.Sprites.isReady('player_prone'))));
@@ -344,6 +349,11 @@ APH.Ent = (function(){
         /* #65: sprite 分支也要画 🍽(脚底锚原点, 头顶≈baseline*sc 之上) */
         drawPlayerHungerMark(e, -((defS&&defS.baseline)||248)*sc + 4);
         drawPlayerSickMark(e, -((defS&&defS.baseline)||248)*sc + 4);
+        if(chopping){
+          ctx.font='14px sans-serif'; ctx.textAlign='center';
+          var pSwing = Math.sin(time * 14);
+          ctx.fillText('🪓', 12 + pSwing * 3, -((defS&&defS.baseline)||248)*sc + 12 + pSwing * 4);
+        }
         /* ADR-22: sprite 分支玩家社交气泡 */
         if(e.socialBubble){
           ctx.fillStyle='#ffffff';
@@ -385,6 +395,11 @@ APH.Ent = (function(){
     drawPlayerHungerMark(e, -40+(e.moving?bobbing*0.5:0));
     /* #70 补充: 程序化分支玩家 ✚ */
     drawPlayerSickMark(e, -40+(e.moving?bobbing*0.5:0));
+    if(chopping){
+      ctx.font='14px sans-serif'; ctx.textAlign='center';
+      var pSwing2 = Math.sin(time * 14);
+      ctx.fillText('🪓', 12 + pSwing2 * 3, -36 + pSwing2 * 4);
+    }
     /* ADR-22: 玩家社交微气泡 */
     if(e.socialBubble){
       ctx.fillStyle='#ffffff';
@@ -1112,8 +1127,13 @@ APH.Ent = (function(){
       ctx.font='16px sans-serif'; ctx.textAlign='center';
       ctx.fillText(e.socialBubble, 0, iconY-14+bob);
     }
+    if(e.gathering && !e.downed && !e.isSleeping){
+      ctx.font='14px sans-serif'; ctx.textAlign='center';
+      var swing = Math.sin((APH.state && APH.state.clock || 0) * 14);
+      ctx.fillText('🪓', 12 + swing * 3, iconY - 8 + bob + swing * 2);
+    }
     /* 工位劳动徽章 (ADR-29) */
-    if(e.job && !e.drafted && !e.downed && !e.isSleeping && !e.socialBubble){
+    if(e.job && !e.drafted && !e.downed && !e.isSleeping && !e.socialBubble && !e.gathering){
       var jobIcons = {
         bl_farm: '🌾', bl_crop_plot: '🌱', bl_mine: '⛏', bl_lab: '🔬',
         bl_workshop: '🔨', bl_kitchen: '🍳', bl_clinic: '🩺', bl_pasture: '🐑',
@@ -1261,7 +1281,11 @@ APH.Ent = (function(){
   function drawFlora(e, time){
     if(!ctx || !e) return;
     ctx.save();
-    ctx.translate(e.x, e.y);
+    var shake = 0;
+    if(e.chopAt != null && time != null && (time - e.chopAt) >= 0 && (time - e.chopAt) < 0.14){
+      shake = Math.sin((time - e.chopAt) * 80) * 3;
+    }
+    ctx.translate(e.x + shake, e.y);
     ctx.fillStyle='rgba(0,0,0,.22)';
     ctx.beginPath(); ctx.ellipse(0,4,12,6,0,0,U.TAU); ctx.fill();
     if(e.kind === 'tree'){

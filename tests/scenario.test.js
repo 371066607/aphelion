@@ -3255,6 +3255,20 @@ test('#165 commander: 未征召时按砍伐标记自动前往砍树', () => {
   A(S.px > x0 + 40, '指挥官应向被标记树木移动');
 });
 
+test('#166 chop: 贴树砍伐是持续作业，一帧不得砍倒，并进入伐木姿态', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.playerDrafted = false;
+  const tree = { id:'fl_cmd_slow', type:T.FLORA, kind:'tree', x:S.px+20, y:S.py, hp:30, maxHp:30, dead:false };
+  S.entities.push(tree);
+  APH.Colony.applyDesignation(S.designations, tree, 'chop');
+  M.updateHome(0.016);
+  A(tree.dead !== true, '一帧不得砍倒成树');
+  A(tree.hp < 30 && tree.hp > 20, '一帧只推进少量耐久, hp='+tree.hp);
+  const pe = APH.Ent.findPlayer();
+  A(S.gathering === true || (pe && pe.gathering), '贴树作业时应进入伐木姿态');
+});
+
 test('#165 hungry: 无口粮时饥饿居民仍执行规划砍伐（避免饿到停工）', () => {
   const ents = cmdHomeSetup();
   const p = ents[0];

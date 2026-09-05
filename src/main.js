@@ -648,6 +648,36 @@ window.APH = window.APH || {};
       }
     }
   }
+  /* 采集作业的可见挥砍：面向目标、周期性木屑/石屑、树木震动 */
+  function pulseGatherWork(flora, worker, dt){
+    var s = APH.state;
+    if(!flora || flora.dead) return;
+    var period = (CFG.gathering && CFG.gathering.strikePeriod != null) ? CFG.gathering.strikePeriod : 0.45;
+    flora.chopT = (flora.chopT || 0) + (dt || 0);
+    if(worker){
+      worker.gathering = true;
+      worker.walking = false;
+      worker.moving = false;
+      var wx = worker.x != null ? worker.x : s.px;
+      var wy = worker.y != null ? worker.y : s.py;
+      var ang = Math.atan2(flora.y - wy, flora.x - wx);
+      worker.face = ang;
+      if(worker.type === T.PLAYER || worker.id === 'player'){
+        s.gathering = true;
+        s.face = ang;
+      }
+    }
+    if(flora.chopT < period) return;
+    flora.chopT -= period;
+    flora.chopAt = s.clock || 0;
+    var isRock = !!(flora.kind && flora.kind.indexOf('rock') === 0);
+    var hue = isRock ? 210 : 32;
+    for(var i = 0; i < 5; i++){
+      s.parts.push({ t:'dust', x:flora.x+U.rr(-8,8), y:flora.y+U.rr(-14,-2), life:U.rr(.28,.5), max:.5 });
+    }
+    s.parts.push({ t:'shard', x:flora.x, y:flora.y-10, vx:U.rr(-70,70), vy:U.rr(-90,-20), life:.4, max:.4, hue:hue });
+    s.parts.push({ t:'shard', x:flora.x, y:flora.y-8, vx:U.rr(-50,50), vy:U.rr(-70,-10), life:.35, max:.35, hue:hue });
+  }
   function syncPlayerSleep(){
     var s=APH.state;
     var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
@@ -690,7 +720,10 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
-    /* ADR-29: 未征召指挥官按工作优先级自治（饿了去吃、有规划就去砍），征召后才听右键军令 */
+    /* ADR-29: 未征召指挥官按工作优先级自治。贴树后按真实 dt 持续作业（禁止把 hp/s 误当 dt 一帧砍倒）。 */
+    var peGather = APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
+    if(peGather) peGather.gathering = false;
+    s.gathering = false;
     var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
     if(s.scene==='home' && pGatherPrio > 0 && s.nearFlora && !s.nearFlora.dead &&
        (s.designations && s.designations[s.nearFlora.id]) &&
@@ -698,13 +731,16 @@ window.APH = window.APH || {};
       var pG = CFG.gathering || {};
       var resW = APH.Colony.workOnFlora(s.nearFlora,
         { skills: pG.playerGatherSkills || {sk_farm:6,sk_craft:6}, mood:80, food:playerFood() },
-        pG.playerGatherDps != null ? pG.playerGatherDps : 15);
+        dt);
       s.target = null;
+      pulseGatherWork(s.nearFlora, peGather || { type:T.PLAYER, id:'player', x:s.px, y:s.py }, dt);
       if(resW.done && resW.dropItemId){
         APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
         var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
         APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
         if(s.designations) delete s.designations[s.nearFlora.id];
+        s.gathering = false;
+        if(peGather) peGather.gathering = false;
       }
     }
     updateCommanderAutonomy();
@@ -902,6 +938,11 @@ window.APH = window.APH || {};
         if(mealHint) APH.UI.setHint('🍽 饥饿 · 指挥官正前往进食');
         else APH.UI.setHint('🍽 没有口粮 · 请用【命令】标记浆果丛采摘，或远征带回食物');
       }
+    } else if(s.gathering && s.nearFlora){
+      var gKind = s.nearFlora.kind || 'tree';
+      var gName = gKind === 'tree' ? '树木' : (gKind.indexOf('rock')===0 ? '矿石' : '植株');
+      var gPct = s.nearFlora.maxHp ? Math.max(0, Math.round(100 * s.nearFlora.hp / s.nearFlora.maxHp)) : 0;
+      APH.UI.setHint('🪓 正在砍伐' + gName + ' · 剩余 ' + gPct + '%');
     }
 
     /* ADR-28 底部主标签栏显隐与高亮同步 (家园显示, 远征隐藏) */
@@ -1821,7 +1862,9 @@ window.APH = window.APH || {};
       return true;
     }
     if(s.scene==='home' && s.nearFlora){
-      var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6}, mood:80, food:playerFood() }, 15);
+      var strikeDt = (CFG.gathering && CFG.gathering.strikePeriod != null) ? CFG.gathering.strikePeriod : 0.45;
+      var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6}, mood:80, food:playerFood() }, strikeDt);
+      pulseGatherWork(s.nearFlora, APH.Ent.findPlayer() || { type:T.PLAYER, id:'player', x:s.px, y:s.py }, strikeDt);
       if(resW.done && resW.dropItemId){
         APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
         var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
@@ -3829,6 +3872,7 @@ window.APH = window.APH || {};
           if(!uFl || uFl.dead || uFl.hp<=0){ e.userOrder=null; e.gathering=false; }
           else if(U.dst(e.x,e.y,uFl.x,uFl.y)<=((C.gatherArriveR!=null)?C.gatherArriveR:48)){
             var ugRes=APH.Colony.workOnFlora(uFl, r, dt);
+            pulseGatherWork(uFl, e, dt);
             e.gathering=true; e.walking=false;
             if(ugRes.done && ugRes.dropItemId){
               APH.Combat.spawnDrop(uFl.x, uFl.y, ugRes.dropItemId, ugRes.dropCount, {stock:true});
@@ -3950,6 +3994,7 @@ window.APH = window.APH || {};
             e.gatherTarget = null;
           } else if(U.dst(e.x, e.y, gt.x, gt.y) < 48){
             var gRes = APH.Colony.workOnFlora(gt, r, dt);
+            pulseGatherWork(gt, e, dt);
             e.gathering = true;
             e.walking = false;
             if(gRes.done && gRes.dropItemId){

@@ -14,6 +14,7 @@ test('gathering: CFG.gathering 配置完整', () => {
   A(G.regenTicks.rock_stone === 10, '石块再生 10 跳');
   A(Array.isArray(G.typePriority), 'typePriority 必须为数组');
   A(G.typePriority[0] === 'tree', '优先类型首位为 tree');
+  A(G.strikePeriod === 0.45, '可见挥砍间隔应为 0.45s');
 });
 
 test('gathering: workOnFlora 砍树推进与掉落', () => {
