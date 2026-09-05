@@ -2743,17 +2743,22 @@ function cmdHomeSetup(){
   if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
   A(S.scene==='home', '应在殖民地');
   S.mode='running';
+  S.orderTool=null; S.selectedPawns=[]; S.selectedRid=null;
   S.war = S.war || {}; S.war.raidActive=false; S.war.raidWarn=0;
   S.meta.residents = [
     { id:'rs_cmd1', name:'征召甲', job:null, skills:{sk_build:5,sk_farm:3}, mood:80, food:90, rest:90 },
     { id:'rs_cmd2', name:'征召乙', job:'bl_farm', skills:{sk_farm:5}, mood:80, food:90, rest:90 },
   ];
   S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
+  if(!S.colony.buildings.length) S.colony.buildings.push({ id:'bl_landing_pad', x:1100, y:1340 });
   S.colony.buildings.push(
     {id:'bl_farm', x:S.px+300, y:S.py, lv:1},
     {id:'bl_house', x:S.px-240, y:S.py, lv:1}
   );
   S.entities = S.entities.filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy');
+  if(!S.entities.some(e=>e.type===T.BUILDING&&e.pad)){
+    S.entities.push({ id:'be_pad_cmd', type:T.BUILDING, bid:'bl_landing_pad', pad:true, x:1100, y:1340 });
+  }
   M.syncResidents();
   const ents = S.entities.filter(e=>e.type==='resident');
   A(ents.length===2, '居民实体应=2, got '+ents.length);
@@ -3127,6 +3132,46 @@ test('#162 squad: 鼠标拉框多选编队、批量征召、散兵线战术集�
   A(p1.drafted === false && p2.drafted === false, '解除后全队应脱离战备');
   S.selectedPawns = [];
   M.cmd.deselect();
+});
+
+test('#163 right_click: 全局右键交互（出航、开箱、破译、送医、返航）与远征 RTS', () => {
+  cmdHomeSetup();
+  const pad = S.entities.find(e => e.type === T.BUILDING && e.pad);
+  A(!!pad, '家园应有发射台');
+  M.cmd.rightClick(pad.x, pad.y);
+  A(S.scene === 'expedition', '右键点击发射台应出发远征');
+
+  // 2. 远征场景：右键点击远古遗物箱 → 开箱并喷出古代蓝图与核心
+  const vault = { id: 'ancient_vault_rts', type: T.BUILDING, bid: 'ancient_vault', x: S.px + 120, y: S.py, opened: false };
+  S.entities.push(vault);
+  M.cmd.rightClick(vault.x, vault.y);
+  A(vault.opened === true, '右键点击遗物箱应成功开启');
+  const drops = S.entities.filter(e => e && e.type === T.DROPPED);
+  A(drops.some(d => d.itemId === 'it_ancient_blueprint'), '箱内必定喷出古代蓝图残卷');
+  A(drops.some(d => d.itemId === 'it_ancient_core'), '箱内必定喷出史前高能核心');
+
+  // 3. 远征场景：右键点击古代终端 → 破译
+  const term = { id: 'ancient_terminal_rts', type: T.BUILDING, bid: 'ancient_terminal', x: S.px + 180, y: S.py, hacked: false };
+  S.entities.push(term);
+  S._hackRng = () => 0.1;
+  M.cmd.rightClick(term.x, term.y);
+  A(term.hacked === true, '右键点击古代终端应成功破译');
+
+  // 4. 远征场景：右键点击返回舱 → 登机返航
+  const retPad = S.entities.find(e => e.type === T.BUILDING && e.pad);
+  A(!!retPad, '远征应有着陆返回舱');
+  M.cmd.rightClick(retPad.x, retPad.y);
+  A(S.scene === 'home', '右键点击返回舱应返航回到家园');
+
+  // 5. 家园场景：右键点击倒地队友 → 紧急送医救治
+  const clinic = { id: 'bl_clinic', bid: 'bl_clinic', x: 1000, y: 1000, dead: false };
+  S.colony.buildings.push(clinic);
+  const ally = { id: 'rs_downed_ally', type: T.RESIDENT, name: '重伤员', x: 1200, y: 1200, downed: true, dead: false };
+  S.meta.residents.push({ id: 'rs_downed_ally', name: '重伤员', downed: true, mood: 50, food: 80, illness: 60 });
+  S.entities.push(ally);
+  M.cmd.rightClick(ally.x, ally.y);
+  A(ally.downed === false, '送医后倒地标志应清除');
+  A(ally.medLying === true, '送医后应处于医疗舱躺卧治疗态');
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

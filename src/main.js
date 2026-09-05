@@ -11,6 +11,7 @@ window.APH = window.APH || {};
   var U=APH.U, CFG=APH.CFG, T=CFG.entType;
   var orderDrag=false, orderFrom=null, orderTo=null;
   var pawnDrag=false, pawnDragStart=null, pawnDragEnd=null;
+  var handleContextMenu = function(){ return false; };
   /* 真实可视区域(canvas实际显示尺寸), 预览面板缩放/分栏安全 */
   function vpW(){ var v=APH.World.getViewport(); return (v&&v.w)||innerWidth; }
   function vpH(){ var v=APH.World.getViewport(); return (v&&v.h)||innerHeight; }
@@ -2356,25 +2357,125 @@ window.APH = window.APH || {};
         tryPlace(s0.buildMode, wx0, wy0);
       }
     });
-    /* ADR-29 / ADR-28 右键 = 上下文微操优先执行 / 解除征召 / 退出规划 */
-    cv.addEventListener('contextmenu',function(e){
-      e.preventDefault();
+    /* ADR-29 / ADR-28 右键 = 上下文微操与全局右键交互处理 */
+    handleContextMenu = function(e){
+      if(e.preventDefault) e.preventDefault();
       var s0=APH.state;
+      if(s0.mode !== 'running') return false;
+
+      var wx = e.clientX - vpW()/2 + s0.camX;
+      var wy = e.clientY - vpH()/2 + s0.camY;
+      var pickR = 40;
+
+      /* 1. 退出规划工具模式 */
       if(s0.orderTool){
         s0.orderTool = null;
         orderDrag = false;
         APH.UI.setHint('');
         APH.UI.floatText('退出规划模式', '#c5e3f6');
         if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
-        return;
+        return true;
       }
+
+      /* 2. 远征场景：远古遗迹交互 (遗物箱、数据终端、能量闸门、信标优先) */
+      if(s0.scene === 'expedition'){
+        var hitVault = s0.entities.find(function(en){
+          return en && en.type === T.BUILDING && en.bid === 'ancient_vault' && !en.dead && U.dst(en.x, en.y, wx, wy) <= 45;
+        });
+        if(hitVault){
+          var vObj = hitVault.vault || hitVault;
+          if(!vObj.opened && APH.Planet && APH.Planet.openArtifactVault){
+            var vRes = APH.Planet.openArtifactVault(vObj);
+            if(vRes && vRes.drops){
+              vRes.drops.forEach(function(d, di){
+                APH.Combat.spawnDrop(hitVault.x + (di*16-8), hitVault.y + 20, d.id, d.n || 1);
+              });
+            }
+            s0.selectedTarget = { type: 'building', entity: hitVault };
+            updateInspectorNow();
+            return true;
+          }
+        }
+
+        var hitTerm = s0.entities.find(function(en){
+          return en && en.type === T.BUILDING && en.bid === 'ancient_terminal' && !en.dead && U.dst(en.x, en.y, wx, wy) <= 45;
+        });
+        if(hitTerm){
+          var tObj = hitTerm.terminal || hitTerm;
+          if(!tObj.hacked && APH.Res && APH.Res.hackTerminal){
+            var hackScholar = { id: 'player', name: '指挥官', skills: { sk_lore: (s0.meta && s0.meta.loreSkill) || 6 } };
+            var rngFn = s0._hackRng || Math.random;
+            var hRes = APH.Res.hackTerminal(tObj, hackScholar, rngFn);
+            if(hRes && hRes.success){
+              hitTerm.hacked = true;
+              if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ ' + hRes.text, '#00e5ff');
+            } else if(hRes && window.APH.UI && APH.UI.floatText){
+              APH.UI.floatText('⚠ ' + hRes.text, '#ff4d4d');
+            }
+            s0.selectedTarget = { type: 'building', entity: hitTerm };
+            updateInspectorNow();
+            return true;
+          }
+        }
+
+        var hitGate = s0.entities.find(function(en){
+          return en && en.type === T.BUILDING && en.bid === 'ancient_gate' && !en.dead && U.dst(en.x, en.y, wx, wy) <= 45;
+        });
+        if(hitGate && hitGate.gate && !hitGate.gate.broken && APH.Planet && APH.Planet.damageAncientGate){
+          APH.Planet.damageAncientGate(hitGate.gate || hitGate, 999);
+          if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 能量闸门破译解除！', '#00e5ff');
+          return true;
+        }
+
+        var hitBeacon = s0.entities.find(function(en){
+          return en && en.type === T.BEACON && !en.done && U.dst(en.x, en.y, wx, wy) <= 50;
+        });
+        if(hitBeacon){
+          s0.target = { x: hitBeacon.x, y: hitBeacon.y + 20 };
+          s0.scanning = hitBeacon;
+          s0.scanT = 0;
+          APH.UI.showScanRing();
+          APH.UI.floatText('前往信标并启动扫描...', '#ffc857');
+          return true;
+        }
+      }
+
+      /* 3. 检查是否右键发射台 / 返回舱 (出航/返航) */
+      var hitPad = s0.entities.find(function(en){
+        return en && en.type === T.BUILDING && (en.bid === 'bl_landing_pad' || en.pad) && U.dst(en.x, en.y, wx, wy) <= 50;
+      });
+      if(hitPad){
+        if(s0.scene === 'home'){
+          launchExpedition();
+        } else if(s0.scene === 'expedition'){
+          returnHome();
+        }
+        return true;
+      }
+
+      /* 4. 救护倒地昏迷队友 */
+      var hitDowned = s0.entities.find(function(en){
+        return en && en.type === T.RESIDENT && !en.dead && en.downed && U.dst(en.x, en.y, wx, wy) <= 42;
+      });
+      if(hitDowned){
+        var clinicB = (s0.colony && s0.colony.buildings || []).find(function(b){ return (b.id === 'bl_clinic' || b.bid === 'bl_clinic') && !b.dead; });
+        if(clinicB){
+          hitDowned.x = clinicB.x; hitDowned.y = clinicB.y;
+          hitDowned.downed = false; hitDowned.medLying = true;
+          var rDowned = residentOf(hitDowned);
+          if(rDowned){
+            rDowned.downed = false; rDowned.medLying = true;
+          }
+          APH.UI.floatText('✚ 已将伤员紧急送往医疗舱！', '#7dffab');
+          updateInspectorNow();
+          return true;
+        }
+      }
+
+      /* 5. 战备编队或单兵微操 */
       var activeSquad = (s0.selectedPawns && s0.selectedPawns.length > 0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
       if(activeSquad.length > 0){
-        var wx = e.clientX - vpW()/2 + s0.camX;
-        var wy = e.clientY - vpH()/2 + s0.camY;
-        var pickR = 34;
-
-        /* 1. 检查是否右键集火具体敌人 */
+        /* 集火敌人 */
         var hitEnemy = s0.entities.find(function(en){
           return en && en.type === T.ENEMY && !en.dead && !en.isSoldier && U.dst(en.x, en.y, wx, wy) <= pickR;
         });
@@ -2388,10 +2489,10 @@ window.APH = window.APH || {};
           APH.state.parts.push({ t: 'ping', x: hitEnemy.x, y: hitEnemy.y, life: 0.8, max: 0.8 });
           updateCmdPanel();
           updateInspectorNow();
-          return;
+          return true;
         }
 
-        /* 2. 检查是否右键点击了被规划标记的目标 (树木/矿石) */
+        /* 规划目标开采 */
         var hitFlora = s0.entities.find(function(en){
           return en && en.type === T.FLORA && !en.dead && U.dst(en.x, en.y, wx, wy) <= pickR;
         });
@@ -2403,10 +2504,10 @@ window.APH = window.APH || {};
           APH.state.parts.push({ t: 'ping', x: hitFlora.x, y: hitFlora.y, life: 0.8, max: 0.8 });
           updateCmdPanel();
           updateInspectorNow();
-          return;
+          return true;
         }
 
-        /* 3. 检查是否右键点击了掉落物 */
+        /* 掉落物搬运 */
         var hitDrop = s0.entities.find(function(en){
           return en && en.type === T.DROPPED && !en.dead && U.dst(en.x, en.y, wx, wy) <= 28;
         });
@@ -2418,10 +2519,10 @@ window.APH = window.APH || {};
           APH.state.parts.push({ t: 'ping', x: hitDrop.x, y: hitDrop.y, life: 0.8, max: 0.8 });
           updateCmdPanel();
           updateInspectorNow();
-          return;
+          return true;
         }
 
-        /* 4. 右键散兵线列队前进 */
+        /* 散兵线走位 */
         var N = activeSquad.length;
         activeSquad.forEach(function(p, idx){
           var offsetX = (idx - (N - 1) / 2) * 26;
@@ -2436,14 +2537,16 @@ window.APH = window.APH || {};
         APH.state.parts.push({ t: 'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
         updateCmdPanel();
         updateInspectorNow();
-        return;
+        return true;
       }
       if(s0.selectedTarget && s0.selectedTarget.type !== 'player'){
         s0.selectedTarget = { type: 'player' };
         s0.selectedPawns = [];
         updateInspectorNow();
       }
-    });
+      return false;
+    }
+    cv.addEventListener('contextmenu', handleContextMenu);
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
@@ -4695,6 +4798,13 @@ window.APH = window.APH || {};
       },
       isDrafted:function(ent){
         return !!(ent && ent.drafted);
+      },
+      rightClick:function(wx, wy){
+        var s = APH.state;
+        var clientX = wx - s.camX + vpW()/2;
+        var clientY = wy - s.camY + vpH()/2;
+        var ev = { clientX: clientX, clientY: clientY, preventDefault: function(){} };
+        return handleContextMenu(ev);
       },
       prioritize:function(ent, targetEntity){
         if(!ent || !targetEntity) return false;
