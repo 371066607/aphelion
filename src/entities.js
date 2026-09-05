@@ -97,7 +97,7 @@ APH.Ent = (function(){
 
     /* N2: 敌人8帧序列帧(idle/move/attack/hurt/death), 士兵不适用 */
     var factionSheet = {fx_maw:'enemy_lighteater', fx_spit:'enemy_acidsplitter',
-                        fx_bulwark:'enemy_siloshell'}[e.faction.id]||'';
+                        fx_bulwark:'enemy_siloshell', fx_automaton:'enemy_automaton'}[e.faction.id]||'';
     var sheetName = e.isSoldier ? '' : factionSheet;
     if (!e.isSoldier && window.APH.Sprites && APH.Sprites.isReady(sheetName)){
       var st;
@@ -524,6 +524,34 @@ APH.Ent = (function(){
       ctx.moveTo(-7,0); ctx.lineTo(7,0);
       ctx.stroke();
       ctx.restore();
+      return;
+    }
+    /* ADR-26: 新建筑 sprite 优先渲染（无 sprite 时才走程序化回退） */
+    if (window.APH.Sprites && APH.Sprites.isReady(e.bid) && (
+      e.bid === 'bl_storage_shelf' || e.bid === 'bl_heater' || e.bid === 'bl_cooler' ||
+      e.bid === 'bl_heavy_turret' || e.bid === 'bl_ancient_generator' || e.bid === 'bl_crop_plot' ||
+      e.bid === 'ancient_wall' || e.bid === 'ancient_gate' || e.bid === 'ancient_terminal' || e.bid === 'ancient_vault')){
+      var cellsN = [1,1];
+      var pwN = cellsN[0]*CFG.GRID*0.62, phN = pwN*0.5;
+      var defSN = APH.Sprites.sheetDef(e.bid);
+      var contentHN = (defSN && defSN.contentH) || 96;
+      var dispHN = (e.def && e.def.dispH) || contentHN;
+      var scN = dispHN / contentHN;
+      ctx.save(); ctx.translate(e.x, e.y);
+      ctx.fillStyle='rgba(247,243,223,.28)';
+      ctx.beginPath(); ctx.ellipse(0,6,pwN,phN,0,0,U.TAU); ctx.fill();
+      ctx.fillStyle='rgba(0,0,0,.32)';
+      ctx.beginPath(); ctx.ellipse(3,7,pwN*.72,phN*.72,0,0,U.TAU); ctx.fill();
+      ctx.restore();
+      APH.Sprites.draw(ctx, e.bid, 0, 0, 0, scN);
+      /* ADR-26: 能量闸门运行时叠加程序化青色力场呼吸层 */
+      if(e.bid === 'ancient_gate' && e.gate && !e.gate.broken){
+        var forceAlpha = 0.25 + 0.15 * Math.sin((time||0) * 4);
+        ctx.save(); ctx.globalAlpha = forceAlpha;
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(-16, -dispHN + 6, 32, dispHN - 12);
+        ctx.restore();
+      }
       return;
     }
     /* ADR-25: 电暖器与制冷空调温控电器 */

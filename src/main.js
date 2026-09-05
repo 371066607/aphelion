@@ -2237,6 +2237,15 @@ window.APH = window.APH || {};
         bl_tv:{idle:1,baseline:236,h:217}, bl_shelf:{idle:1,baseline:236,h:217}, bl_carpet:{idle:1,baseline:207,h:159},
         bl_workshop:{idle:1,baseline:241,h:216},   /* #97补: 漏键致工坊渲染退化(权威值来自 build_sprites.py) */
         bl_sandbag:{idle:1,baseline:240,h:106},
+        /* ADR-25/26 新建筑视觉资产 */
+        bl_storage_shelf:{idle:1,baseline:223,h:192}, bl_heater:{idle:1,baseline:206,h:157},
+        bl_cooler:{idle:1,baseline:223,h:175}, bl_heavy_turret:{idle:1,baseline:206,h:162},
+        bl_ancient_generator:{idle:1,baseline:214,h:163}, bl_crop_plot:{idle:1,baseline:220,h:194},
+        /* ADR-24 遗迹构件 */
+        ancient_wall:{idle:1,baseline:212,h:175}, ancient_gate:{idle:1,baseline:222,h:177},
+        ancient_terminal:{idle:1,baseline:227,h:187}, ancient_vault:{idle:1,baseline:232,h:198},
+        /* ADR-26 机械哨兵 */
+        enemy_automaton:{baseline:223,h:187},
         /* 人形锚点/内容高（idleFrames 字段只给建筑用，这里不填） */
         player_walk:{baseline:248,h:240},
         player_idle:{baseline:248,h:236},
