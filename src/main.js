@@ -10,6 +10,7 @@ window.APH = window.APH || {};
   'use strict';
   var U=APH.U, CFG=APH.CFG, T=CFG.entType;
   var orderDrag=false, orderFrom=null, orderTo=null;
+  var pawnDrag=false, pawnDragStart=null, pawnDragEnd=null;
   /* 真实可视区域(canvas实际显示尺寸), 预览面板缩放/分栏安全 */
   function vpW(){ var v=APH.World.getViewport(); return (v&&v.w)||innerWidth; }
   function vpH(){ var v=APH.World.getViewport(); return (v&&v.h)||innerHeight; }
@@ -26,6 +27,7 @@ window.APH = window.APH || {};
     o2:100, hp:100, cry:0, found:0, totalBeacons:6,
     orderTool:null,              // ADR-28 规划工具模式 (chop|mine|haul|deconstruct|cancel)
     designations:{},             // ADR-28 规划标记字典 { [entityId]: { type, entityId } }
+    selectedPawns:[],            // ADR-29 多选小人编队列表
     carry:{},                    // 远征背包 {itemId: n}
     fireCd:0, iFrameT:0, hurtFlash:0, noiseT:0,
     camX:0, camY:0, shake:0,
@@ -1344,6 +1346,7 @@ window.APH = window.APH || {};
       drawSelectedRing(s.clock);
       drawDesignations(s.clock);
       drawOrderDragBox();
+      drawPawnDragBox();
       drawTutorialArrow(s.clock);
       drawDebugMark();
       APH.UI.updHUD();
@@ -1541,6 +1544,35 @@ window.APH = window.APH || {};
     ctx2.strokeStyle = '#59d9ff';
     ctx2.lineWidth = 1.5;
     ctx2.setLineDash([5, 4]);
+    ctx2.strokeRect(minX, minY, w, h);
+    ctx2.restore();
+  }
+
+  /* ADR-29 / Ticket #162: 小人编队框选矩形渲染 */
+  function drawPawnDragBox(){
+    if(!pawnDrag || !pawnDragStart || !pawnDragEnd) return;
+    var s = APH.state;
+    if(s.scene !== 'home') return;
+    var cv2 = document.getElementById('cv');
+    if(!cv2) return;
+    var ctx2 = cv2.getContext('2d');
+
+    var sx0 = pawnDragStart.x - s.camX + vpW()/2;
+    var sy0 = pawnDragStart.y - s.camY + vpH()/2;
+    var sx1 = pawnDragEnd.x - s.camX + vpW()/2;
+    var sy1 = pawnDragEnd.y - s.camY + vpH()/2;
+
+    var minX = Math.min(sx0, sx1);
+    var maxX = Math.max(sx0, sx1);
+    var minY = Math.min(sy0, sy1);
+    var maxY = Math.max(sy0, sy1);
+    var w = maxX - minX, h = maxY - minY;
+
+    ctx2.save();
+    ctx2.fillStyle = 'rgba(89,217,255,0.12)';
+    ctx2.fillRect(minX, minY, w, h);
+    ctx2.strokeStyle = '#59d9ff';
+    ctx2.lineWidth = 1.2;
     ctx2.strokeRect(minX, minY, w, h);
     ctx2.restore();
   }
@@ -2095,6 +2127,22 @@ window.APH = window.APH || {};
       TOGGLE_DRAFT: function(){
         var s = APH.state;
         if(s.mode !== 'running' || s.scene !== 'home') return false;
+        if(s.selectedPawns && s.selectedPawns.length > 1){
+          var anyUndrafted = s.selectedPawns.some(function(p){ return !p.drafted && p !== APH.Ent.findPlayer(); });
+          var targetState = anyUndrafted;
+          s.selectedPawns.forEach(function(p){
+            if(p.type === 'player' || p.id === 'player') s.playerDrafted = targetState;
+            else p.drafted = targetState;
+            p.userOrder = null;
+            p.walking = false;
+          });
+          var msg = targetState ? ('✔ 编队 ' + s.selectedPawns.length + ' 人已全员立正征召 (战斗戒备)') : ('✔ 编队已全员解除征召 (归队作息)');
+          APH.UI.floatText(msg, targetState ? '#ff4d4d' : '#7dffab');
+          updateCmdPanel();
+          updateInspectorNow();
+          if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+          return true;
+        }
         if(s.selectedRid){
           var ent = selectedPawnEnt();
           if(ent){
@@ -2291,6 +2339,13 @@ window.APH = window.APH || {};
         orderTo = { x: wx0, y: wy0 };
         return;
       }
+      /* ADR-29: 鼠标拉框多选编队 — 按下开始 (非规划、非建造且左键) */
+      if(s0.scene==='home' && !s0.orderTool && !s0.buildMode && e.button===0){
+        pawnDrag = true;
+        var wxP = e.clientX-vpW()/2+s0.camX, wyP = e.clientY-vpH()/2+s0.camY;
+        pawnDragStart = { x: wxP, y: wyP };
+        pawnDragEnd = { x: wxP, y: wyP };
+      }
       /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
       if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate'||s0.buildMode==='bl_spike_trap'||s0.buildMode==='bl_sandbag')){
         wallDrag=true; wallLast=null; wallPlaced={};
@@ -2313,52 +2368,79 @@ window.APH = window.APH || {};
         if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
         return;
       }
-      if(s0.selectedRid){
-        var ent = selectedPawnEnt();
-        if(ent){
-          var wx = e.clientX - vpW()/2 + s0.camX;
-          var wy = e.clientY - vpH()/2 + s0.camY;
-          var pickR = 34;
+      var activeSquad = (s0.selectedPawns && s0.selectedPawns.length > 0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
+      if(activeSquad.length > 0){
+        var wx = e.clientX - vpW()/2 + s0.camX;
+        var wy = e.clientY - vpH()/2 + s0.camY;
+        var pickR = 34;
 
-          /* 检查是否右键点击了被规划标记的目标 (树木/矿石) */
-          var hitFlora = s0.entities.find(function(en){
-            return en && en.type === T.FLORA && !en.dead && U.dst(en.x, en.y, wx, wy) <= pickR;
+        /* 1. 检查是否右键集火具体敌人 */
+        var hitEnemy = s0.entities.find(function(en){
+          return en && en.type === T.ENEMY && !en.dead && !en.isSoldier && U.dst(en.x, en.y, wx, wy) <= pickR;
+        });
+        if(hitEnemy){
+          activeSquad.forEach(function(p){
+            p.userOrder = { type: 'attack', enemy: hitEnemy };
+            if(p.type === 'player' || p.id === 'player') s0.playerDrafted = true;
+            else p.drafted = true;
           });
-          if(hitFlora && s0.designations && s0.designations[hitFlora.id]){
-            ent.userOrder = { type: 'gather', flora: hitFlora };
-            APH.UI.floatText('✔ 优先执行：开采目标', '#7dffab');
-            APH.state.parts.push({ t: 'ping', x: hitFlora.x, y: hitFlora.y, life: 0.8, max: 0.8 });
-            updateCmdPanel();
-            updateInspectorNow();
-            return;
-          }
-
-          /* 检查是否右键点击了掉落物 */
-          var hitDrop = s0.entities.find(function(en){
-            return en && en.type === T.DROPPED && !en.dead && U.dst(en.x, en.y, wx, wy) <= 28;
-          });
-          if(hitDrop){
-            ent.userOrder = { type: 'haul', pile: hitDrop };
-            APH.UI.floatText('✔ 优先执行：搬运物资', '#7dffab');
-            APH.state.parts.push({ t: 'ping', x: hitDrop.x, y: hitDrop.y, life: 0.8, max: 0.8 });
-            updateCmdPanel();
-            updateInspectorNow();
-            return;
-          }
-
-          /* 右键点击空旷地面 → 下达移动令 */
-          ent.userOrder = { type: 'move', x: wx, y: wy };
-          APH.UI.floatText('✔ 移动指令', '#8fd4ff');
-          APH.state.parts.push({ t: 'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
+          APH.UI.floatText('✔ 全队集火目标！', '#ff4d4d');
+          APH.state.parts.push({ t: 'ping', x: hitEnemy.x, y: hitEnemy.y, life: 0.8, max: 0.8 });
           updateCmdPanel();
           updateInspectorNow();
           return;
         }
-        deselectPawn();
+
+        /* 2. 检查是否右键点击了被规划标记的目标 (树木/矿石) */
+        var hitFlora = s0.entities.find(function(en){
+          return en && en.type === T.FLORA && !en.dead && U.dst(en.x, en.y, wx, wy) <= pickR;
+        });
+        if(hitFlora && s0.designations && s0.designations[hitFlora.id]){
+          activeSquad.forEach(function(p){
+            p.userOrder = { type: 'gather', flora: hitFlora };
+          });
+          APH.UI.floatText('✔ 优先执行：开采目标', '#7dffab');
+          APH.state.parts.push({ t: 'ping', x: hitFlora.x, y: hitFlora.y, life: 0.8, max: 0.8 });
+          updateCmdPanel();
+          updateInspectorNow();
+          return;
+        }
+
+        /* 3. 检查是否右键点击了掉落物 */
+        var hitDrop = s0.entities.find(function(en){
+          return en && en.type === T.DROPPED && !en.dead && U.dst(en.x, en.y, wx, wy) <= 28;
+        });
+        if(hitDrop){
+          activeSquad.forEach(function(p){
+            p.userOrder = { type: 'haul', pile: hitDrop };
+          });
+          APH.UI.floatText('✔ 优先执行：搬运物资', '#7dffab');
+          APH.state.parts.push({ t: 'ping', x: hitDrop.x, y: hitDrop.y, life: 0.8, max: 0.8 });
+          updateCmdPanel();
+          updateInspectorNow();
+          return;
+        }
+
+        /* 4. 右键散兵线列队前进 */
+        var N = activeSquad.length;
+        activeSquad.forEach(function(p, idx){
+          var offsetX = (idx - (N - 1) / 2) * 26;
+          var tx = wx + offsetX, ty = wy;
+          if(p.type === 'player' || p.id === 'player'){
+            s0.target = { x: tx, y: ty };
+          } else {
+            p.userOrder = { type: 'move', x: tx, y: ty };
+          }
+        });
+        APH.UI.floatText('✔ 战术移动 (' + N + '人)', '#8fd4ff');
+        APH.state.parts.push({ t: 'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
+        updateCmdPanel();
+        updateInspectorNow();
         return;
       }
       if(s0.selectedTarget && s0.selectedTarget.type !== 'player'){
         s0.selectedTarget = { type: 'player' };
+        s0.selectedPawns = [];
         updateInspectorNow();
       }
     });
@@ -2367,6 +2449,9 @@ window.APH = window.APH || {};
       downX=e.clientX; downY=e.clientY;
       if(orderDrag){
         orderTo = { x: e.clientX-vpW()/2+APH.state.camX, y: e.clientY-vpH()/2+APH.state.camY };
+      }
+      if(pawnDrag){
+        pawnDragEnd = { x: e.clientX-vpW()/2+APH.state.camX, y: e.clientY-vpH()/2+APH.state.camY };
       }
       /* T2 拖拽续铺: 从上一格到当前格增量线段(防从起点重算的幻影格+重试刷屏) */
       if(wallDrag && APH.state.buildMode && APH.state.scene==='home'){
@@ -2387,6 +2472,34 @@ window.APH = window.APH || {};
     cv.addEventListener('pointerup',function(e){
       wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
       if(e.button===2) return;   /* 右键已在 contextmenu 处理 */
+      if(pawnDrag){
+        pawnDrag = false;
+        var dDistP = Math.abs(pawnDragEnd.x - pawnDragStart.x) + Math.abs(pawnDragEnd.y - pawnDragStart.y);
+        if(dDistP >= 18){
+          var s0 = APH.state;
+          var boxed = APH.Colony.boxSelectEntities(s0.entities, pawnDragStart.x, pawnDragStart.y, pawnDragEnd.x, pawnDragEnd.y);
+          var pawns = boxed.filter(function(en){ return en && !en.dead && en.type === T.RESIDENT; });
+          var minX = Math.min(pawnDragStart.x, pawnDragEnd.x), maxX = Math.max(pawnDragStart.x, pawnDragEnd.x);
+          var minY = Math.min(pawnDragStart.y, pawnDragEnd.y), maxY = Math.max(pawnDragStart.y, pawnDragEnd.y);
+          if(s0.px >= minX && s0.px <= maxX && s0.py >= minY && s0.py <= maxY){
+            pawns.unshift(APH.Ent.findPlayer() || { type: 'player', id: 'player', name: '指挥官' });
+          }
+          if(pawns.length > 0){
+            s0.selectedPawns = pawns;
+            var first = pawns[0];
+            if(first.type === 'player' || first.id === 'player'){
+              s0.selectedTarget = { type: 'player' };
+              deselectPawn();
+            } else {
+              selectPawn(first.rid || first.id);
+            }
+            APH.UI.floatText('✔ 编队已选中 ' + pawns.length + ' 名成员 (按 R 键战备征召)', '#59d9ff');
+            updateInspectorNow();
+            if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+            return;
+          }
+        }
+      }
       if(orderDrag){
         orderDrag = false;
         var s0 = APH.state;
@@ -3463,8 +3576,30 @@ window.APH = window.APH || {};
       }
       e.breaking=null;
       /* ADR-29 战备征召中: 拔枪立正，不参与日常工作/游荡/进食 (右键战术指令优先) */
-      if(e.drafted && (!e.userOrder || e.userOrder.type === 'move')){
-        if(!e.userOrder){
+      if(e.drafted){
+        e.fireCd = Math.max(0, (e.fireCd || 0) - dt);
+        /* 自动索敌或集火开火 */
+        var targetEn = null;
+        if(e.userOrder && e.userOrder.type === 'attack' && e.userOrder.enemy && !e.userOrder.enemy.dead){
+          targetEn = e.userOrder.enemy;
+        } else {
+          var aimR = (CFG.combat && CFG.combat.plasmaR) || 240;
+          targetEn = APH.Ent.findNearest(s.entities, T.ENEMY, e.x, e.y, aimR, function(en){
+            return en && !en.dead && !en.isSoldier;
+          });
+        }
+        if(targetEn){
+          e.face = Math.atan2(targetEn.y - e.y, targetEn.x - e.x);
+          if(e.fireCd <= 0){
+            e.fireCd = 0.75;
+            var pDmg = (CFG.combat && CFG.combat.plasmaDmg) || 15;
+            var projSpd = 400;
+            var proj = APH.Combat.makeProj(e.x, e.y - 12, Math.cos(e.face)*projSpd, Math.sin(e.face)*projSpd, 'player', pDmg);
+            s.entities.push(proj);
+            if(s.parts) s.parts.push({ t:'spark', x:e.x, y:e.y-12, life:0.15, max:0.15 });
+          }
+        }
+        if(!e.userOrder || e.userOrder.type !== 'move'){
           e.walking = false;
           e.tx = e.x; e.ty = e.y;
           return;

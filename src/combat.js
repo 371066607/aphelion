@@ -1055,6 +1055,17 @@ APH.Combat = (function(){
     return true;
   }
 
+  /* ---------- ADR-29 / Ticket #162: 掩体判定纯函数 ---------- */
+  function hasCover(ent, buildings){
+    if(!ent || !buildings || !Array.isArray(buildings)) return false;
+    for(var i = 0; i < buildings.length; i++){
+      var b = buildings[i];
+      if(!b || (b.id !== 'bl_sandbag' && b.id !== 'bl_wall')) continue;
+      if(U.dst(ent.x, ent.y, b.x, b.y) <= 42) return true;
+    }
+    return false;
+  }
+
   /* ---- 玩家受伤(含无敌帧) ---- */
   function hurtPlayer(dmg, source){
     var s = APH.state;
@@ -1062,6 +1073,11 @@ APH.Combat = (function(){
     /* #66 床边睡眠: 受伤即醒(伤害真正落地时) */
     if(s.meta && s.meta.playerNeeds && s.meta.playerNeeds.isSleeping){
       if(window.APH.Res && window.APH.Res.playerWake) window.APH.Res.playerWake(s.meta.playerNeeds);
+    }
+    /* ADR-29 掩体减免 (沙袋/墙角 55% 伤害减免) */
+    if(s.scene === 'home' && hasCover({ x: s.px, y: s.py }, s.colony && s.colony.buildings)){
+      dmg = Math.max(1, Math.round(dmg * 0.45));
+      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('🛡️ 掩体抵挡伤害 (55%)', '#59d9ff');
     }
     s.iFrameT = 0.5;
     s.hp -= dmg;
@@ -1396,6 +1412,7 @@ APH.Combat = (function(){
     strikeTrap:strikeTrap, pathHasTrap:pathHasTrap, trapBreachFocus:trapBreachFocus,
     /* T5 弹道掩体 */
     segHitBox:segHitBox,
+    hasCover:hasCover,
     raidBaseSuccess:raidBaseSuccess,
     /* 袭家防务推进高阶接缝 (ADR-21) */
     startRaid:startRaid,

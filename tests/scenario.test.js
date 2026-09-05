@@ -3071,6 +3071,64 @@ test('#161 colonist_bar: 顶部小人条选择、R 键战备征召切换与聚�
   M.cmd.deselect();
 });
 
+test('#162 squad: 鼠标拉框多选编队、批量征召、散兵线战术集结与掩体交火', () => {
+  const ents = cmdHomeSetup();
+  const p1 = ents[0], p2 = ents[1];
+  p1.x = S.px + 50; p1.y = S.py + 50;
+  p2.x = S.px + 90; p2.y = S.py + 60;
+  p1.drafted = false; p2.drafted = false;
+  S.selectedPawns = [];
+
+  // 1. 框选多选编队：框选 [S.px, S.py] 到 [S.px+120, S.py+120]
+  const boxed = APH.Colony.boxSelectEntities(S.entities, S.px, S.py, S.px + 120, S.py + 120);
+  const pawns = boxed.filter(e => e.type === T.RESIDENT);
+  A(pawns.length === 2, '应框选 2 名小人');
+  S.selectedPawns = pawns;
+
+  // 2. 批量征召：按 R 键全队拔枪立正
+  APH.Input.dispatchAction('TOGGLE_DRAFT');
+  A(p1.drafted === true && p2.drafted === true, '编队全员应进入征召战备状态');
+  A(p1.walking === false && p2.walking === false, '征召后小人应立正待命');
+
+  // 3. 右键地面：散兵线列队战术前进 (两小人终点产生间距偏移)
+  const targetPt = { x: S.px + 200, y: S.py + 200 };
+  const N = S.selectedPawns.length;
+  S.selectedPawns.forEach((p, idx) => {
+    const offsetX = (idx - (N - 1) / 2) * 26;
+    p.userOrder = { type: 'move', x: targetPt.x + offsetX, y: targetPt.y };
+  });
+  A(p1.userOrder.x !== p2.userOrder.x, '两名小人应保持战术横向散兵间距');
+  A(Math.abs(p1.userOrder.x - p2.userOrder.x) === 26, '散兵间距应为 26px');
+
+  // 4. 敌对目标接近 → 征召小人自动举枪开火射击
+  const enemy = { id: 'en_squad_test', type: T.ENEMY, x: p1.x + 80, y: p1.y, hp: 40, dead: false, faction: { gene: { size: 1 } } };
+  S.entities.push(enemy);
+  p1.fireCd = 0;
+  const projBefore = S.entities.filter(e => e.type === T.PROJECTILE).length;
+  M.updateHome(0.016);
+  const projAfter = S.entities.filter(e => e.type === T.PROJECTILE).length;
+  A(projAfter > projBefore, '敌人进入射程后征召小人应自动发射等离子弹丸');
+
+  // 5. 右键敌人强制集火
+  S.selectedPawns.forEach(p => { p.userOrder = { type: 'attack', enemy: enemy }; });
+  A(p1.userOrder.type === 'attack' && p2.userOrder.type === 'attack', '全队应进入集火指令');
+  A(p1.userOrder.enemy === enemy && p2.userOrder.enemy === enemy, '集火目标一致');
+
+  // 6. 掩体减伤
+  S.colony.buildings.push({ id: 'bl_sandbag', x: S.px, y: S.py });
+  S.hp = 100; S.iFrameT = 0; S.scene = 'home';
+  const hpBefore = S.hp;
+  APH.Combat.hurtPlayer(20, 'enemy_test');
+  const damageTaken = hpBefore - S.hp;
+  A(damageTaken === 9, '站在沙袋掩体旁伤害应由 20 减免至 9 (55% 减伤), got: ' + damageTaken);
+
+  // 7. 解除征召与清空编队
+  APH.Input.dispatchAction('TOGGLE_DRAFT');
+  A(p1.drafted === false && p2.drafted === false, '解除后全队应脱离战备');
+  S.selectedPawns = [];
+  M.cmd.deselect();
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

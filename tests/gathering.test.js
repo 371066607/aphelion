@@ -141,3 +141,26 @@ test('designation: boxSelectEntities 矩形框选几何筛选纯函数', () => {
   const sel3 = boxSel(list, 0, 0, 50, 50);
   A(sel3.length === 0, '未命中应返回空数组');
 });
+
+test('combat: hasCover 沙袋与墙体掩体加成纯函数', () => {
+  const hasCover = APH.Combat.hasCover;
+  A(typeof hasCover === 'function', 'hasCover 必须存在');
+
+  const blds = [
+    { id: 'bl_sandbag', x: 200, y: 200 },
+    { id: 'bl_wall', x: 400, y: 400 },
+    { id: 'bl_farm', x: 600, y: 600 },
+  ];
+
+  // 1. 靠近沙袋 (距离 30px <= 42px) -> 有掩体
+  A(hasCover({ x: 215, y: 200 }, blds) === true, '靠近沙袋应判定有掩体');
+
+  // 2. 靠近墙体 -> 有掩体
+  A(hasCover({ x: 400, y: 420 }, blds) === true, '靠近墙体应判定有掩体');
+
+  // 3. 靠近农场 (普通建筑) -> 无掩体
+  A(hasCover({ x: 610, y: 600 }, blds) === false, '靠近农场不应算掩体');
+
+  // 4. 远离沙袋 (距离 100px) -> 无掩体
+  A(hasCover({ x: 300, y: 200 }, blds) === false, '远离沙袋应判定无掩体');
+});
