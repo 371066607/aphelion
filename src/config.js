@@ -421,6 +421,15 @@ APH.CFG = {
     typePriority: ['tree', 'rock_stone', 'rock_iron', 'bush_berry', 'bush_herb'], // 采集目标优先级
   },
 
+  /* 环世界式征召与直接命令 (ADR-19) */
+  command: {
+    pickR: 34,          // 点选居民判定半径 (px)
+    moveArriveR: 8,     // 移动令到达半径
+    gatherArriveR: 48,  // 采集令到达半径 (与自动采集一致)
+    sleepArriveR: 40,   // 休息令到达半径
+    selectedRingR: 22,  // 选中环半径
+  },
+
   /* 微环境温度与冷热控制 (ADR-25 / Spec #143) */
   temperature: {
     weatherBaseTemp: {

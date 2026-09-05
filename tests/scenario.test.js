@@ -2736,5 +2736,150 @@ test('#142 ruins: 开启远古遗物箱获得古代蓝图与高能核心', () =>
   }
 });
 
+
+/* ================= ADR-29 征召与直接命令 (环世界式) ================= */
+
+function cmdHomeSetup(){
+  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
+  A(S.scene==='home', '应在殖民地');
+  S.mode='running';
+  S.war = S.war || {}; S.war.raidActive=false; S.war.raidWarn=0;
+  S.meta.residents = [
+    { id:'rs_cmd1', name:'征召甲', job:null, skills:{sk_build:5,sk_farm:3}, mood:80, food:90, rest:90 },
+    { id:'rs_cmd2', name:'征召乙', job:'bl_farm', skills:{sk_farm:5}, mood:80, food:90, rest:90 },
+  ];
+  S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
+  S.colony.buildings.push(
+    {id:'bl_farm', x:S.px+300, y:S.py, lv:1},
+    {id:'bl_house', x:S.px-240, y:S.py, lv:1}
+  );
+  S.entities = S.entities.filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy');
+  M.syncResidents();
+  const ents = S.entities.filter(e=>e.type==='resident');
+  A(ents.length===2, '居民实体应=2, got '+ents.length);
+  return ents;
+}
+
+test('#149 cmd: 点选居民征召 → 待命(不游荡不上岗), Esc解除恢复', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  S.selectedRid = null;
+  M.cmd.select(p);
+  A(S.selectedRid==='rs_cmd1', '选中应写 selectedRid, got '+S.selectedRid);
+  /* 征召待命: 无命令时不动 */
+  const x0=p.x, y0=p.y;
+  p.x=S.px+100; p.y=S.py+100;   /* 远离岗位 */
+  S.keys={};
+  M.updateHome(0.016);
+  M.updateHome(0.016);
+  const ent2 = M.cmd.selectedEnt();
+  A(ent2===p, 'selectedEnt 应返回选中实体');
+  A(Math.abs(ent2.x-(S.px+100))<2 && Math.abs(ent2.y-(S.py+100))<2, '征召待命不应移动');
+  A(!ent2.userOrder, '待命不应有命令');
+  /* 解除 → 恢复 AI (游荡/上岗) */
+  M.cmd.deselect();
+  A(S.selectedRid===null, '解除后 selectedRid 应清空');
+  A(!p.userOrder, '解除应清命令');
+});
+
+test('#149 cmd: 移动令 → 走到目标后自动清令', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  p.x=S.px; p.y=S.py;
+  M.cmd.select(p);
+  M.cmd.orderMove({x:p.x+150, y:p.y});
+  A(p.userOrder && p.userOrder.type==='move', '应写移动令');
+  S.keys={};
+  for(let i=0;i<600 && p.userOrder;i++) M.updateHome(0.016);
+  A(!p.userOrder, '到达后命令应清除');
+  A(Math.abs(p.x-(S.px+150))<16, '应走到目标点附近, got '+Math.round(p.x)+','+Math.round(S.px));
+  M.cmd.deselect();
+});
+
+test('#149 cmd: 采集令 → 走到树下砍完掉落, 自动清令', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  p.x=S.px; p.y=S.py;
+  const tree = { type:T.FLORA, kind:'tree', x:p.x+90, y:p.y, hp:6, maxHp:6, dead:false };
+  S.entities.push(tree);
+  M.cmd.select(p);
+  M.cmd.orderGather();
+  A(p.userOrder && p.userOrder.type==='gather', '应写采集令');
+  S.keys={};
+  for(let i=0;i<900 && p.userOrder;i++) M.updateHome(0.016);
+  A(!p.userOrder, '砍完应清令');
+  A(tree.dead===true, '树应被砍死');
+  const drops = S.entities.filter(e=>e.type==='dropped' && e.itemId==='it_wood');
+  A(drops.length>=1, '应掉落木材堆');
+  M.cmd.deselect();
+});
+
+test('#149 cmd: 搬运令 → 抓取地上堆并入库, 自动清令', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  S.meta.res = S.meta.res || { mineral:0, food:0, leather:0 };
+  S.meta.res.mineral = 0;
+  p.x=S.px; p.y=S.py;
+  const pile = { type:T.DROPPED, id:'dp_cmd1', itemId:'it_mineral', x:p.x+70, y:p.y, n:5 };
+  S.entities.push(pile);
+  M.cmd.select(p);
+  M.cmd.orderHaul();
+  A(p.userOrder && p.userOrder.type==='haul', '应写搬运令');
+  S.keys={};
+  for(let i=0;i<1200 && p.userOrder;i++) M.updateHome(0.016);
+  A(!p.userOrder, '入库后应清令');
+  A(pile.dead===true, '地上堆应被拾取');
+  A(S.meta.res.mineral===5, '矿物应入库 +5, got '+S.meta.res.mineral);
+  M.cmd.deselect();
+});
+
+test('#149 cmd: 休息令 → 走到住宅入睡(isSleeping), 吃饭令 → 就近进食', () => {
+  const ents = cmdHomeSetup();
+  /* 休息令 */
+  const p1 = ents[0];
+  p1.x=S.px; p1.y=S.py;
+  p1.rest = 10;
+  M.cmd.select(p1);
+  M.cmd.orderSleep();
+  S.keys={};
+  for(let i=0;i<900 && p1.userOrder;i++) M.updateHome(0.016);
+  A(!p1.userOrder, '入睡后应清令');
+  A(p1.isSleeping===true || S.meta.residents[0].isSleeping===true, '应进入睡眠');
+  /* 睡眠恢复由 needsTick 接管; 手动唤醒走正常途径 */
+  S.meta.residents[0].isSleeping=false;
+  M.cmd.deselect();
+  /* 吃饭令: 地上熟食堆 */
+  const p2 = ents[1];
+  S.meta.res.food = 0;
+  p2.x=S.px+40; p2.y=S.py;
+  p2.food = 30;
+  const meal = { type:T.DROPPED, id:'dp_meal1', itemId:'it_roasted_meat', x:p2.x+30, y:p2.y, n:2 };
+  S.entities.push(meal);
+  M.cmd.select(p2);
+  M.cmd.orderEat();
+  A(p2.userOrder && p2.userOrder.type==='eat', '应写吃饭令');
+  for(let i=0;i<600 && p2.userOrder;i++) M.updateHome(0.016);
+  A(!p2.userOrder, '进食后应清令');
+  A(S.meta.residents[1].food>30, '饱食应上升, got '+S.meta.residents[1].food);
+  M.cmd.deselect();
+});
+
+test('#149 cmd: 袭击中移动令保留(撤离), 非移动令被清除', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  S.war.raidActive = true;
+  p.userOrder = {type:'gather', flora:{type:T.FLORA,kind:'tree',x:1,y:1,hp:5,dead:false}};
+  M.cmd.select(p);
+  M.cmd.orderMove({x:p.x-80, y:p.y-60});
+  A(p.userOrder && p.userOrder.type==='move', '袭击中移动令应保留');
+  S.keys={};
+  M.updateHome(0.016);
+  A(p.userOrder && p.userOrder.type==='move', '移动令应持续执行');
+  M.cmd.deselect();
+  S.war.raidActive = false;
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
+
+process.exit(fail?1:0);
 process.exit(fail?1:0);

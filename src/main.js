@@ -68,6 +68,7 @@ window.APH = window.APH || {};
     var s = APH.state;
     if(s.scene==='expedition') return;
     closeColonyOverlays();
+    s.selectedRid=null;   /* ADR-29: 离开家园解除征召 (实体将重建) */
     saveColony();
     var sh=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
     APH.UI.floatText(sh.mission,'#ffc857');
@@ -1295,9 +1296,11 @@ window.APH = window.APH || {};
       selfCenter();
       /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
+      drawSelectedRing(s.clock);
       drawTutorialArrow(s.clock);
       drawDebugMark();
       APH.UI.updHUD();
+      if(tickN%15===0) updateCmdPanel();   /* ADR-29: 命令面板状态行低频刷新 */
       return;
     }
 
@@ -1385,6 +1388,39 @@ window.APH = window.APH || {};
     /* 软居中: 每帧额外把偏差的30%收掉(叠加在lerp之上, 保证稳态偏差<40px) */
     s.camX += dx*0.30;
     s.camY += dy*0.30;
+  }
+
+  /* ADR-29 征召渲染: 选中环 + 命令旗标 (世界坐标层, 在实体后绘制) */
+  function drawSelectedRing(time){
+    var s=APH.state;
+    if(!s.selectedRid || s.scene!=='home') return;
+    var ent=selectedPawnEnt();
+    if(!ent){ s.selectedRid=null; updateCmdPanel(); return; }   /* 选中者死亡/离场 → 自动解除 */
+    var ctx2=document.getElementById('cv').getContext('2d');
+    var C=CFG.command||{};
+    var ringR=(C.selectedRingR!=null)?C.selectedRingR:22;
+    /* 脚底选中环 (脉动) */
+    var pulse=Math.sin(time*4)*.5+.5;
+    ctx2.strokeStyle='rgba(89,217,255,'+(0.55+pulse*.4)+')';
+    ctx2.lineWidth=2;
+    ctx2.beginPath();
+    ctx2.ellipse(ent.x, ent.y+10, ringR, ringR*.42, 0, 0, U.TAU);
+    ctx2.stroke();
+    /* 命令旗标: 虚线到目标点 */
+    var uo=ent.userOrder;
+    if(uo && uo.type==='move'){
+      ctx2.setLineDash([6,6]);
+      ctx2.strokeStyle='rgba(125,255,171,.55)';
+      ctx2.beginPath();
+      ctx2.moveTo(ent.x, ent.y+6);
+      ctx2.lineTo(uo.x, uo.y);
+      ctx2.stroke();
+      ctx2.setLineDash([]);
+      ctx2.strokeStyle='rgba(125,255,171,.9)';
+      ctx2.beginPath();
+      ctx2.arc(uo.x, uo.y, 8+pulse*3, 0, U.TAU);
+      ctx2.stroke();
+    }
   }
 
   function drawTutorialArrow(time){
@@ -1986,6 +2022,7 @@ window.APH = window.APH || {};
       },
       CANCEL_OR_CLOSE: function(){
         var s=APH.state;
+        if(s.selectedRid){ deselectPawn(); return true; }   /* ADR-29: Esc 解除征召 */
         if(s.buildMode){ s.buildMode=null; APH.UI.setHint(''); return true; }
         if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return true;
         return false;
@@ -2085,6 +2122,12 @@ window.APH = window.APH || {};
         tryPlace(s0.buildMode, wx0, wy0);
       }
     });
+    /* ADR-29 右键 = 解除征召 (并阻止浏览器菜单) */
+    cv.addEventListener('contextmenu',function(e){
+      e.preventDefault();
+      var s0=APH.state;
+      if(s0.selectedRid){ deselectPawn(); }
+    });
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
@@ -2106,6 +2149,7 @@ window.APH = window.APH || {};
     });
     cv.addEventListener('pointerup',function(e){
       wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
+      if(e.button===2) return;   /* 右键已在 contextmenu 处理 */
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
         /* 建造模式: 点地放置(墙/闸门已在 pointerdown 铺设, 防重复) */
         if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'&&s.buildMode!=='bl_spike_trap'&&s.buildMode!=='bl_sandbag'){
@@ -2114,6 +2158,23 @@ window.APH = window.APH || {};
           return;
         }
         var t={x:e.clientX-vpW()/2+APH.state.camX, y:e.clientY-vpH()/2+APH.state.camY};
+        /* ADR-29 征召交互: 家园+非建造模式 → 点选居民/对选中居民下令 */
+        if(s.scene==='home' && !s.buildMode){
+          var cmd=(CFG&&CFG.command)||{};
+          var pickR=(cmd.pickR!=null)?cmd.pickR:34;
+          var hitRes=s.entities.find(function(en){
+            return en && en.type===T.RESIDENT && !en.dead && U.dst(en.x,en.y,t.x,t.y)<=pickR;
+          });
+          if(hitRes){
+            if(s.selectedRid===(hitRes.rid||hitRes.id)){ deselectPawn(); }   /* 再点同一位=解除 */
+            else selectPawn(hitRes.rid||hitRes.id);
+            return;
+          }
+          if(s.selectedRid){
+            orderMove(t);
+            return;
+          }
+        }
         APH.state.target=t;
         APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
       }
@@ -2697,6 +2758,101 @@ window.APH = window.APH || {};
     for(var i=0;i<list.length;i++) if(list[i].id===id) return list[i];
     return null;
   }
+  /* ================= ADR-29 征召与直接命令 (环世界式) ================= */
+  function selectedPawnEnt(){
+    var s=APH.state;
+    if(!s.selectedRid) return null;
+    return s.entities.find(function(en){
+      return en && en.type===T.RESIDENT && !en.dead && (en.rid||en.id)===s.selectedRid;
+    }) || null;
+  }
+  function selectPawn(rid){
+    var s=APH.state;
+    s.selectedRid=rid;
+    var ent=selectedPawnEnt();
+    var r=ent?residentOf(ent):null;
+    APH.UI.floatText('已选中 '+(r?r.name:'居民')+' · 左键点地下令, Esc 解除', '#59d9ff');
+    updateCmdPanel();
+  }
+  function deselectPawn(){
+    var s=APH.state;
+    var ent=selectedPawnEnt();
+    if(ent) ent.userOrder=null;
+    s.selectedRid=null;
+    updateCmdPanel();
+  }
+  function orderMove(t){
+    var ent=selectedPawnEnt();
+    if(!ent) return;
+    ent.userOrder={type:'move', x:t.x, y:t.y};
+    APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
+    updateCmdPanel();
+  }
+  /* 命令面板辅助: 按钮点击下各类令 (bindBuildUI 绑定, CMD_* 键盘等价路径也走这里) */
+  function orderGather(){
+    var s=APH.state, ent=selectedPawnEnt();
+    if(!ent) return;
+    var near=APH.Ent.findNearest(s.entities, T.FLORA, ent.x, ent.y, (CFG.gathering&&CFG.gathering.searchRadius)||800, function(fe){ return fe && !fe.dead; });
+    if(!near){ APH.UI.floatText('附近没有可采集的资源','#ff9a9a'); return; }
+    ent.userOrder={type:'gather', flora:near};
+    APH.UI.floatText('→ 前去采集','#c8e89a');
+    updateCmdPanel();
+  }
+  function orderHaul(){
+    var s=APH.state, ent=selectedPawnEnt();
+    if(!ent) return;
+    var H=CFG.haul||{};
+    var seekR=H.seekR!=null?H.seekR:1200;
+    var drop=nearestDrop(ent, seekR);
+    if(!drop){ APH.UI.floatText('附近没有可搬运的物资','#ff9a9a'); return; }
+    ent.userOrder={type:'haul', pile:drop};
+    APH.UI.floatText('→ 前去搬运','#8fd4ff');
+    updateCmdPanel();
+  }
+  function orderSleep(){
+    var ent=selectedPawnEnt();
+    if(!ent) return;
+    ent.userOrder={type:'sleep'};
+    updateCmdPanel();
+  }
+  function orderEat(){
+    var ent=selectedPawnEnt();
+    if(!ent) return;
+    ent.userOrder={type:'eat'};
+    updateCmdPanel();
+  }
+  function updateCmdPanel(){
+    var panel=document.getElementById('cmdPanel');
+    if(!panel) return;
+    var s=APH.state;
+    var ent=selectedPawnEnt();
+    if(!s.selectedRid || !ent || s.scene!=='home'){
+      panel.style.display='none';
+      return;
+    }
+    var r=residentOf(ent);
+    var orderTxt='待命中';
+    if(ent.userOrder){
+      var ot=ent.userOrder.type;
+      orderTxt= ot==='move'?'移动中': ot==='gather'?'采集中': ot==='haul'?'搬运中': ot==='sleep'?'前往休息': ot==='eat'?'前往进食': '待命中';
+    }else if(ent.job){
+      orderTxt='岗位: '+ent.job;
+    }
+    panel.innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px">'+
+      '<span style="color:#59d9ff;font-weight:700">⦿ '+(r?r.name:'居民')+'</span>'+
+      '<span style="color:#8fa3cc;font-size:11px">'+orderTxt+'</span>'+
+      '<span style="flex:1"></span>'+
+      '<button data-cmd="gather" style="'+CMD_BTN_CSS+'">⛏ 采集</button>'+
+      '<button data-cmd="haul" style="'+CMD_BTN_CSS+'">📦 搬运</button>'+
+      '<button data-cmd="sleep" style="'+CMD_BTN_CSS+'">🛏 休息</button>'+
+      '<button data-cmd="eat" style="'+CMD_BTN_CSS+'">🍽 吃饭</button>'+
+      '<button data-cmd="dismiss" style="'+CMD_BTN_CSS+'color:#ff9a9a">✕ 解除</button>'+
+      '</div>';
+    panel.style.display='block';
+  }
+  var CMD_BTN_CSS='background:rgba(89,217,255,.10);border:1px solid rgba(89,217,255,.45);color:#bfe8ff;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;white-space:nowrap';
+
   function nearestMeal(e, rMax){
     var s=APH.state, best=null, bd=rMax;
     var bestCooked=null, bestCookedDist=rMax;
@@ -2975,6 +3131,101 @@ window.APH = window.APH || {};
         return;
       }
       e.breaking=null;
+      /* ADR-29 征召命令: 用户直接指令优先于一切自动行为 (失能者已在上方短路) */
+      if(e.userOrder && e.userOrder.type){
+        var uo=e.userOrder, C=CFG.command||{};
+        var spdO=spd*sickSpeedMul*wxMul*bagMul;
+        if(uo.type==='move'){
+          if(U.dst(e.x,e.y,uo.x,uo.y)<=((C.moveArriveR!=null)?C.moveArriveR:8)){
+            e.userOrder=null; e.walking=false; e.tx=e.x; e.ty=e.y;
+          }else{
+            e.tx=uo.x; e.ty=uo.y;
+            APH.Res.walkAround(e, {x:uo.x,y:uo.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        /* 袭击中只保留移动令 (手动撤离), 其余交还逃跑/战斗 AI */
+        if(raid){ e.userOrder=null; }
+        else if(uo.type==='gather'){
+          var uFl=uo.flora;
+          if(!uFl || uFl.dead || uFl.hp<=0){ e.userOrder=null; e.gathering=false; }
+          else if(U.dst(e.x,e.y,uFl.x,uFl.y)<=((C.gatherArriveR!=null)?C.gatherArriveR:48)){
+            var ugRes=APH.Colony.workOnFlora(uFl, r, dt);
+            e.gathering=true; e.walking=false;
+            if(ugRes.done && ugRes.dropItemId){
+              APH.Combat.spawnDrop(uFl.x, uFl.y, ugRes.dropItemId, ugRes.dropCount, {stock:true});
+              var ugName=(CFG.items[ugRes.dropItemId]&&CFG.items[ugRes.dropItemId].name)||ugRes.dropItemId;
+              APH.UI.floatText((r?r.name:'居民')+' 完成 '+ugName+'×'+ugRes.dropCount, '#7dffab');
+              e.userOrder=null; e.gathering=false;
+            }
+          }else{
+            e.gathering=false;
+            e.tx=uFl.x; e.ty=uFl.y;
+            APH.Res.walkAround(e, {x:uFl.x,y:uFl.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        else if(uo.type==='haul'){
+          if(!e.haulCarry){
+            var uPile=uo.pile;
+            if(!uPile || uPile.dead){ e.userOrder=null; }
+            else if(U.dst(e.x,e.y,uPile.x,uPile.y)<=grabR){
+              e.haulCarry={itemId:uPile.itemId, n:uPile.n||1};
+              uPile.dead=true;
+              APH.UI.floatText((e.name||'居民')+' 拾起物资','#8fd4ff');
+            }else{
+              e.tx=uPile.x; e.ty=uPile.y;
+              APH.Res.walkAround(e, {x:uPile.x,y:uPile.y}, dt, spdO, navGrid);
+            }
+            return;
+          }
+          /* 已抓取 → 送最近兼容仓储点入库 (同 doHaul 逻辑) */
+          var uSpot=(APH.Colony.findBestStorageSpot)?APH.Colony.findBestStorageSpot(e.haulCarry.itemId, s.colony&&s.colony.buildings, rooms, e):stock;
+          if(U.dst(e.x,e.y,uSpot.x,uSpot.y)<=dumpR){
+            APH.Colony.collectHome(s.meta, e.haulCarry.itemId, e.haulCarry.n||1);
+            var uhName=(CFG.items[e.haulCarry.itemId]&&CFG.items[e.haulCarry.itemId].name)||e.haulCarry.itemId;
+            APH.UI.floatText((e.name||'居民')+' 入库 '+uhName+'×'+(e.haulCarry.n||1),'#9fe8c8');
+            e.haulCarry=null; e.userOrder=null;
+          }else{
+            e.tx=uSpot.x; e.ty=uSpot.y;
+            APH.Res.walkAround(e, {x:uSpot.x,y:uSpot.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        else if(uo.type==='sleep'){
+          var uHouse=null, uHd=Infinity;
+          (s.colony.buildings||[]).forEach(function(ub){
+            if(ub.id!=='bl_house'||ub.dead) return;
+            var ud=U.dst(e.x,e.y,ub.x,ub.y);
+            if(ud<uHd){ uHd=ud; uHouse=ub; }
+          });
+          if(!uHouse){ e.userOrder=null; APH.UI.floatText('没有可休息的住宅','#ff9a9a'); }
+          else if(uHd<=((C.sleepArriveR!=null)?C.sleepArriveR:40)){
+            r.isSleeping=true; r.job=null; e.job=null; e.userOrder=null;
+            APH.UI.floatText((e.name||'居民')+' 开始休息','#b39dff');
+          }else{
+            e.tx=uHouse.x; e.ty=uHouse.y;
+            APH.Res.walkAround(e, {x:uHouse.x,y:uHouse.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        else if(uo.type==='eat'){
+          var ate=tryEatHere(e, r, grabR, dumpR);
+          if(ate || !nearestMeal(e, 1e9)){ e.userOrder=null; }
+          else{
+            var um=nearestMeal(e, 1e9);
+            e.tx=um.x; e.ty=um.y;
+            APH.Res.walkAround(e, {x:um.x,y:um.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        else { e.userOrder=null; }
+      }
+      /* ADR-29 征召待命: 被选中但无命令 → 不上岗不游荡 (饥饿时仍放行自动进食安全网) */
+      if(!raid && s.selectedRid && (e.rid||e.id)===s.selectedRid){
+        var rHungry = r && r.food!=null && r.food<eatBelow;
+        if(!rHungry){ e.walking=false; e.tx=e.x; e.ty=e.y; return; }
+      }
       var hungry=r && r.food!=null && r.food<eatBelow;
       /* T8: 有桌有座 → 优先去最近空椅坐吃 (座次分配已在本帧 seatMap) */
       var seat=!raid && hungry ? (seatMap[r.id]||null) : null;
@@ -3745,6 +3996,20 @@ window.APH = window.APH || {};
     btn.addEventListener('click',function(){ toggleBuildRow(); });
     var rb=document.getElementById('rosterBtn');
     if(rb) rb.addEventListener('click',function(){ if(APH.UI&&APH.UI.toggle) APH.UI.toggle('roster'); });
+    /* ADR-29 征召命令面板: 按钮下发各类令 */
+    var cp=document.getElementById('cmdPanel');
+    if(cp){
+      cp.addEventListener('click',function(ev){
+        var b=ev.target.closest('[data-cmd]');
+        if(!b) return;
+        var cmd=b.getAttribute('data-cmd');
+        if(cmd==='gather') orderGather();
+        else if(cmd==='haul') orderHaul();
+        else if(cmd==='sleep') orderSleep();
+        else if(cmd==='eat') orderEat();
+        else if(cmd==='dismiss') deselectPawn();
+      });
+    }
     /* ADR-28 RimWorld 式命令表：点击格子切换优先级 (0→1→2→3→0) */
     var resBody = document.getElementById('resBody');
     if(resBody){
@@ -3862,6 +4127,23 @@ window.APH = window.APH || {};
     residentsTick:residentsTick,
     syncResidents:syncResidentEntities,
     updateResidents:updateResidents,
+    /* ADR-29 征召与直接命令 (场景测试/程序化验证通道) */
+    cmd:{
+      select:function(eOrRid){
+        if(typeof eOrRid==='string') selectPawn(eOrRid);
+        else if(eOrRid) selectPawn(eOrRid.rid||eOrRid.id);
+        return APH.state.selectedRid||null;
+      },
+      deselect:deselectPawn,
+      selectedRid:function(){ return APH.state.selectedRid||null; },
+      selectedEnt:selectedPawnEnt,
+      orderMove:orderMove,
+      orderGather:orderGather,
+      orderHaul:orderHaul,
+      orderSleep:orderSleep,
+      orderEat:orderEat,
+      refreshPanel:updateCmdPanel,
+    },
     cycleSelectedJob:cycleSelectedJob,
     perfGuard:perfGuard,
     startRaid:startRaid,
