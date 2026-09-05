@@ -1006,15 +1006,17 @@ APH.Ent = (function(){
       if(s.hurtFlash>0) s.hurtFlash-=dt;
       return;
     }
-    /* 按键/指令唤醒: 先醒后动同一帧 */
-    if(sleeping && (hasKey || hasPanKey || s.target)){
+    /* 环世界: 镜头平移 (WASD) 与寻路目标不得把人摇醒。
+       唤醒入口: 征召、摇杆微操、受伤、E、精力回满。 */
+    if(sleeping && (hasKey || s.playerDrafted)){
       if(window.APH.Res && APH.Res.playerWake) APH.Res.playerWake(needs);
       sleeping = false;
     }
     if(sleeping){
       /* 睡眠中: 不移动、不寻路; 实体同步俯卧+清走位; 计时器照常衰减 */
-      if(pe){ pe.isSleeping = true; pe.moving = false; }   // #67 累塌: 清 stale 走位, 避免醒后残留走帧
+      if(pe){ pe.isSleeping = true; pe.moving = false; }
       s.target = null;
+      s.cmdIdleWalk = false;
       if(s.fireCd>0) s.fireCd-=dt;
       if(s.iFrameT>0) s.iFrameT-=dt;
       if(s.hurtFlash>0) s.hurtFlash-=dt;

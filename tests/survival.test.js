@@ -17,12 +17,13 @@ test('rest: needsTick 自然衰减精力 (7/跳)', function(){
   if (r.isSleeping) throw new Error('rest=73 不应进入睡眠');
 });
 
-test('rest: needsTick 精力 < 20 自动进入睡眠状态', function(){
+test('rest: needsTick 精力 < 20 标记困倦，不原地瞬睡', function(){
   var r = APH.Res.generate('test3', 12345);
   r.rest = 25;
   APH.Res.needsTick(r, true); // 25 - 7 = 18 < 20
   if (r.rest !== 18) throw new Error('rest 应为 18，实际: ' + r.rest);
-  if (!r.isSleeping) throw new Error('rest=18 应触发 isSleeping=true');
+  if (!r.wantSleep) throw new Error('rest=18 应标记 wantSleep');
+  if (r.isSleeping) throw new Error('有床可去时不应原地瞬睡');
 });
 
 test('rest: 睡眠中在床铺恢复 (+25/跳) 且满 100 醒来', function(){
@@ -293,7 +294,8 @@ test('survival_integration: 居民生存全属性在名册与实体模型中完�
 
   // 2. 状态推进
   APH.Res.needsTick(r, false);
-  if (!r.isSleeping) throw new Error('精力 < 20 应进入睡眠');
+  if (!r.wantSleep) throw new Error('精力 < 20 应标记 wantSleep');
+  if (r.isSleeping) throw new Error('困倦后应走去床，不应 needsTick 原地瞬睡');
 
   // 3. 娱乐补充
   APH.Res.enjoyRecreation(r, 80);

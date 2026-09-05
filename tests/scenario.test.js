@@ -872,7 +872,8 @@ test('home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救
   const r2 = S.meta.residents[1];
 
   A(!!r1.bedId, 'r1 应分配到居住舱床位');
-  A(r1.isSleeping, 'r1 rest<20 应进入睡眠');
+  A(r1.wantSleep, 'r1 rest<20 应困倦想睡');
+  A(!r1.isSleeping, 'r1 应走去床再睡，不应原地瞬睡');
   A(r1.mood >= 80, 'r1 高娱乐+舒适床位应维持高心情');
 
   // 2. r2 严重疫病机能损毁与击倒判定
@@ -895,7 +896,7 @@ test('home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救
   M.syncResidents();
   const ent1 = S.entities.find(e=>e.rid==='rs_surv_1'||e.id==='rs_surv_1');
   A(!!ent1, '应同步实体');
-  A(ent1.isSleeping, '实体应同步 isSleeping 状态');
+  A(!ent1.isSleeping, '尚未走到床前，实体不应已俯卧');
 
   // 6. R 键名册渲染
   const body = document.getElementById('resBody');
@@ -1019,7 +1020,7 @@ test('#59 smoke: 玩家俯卧触发(惰性 flag)不崩、不走循环', () => {
   A(!threw, '玩家(含俯卧flag惰性)绘制不应崩');
 });
 
-/* #66 床边睡眠/唤醒: 靠床 E 睡(俯卧), WASD/E/受伤醒, 绝不自动走向床
+/* #66 床边睡眠/唤醒: 靠床 E 睡(俯卧); 平移镜头不醒; E/受伤/征召可醒
    驱动通道: updateHome / residentsTick / debugPressE (无 __frame 导出) */
 test('#66: 靠床近判定 nearBed 且不触发自动寻路 (S.target 保持 null)', () => {
   S.scene = 'home';
@@ -1055,17 +1056,18 @@ test('#66: 靠床 E 入睡 → meta+实体俯卧, drawPlayer 不崩', () => {
   A(!threw, '睡中玩家绘制不应崩');
 });
 
-test('#66: 视口平移按键唤醒 (meta+实体同步, camX 变化)', () => {
+test('#66: 视口平移不唤醒睡眠 (摄像机仍平移)', () => {
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = true;
+  S.playerDrafted = false;
   S.keys = {};
   const camX0 = S.camX;
   S.keys.KeyA = true;   // 向左平移视口
   M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === false, '按键应唤醒, 实际仍睡');
+  A(S.meta.playerNeeds.isSleeping === true, '环世界: 平移镜头不得把人摇醒');
   const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
+  A(pe && pe.isSleeping === true, '实体应保持俯卧');
   A(S.camX < camX0, 'WASD 应向左平移摄像机, 实际 camX=' + S.camX);
   S.keys = {};
 });
@@ -1120,18 +1122,19 @@ test('#67: 家园精力归零累塌 → meta+实体俯卧, bedId=null, moving=fa
   A(!threw, '累塌俯卧玩家绘制不应崩');
 });
 
-test('#67: 累塌后按键唤醒 (复用 #66)', () => {
+test('#67: 累塌后平移镜头不唤醒', () => {
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = true;
   S.meta.playerNeeds.bedId = null;
+  S.playerDrafted = false;
   S.keys = {};
   const camX0 = S.camX;
   S.keys.KeyA = true;   // 向左平移视口
   M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === false, 'WASD 应唤醒累塌睡眠, 实际仍睡');
+  A(S.meta.playerNeeds.isSleeping === true, '累塌睡眠中平移镜头不得唤醒');
   const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
+  A(pe && pe.isSleeping === true, '实体应保持俯卧');
   A(S.camX < camX0, 'WASD 应向左平移摄像机');
   S.keys = {};
 });
@@ -2862,6 +2865,10 @@ test('#149 cmd: 休息令 → 走到住宅入睡(isSleeping), 吃饭令 → 就�
   S.meta.res.food = 0;
   p2.x=S.px+40; p2.y=S.py;
   p2.food = 30;
+  S.meta.residents[1].food = 30;
+  S.meta.residents[1].wantSleep = false;
+  S.meta.residents[1].isSleeping = false;
+  S.meta.residents[1].rest = 90;
   const meal = { type:T.DROPPED, id:'dp_meal1', itemId:'it_roasted_meat', x:p2.x+30, y:p2.y, n:2 };
   S.entities.push(meal);
   M.cmd.select(p2);
@@ -3215,11 +3222,13 @@ function commanderSoloSetup(){
   S.meta.playerNeeds.isSleeping=false;
   S.meta.playerNeeds.downed=false;
   S.meta.playerNeeds.illness=0;
+  S.meta.playerNeeds.food=80;
+  S.meta.playerNeeds.rest=100;
   S.keys={}; S.target=null; S.joy=null;
   S.designations={};
   S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
   if(!S.colony.buildings.length) S.colony.buildings.push({ id:'bl_landing_pad', x:1100, y:1340 });
-  S.entities = (S.entities||[]).filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy');
+  S.entities = (S.entities||[]).filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy' && !(e.type===T.BUILDING && e.bid && e.bid!=='bl_landing_pad'));
   if(!S.entities.some(e=>e.type===T.BUILDING&&e.pad)){
     S.entities.push({ id:'be_pad_cmd_solo', type:T.BUILDING, bid:'bl_landing_pad', pad:true, x:1100, y:1340 });
   }
@@ -3276,6 +3285,9 @@ test('#165 hungry: 无口粮时饥饿居民仍执行规划砍伐（避免饿到�
   p.x = S.px; p.y = S.py; p.job=null; p.drafted=false; p.userOrder=null;
   S.meta.residents[0].job=null;
   S.meta.residents[0].food=0;
+  S.meta.residents[0].rest=90;
+  S.meta.residents[0].wantSleep=false;
+  S.meta.residents[0].isSleeping=false;
   S.meta.res = S.meta.res || {};
   S.meta.res.food=0;
   S.meta.workPrio = S.meta.workPrio || {};
@@ -3308,6 +3320,48 @@ test('#167 idle: 未征召无任务指挥官会在院子里自主漫步', () => 
     if(d > maxD) maxD = d;
   }
   A(maxD > 24, '无任务指挥官应在院子漫步，不应原地罚站, 最大位移='+maxD.toFixed(1));
+});
+
+test('#168 rest: 困了的指挥官走去居住舱上床，平移镜头不摇醒', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 12;
+  S.meta.playerNeeds.isSleeping = false;
+  S.playerDrafted = false;
+  S.designations = {};
+  S.keys = {};
+  S.colony.buildings.push({ id:'bl_house', x:1400, y:1170, lv:1 });
+  APH.Colony.placeBuildingEntity('bl_house', 1400, 1170, 1);
+  const x0 = S.px;
+  for(let i=0; i<900 && !S.meta.playerNeeds.isSleeping; i++) M.updateHome(0.016);
+  A(S.meta.playerNeeds.isSleeping === true, '困倦指挥官应走到居住舱入睡');
+  A(S.px > x0 + 40, '应向居住舱方向移动');
+  const cam0 = S.camX;
+  S.keys.KeyD = true;
+  M.updateHome(0.1);
+  A(S.meta.playerNeeds.isSleeping === true, '睡眠中平移镜头不得唤醒');
+  A(S.camX > cam0, 'WASD 仍应平移摄像机');
+  S.keys = {};
+});
+
+test('#168 rest: 困了的居民走去居住舱再睡，不原地瞬睡', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  p.x = S.px; p.y = S.py;
+  p.job = null; p.drafted = false; p.userOrder = null;
+  S.meta.residents[0].job = null;
+  S.meta.residents[0].rest = 12;
+  S.meta.residents[0].wantSleep = true;
+  S.meta.residents[0].isSleeping = false;
+  S.meta.residents[0].food = 90;
+  S.selectedRid = null;
+  const house = (S.colony.buildings||[]).find(b=>b.id==='bl_house');
+  A(!!house, 'cmdHomeSetup 应有居住舱');
+  const d0 = Math.hypot(p.x - house.x, p.y - house.y);
+  for(let i=0; i<800 && !S.meta.residents[0].isSleeping; i++) M.updateHome(0.016);
+  A(S.meta.residents[0].isSleeping === true, '困倦居民应走到居住舱入睡');
+  const d1 = Math.hypot(p.x - house.x, p.y - house.y);
+  A(d1 < d0 - 10 || d1 < 50, '应靠近居住舱, d0='+d0.toFixed(0)+' d1='+d1.toFixed(0));
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

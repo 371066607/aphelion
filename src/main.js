@@ -610,6 +610,8 @@ window.APH = window.APH || {};
     if(s.joy && s.joy.active) return;
 
     var hungry = playerFood() < foodEatBelow();
+    var restNow = (s.meta.playerNeeds && s.meta.playerNeeds.rest != null) ? s.meta.playerNeeds.rest : 100;
+    var restSleepAt = (CFG.player && CFG.player.restSleepAt != null) ? CFG.player.restSleepAt : 20;
     var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
 
     if(hungry){
@@ -640,6 +642,33 @@ window.APH = window.APH || {};
         else s.target = { x: berry.x, y: berry.y };
         return;
       }
+    }
+
+    /* 环世界: 困了去居住舱上床。镜头平移不唤醒；无床则就地躺。 */
+    if(restNow < restSleepAt){
+      s.cmdIdleWalk = false;
+      if(s.nearBed){
+        if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
+        syncPlayerSleep();
+        s.target = null;
+        if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 上床休息','#b39dff');
+        return;
+      }
+      var house=null, hd=Infinity;
+      (s.colony && s.colony.buildings || []).forEach(function(b){
+        if(!b || b.dead || b.id!=='bl_house') return;
+        var d=U.dst(s.px,s.py,b.x,b.y);
+        if(d<hd){ hd=d; house=b; }
+      });
+      if(house){
+        s.target = { x: house.x, y: house.y + 18 };
+        return;
+      }
+      if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, false);
+      syncPlayerSleep();
+      s.target = null;
+      if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 太困了，就地躺下','#b39dff');
+      return;
     }
 
     if(pGatherPrio > 0){
@@ -1032,6 +1061,10 @@ window.APH = window.APH || {};
         if(mealHint) APH.UI.setHint('🍽 饥饿 · 指挥官正前往进食');
         else APH.UI.setHint('🍽 没有口粮 · 请用【命令】标记浆果丛采摘，或远征带回食物');
       }
+    } else if(playerSleeping()){
+      APH.UI.setHint('😴 睡眠中 · 精力 '+Math.round((s.meta.playerNeeds&&s.meta.playerNeeds.rest)||0)+' · 征召或受伤可醒');
+    } else if(s.scene==='home' && !s.playerDrafted && s.meta.playerNeeds && s.meta.playerNeeds.rest < ((CFG.player&&CFG.player.restSleepAt)!=null?CFG.player.restSleepAt:20)){
+      APH.UI.setHint('😴 困了 · 正前往居住舱休息');
     } else if(s.gathering && s.nearFlora){
       var gKind = s.nearFlora.kind || 'tree';
       var gName = gKind === 'tree' ? '树木' : (gKind.indexOf('rock')===0 ? '矿石' : '植株');
@@ -4037,10 +4070,33 @@ window.APH = window.APH || {};
         }
         else { e.userOrder=null; }
       }
-      /* ADR-29 征召待命: 被选中但无命令 → 不上岗不游荡 (饥饿时仍放行自动进食安全网) */
+      /* ADR-29 征召待命: 被选中但无命令 → 不上岗不游荡 (饥饿/困倦仍放行安全网) */
       if(!raid && s.selectedRid && (e.rid||e.id)===s.selectedRid){
         var rHungry = r && r.food!=null && r.food<eatBelow;
-        if(!rHungry){ e.walking=false; e.tx=e.x; e.ty=e.y; return; }
+        var rSleepy = r && r.wantSleep && !r.isSleeping;
+        if(!rHungry && !rSleepy){ e.walking=false; e.tx=e.x; e.ty=e.y; return; }
+      }
+      /* 环世界: 困了走去居住舱上床，不要原地瞬睡 */
+      if(!raid && r && r.wantSleep && !r.isSleeping && !e.drafted){
+        var houseR=null, houseD=Infinity;
+        (s.colony.buildings||[]).forEach(function(hb){
+          if(!hb || hb.dead || hb.id!=='bl_house') return;
+          var dH=U.dst(e.x,e.y,hb.x,hb.y);
+          if(dH<houseD){ houseD=dH; houseR=hb; }
+        });
+        var sleepArrive=(CFG.command&&CFG.command.sleepArriveR!=null)?CFG.command.sleepArriveR:40;
+        if(!houseR){
+          r.isSleeping=true; e.isSleeping=true; e.walking=false;
+          return;
+        }
+        if(houseD<=sleepArrive){
+          r.isSleeping=true; e.isSleeping=true; e.walking=false;
+          e.x=houseR.x+8; e.y=houseR.y+18;
+          return;
+        }
+        e.tx=houseR.x+8; e.ty=houseR.y+18;
+        APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
+        return;
       }
       var hungry=r && r.food!=null && r.food<eatBelow;
       /* T8: 有桌有座 → 优先去最近空椅坐吃 (座次分配已在本帧 seatMap) */

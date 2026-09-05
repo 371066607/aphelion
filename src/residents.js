@@ -291,13 +291,22 @@ APH.Res = (function(){
     var bedRec=C.bedRecover!=null?C.bedRecover:25;
     var floorRec=C.floorRecover!=null?C.floorRecover:18;
 
+    /* 环世界: 困了 (rest < restSleepAt) 只标记 wantSleep，由走位去床再躺下。
+       精力归零才原地累塌。needsTick 不再把人就地瞬睡。 */
     if(r.isSleeping){
       var rec = r.bedId ? bedRec : floorRec;
       r.rest = Math.min(100, r.rest + rec);
-      if(r.rest >= restWakeAt) r.isSleeping = false;
+      if(r.rest >= restWakeAt){
+        r.isSleeping = false;
+        r.wantSleep = false;
+      }
     }else{
       r.rest = Math.max(0, r.rest - restDrain);
-      if(r.rest < restSleepAt) r.isSleeping = true;
+      r.wantSleep = r.rest < restSleepAt;
+      if(r.rest <= 0){
+        r.isSleeping = true;
+        r.wantSleep = true;
+      }
     }
 
     /* #69 病重躺舱: 病情回落到阈值以下且未击倒 → 起身 (独立于 isSleeping, 与睡醒互不干扰)
