@@ -2963,6 +2963,48 @@ test('#157 orders: 规划工具箱选择、框选打标与自动清标', () => {
   A(!S.designations['fl_tree_c'], '死亡实体标记应被自动清理');
 });
 
+test('#158 orders: 严格无标不采、规划驱动全链路开采入库与右键强制微操', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  p.x = S.px; p.y = S.py;
+  S.designations = {};
+  S.meta.workPrio = S.meta.workPrio || {};
+  S.meta.workPrio[p.id] = { sk_gather: 1, sk_haul: 1, sk_farm: 0, sk_build: 0 };
+  p.job = null;
+  M.cmd.deselect();
+
+  // 1. 严格无标不采：野树在附近但未规划标记 → 居民不主动前往开采
+  const wildTree = { id: 'fl_wild_1', type: T.FLORA, kind: 'tree', x: p.x + 50, y: p.y, hp: 10, maxHp: 10, dead: false };
+  S.entities.push(wildTree);
+  for(let i = 0; i < 30; i++) M.updateHome(0.016);
+  A(!p.gatherTarget, '无标记时居民不得私自开采野树');
+  A(wildTree.hp === 10, '野树 HP 不应下降');
+
+  // 2. 规划打标 → 居民立即主动前往开采
+  APH.Colony.applyDesignation(S.designations, wildTree, 'chop');
+  A(S.designations['fl_wild_1'] && S.designations['fl_wild_1'].type === 'chop', '打上 chop 标记');
+  for(let i = 0; i < 600 && !wildTree.dead; i++) M.updateHome(0.016);
+  A(wildTree.dead === true, '规划目标应被砍倒');
+  A(!S.designations['fl_wild_1'], '目标完成后标记应自动从 designations 清除');
+
+  // 3. 掉落物存在 → 搬运工自主入库
+  const woodDrops = S.entities.filter(e => e.type === 'dropped' && e.itemId === 'it_wood');
+  A(woodDrops.length >= 1, '砍倒后应掉落木材堆');
+  const woodBefore = S.meta.res.wood || 0;
+  for(let i = 0; i < 800 && woodDrops.some(d => !d.dead); i++) M.updateHome(0.016);
+  A((S.meta.res.wood || 0) > woodBefore || S.entities.some(e => e.haulCarry), '木材应入库或正在搬运入库');
+
+  // 4. 右键强制微操执行 (Prioritize)
+  const prioRock = { id: 'fl_prio_rock', type: T.FLORA, kind: 'rock_iron', x: p.x + 120, y: p.y, hp: 15, maxHp: 15, dead: false };
+  S.entities.push(prioRock);
+  APH.Colony.applyDesignation(S.designations, prioRock, 'mine');
+  M.cmd.select(p);
+  const prioritized = M.cmd.prioritize(p, prioRock);
+  A(prioritized === true, '优先执行应成功');
+  A(p.userOrder && p.userOrder.type === 'gather' && p.userOrder.flora === prioRock, '应赋予最高优先级 gather 命令');
+  M.cmd.deselect();
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

@@ -2238,7 +2238,7 @@ window.APH = window.APH || {};
         tryPlace(s0.buildMode, wx0, wy0);
       }
     });
-    /* ADR-29 右键 = 解除征召 / 退出规划 (并阻止浏览器菜单) */
+    /* ADR-29 / ADR-28 右键 = 上下文微操优先执行 / 解除征召 / 退出规划 */
     cv.addEventListener('contextmenu',function(e){
       e.preventDefault();
       var s0=APH.state;
@@ -2250,7 +2250,54 @@ window.APH = window.APH || {};
         if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
         return;
       }
-      if(s0.selectedRid){ deselectPawn(); }
+      if(s0.selectedRid){
+        var ent = selectedPawnEnt();
+        if(ent){
+          var wx = e.clientX - vpW()/2 + s0.camX;
+          var wy = e.clientY - vpH()/2 + s0.camY;
+          var pickR = 34;
+
+          /* 检查是否右键点击了被规划标记的目标 (树木/矿石) */
+          var hitFlora = s0.entities.find(function(en){
+            return en && en.type === T.FLORA && !en.dead && U.dst(en.x, en.y, wx, wy) <= pickR;
+          });
+          if(hitFlora && s0.designations && s0.designations[hitFlora.id]){
+            ent.userOrder = { type: 'gather', flora: hitFlora };
+            APH.UI.floatText('✔ 优先执行：开采目标', '#7dffab');
+            APH.state.parts.push({ t: 'ping', x: hitFlora.x, y: hitFlora.y, life: 0.8, max: 0.8 });
+            updateCmdPanel();
+            updateInspectorNow();
+            return;
+          }
+
+          /* 检查是否右键点击了掉落物 */
+          var hitDrop = s0.entities.find(function(en){
+            return en && en.type === T.DROPPED && !en.dead && U.dst(en.x, en.y, wx, wy) <= 28;
+          });
+          if(hitDrop){
+            ent.userOrder = { type: 'haul', pile: hitDrop };
+            APH.UI.floatText('✔ 优先执行：搬运物资', '#7dffab');
+            APH.state.parts.push({ t: 'ping', x: hitDrop.x, y: hitDrop.y, life: 0.8, max: 0.8 });
+            updateCmdPanel();
+            updateInspectorNow();
+            return;
+          }
+
+          /* 右键点击空旷地面 → 下达移动令 */
+          ent.userOrder = { type: 'move', x: wx, y: wy };
+          APH.UI.floatText('✔ 移动指令', '#8fd4ff');
+          APH.state.parts.push({ t: 'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
+          updateCmdPanel();
+          updateInspectorNow();
+          return;
+        }
+        deselectPawn();
+        return;
+      }
+      if(s0.selectedTarget && s0.selectedTarget.type !== 'player'){
+        s0.selectedTarget = { type: 'player' };
+        updateInspectorNow();
+      }
     });
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
@@ -3495,26 +3542,38 @@ window.APH = window.APH || {};
               APH.UI.floatText((r ? r.name : '居民')+' 采集完成 +'+gRes.dropCount+' '+gName, '#c8e89a');
               e.gatherTarget = null;
               e.gathering = false;
+              if(s.designations) delete s.designations[gt.id];
             }
+            return;
           } else {
             e.gathering = false;
+            e.tx = gt.x; e.ty = gt.y;
             APH.Res.walkAround(e, {x:gt.x, y:gt.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
+            return;
           }
         } else if(gatherPrio > 0){
           var searchR = (CFG.gathering && CFG.gathering.searchRadius) || 800;
           var typePrio = (CFG.gathering && CFG.gathering.typePriority) || ['tree','rock_stone','rock_iron','bush_berry','bush_herb'];
           var bestFlora = null, bestD = searchR;
-          for(var tp = 0; tp < typePrio.length; tp++){
-            for(var fi = 0; fi < s.entities.length; fi++){
-              var fe = s.entities[fi];
-              if(!fe || fe.dead || fe.type !== T.FLORA || fe.kind !== typePrio[tp]) continue;
-              var fd = U.dst(e.x, e.y, fe.x, fe.y);
-              if(fd < bestD){ bestD = fd; bestFlora = fe; }
+          /* ADR-28: 严格无标不采 — 仅当自然实体具有 chop 或 mine 规划标记时才自动前往 */
+          if(s.designations){
+            for(var tp = 0; tp < typePrio.length; tp++){
+              for(var fi = 0; fi < s.entities.length; fi++){
+                var fe = s.entities[fi];
+                if(!fe || fe.dead || fe.type !== T.FLORA || fe.kind !== typePrio[tp]) continue;
+                var des = s.designations[fe.id];
+                if(!des || (des.type !== 'chop' && des.type !== 'mine')) continue;
+                var fd = U.dst(e.x, e.y, fe.x, fe.y);
+                if(fd < bestD){ bestD = fd; bestFlora = fe; }
+              }
+              if(bestFlora) break;
             }
-            if(bestFlora) break;
           }
           if(bestFlora){
             e.gatherTarget = bestFlora;
+            e.tx = bestFlora.x; e.ty = bestFlora.y;
+            APH.Res.walkAround(e, {x:bestFlora.x, y:bestFlora.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
+            return;
           } else if(haulPrio > 0){
             doHaul(e, r);
           } else {
@@ -4393,6 +4452,23 @@ window.APH = window.APH || {};
       orderHaul:orderHaul,
       orderSleep:orderSleep,
       orderEat:orderEat,
+      prioritize:function(ent, targetEntity){
+        if(!ent || !targetEntity) return false;
+        var T = (window.APH && window.APH.CFG && window.APH.CFG.entType) || {};
+        if(targetEntity.type === T.FLORA){
+          ent.userOrder = { type: 'gather', flora: targetEntity };
+          return true;
+        }
+        if(targetEntity.type === T.DROPPED){
+          ent.userOrder = { type: 'haul', pile: targetEntity };
+          return true;
+        }
+        if(targetEntity.x != null && targetEntity.y != null){
+          ent.userOrder = { type: 'move', x: targetEntity.x, y: targetEntity.y };
+          return true;
+        }
+        return false;
+      },
       refreshPanel:updateCmdPanel,
     },
     cycleSelectedJob:cycleSelectedJob,
