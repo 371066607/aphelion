@@ -1347,13 +1347,18 @@ window.APH = window.APH || {};
       drawTutorialArrow(s.clock);
       drawDebugMark();
       APH.UI.updHUD();
-      if(tickN%15===0) updateCmdPanel();   /* ADR-29: 命令面板状态行低频刷新 */
+      if(tickN%15===0){
+        updateCmdPanel();   /* ADR-29: 命令面板状态行低频刷新 */
+        if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar(); /* 顶部头像条刷新 */
+      }
       if(tickN%10===0) updateInspectorNow(); /* ADR-28 / Ticket #156: 检查器状态低频刷新 */
       return;
     }
 
     var insp = document.getElementById('inspector');
     if(insp) insp.style.display = 'none';
+    var colBar = document.getElementById('colonistBar');
+    if(colBar) colBar.style.display = 'none';
 
     var night = APH.World.daylight() < .5;
     updateExpedition(dt);
@@ -2087,9 +2092,45 @@ window.APH = window.APH || {};
         if(APH.state.mode==='running') toggleDiplomacy();
         return true;
       },
-      TOGGLE_ROSTER: function(){
-        if(APH.state.mode==='running'&&APH.state.scene==='home') toggleResPanel();
+      TOGGLE_DRAFT: function(){
+        var s = APH.state;
+        if(s.mode !== 'running' || s.scene !== 'home') return false;
+        if(s.selectedRid){
+          var ent = selectedPawnEnt();
+          if(ent){
+            ent.drafted = !ent.drafted;
+            if(ent.drafted){
+              ent.walking = false;
+              ent.userOrder = null;
+              APH.UI.floatText((ent.name||'居民') + ' 战备征召 (立正待命)', '#ff4d4d');
+            } else {
+              ent.userOrder = null;
+              APH.UI.floatText((ent.name||'居民') + ' 解除征召 (归队作息)', '#7dffab');
+            }
+            updateCmdPanel();
+            updateInspectorNow();
+            if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+            return true;
+          }
+        }
+        s.playerDrafted = !s.playerDrafted;
+        if(s.playerDrafted){
+          APH.UI.floatText('⭐ 指挥官战备征召 (立正待命)', '#ff4d4d');
+        } else {
+          APH.UI.floatText('⭐ 指挥官解除征召 (归队作息)', '#7dffab');
+        }
+        updateInspectorNow();
+        if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
         return true;
+      },
+      FOCUS_COMMANDER: function(){
+        var s = APH.state;
+        if(s.scene === 'home' && s.px != null){
+          centerCameraOn(s.px, s.py);
+          APH.UI.floatText('镜头已聚焦至指挥官', '#59d9ff');
+          return true;
+        }
+        return false;
       },
       TOGGLE_TECH: function(){
         var s=APH.state;
@@ -2517,6 +2558,7 @@ window.APH = window.APH || {};
     APH.UI.hideIntro();
     APH.UI.armProbe();
     updateInspectorNow();
+    if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
     APH.state.meta.stats.landings++;
     APH.Save.saveMeta(APH.state.meta);
   }
@@ -3420,6 +3462,14 @@ window.APH = window.APH || {};
         return;
       }
       e.breaking=null;
+      /* ADR-29 战备征召中: 拔枪立正，不参与日常工作/游荡/进食 (右键战术指令优先) */
+      if(e.drafted && (!e.userOrder || e.userOrder.type === 'move')){
+        if(!e.userOrder){
+          e.walking = false;
+          e.tx = e.x; e.ty = e.y;
+          return;
+        }
+      }
       /* ADR-29 征召命令: 用户直接指令优先于一切自动行为 (失能者已在上方短路) */
       if(e.userOrder && e.userOrder.type){
         var uo=e.userOrder, C=CFG.command||{};
@@ -4323,6 +4373,34 @@ window.APH = window.APH || {};
       });
     }
 
+    /* ADR-29 顶部殖民者头像条点击与双击聚焦绑定 */
+    var cb = document.getElementById('colonistBar');
+    if(cb){
+      var lastCardT = 0, lastCardId = null;
+      cb.addEventListener('click', function(ev){
+        var card = ev.target.closest('[data-pawn-id]');
+        if(!card) return;
+        var pid = card.getAttribute('data-pawn-id');
+        var now = performance.now();
+        var s = APH.state;
+        var isDbl = (now - lastCardT < 400 && lastCardId === pid);
+        lastCardT = now;
+        lastCardId = pid;
+
+        if(pid === 'player'){
+          s.selectedTarget = { type: 'player' };
+          deselectPawn();
+          updateInspectorNow();
+          if(isDbl && s.px != null) centerCameraOn(s.px, s.py);
+        } else {
+          selectPawn(pid);
+          var ent = selectedPawnEnt();
+          if(isDbl && ent) centerCameraOn(ent.x, ent.y);
+        }
+        if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+      });
+    }
+
     /* 兼容老圆钮(若存在) */
     var btn=document.getElementById('buildBtn');
     if(btn) btn.addEventListener('click',function(){ toggleBuildRow(); });
@@ -4475,6 +4553,14 @@ window.APH = window.APH || {};
       orderHaul:orderHaul,
       orderSleep:orderSleep,
       orderEat:orderEat,
+      draft:function(ent, flag){
+        if(!ent) return false;
+        ent.drafted = flag !== undefined ? !!flag : !ent.drafted;
+        return ent.drafted;
+      },
+      isDrafted:function(ent){
+        return !!(ent && ent.drafted);
+      },
       prioritize:function(ent, targetEntity){
         if(!ent || !targetEntity) return false;
         var T = (window.APH && window.APH.CFG && window.APH.CFG.entType) || {};

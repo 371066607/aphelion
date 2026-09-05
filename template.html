@@ -39,6 +39,28 @@
     padding:8px 12px;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.5);
     backdrop-filter:blur(6px);transition:all .15s ease}
 
+  /* ADR-29 / Ticket #161: 屏幕顶部殖民者头像条 */
+  #colonistBar{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:35;
+    display:none;align-items:center;gap:8px;max-width:80vw;overflow-x:auto;padding:4px 6px}
+  .aph-colonist-card{
+    background:rgba(10,14,24,.88);border:1.5px solid rgba(89,217,255,.3);border-radius:12px;
+    padding:4px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    min-width:52px;box-shadow:0 3px 12px rgba(0,0,0,.45);backdrop-filter:blur(4px);
+    transition:all .15s ease;position:relative;user-select:none}
+  .aph-colonist-card:hover{
+    border-color:#ffc857;transform:translateY(-1px);background:rgba(20,28,45,.95)}
+  .aph-colonist-card.selected{
+    border-color:#59d9ff;box-shadow:0 0 10px rgba(89,217,255,.6);background:rgba(18,34,55,.95)}
+  .aph-colonist-card.drafted{
+    border-color:#ff4d4d;box-shadow:0 0 10px rgba(255,77,77,.6)}
+  .aph-card-badge{
+    position:absolute;top:-4px;right:-4px;background:#ff4d4d;color:#fff;border-radius:50%;
+    width:14px;height:14px;font-size:9px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 4px rgba(0,0,0,.6)}
+  .aph-card-bar{
+    width:100%;height:3px;background:rgba(255,255,255,.15);border-radius:2px;margin-top:3px;overflow:hidden}
+  .aph-card-fill{height:100%;border-radius:2px}
+
   /* ADR-28 / Ticket #155: 环世界式底部主标签条 */
   #mainTabsBar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:50;
     display:none;align-items:center;gap:6px;background:rgba(10,14,24,.92);border:1px solid rgba(89,217,255,.35);
@@ -120,6 +142,9 @@
 </head>
 <body>
 <canvas id="cv"></canvas>
+
+<!-- 顶部殖民者头像栏 (ADR-29 / Ticket #161) -->
+<div id="colonistBar"></div>
 
 <!-- 左下角检查器 (ADR-28 / Ticket #156) -->
 <div id="inspector"></div>

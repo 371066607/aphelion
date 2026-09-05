@@ -3037,6 +3037,40 @@ test('#160 camera: 键盘 WASD 平移视口、Shift 加速与居中对焦', () =
   A(S.camY >= 0, '视口不得飞出地图顶部');
 });
 
+test('#161 colonist_bar: 顶部小人条选择、R 键战备征召切换与聚焦居中', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  S.selectedRid = null;
+  p.drafted = false;
+
+  // 1. 头像条渲染
+  const barHtml = APH.UI.colonistBarHtml(S.meta.residents, S);
+  A(barHtml.indexOf('data-pawn-id="player"') !== -1, '头像条应包含指挥官');
+  A(barHtml.indexOf(p.name) !== -1, '头像条应包含居民名字');
+
+  // 2. 选择小人并按 R 键战备征召
+  M.cmd.select(p);
+  A(S.selectedRid === p.id, '应选中居民');
+  APH.Input.dispatchAction('TOGGLE_DRAFT');
+  A(p.drafted === true, '按 R 键后小人应进入战备征召状态');
+  A(p.walking === false, '征召后小人应立正待命');
+
+  // 3. 头像条带战备角标
+  const draftedBar = APH.UI.colonistBarHtml(S.meta.residents, S);
+  A(draftedBar.indexOf('drafted') !== -1, '头像条中征召小人应带 drafted 样式');
+  A(draftedBar.indexOf('⚔') !== -1, '头像条中征召小人应带武器角标');
+
+  // 4. 双击对焦：平滑居中到小人坐标
+  p.x = 1500; p.y = 1200;
+  M.centerCameraOn(p.x, p.y);
+  A(Math.abs(S.camX - 1500) < 1 && Math.abs(S.camY - 1200) < 1, '镜头应居中对焦到小人坐标');
+
+  // 5. 再次按 R 键解除征召
+  APH.Input.dispatchAction('TOGGLE_DRAFT');
+  A(p.drafted === false, '再次按 R 键后小人应解除征召');
+  M.cmd.deselect();
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

@@ -221,5 +221,20 @@ const terrainHtml = UI.inspectorHtml({
 }, mockState);
 assert('地表检查器非空且含坐标', terrainHtml.indexOf('1000') !== -1);
 
+// 12. ADR-29 / Ticket #161: 顶部殖民者头像栏 (Colonist Bar) HTML 纯函数断言
+assert('colonistBarHtml 已导出', typeof UI.colonistBarHtml === 'function');
+assert('renderColonistBar 已导出', typeof UI.renderColonistBar === 'function');
+
+const barHtml = UI.colonistBarHtml(mockState.meta.residents, mockState);
+assert('头像条包含指挥官卡片', barHtml.indexOf('data-pawn-id="player"') !== -1);
+assert('头像条包含居民卡片', barHtml.indexOf('data-pawn-id="rs_1"') !== -1);
+assert('头像条包含居民姓名', barHtml.indexOf('阿尔法') !== -1);
+
+// 征召状态卡片标记
+mockState.playerDrafted = true;
+const draftedBarHtml = UI.colonistBarHtml(mockState.meta.residents, mockState);
+assert('征召指挥官卡片带 drafted 样式', draftedBarHtml.indexOf('drafted') !== -1);
+assert('征召卡片含武器角标', draftedBarHtml.indexOf('aph-card-badge') !== -1);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);

@@ -1690,6 +1690,66 @@ APH.UI = (function(){
     '</div>';
   }
 
+  /* ---------- ADR-29 / Ticket #161: 顶部殖民者头像栏 ---------- */
+  function colonistBarHtml(residents, s){
+    if(!s) s = (window.APH && window.APH.state) || {};
+    var m = s.meta || {};
+    var list = residents || m.residents || [];
+    var curSel = s.selectedTarget || { type: 'player' };
+    var curRid = s.selectedRid;
+    var h = '';
+
+    /* 1. 指挥官卡片 */
+    var isPlayerSel = curSel.type === 'player' && !curRid;
+    var pDrafted = !!s.playerDrafted;
+    var pHp = Math.max(0, Math.min(100, Math.round(s.hp != null ? s.hp : 100)));
+    var pHpCol = pHp > 50 ? '#7dffab' : (pHp > 25 ? '#ffc857' : '#ff4d4d');
+    var pCls = 'aph-colonist-card' + (isPlayerSel ? ' selected' : '') + (pDrafted ? ' drafted' : '');
+    var pBadge = pDrafted ? '<div class="aph-card-badge" title="已征召战备">⚔</div>' : '';
+
+    h += '<div class="' + pCls + '" data-pawn-id="player" title="指挥官 · 单击选中, 双击镜头聚焦">' +
+      pBadge +
+      '<div style="font-size:16px;line-height:1">🧑‍🚀</div>' +
+      '<div style="font-size:10px;font-weight:700;color:#59d9ff;margin-top:2px">你</div>' +
+      '<div class="aph-card-bar"><div class="aph-card-fill" style="width:' + pHp + '%;background:' + pHpCol + '"></div></div>' +
+    '</div>';
+
+    /* 2. 居民卡片列表 */
+    list.forEach(function(r){
+      var ent = (s.entities || []).find(function(e){ return e && (e.rid === r.id || e.id === r.id); });
+      var isSel = curRid === r.id || (curSel.type === 'resident' && curSel.entity && (curSel.entity.rid === r.id || curSel.entity.id === r.id));
+      var isDrafted = ent && !!ent.drafted;
+      var mood = Math.round(r.mood != null ? r.mood : 80);
+      var hp = 100 - (r.illness || 0);
+      var hpCol = hp > 50 ? '#7dffab' : (hp > 25 ? '#ffc857' : '#ff4d4d');
+      var cls = 'aph-colonist-card' + (isSel ? ' selected' : '') + (isDrafted ? ' drafted' : '');
+      var badge = isDrafted ? '<div class="aph-card-badge" title="已征召战备">⚔</div>' : '';
+      var face = mood >= 70 ? '🙂' : (mood >= 35 ? '😐' : '😞');
+
+      h += '<div class="' + cls + '" data-pawn-id="' + r.id + '" title="' + r.name + ' · 心情 ' + mood + '% · 单击选中, 双击镜头聚焦">' +
+        badge +
+        '<div style="font-size:16px;line-height:1">' + face + '</div>' +
+        '<div style="font-size:10px;font-weight:700;color:#c5e3f6;margin-top:2px">' + (r.name || '居民').slice(0, 3) + '</div>' +
+        '<div class="aph-card-bar"><div class="aph-card-fill" style="width:' + Math.max(0, Math.min(100, hp)) + '%;background:' + hpCol + '"></div></div>' +
+      '</div>';
+    });
+
+    return h;
+  }
+
+  function renderColonistBar(){
+    var bar = document.getElementById('colonistBar');
+    var s = (window.APH && window.APH.state);
+    if(bar && s){
+      if(s.mode === 'running' && s.scene === 'home'){
+        bar.style.display = 'flex';
+        bar.innerHTML = colonistBarHtml(null, s);
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+  }
+
   return {
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
@@ -1703,6 +1763,7 @@ APH.UI = (function(){
     renderDiplomacy:renderDiplomacy, doSendTribute:doSendTribute, doSignTradePact:doSignTradePact, doDeterRival:doDeterRival,
     renderTradePanel:renderTradePanel, doTradeRow:doTradeRow, moveTradeSel:moveTradeSel,
     renderBuildRow:renderBuildRow, renderOrdersRow:renderOrdersRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml,
-    inspectorHtml:inspectorHtml
+    inspectorHtml:inspectorHtml,
+    colonistBarHtml:colonistBarHtml, renderColonistBar:renderColonistBar
   };
 })();
