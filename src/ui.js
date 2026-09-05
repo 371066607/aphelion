@@ -1323,48 +1323,70 @@ APH.UI = (function(){
   var PRIO_LABEL = ['禁','优','普','闲'];
   /* ADR-28: 虚拟工作列（不进 SKILLS 技能数组，只作优先级分配） */
   var VIRTUAL_WORK = [
-    { key: 'sk_gather', name: '采集' },
-    { key: 'sk_haul', name: '搬运' },
+    { key: 'sk_gather', name: '采集', icon: '🪓' },
+    { key: 'sk_haul', name: '搬运', icon: '📦' },
   ];
+  var WORK_ICONS = { sk_build:'🔨', sk_farm:'🌾', sk_ranch:'🐑', sk_craft:'🔧', sk_lore:'🔬', sk_social:'💬' };
   function allWorkCols(){
     var cols = [];
-    (APH.Res.SKILLS || []).forEach(function(sk){ cols.push({ key: sk, name: (APH.Res.SKILL_NAMES[sk] || sk) }); });
+    (APH.Res.SKILLS || []).forEach(function(sk){ cols.push({ key: sk, name: (APH.Res.SKILL_NAMES[sk] || sk), icon: WORK_ICONS[sk]||'' }); });
     VIRTUAL_WORK.forEach(function(v){ cols.push(v); });
     return cols;
   }
+  /* RimWorld 式优先级颜色 (1=红橙 2=黄 3=浅蓝 4=灰暗) */
+  var RW_PRIO_BG = ['#1a1f2e','#c0392b','#c4a000','#2d6a9f','#3a455c'];
+  var RW_PRIO_TX = ['#5d6f96','#ffffff','#ffffff','#ffffff','#8fa3cc'];
 
   function prioGridHtml(m){
     var s = window.APH && window.APH.state;
-    var cur = prioCursor();
     var wp = m.workPrio || {};
     var cols = allWorkCols();
-    var html = '<div style="margin-bottom:14px">' +
-      '<div style="color:#ffc857;margin-bottom:4px">工作优先级 · 方向键选格, 数字 0~3 设值 ' +
-      '<span style="color:#5d6f96">(0禁止 1优先 2普通 3闲时; 列头亮=技能高)</span></div>' +
-      '<table style="border-collapse:collapse;font-size:11px"><tr><td></td>';
+    var html = '<div style="margin-bottom:16px">' +
+      '<div style="color:#ffc857;margin-bottom:6px;font-size:13px;font-weight:700">⚙ 工作优先级命令表 <span style="color:#5d6f96;font-weight:400;font-size:11px">点击格子切换优先级 (1最高 → 4最低 → 禁止)</span></div>' +
+      '<table style="border-collapse:separate;border-spacing:3px;font-size:12px;user-select:none">' +
+      '<tr><td style="padding:4px 10px;color:#ffc857;font-weight:700;font-size:12px">居民</td>';
     cols.forEach(function(col){
       var isVirt = col.key === 'sk_gather' || col.key === 'sk_haul';
-      html += '<td style="padding:2px 7px;color:' + (isVirt ? '#59d9ff' : '#8fa3cc') + '">' + col.name + '</td>';
+      html += '<td style="padding:4px 6px;text-align:center;min-width:52px;cursor:default;' +
+        'color:' + (isVirt ? '#59d9ff' : '#8fa3cc') + ';font-weight:700;font-size:11px;' +
+        'background:' + (isVirt ? 'rgba(89,217,255,.08)' : 'transparent') + ';' +
+        'border-radius:6px 6px 0 0" title="' + col.name + '">' +
+        '<div style="font-size:16px;margin-bottom:1px">' + (col.icon||'') + '</div>' +
+        '<div>' + col.name + '</div></td>';
     });
     html += '</tr>';
     (m.residents || []).forEach(function(r, ri){
-      html += '<tr><td style="padding:2px 7px;color:' + (((s && s.resSel) || 0) === ri ? '#ffc857' : '#cdd9f5') + '">' +
-        esc(r.name) + '</td>';
+      html += '<tr><td style="padding:4px 10px;color:#f7f3df;font-weight:700;font-size:12px;white-space:nowrap">' +
+        '<span style="color:#8fa3cc;font-size:10px">' + (ri+1) + '.</span> ' + esc(r.name) + '</td>';
       var p = wp[r.id] || (APH.Res && APH.Res.defaultPrio ? APH.Res.defaultPrio(r) : {});
-      cols.forEach(function(col, ci){
+      cols.forEach(function(col){
         var v = p[col.key] != null ? p[col.key] : 2;
-        var lv = col.key.startsWith('sk_') && r.skills ? (r.skills[col.key] || 0) : 0;
-        var isCur = (cur.r === ri && cur.c === ci);
-        var bg = lv >= 6 ? 'rgba(125,255,171,.16)' : (lv >= 3 ? 'rgba(125,255,171,.07)' : 'transparent');
-        html += '<td style="padding:2px 0;text-align:center"><span style="display:inline-block;' +
-          'width:30px;border-radius:4px;padding:1px 0;background:' + bg + ';color:' + PRIO_COLOR[v] + ';' +
-          'border:1px solid ' + (isCur ? '#ffc857' : '#1a2334') + ';' +
-          (v === 0 ? 'text-decoration:line-through;' : '') + '">' +
-          v + PRIO_LABEL[v] + '</span></td>';
+        var lv = col.key !== 'sk_gather' && col.key !== 'sk_haul' && r.skills ? (r.skills[col.key] || 0) : 0;
+        /* RimWorld 优先级: 0=禁止 1=最高(红) 2=中(黄) 3=低(蓝) */
+        var bgIdx = v === 0 ? 0 : v;  /* 0→暗灰 1→红 2→黄 3→蓝 */
+        var bg = v === 0 ? RW_PRIO_BG[0] : RW_PRIO_BG[v];
+        var tx = v === 0 ? RW_PRIO_TX[0] : RW_PRIO_TX[v];
+        var label = v === 0 ? '✕' : String(v);
+        var lvTag = lv > 0 ? '<div style="font-size:9px;opacity:.6;margin-top:1px">Lv' + lv + '</div>' : '';
+        html += '<td data-prio-r="' + esc(r.id) + '" data-prio-c="' + col.key + '" style="padding:4px 0;text-align:center;cursor:pointer;' +
+          'min-width:52px;border-radius:8px;transition:all .15s;' +
+          'background:' + bg + ';color:' + tx + ';' +
+          'border:2px solid ' + (v===0 ? '#1a2334' : 'rgba(255,255,255,.15)') + ';' +
+          (v === 0 ? 'opacity:.45;' : '') + '" ' +
+          'onmouseover="this.style.borderColor=\'#ffc857\'" ' +
+          'onmouseout="this.style.borderColor=\'' + (v===0 ? '#1a2334' : 'rgba(255,255,255,.15)') + '\'"' +
+          ' title="' + esc(r.name) + ' · ' + col.name + ' · 优先级 ' + v + ' · 点击切换">' +
+          '<div style="font-size:18px;font-weight:800;line-height:1">' + label + '</div>' + lvTag + '</td>';
       });
       html += '</tr>';
     });
-    html += '</table></div>';
+    html += '</table>' +
+      '<div style="margin-top:6px;font-size:10px;color:#5d6f96">' +
+      '<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:' + RW_PRIO_BG[1] + ';vertical-align:middle"></span> 1 最高 ' +
+      '<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:' + RW_PRIO_BG[2] + ';vertical-align:middle;margin-left:8px"></span> 2 普通 ' +
+      '<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:' + RW_PRIO_BG[3] + ';vertical-align:middle;margin-left:8px"></span> 3 闲时 ' +
+      '<span style="display:inline-block;width:14px;height:14px;border-radius:4px;background:' + RW_PRIO_BG[0] + ';vertical-align:middle;margin-left:8px"></span> ✕ 禁止' +
+      '</div></div>';
     return html;
   }
 

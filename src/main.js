@@ -3729,6 +3729,31 @@ window.APH = window.APH || {};
     btn.addEventListener('click',function(){ toggleBuildRow(); });
     var rb=document.getElementById('rosterBtn');
     if(rb) rb.addEventListener('click',function(){ if(APH.UI&&APH.UI.toggle) APH.UI.toggle('roster'); });
+    /* ADR-28 RimWorld 式命令表：点击格子切换优先级 (0→1→2→3→0) */
+    var resBody = document.getElementById('resBody');
+    if(resBody){
+      resBody.addEventListener('click',function(ev){
+        var td = ev.target.closest('[data-prio-r]');
+        if(!td) return;
+        var rid = td.getAttribute('data-prio-r');
+        var colKey = td.getAttribute('data-prio-c');
+        var s = APH.state, m = s.meta;
+        if(!m || !m.residents) return;
+        var r = m.residents.find(function(x){ return x.id === rid; });
+        if(!r) return;
+        m.workPrio = m.workPrio || {};
+        if(!m.workPrio[rid] && APH.Res && APH.Res.defaultPrio) m.workPrio[rid] = APH.Res.defaultPrio(r);
+        var cur = m.workPrio[rid][colKey] != null ? m.workPrio[rid][colKey] : 2;
+        var next = (cur + 1) % 4;  /* 0→1→2→3→0 */
+        m.workPrio[rid][colKey] = next;
+        r.jobLocked = false;
+        if(APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+        var colName = colKey === 'sk_gather' ? '采集' : (colKey === 'sk_haul' ? '搬运' : (APH.Res.SKILL_NAMES[colKey]||colKey));
+        var label = next === 0 ? '✕ 禁止' : next;
+        APH.UI.floatText(r.name + ' · ' + colName + ' → ' + label, '#8fd4ff');
+        renderResPanel();
+      });
+    }
   }
   /* (D) 旧 autoAssign 已被 Colony.assignByPriority 取代 */
   
