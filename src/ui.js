@@ -1261,7 +1261,33 @@ APH.UI = (function(){
 
   /* ---------- 规划命令抽屉 (Orders Drawer, ADR-28 / Ticket #157) ---------- */
   function renderOrdersRow(){
-    /* 在 Ticket #157 中展开完整工具箱 */
+    var row = document.getElementById('ordersRow');
+    if(!row) return;
+    var s = (window.APH && window.APH.state) || {};
+    var cur = s.orderTool;
+    var tools = [
+      { id: 'chop', name: '砍伐', icon: '🪓', title: '单点或拉框圈选树木与灌木进行砍伐' },
+      { id: 'mine', name: '开采', icon: '⛏', title: '单点或拉框圈选岩石与矿脉进行开采' },
+      { id: 'haul', name: '搬运', icon: '✋', title: '单点或拉框圈选掉落物资进行优先搬运' },
+      { id: 'deconstruct', name: '拆除', icon: '🔨', title: '单点或圈选建筑进行拆除退还材料' },
+      { id: 'cancel', name: '取消', icon: '✕', title: '单点或拉框清除区域内的规划标记', cancel: true },
+    ];
+    var h = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">';
+    tools.forEach(function(t){
+      var active = cur === t.id;
+      var bg = active ? 'rgba(89,217,255,.3)' : 'rgba(89,217,255,.08)';
+      var bcol = active ? '#59d9ff' : (t.cancel ? 'rgba(255,154,154,.4)' : 'rgba(89,217,255,.25)');
+      var tcol = active ? '#fff' : (t.cancel ? '#ff9a9a' : '#c5e3f6');
+      var shadow = active ? 'box-shadow:0 0 10px rgba(89,217,255,.5);' : '';
+      h += '<button data-order-tool="' + t.id + '" title="' + t.title + '" style="' +
+        'background:' + bg + ';border:1.5px solid ' + bcol + ';color:' + tcol + ';' +
+        'padding:8px 18px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;' +
+        'letter-spacing:1px;transition:all .15s ease;' + shadow + '">' +
+        t.icon + ' ' + t.name +
+        '</button>';
+    });
+    h += '</div>';
+    row.innerHTML = h;
   }
   registerModal('orders', {
     elId: 'ordersRow',
@@ -1676,7 +1702,7 @@ APH.UI = (function(){
     moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus,
     renderDiplomacy:renderDiplomacy, doSendTribute:doSendTribute, doSignTradePact:doSignTradePact, doDeterRival:doDeterRival,
     renderTradePanel:renderTradePanel, doTradeRow:doTradeRow, moveTradeSel:moveTradeSel,
-    renderBuildRow:renderBuildRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml,
+    renderBuildRow:renderBuildRow, renderOrdersRow:renderOrdersRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml,
     inspectorHtml:inspectorHtml
   };
 })();

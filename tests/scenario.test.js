@@ -2918,6 +2918,51 @@ test('#156 inspector: 左下角检查器展示指挥官、居民、植物、建�
   A(S.selectedTarget && S.selectedTarget.type === 'player', '解除后应重置为指挥官');
 });
 
+test('#157 orders: 规划工具箱选择、框选打标与自动清标', () => {
+  cmdHomeSetup();
+  S.designations = {};
+
+  // 1. 添加 3 棵树与 2 块铁矿
+  const t1 = { id: 'fl_tree_a', type: T.FLORA, kind: 'tree', x: S.px + 100, y: S.py + 100, hp: 20, maxHp: 20, dead: false };
+  const t2 = { id: 'fl_tree_b', type: T.FLORA, kind: 'tree', x: S.px + 120, y: S.py + 130, hp: 20, maxHp: 20, dead: false };
+  const t3 = { id: 'fl_tree_c', type: T.FLORA, kind: 'tree', x: S.px + 140, y: S.py + 110, hp: 20, maxHp: 20, dead: false };
+  const r1 = { id: 'fl_rock_a', type: T.FLORA, kind: 'rock_iron', x: S.px + 200, y: S.py + 200, hp: 40, maxHp: 40, dead: false };
+  const r2 = { id: 'fl_rock_b', type: T.FLORA, kind: 'rock_iron', x: S.px + 220, y: S.py + 210, hp: 40, maxHp: 40, dead: false };
+  S.entities.push(t1, t2, t3, r1, r2);
+
+  // 2. 模拟选定 chop 工具，框选树林区域 [S.px+80, S.py+80] 到 [S.px+160, S.py+160]
+  S.orderTool = 'chop';
+  const boxedTrees = APH.Colony.boxSelectEntities(S.entities, S.px + 80, S.py + 80, S.px + 160, S.py + 160);
+  A(boxedTrees.length === 3, '应框选 3 棵树, got ' + boxedTrees.length);
+  boxedTrees.forEach(bt => APH.Colony.applyDesignation(S.designations, bt, S.orderTool));
+
+  A(S.designations['fl_tree_a'] && S.designations['fl_tree_a'].type === 'chop', 't1 应打上 chop 标记');
+  A(S.designations['fl_tree_b'] && S.designations['fl_tree_b'].type === 'chop', 't2 应打上 chop 标记');
+  A(S.designations['fl_tree_c'] && S.designations['fl_tree_c'].type === 'chop', 't3 应打上 chop 标记');
+  A(!S.designations['fl_rock_a'], '岩石不应被打上 chop 标记');
+
+  // 3. 模拟选定 mine 工具，框选矿石区
+  S.orderTool = 'mine';
+  const boxedRocks = APH.Colony.boxSelectEntities(S.entities, S.px + 180, S.py + 180, S.px + 240, S.py + 240);
+  A(boxedRocks.length === 2, '应框选 2 块矿石');
+  boxedRocks.forEach(br => APH.Colony.applyDesignation(S.designations, br, S.orderTool));
+  A(S.designations['fl_rock_a'] && S.designations['fl_rock_a'].type === 'mine', 'r1 应打上 mine 标记');
+  A(S.designations['fl_rock_b'] && S.designations['fl_rock_b'].type === 'mine', 'r2 应打上 mine 标记');
+
+  // 4. 模拟选定 cancel 工具，框选 t1 和 t2
+  S.orderTool = 'cancel';
+  const cancelTrees = APH.Colony.boxSelectEntities(S.entities, S.px + 80, S.py + 80, S.px + 130, S.py + 140);
+  cancelTrees.forEach(ct => APH.Colony.applyDesignation(S.designations, ct, S.orderTool));
+  A(!S.designations['fl_tree_a'], 't1 标记应被取消');
+  A(!S.designations['fl_tree_b'], 't2 标记应被取消');
+  A(S.designations['fl_tree_c'], '未在取消框内的 t3 标记应保留');
+
+  // 5. 死亡实体在 updateHome 中自动清标
+  t3.dead = true;
+  M.updateHome(0.016);
+  A(!S.designations['fl_tree_c'], '死亡实体标记应被自动清理');
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

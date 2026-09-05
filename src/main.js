@@ -9,6 +9,7 @@ window.APH = window.APH || {};
 (function(){
   'use strict';
   var U=APH.U, CFG=APH.CFG, T=CFG.entType;
+  var orderDrag=false, orderFrom=null, orderTo=null;
   /* 真实可视区域(canvas实际显示尺寸), 预览面板缩放/分栏安全 */
   function vpW(){ var v=APH.World.getViewport(); return (v&&v.w)||innerWidth; }
   function vpH(){ var v=APH.World.getViewport(); return (v&&v.h)||innerHeight; }
@@ -23,6 +24,8 @@ window.APH = window.APH || {};
     face:-Math.PI/2, walkPh:0, moving:false, run:false,
     downed:false,                // #72 家园击倒: 运行时镜像(meta.playerNeeds.downed 真源)
     o2:100, hp:100, cry:0, found:0, totalBeacons:6,
+    orderTool:null,              // ADR-28 规划工具模式 (chop|mine|haul|deconstruct|cancel)
+    designations:{},             // ADR-28 规划标记字典 { [entityId]: { type, entityId } }
     carry:{},                    // 远征背包 {itemId: n}
     fireCd:0, iFrameT:0, hurtFlash:0, noiseT:0,
     camX:0, camY:0, shake:0,
@@ -813,6 +816,16 @@ window.APH = window.APH || {};
       }
     }
 
+    /* ADR-28: 自动清除已死亡/已入库实体的规划标记 */
+    if(s.designations){
+      for(var did in s.designations){
+        var de = s.entities.find(function(en){ return en && en.id === did; });
+        if(!de || de.dead){
+          delete s.designations[did];
+        }
+      }
+    }
+
     /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
     if(APH.Colony && APH.Colony.tickConstruction) APH.Colony.tickConstruction(s, dt);
@@ -1307,6 +1320,8 @@ window.APH = window.APH || {};
       /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
       drawSelectedRing(s.clock);
+      drawDesignations(s.clock);
+      drawOrderDragBox();
       drawTutorialArrow(s.clock);
       drawDebugMark();
       APH.UI.updHUD();
@@ -1435,6 +1450,72 @@ window.APH = window.APH || {};
       ctx2.arc(uo.x, uo.y, 8+pulse*3, 0, U.TAU);
       ctx2.stroke();
     }
+  }
+
+  /* ADR-28 / Ticket #157: 规划标记悬浮徽章与框选选框渲染 */
+  function drawDesignations(time){
+    var s = APH.state;
+    if(!s.designations || s.scene !== 'home') return;
+    var cv2 = document.getElementById('cv');
+    if(!cv2) return;
+    var ctx2 = cv2.getContext('2d');
+    var pulse = Math.sin(time * 5) * 0.25 + 0.75;
+
+    (s.entities || []).forEach(function(e){
+      if(!e || e.dead || !s.designations[e.id]) return;
+      var des = s.designations[e.id];
+      var icon = des.type === 'chop' ? '🪓' : (des.type === 'mine' ? '⛏' : (des.type === 'haul' ? '✋' : '🔨'));
+      var bgCol = des.type === 'deconstruct' ? 'rgba(255,80,80,' + (0.5 * pulse) + ')' : 'rgba(89,217,255,' + (0.45 * pulse) + ')';
+      var borderCol = des.type === 'deconstruct' ? '#ff5050' : '#59d9ff';
+
+      /* 世界坐标转屏幕坐标 */
+      var sx = e.x - s.camX + vpW()/2;
+      var sy = (e.y - 28) - s.camY + vpH()/2;
+
+      ctx2.save();
+      ctx2.fillStyle = bgCol;
+      ctx2.beginPath();
+      ctx2.arc(sx, sy, 10, 0, U.TAU);
+      ctx2.fill();
+      ctx2.strokeStyle = borderCol;
+      ctx2.lineWidth = 1.2;
+      ctx2.stroke();
+
+      ctx2.font = '12px sans-serif';
+      ctx2.textAlign = 'center';
+      ctx2.textBaseline = 'middle';
+      ctx2.fillText(icon, sx, sy + 1);
+      ctx2.restore();
+    });
+  }
+
+  function drawOrderDragBox(){
+    if(!orderDrag || !orderFrom || !orderTo) return;
+    var s = APH.state;
+    if(s.scene !== 'home') return;
+    var cv2 = document.getElementById('cv');
+    if(!cv2) return;
+    var ctx2 = cv2.getContext('2d');
+
+    var sx0 = orderFrom.x - s.camX + vpW()/2;
+    var sy0 = orderFrom.y - s.camY + vpH()/2;
+    var sx1 = orderTo.x - s.camX + vpW()/2;
+    var sy1 = orderTo.y - s.camY + vpH()/2;
+
+    var minX = Math.min(sx0, sx1);
+    var maxX = Math.max(sx0, sx1);
+    var minY = Math.min(sy0, sy1);
+    var maxY = Math.max(sy0, sy1);
+    var w = maxX - minX, h = maxY - minY;
+
+    ctx2.save();
+    ctx2.fillStyle = 'rgba(89,217,255,0.14)';
+    ctx2.fillRect(minX, minY, w, h);
+    ctx2.strokeStyle = '#59d9ff';
+    ctx2.lineWidth = 1.5;
+    ctx2.setLineDash([5, 4]);
+    ctx2.strokeRect(minX, minY, w, h);
+    ctx2.restore();
   }
 
   function drawTutorialArrow(time){
@@ -2036,6 +2117,14 @@ window.APH = window.APH || {};
       },
       CANCEL_OR_CLOSE: function(){
         var s=APH.state;
+        if(s.orderTool){
+          s.orderTool = null;
+          orderDrag = false;
+          APH.UI.setHint('');
+          APH.UI.floatText('退出规划模式', '#c5e3f6');
+          if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
+          return true;
+        }
         if(s.selectedRid || (s.selectedTarget && s.selectedTarget.type!=='player')){
           deselectPawn();
           s.selectedTarget = { type: 'player' };
@@ -2130,8 +2219,16 @@ window.APH = window.APH || {};
     var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0,wallDrag=false,wallFrom=null,wallLast=null,wallPlaced={};
     cv.addEventListener('pointerdown',function(e){
       downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
-      /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
+      /* ADR-28: 规划划区拖拽框选 — 按下开始 */
       var s0=APH.state;
+      if(s0.scene==='home' && s0.orderTool){
+        orderDrag = true;
+        var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
+        orderFrom = { x: wx0, y: wy0 };
+        orderTo = { x: wx0, y: wy0 };
+        return;
+      }
+      /* T2: 墙/闸门拖拽连续放置 — 按下即开始(在建造模式下) */
       if(s0.scene==='home'&&s0.buildMode&&(s0.buildMode==='bl_wall'||s0.buildMode==='bl_gate'||s0.buildMode==='bl_spike_trap'||s0.buildMode==='bl_sandbag')){
         wallDrag=true; wallLast=null; wallPlaced={};
         var wx0=e.clientX-vpW()/2+s0.camX, wy0=e.clientY-vpH()/2+s0.camY;
@@ -2141,15 +2238,26 @@ window.APH = window.APH || {};
         tryPlace(s0.buildMode, wx0, wy0);
       }
     });
-    /* ADR-29 右键 = 解除征召 (并阻止浏览器菜单) */
+    /* ADR-29 右键 = 解除征召 / 退出规划 (并阻止浏览器菜单) */
     cv.addEventListener('contextmenu',function(e){
       e.preventDefault();
       var s0=APH.state;
+      if(s0.orderTool){
+        s0.orderTool = null;
+        orderDrag = false;
+        APH.UI.setHint('');
+        APH.UI.floatText('退出规划模式', '#c5e3f6');
+        if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
+        return;
+      }
       if(s0.selectedRid){ deselectPawn(); }
     });
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
+      if(orderDrag){
+        orderTo = { x: e.clientX-vpW()/2+APH.state.camX, y: e.clientY-vpH()/2+APH.state.camY };
+      }
       /* T2 拖拽续铺: 从上一格到当前格增量线段(防从起点重算的幻影格+重试刷屏) */
       if(wallDrag && APH.state.buildMode && APH.state.scene==='home'){
         var s0=APH.state;
@@ -2169,6 +2277,34 @@ window.APH = window.APH || {};
     cv.addEventListener('pointerup',function(e){
       wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
       if(e.button===2) return;   /* 右键已在 contextmenu 处理 */
+      if(orderDrag){
+        orderDrag = false;
+        var s0 = APH.state;
+        s0.designations = s0.designations || {};
+        var tool = s0.orderTool;
+        var dDist = Math.abs(orderTo.x - orderFrom.x) + Math.abs(orderTo.y - orderFrom.y);
+        var changed = 0;
+        if(dDist < 14){
+          var pickR = 34;
+          var hit = s0.entities.find(function(en){
+            return en && !en.dead && U.dst(en.x, en.y, orderTo.x, orderTo.y) <= pickR;
+          });
+          if(hit && APH.Colony.applyDesignation(s0.designations, hit, tool)){
+            changed++;
+          }
+        } else {
+          var boxed = APH.Colony.boxSelectEntities(s0.entities, orderFrom.x, orderFrom.y, orderTo.x, orderTo.y);
+          boxed.forEach(function(be){
+            if(APH.Colony.applyDesignation(s0.designations, be, tool)) changed++;
+          });
+        }
+        if(changed > 0){
+          var msg = tool === 'cancel' ? ('✔ 已清除 ' + changed + ' 处规划标记') : ('✔ 已规划 ' + changed + ' 处目标');
+          APH.UI.floatText(msg, tool === 'cancel' ? '#ff9a9a' : '#59d9ff');
+        }
+        updateInspectorNow();
+        return;
+      }
       if(performance.now()-downT<450 && downMoved<12 && APH.state.mode==='running'){
         /* 建造模式: 点地放置(墙/闸门已在 pointerdown 铺设, 防重复) */
         if(s.scene==='home'&&s.buildMode&&s.buildMode!=='bl_wall'&&s.buildMode!=='bl_gate'&&s.buildMode!=='bl_spike_trap'&&s.buildMode!=='bl_sandbag'){
@@ -4086,6 +4222,25 @@ window.APH = window.APH || {};
     if(tt) tt.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('techMap'); });
     var td = document.getElementById('tabDiplo');
     if(td) td.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('diplomacy'); });
+
+    /* ADR-28 规划工具箱事件绑定 */
+    var ordersRow = document.getElementById('ordersRow');
+    if(ordersRow){
+      ordersRow.addEventListener('click', function(ev){
+        var btn = ev.target.closest('[data-order-tool]');
+        if(!btn) return;
+        var toolId = btn.getAttribute('data-order-tool');
+        var s = APH.state;
+        s.orderTool = (s.orderTool === toolId) ? null : toolId;
+        if(s.orderTool){
+          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', cancel:'✕ 取消' };
+          APH.UI.setHint('[' + (toolNames[s.orderTool]||s.orderTool) + ' 模式] 鼠标在地图上单点或拉框圈选 · 右键/Esc 退出');
+        } else {
+          APH.UI.setHint('');
+        }
+        if(APH.UI && APH.UI.renderOrdersRow) APH.UI.renderOrdersRow();
+      });
+    }
 
     /* 兼容老圆钮(若存在) */
     var btn=document.getElementById('buildBtn');

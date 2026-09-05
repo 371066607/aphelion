@@ -2190,6 +2190,75 @@ APH.Colony = (function(){
     if(window.APH.Main && APH.Main.residentsTick) APH.Main.residentsTick();
   }
 
+  /* ---------- ADR-28 / Ticket #157: 规划划区与框选判定纯函数 ---------- */
+  function boxSelectEntities(entities, x0, y0, x1, y1){
+    if(!entities || !Array.isArray(entities)) return [];
+    var minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    var minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    var res = [];
+    for(var i = 0; i < entities.length; i++){
+      var e = entities[i];
+      if(!e || e.dead) continue;
+      var ex = e.x, ey = e.y;
+      if(ex >= minX && ex <= maxX && ey >= minY && ey <= maxY){
+        res.push(e);
+      }
+    }
+    return res;
+  }
+
+  function applyDesignation(designations, entity, tool){
+    if(!designations || !entity) return false;
+    var id = entity.id;
+    if(!id) return false;
+    var T = (window.APH && window.APH.CFG && window.APH.CFG.entType) || {};
+    var fType = T.FLORA || 'flora';
+    var dType = T.DROPPED || 'dropped';
+    var bType = T.BUILDING || 'building';
+
+    if(tool === 'cancel'){
+      if(designations[id]){
+        delete designations[id];
+        return true;
+      }
+      return false;
+    }
+
+    if(tool === 'chop'){
+      if(entity.type === fType && (entity.kind === 'tree' || (entity.kind && entity.kind.startsWith('bush')))){
+        designations[id] = { type: 'chop', entityId: id };
+        return true;
+      }
+      return false;
+    }
+
+    if(tool === 'mine'){
+      if(entity.type === fType && entity.kind && entity.kind.startsWith('rock')){
+        designations[id] = { type: 'mine', entityId: id };
+        return true;
+      }
+      return false;
+    }
+
+    if(tool === 'haul'){
+      if(entity.type === dType){
+        designations[id] = { type: 'haul', entityId: id };
+        return true;
+      }
+      return false;
+    }
+
+    if(tool === 'deconstruct'){
+      if(entity.type === bType && entity.bid !== 'bl_landing_pad' && !entity.pad){
+        designations[id] = { type: 'deconstruct', entityId: id };
+        return true;
+      }
+      return false;
+    }
+
+    return false;
+  }
+
   return {
     list:list, get:get,
     TECHS:TECHS, TECH_COLUMNS:TECH_COLUMNS, canBuy:canBuy, buyTech:buyTech,
@@ -2227,6 +2296,7 @@ APH.Colony = (function(){
     findNearbySourcedItem:findNearbySourcedItem,
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     floraRespawnTick:floraRespawnTick,
+    boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,

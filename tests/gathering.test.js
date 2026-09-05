@@ -82,3 +82,62 @@ test('gathering: floraRespawnTick 再生系统', () => {
   A(s2.floraRespawn.length === 1, '重生队列应保留');
   A(s2.floraRespawn[0].ticksLeft === 4, '倒计时应递减到 4');
 });
+
+test('designation: applyDesignation 规划打标与取消纯函数', () => {
+  const applyD = APH.Colony.applyDesignation;
+  A(typeof applyD === 'function', 'applyDesignation 必须存在');
+
+  const des = {};
+  const tree = { id: 'fl_tree_1', type: 'flora', kind: 'tree' };
+  const rock = { id: 'fl_rock_1', type: 'flora', kind: 'rock_iron' };
+  const drop = { id: 'dp_item_1', type: 'dropped', itemId: 'it_wood' };
+  const bld = { id: 'bl_house_1', type: 'building', bid: 'bl_house' };
+  const pad = { id: 'bl_pad_1', type: 'building', bid: 'bl_landing_pad' };
+
+  // 砍伐树木
+  A(applyD(des, tree, 'chop') === true, '砍伐树木应成功');
+  A(des['fl_tree_1'] && des['fl_tree_1'].type === 'chop', '标记应为 chop');
+  A(applyD(des, rock, 'chop') === false, '砍伐岩石应被拒绝');
+
+  // 开采矿石
+  A(applyD(des, rock, 'mine') === true, '开采岩石应成功');
+  A(des['fl_rock_1'] && des['fl_rock_1'].type === 'mine', '标记应为 mine');
+  A(applyD(des, tree, 'mine') === false, '开采树木应被拒绝');
+
+  // 搬运物资
+  A(applyD(des, drop, 'haul') === true, '搬运掉落物应成功');
+  A(des['dp_item_1'] && des['dp_item_1'].type === 'haul', '标记应为 haul');
+
+  // 拆除建筑与保护发射台
+  A(applyD(des, bld, 'deconstruct') === true, '拆除普通建筑应成功');
+  A(applyD(des, pad, 'deconstruct') === false, '拆除发射台必须被拒绝');
+
+  // 取消标记
+  A(applyD(des, tree, 'cancel') === true, '取消标记应成功');
+  A(!des['fl_tree_1'], '树木标记应被清除');
+});
+
+test('designation: boxSelectEntities 矩形框选几何筛选纯函数', () => {
+  const boxSel = APH.Colony.boxSelectEntities;
+  A(typeof boxSel === 'function', 'boxSelectEntities 必须存在');
+
+  const list = [
+    { id: 'e1', x: 100, y: 100, dead: false },
+    { id: 'e2', x: 200, y: 250, dead: false },
+    { id: 'e3', x: 400, y: 500, dead: false },
+    { id: 'e4', x: 150, y: 150, dead: true }, // 死亡实体被排除
+  ];
+
+  // 顺向拉框 [50, 50] -> [250, 300]
+  const sel1 = boxSel(list, 50, 50, 250, 300);
+  A(sel1.length === 2, '应框中 e1 与 e2, got ' + sel1.length);
+  A(sel1.some(e => e.id === 'e1') && sel1.some(e => e.id === 'e2'), '应包含 e1 与 e2');
+
+  // 反向拉框 [300, 300] -> [50, 50]
+  const sel2 = boxSel(list, 300, 300, 50, 50);
+  A(sel2.length === 2, '反向拉框也应框中 2 个');
+
+  // 未框中任何实体
+  const sel3 = boxSel(list, 0, 0, 50, 50);
+  A(sel3.length === 0, '未命中应返回空数组');
+});
