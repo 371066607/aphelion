@@ -58,7 +58,7 @@ APH.Weather = (function(){
   /* 持续时长: dur[天]区间 × dayLen, 同 rng 掷定 */
   function durOf(id, cfg, rng){
     var d = (cfg.dur && cfg.dur[id]) || [2, 5];
-    var dayLen = (cfg.dayLen != null ? cfg.dayLen : 210);
+    var dayLen = (cfg.dayLen != null ? cfg.dayLen : (CFG.DAY_LEN || 3600));
     var min = d[0] * dayLen, max = d[1] * dayLen;
     return min + (rng ? rng() : 0) * (max - min);
   }
@@ -98,7 +98,7 @@ APH.Weather = (function(){
   function expectDur(id){
     var cfg = W();
     var d = (cfg.dur && cfg.dur[id]) || [2, 5];
-    var dayLen = (cfg.dayLen != null ? cfg.dayLen : 210);
+    var dayLen = (cfg.dayLen != null ? cfg.dayLen : (CFG.DAY_LEN || 3600));
     return ((d[0] + d[1]) / 2) * dayLen;
   }
   /* 预计剩余秒数: 中值 - 已持续 t, 不取负 */

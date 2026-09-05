@@ -21,8 +21,8 @@ test('defaultWeather: 无老档→晴天', () => {
 /* ---------- tickWeather: 持续时长 ---------- */
 test('tickWeather: 晴天持续(权重自身最大)→到时长后掷骰仍可继续晴', () => {
   // wx_clear: {wx_clear:4, ...} 首条自身; rng=0 → 命中 wx_clear (继续晴)
-  const w = { id: 'wx_clear', t: 2000 };          // 超过任何 dur 上限(5天=1050s), 必掷
-  const r = W.tickWeather(w, 210, () => 0);       // rng=0 → 第一权重 = wx_clear
+  const w = { id: 'wx_clear', t: 1e7 };          // 超过任何 dur 上限, 必掷
+  const r = W.tickWeather(w, 1, () => 0);       // rng=0 → 第一权重 = wx_clear
   if (r.id !== 'wx_clear') throw new Error('rng=0应继续晴(自身权重最大): ' + r.id);
   if (r.t !== 0) throw new Error('掷后 t 应归零: ' + r.t);
 });
@@ -31,8 +31,8 @@ test('tickWeather: 晴天持续(权重自身最大)→到时长后掷骰仍可�
 test('tickWeather: 晴朗到时长后 rng=0.99 命中末位权重(雨/雪/雾之外的冷门)', () => {
   // wx_clear 转移: {wx_clear:4, wx_rain:3, wx_snow:2, wx_fog:1, wx_heat:1, wx_cold:1} total=12
   // rng=0.99*12=11.88 → 逐个减去: 4→7.88, 3→4.88, 2→2.88, 1→1.88, 1→0.88, 1→-0.12 → wx_cold
-  const w = { id: 'wx_clear', t: 2000 };
-  const r = W.tickWeather(w, 210, () => 0.99);
+  const w = { id: 'wx_clear', t: 1e7 };
+  const r = W.tickWeather(w, 1, () => 0.99);
   if (r.id !== 'wx_cold') throw new Error('rng=0.99应命中末位 wx_cold: ' + r.id);
 });
 
@@ -41,8 +41,8 @@ test('tickWeather: 冷却中的天气被排除(雷暴cd期内雨→雨不选雷�
   // wx_rain: {wx_clear:4, wx_rain:3, wx_rain_heavy:2, wx_fog:2, wx_acid:1, wx_thunder:1} total=13
   // rng=0.999*13=12.987 → 4→8.987, 3→5.987, 2→3.987, 2→1.987, 1→0.987, 1→-0.013 → wx_thunder 被cd排除
   // 排除后 total=12: 4→8.987, 3→5.987, 2→3.987, 2→1.987, 1→0.987 → wx_acid(最后一个)
-  const w = { id: 'wx_rain', t: 2000, cd: { wx_thunder: 500 } };
-  const r = W.tickWeather(w, 210, () => 0.999);
+  const w = { id: 'wx_rain', t: 1e7, cd: { wx_thunder: 500 } };
+  const r = W.tickWeather(w, 1, () => 0.999);
   if (r.id === 'wx_thunder') throw new Error('冷却中不应选雷暴: ' + r.id);
   if (r.id !== 'wx_acid') throw new Error('排除后末位应 wx_acid: ' + r.id);
 });
@@ -126,7 +126,7 @@ test('weatherEffects: 全表 11×5 字段与 CFG 一致', () => {
 
 test('tickWeather: 进入极端天气写入冷却', () => {
   // 从 wx_rain 到时, rng 命中 wx_thunder → 应写 cd{wx_thunder:630}
-  const w = { id: 'wx_rain', t: 2000 };
+  const w = { id: 'wx_rain', t: 1e7 };
   // wx_rain total=13: cum thunder=[12,13) → rng∈[0.923,1) 取 0.95
   const r2 = W.tickWeather(w, 1, () => 0.95);
   if (r2.id !== 'wx_thunder') throw new Error('应选雷暴: ' + r2.id);
@@ -144,18 +144,18 @@ test('tickWeather: 空cd对象归一为null', () => {
 });
 
 test('tickWeather: dur 边界(1天=210s 内不切, 210s 后切)', () => {
-  // wx_thunder dur [1,1]天 → dur = 210 + rng()*0 = 210
+  const day = (APH.CFG.weather && APH.CFG.weather.dayLen) || 3600;
   const w = { id: 'wx_thunder', t: 0, cd: { wx_thunder: 630 } };
-  const r1 = W.tickWeather(w, 209, () => 0.5);
-  if (r1.id !== 'wx_thunder') throw new Error('209s应仍雷暴: ' + r1.id);
-  const r2 = W.tickWeather(w, 210, () => 0);
+  const r1 = W.tickWeather(w, day - 1, () => 0.5);
+  if (r1.id !== 'wx_thunder') throw new Error((day-1)+'s应仍雷暴: ' + r1.id);
+  const r2 = W.tickWeather(w, day, () => 0);
   // rng=0 → pick 命中首权重; wx_thunder 转移 {wx_rain:3, wx_clear:3, wx_blizzard:1} → wx_rain
   if (r2.id !== 'wx_rain') throw new Error('到时应切雨: ' + r2.id);
 });
 
 test('tickWeather: 热浪/寒潮属极端(写cd) — 冷却清单与 exposureGain>0 唯一真源一致', () => {
   // 热浪进入: 从 wx_clear 到时, rng 命中 wx_heat (wx_clear 转移 {clear:4,rain:3,snow:2,fog:1,heat:1,cold:1} total=12; cum heat=[10,11)
-  const w = { id: 'wx_clear', t: 2000 };
+  const w = { id: 'wx_clear', t: 1e7 };
   const r = W.tickWeather(w, 1, () => 0.88);   // 0.88*12=10.56 → 4→6.56,3→3.56,2→1.56,1→0.56,1→-0.44 → wx_heat
   if (r.id !== 'wx_heat') throw new Error('应选热浪: ' + r.id);
   if (!r.cd || r.cd.wx_heat !== 630) throw new Error('热浪应写cd630: ' + JSON.stringify(r.cd));

@@ -19,17 +19,18 @@ test('w3_currentId: 无 meta.weather → wx_clear (老档零迁移兜底)', () =
 
 /* ---------- HUD: 预计时长 ---------- */
 test('w3_expectDur: dur 区间中值 × dayLen (晴 3.5天=735s, 雷暴 1天=210s)', () => {
-  // CFG.weather.dur: wx_clear=[2,5] → (2+5)/2×210=735; wx_thunder=[1,1] → 1×210=210
+  const day = (APH.CFG.weather && APH.CFG.weather.dayLen) || 3600;
   const clear = W.expectDur('wx_clear');
-  if (clear !== 735) throw new Error('wx_clear 预计应 735s, 实际: ' + clear);
+  if (clear !== 3.5 * day) throw new Error('wx_clear 预计应 '+ (3.5*day) +'s, 实际: ' + clear);
   const thunder = W.expectDur('wx_thunder');
-  if (thunder !== 210) throw new Error('wx_thunder 预计应 210s, 实际: ' + thunder);
+  if (thunder !== day) throw new Error('wx_thunder 预计应 '+day+'s, 实际: ' + thunder);
 });
 
 test('w3_expectRemain: 中值-已过 t, 超时不取负', () => {
+  const day = (APH.CFG.weather && APH.CFG.weather.dayLen) || 3600;
   const r1 = W.expectRemain({ id: 'wx_thunder', t: 50 });
-  if (r1 !== 160) throw new Error('剩 210-50=160, 实际: ' + r1);
-  const r2 = W.expectRemain({ id: 'wx_clear', t: 9999 });
+  if (r1 !== day - 50) throw new Error('剩 '+(day-50)+', 实际: ' + r1);
+  const r2 = W.expectRemain({ id: 'wx_clear', t: 1e9 });
   if (r2 !== 0) throw new Error('超时应为 0(不取负), 实际: ' + r2);
 });
 

@@ -106,9 +106,9 @@ test('homeFoodTick: 家园掉饱食, 远征不掉, 不饿死', () => {
   if (typeof Res.homeFoodTick !== 'function') throw new Error('缺失 APH.Res.homeFoodTick');
   const drain = (APH.CFG.residents && APH.CFG.residents.foodDrain != null) ? APH.CFG.residents.foodDrain : 6;
   const next = Res.homeFoodTick(50, 'home');
-  if (next !== 50 - drain) throw new Error('家园应掉饱食 '+drain+', 实际: '+next);
+  if (Math.abs(next - (50 - drain)) > 0.02) throw new Error('家园应掉饱食 '+drain+', 实际: '+next);
   if (Res.homeFoodTick(50, 'expedition') !== 50) throw new Error('远征饱食不应下降');
-  if (Res.homeFoodTick(2, 'home') !== 0) throw new Error('饱食应钳到 0, 不饿死');
+  if (Res.homeFoodTick(0, 'home') !== 0) throw new Error('饱食应钳到 0, 不饿死');
 });
 test('ensurePlayerNeeds: 缺省饱食并兼容旧档', () => {
   if (typeof Res.ensurePlayerNeeds !== 'function') throw new Error('缺失 APH.Res.ensurePlayerNeeds');
@@ -118,12 +118,23 @@ test('ensurePlayerNeeds: 缺省饱食并兼容旧档', () => {
   const b = Res.ensurePlayerNeeds({ playerNeeds:{ food:41 } });
   if (b.playerNeeds.food !== 41) throw new Error('已有饱食不得覆盖');
 });
+test('#166 day: 一天 60 分钟，饱食/精力按白天校准', () => {
+  const day = APH.CFG.DAY_LEN;
+  const tick = (APH.CFG.time && APH.CFG.time.prodTick) || 30;
+  if (day !== 3600) throw new Error('一天应为 3600 秒, 实际: '+day);
+  const ticks = day / tick;
+  const foodDay = ticks * ((APH.CFG.residents && APH.CFG.residents.foodDrain) || 0);
+  const restDay = ticks * ((APH.CFG.residents && APH.CFG.residents.restDrain) || 0);
+  if (foodDay < 20 || foodDay > 60) throw new Error('一天掉饱食应在一顿量级, 实际: '+foodDay);
+  if (restDay < 30 || restDay > 70) throw new Error('一天掉精力应让夜里想睡, 实际: '+restDay);
+});
 test('homeRestTick: 家园掉精力, 远征不掉, 钳到 0', () => {
   if (typeof Res.homeRestTick !== 'function') throw new Error('缺失 APH.Res.homeRestTick');
+  const drain = (APH.CFG.residents && APH.CFG.residents.restDrain != null) ? APH.CFG.residents.restDrain : 0.42;
   const next = Res.homeRestTick(50, 'home');
-  if (next !== 43) throw new Error('家园应掉精力 7, 实际: '+next);
+  if (Math.abs(next - (50 - drain)) > 0.02) throw new Error('家园应掉精力 '+drain+', 实际: '+next);
   if (Res.homeRestTick(50, 'expedition') !== 50) throw new Error('远征精力不应下降');
-  if (Res.homeRestTick(2, 'home') !== 0) throw new Error('精力应钳到 0');
+  if (Res.homeRestTick(0, 'home') !== 0) throw new Error('精力应钳到 0');
 });
 test('ensurePlayerNeeds: 缺省精力并兼容旧档', () => {
   const a = Res.ensurePlayerNeeds({});
@@ -159,7 +170,8 @@ test('needsTick: 饿了有粮就吃, 没粮掉饱食', () => {
   if(!out.ate || r.food!==75) throw new Error('应吃+25: '+r.food);
   const r2={food:50,mood:60};
   Res.needsTick(r2,false);
-  if(r2.food!==44) throw new Error('无粮应-6: '+r2.food);
+  const drain = (APH.CFG.residents && APH.CFG.residents.foodDrain) || 0.35;
+  if(Math.abs(r2.food-(50-drain))>0.02) throw new Error('无粮应掉饱食: '+r2.food);
 });
 test('eatOnce: 饿了才吃一口, 饱了不再吃', () => {
   const r={food:50};
@@ -169,7 +181,8 @@ test('eatOnce: 饿了才吃一口, 饱了不再吃', () => {
 test('needsTick: 饥饿确定性涨病, 不饿死', () => {
   const r={food:20, mood:50, illness:0};
   Res.needsTick(r, false);
-  if(r.food!==14) throw new Error('应再掉饱食: '+r.food);
+  const drain = (APH.CFG.residents && APH.CFG.residents.foodDrain) || 0.35;
+  if(Math.abs(r.food-(20-drain))>0.02) throw new Error('应再掉饱食: '+r.food);
   if(r.illness!==4) throw new Error('饿应+4病: '+r.illness);
   if(r.mood<=0) throw new Error('本切片不应饿死/心情归零锁死');
 });

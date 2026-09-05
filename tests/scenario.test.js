@@ -195,9 +195,10 @@ test('player rest: 家园 HUD 显示精力, 远征隐藏且不掉', () => {
   const v = document.getElementById('vRest');
   A(v && Number(v.textContent) === Math.round(start), '家园精力数值应显示 '+start+', 实际: '+(v && v.textContent));
   M.residentsTick();
-  A(S.meta.playerNeeds.rest === 93, '家园生产跳应掉精力 7, 实际: '+S.meta.playerNeeds.rest);
+  const restDrain = (APH.CFG.residents && APH.CFG.residents.restDrain) || 0.42;
+  A(Math.abs(S.meta.playerNeeds.rest - (start - restDrain)) < 0.05, '家园生产跳应掉精力, 实际: '+S.meta.playerNeeds.rest);
   APH.UI.updHUD();
-  A(Number(v.textContent) === 93, '家园 HUD 应跟上精力下降, 实际: '+v.textContent);
+  A(Number(v.textContent) === Math.round(S.meta.playerNeeds.rest), '家园 HUD 应跟上精力下降, 实际: '+v.textContent);
   S.scene = 'expedition';
   const frozen = S.meta.playerNeeds.rest;
   M.residentsTick();
@@ -780,7 +781,8 @@ test('home: 仓空时能吃地上粮, 工坊能用地上矿', () => {
   });
   M.residentsTick();
   A(S.meta.res.food===0, '工坊不应动粮仓, got '+S.meta.res.food);
-  A(S.meta.residents[0].food===44, '生产跳只掉饱食不隔空吃, got '+S.meta.residents[0].food);
+  const foodDrain = (APH.CFG.residents && APH.CFG.residents.foodDrain) || 0.35;
+  A(Math.abs(S.meta.residents[0].food - (50 - foodDrain)) < 0.05, '生产跳只掉饱食不隔空吃, got '+S.meta.residents[0].food);
   A(S.meta.residents[0].illness<50, '地上药应能治病, got '+S.meta.residents[0].illness);
   A(!S.entities.some(e=>e.id==='dp_med' && !e.dead), '药堆应用完');
   const ore=S.entities.find(e=>e.id==='dp_ore' && !e.dead);
@@ -1106,7 +1108,7 @@ test('#67: 家园精力归零累塌 → meta+实体俯卧, bedId=null, moving=fa
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.rest = 3;      // 清醒跳掉 7 → 0 → 触发累塌
+  S.meta.playerNeeds.rest = 0.2;      // 一跳掉到 0 → 累塌
   S.nearBed = null;                 // 原地打地铺, 不绑床
   S.keys = {};
   M.residentsTick();
@@ -1283,8 +1285,9 @@ test('#70: 舱内躺卧按床速恢复 (+25/跳, 非地铺 18) 且保持 bed_med
   A(S.meta.playerNeeds.isSleeping === true, 'E 应躺入医疗舱');
   const pe0 = APH.Ent.findPlayer();
   A(pe0 && pe0.isSleeping === true, '实体应俯卧');
-  M.residentsTick();                   // 结算恢复: hasBed=nearBed||nearClinic=true → 床速 +25
-  A(S.meta.playerNeeds.rest === 65, '舱内躺卧应按床速恢复 40+25=65, 实际: ' + S.meta.playerNeeds.rest);
+  M.residentsTick();                   // 结算恢复: hasBed=nearBed||nearClinic=true → 床速
+  const bedRec = (APH.CFG.player && APH.CFG.player.bedRecover) || 0.65;
+  A(Math.abs(S.meta.playerNeeds.rest - (40 + bedRec)) < 0.05, '舱内躺卧应按床速恢复, 实际: ' + S.meta.playerNeeds.rest);
   A(S.meta.playerNeeds.bedId === 'bed_med', '恢复结算后应保持 bed_med, 实际: ' + S.meta.playerNeeds.bedId);
   const pe = APH.Ent.findPlayer();
   A(pe && pe.isSleeping === true, '恢复结算后实体仍应俯卧');
@@ -1913,13 +1916,13 @@ test('W2 天气接线: 极端暴雪结束→强制晴天窗口+喘息', () => {
   const oldW=S.meta.weather, oldEv=S.meta.events;
   try{
     A(S.scene==='home', '应在殖民地场景');
-    S.meta.weather={ id:'wx_blizzard', t:2000, cd:{ wx_blizzard:840 } };
+    S.meta.weather={ id:'wx_blizzard', t:1e7, cd:{ wx_blizzard:840 } };
     const cds={};
     Object.keys(window.APH.CFG.events.deck).forEach(id=>{
       if(id!=='ev_weather') cds[id]=99;
     });
     S.meta.events={ nextIn:0.1, sinceNeg:99, lastNeg:0,
-                    cooldowns:cds, history:[], weatherAcc:600 };
+                    cooldowns:cds, history:[], weatherAcc:4000 };
     M.storyTick(0.5);
     A(S.meta.weather && S.meta.weather.id==='wx_clear' && S.meta.weather.t===0,
       '极端结束应强制晴天窗口, got '+JSON.stringify(S.meta.weather));

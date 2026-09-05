@@ -3462,7 +3462,7 @@ window.APH = window.APH || {};
           APH.Colony.placeBuildingEntity('bl_house', 48*(gx0+2), 48*(gy0+2), 1);
           s.colony.buildings.push({id:'bl_lamp', x:48*(gx0+6), y:48*(gy0+2), lv:1, powered:true});
           APH.Colony.placeBuildingEntity('bl_lamp', 48*(gx0+6), 48*(gy0+2), 1);
-          s.clock=(CFG.DAY_LEN||210)*0.75;   /* 强制夜间(照片验证照明) */
+          s.clock=(CFG.DAY_LEN||3600)*0.75;   /* 强制夜间(照片验证照明) */
           document.title='AUTO: t9debug ready';
         }
         /* T10 调试通道(?t10debug=1): 尖刺陷阱(待触发+已触发)+沙袋, 白天清晰截图 */

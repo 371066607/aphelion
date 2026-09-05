@@ -14,10 +14,11 @@ APH.CFG = {
   GRID: 48,                    // ADR-4 逻辑格网
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },
-  DAY_LEN: 210,                // 一天的秒数（P0.2 将拉到 ~480；本票不改时长）
+  DAY_LEN: 3600,               // 一天 60 分钟（ADR-30 / #166）
   time: {
     defaultScale: 1,
     scales: [1, 2, 3],
+    prodTick: 30,              // 生产跳秒数（与 tickProduction 一致）
   },
 
   /* 土壤肥力体系 (RimWorld 农业) */
@@ -66,8 +67,8 @@ APH.CFG = {
     homeIllnessStart: 0,        // 家园需求: 玩家开局病情 (0=HUD 隐藏)
     bedSleepRadius: 60,        // #66 床边睡眠: 与居住舱交互半径 px
     clinicSleepRadius: 60,     // #70 医疗舱躺下: 与医疗舱交互半径 px (镜像 bedSleepRadius)
-    bedRecover: 25,            // #66 床边睡眠: 床上恢复 /tick
-    floorRecover: 18,          // #66 床边睡眠: 打地铺恢复 /tick (慢 ~30%)
+    bedRecover: 0.65,          // 床上恢复 /生产跳（约一晚从 75 睡到满）
+    floorRecover: 0.45,        // 地铺恢复 /生产跳
     restWakeAt: 100,           // #66 床边睡眠: 精力回满自动醒
     restSleepAt: 20,            // 环世界: 精力低于此值去床上睡 (不是平移镜头摇醒)
     restNightAt: 75,            // 夜间精力低于此值也去睡 (作息，不满血也回舱)
@@ -251,7 +252,7 @@ APH.CFG = {
     sickMarkFontPx: 14,
     eatBelow: 60,
     eatGain: 25,
-    foodDrain: 6,
+    foodDrain: 0.35,           // /生产跳；一天约掉 42，白天结束会饿
     moodWellFood: 65,
     moodWellGain: 2,
     moodCap: 95,
@@ -313,18 +314,18 @@ APH.CFG = {
     diningArriveR: 6,          // 到椅坐下判定半径
     diningTableEatR: 90,       // 坐椅后从桌旁粮堆取食的最大距离 (桌/椅在食堂内, 比 grabR 宽)
     /* 深度生存: 精力/睡眠/床位 (Survival #15) */
-    restDrain: 7,              // 生产跳自然精力衰减
+    restDrain: 0.42,           // /生产跳；一白天约掉 25，夜里想睡
     restSleepAt: 20,           // 精力低于此值入睡
     restNightAt: 75,           // 夜间精力低于此值也去睡
     restWakeAt: 100,           // 精力回满醒来
-    bedRecover: 25,            // 床铺睡眠恢复 /跳
-    floorRecover: 18,          // 地铺睡眠恢复 /跳 (慢 ~30%)
+    bedRecover: 0.65,          // 床铺睡眠恢复 /跳
+    floorRecover: 0.45,        // 地铺睡眠恢复 /跳
     bedMood: 3,                // 有床舒适心情增益
     floorMood: -5,             // 无床打地铺心情惩罚
     disturbedMood: -4,         // 惊醒心情惩罚
     disturbedTicks: 3,         // 惊醒持续跳数
     /* 深度生存: 娱乐与抗压 (Survival #18) */
-    recreationDrain: 5,        // 生产跳自然娱乐衰减
+    recreationDrain: 0.4,      // /生产跳；约一天从 80 掉到无聊线
     recreationJoyAt: 30,       // 娱乐低于此值渴望休闲
     recreationGain: 25,        // 每次休闲恢复
     recreationBuffAt: 80,      // 娱乐高值给 Buff
@@ -585,7 +586,7 @@ APH.CFG = {
     intervalMax: 4.5,          // 事件间隔上限
     firstDelay: 3,             // 开局宽限
     restMinutes: [2, 4],      // 负面事件后强制 2~4 分钟喘息窗口
-    weatherStepSec: 210,        // ev_weather 每次掷骰至少推进的天气时钟(秒; 1天=DAY_LEN)
+    weatherStepSec: 3600,       // ev_weather 每次掷骰至少推进的天气时钟(秒; 1天=DAY_LEN)
     moodMercyAt: 40,           // 心情均值低于此值 → 负面权重×moodMercyMul
     moodMercyMul: 0.5,
     wealthPerThreat: 120,      // 每 120 财富 +1 威胁级
@@ -697,7 +698,7 @@ APH.CFG = {
 
   /* 家园天气 (ADR-15: 马尔可夫状态机; 单位: 秒; 一天=DAY_LEN) */
   weather: {
-    dayLen: 210,                    // 与 DAY_LEN 同步(一天秒数)
+    dayLen: 3600,                   // 与 DAY_LEN 同步(一天秒数)
     /* 转移表: from→to 权重(每次到时掷骰); 晴→雨/雪 高freq, 极端低freq */
     transitions: {
       wx_clear:        { wx_clear: 4, wx_rain: 3, wx_snow: 2, wx_fog: 1, wx_heat: 1, wx_cold: 1 },

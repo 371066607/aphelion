@@ -117,7 +117,7 @@ APH.Opening = (function(){
   function visitorFallbackSec(){
     var n = cfg().visitorFallback;
     if(n!=null) return n;
-    return (APH.CFG && APH.CFG.DAY_LEN) || 210;
+    return (APH.CFG && APH.CFG.DAY_LEN) || 3600;
   }
   function visitorAllowed(opening, buildings, now){
     opening = opening || {};
