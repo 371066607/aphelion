@@ -179,5 +179,47 @@ const gridHtml = UI.prioGridHtml({ residents: [] });
 assert('命令表应含指挥官行', gridHtml.indexOf('指挥官') !== -1);
 assert('指挥官单元格应带 data-prio-r="player"', gridHtml.indexOf('data-prio-r="player"') !== -1);
 
+// 11. ADR-28 / Ticket #156: 通用检查器 (Inspector) HTML 纯函数断言
+assert('inspectorHtml 已导出', typeof UI.inspectorHtml === 'function');
+
+const mockState = {
+  hp: 85, o2: 90, scene: 'home',
+  meta: {
+    playerNeeds: { food: 75, rest: 80, isSleeping: false, downed: false },
+    residents: [
+      { id: 'rs_1', name: '阿尔法', job: 'bl_farm', trait: '勤勉', mood: 88, food: 70, rest: 95 }
+    ]
+  },
+  colony: { buildings: [] }
+};
+
+// 1) 指挥官检查器
+const playerHtml = UI.inspectorHtml({ type: 'player' }, mockState);
+assert('指挥官检查器含标题', playerHtml.indexOf('⭐ 指挥官(你)') !== -1);
+assert('指挥官检查器含生命', playerHtml.indexOf('85') !== -1);
+assert('指挥官检查器含饱食', playerHtml.indexOf('75') !== -1);
+
+// 2) 居民检查器
+const resHtml = UI.inspectorHtml({
+  type: 'resident',
+  entity: { id: 'rs_1', rid: 'rs_1', name: '阿尔法', job: 'bl_farm' }
+}, mockState);
+assert('居民检查器含姓名', resHtml.indexOf('阿尔法') !== -1);
+assert('居民检查器含特质', resHtml.indexOf('勤勉') !== -1);
+
+// 3) 自然实体/树木检查器
+const floraHtml = UI.inspectorHtml({
+  type: 'flora',
+  entity: { id: 'fl_1', kind: 'tree', hp: 20, maxHp: 30 }
+}, mockState);
+assert('树木检查器含名称', floraHtml.indexOf('红树') !== -1);
+assert('树木检查器含耐久', floraHtml.indexOf('20/30') !== -1);
+
+// 4) 地表/地形检查器
+const terrainHtml = UI.inspectorHtml({
+  type: 'terrain', x: 1000, y: 1000
+}, mockState);
+assert('地表检查器非空且含坐标', terrainHtml.indexOf('1000') !== -1);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);

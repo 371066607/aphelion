@@ -800,7 +800,7 @@ window.APH = window.APH || {};
     /* ADR-28 底部主标签栏显隐与高亮同步 (家园显示, 远征隐藏) */
     var mb=document.getElementById('mainTabsBar');
     if(mb){
-      mb.style.display=(s.scene==='home')?'flex':'none';
+      mb.style.display=(s.mode==='running' && s.scene==='home')?'flex':'none';
       if(s.scene==='home' && APH.UI && APH.UI.isOpen && APH.UI.getActiveModal){
         var actMod = APH.UI.getActiveModal();
         var isBuild = APH.UI.isOpen('buildCatalog');
@@ -1311,8 +1311,12 @@ window.APH = window.APH || {};
       drawDebugMark();
       APH.UI.updHUD();
       if(tickN%15===0) updateCmdPanel();   /* ADR-29: 命令面板状态行低频刷新 */
+      if(tickN%10===0) updateInspectorNow(); /* ADR-28 / Ticket #156: 检查器状态低频刷新 */
       return;
     }
+
+    var insp = document.getElementById('inspector');
+    if(insp) insp.style.display = 'none';
 
     var night = APH.World.daylight() < .5;
     updateExpedition(dt);
@@ -2032,7 +2036,12 @@ window.APH = window.APH || {};
       },
       CANCEL_OR_CLOSE: function(){
         var s=APH.state;
-        if(s.selectedRid){ deselectPawn(); return true; }   /* ADR-29: Esc 解除征召 */
+        if(s.selectedRid || (s.selectedTarget && s.selectedTarget.type!=='player')){
+          deselectPawn();
+          s.selectedTarget = { type: 'player' };
+          updateInspectorNow();
+          return true;
+        }
         if(s.buildMode){ s.buildMode=null; APH.UI.setHint(''); return true; }
         if(APH.UI && APH.UI.closeActive && APH.UI.closeActive()) return true;
         return false;
@@ -2168,22 +2177,70 @@ window.APH = window.APH || {};
           return;
         }
         var t={x:e.clientX-vpW()/2+APH.state.camX, y:e.clientY-vpH()/2+APH.state.camY};
-        /* ADR-29 征召交互: 家园+非建造模式 → 点选居民/对选中居民下令 */
+        /* ADR-28 / Ticket #156: 检查器目标选择与征召交互 */
         if(s.scene==='home' && !s.buildMode){
           var cmd=(CFG&&CFG.command)||{};
           var pickR=(cmd.pickR!=null)?cmd.pickR:34;
+
+          /* 1. 优先检查是否点击了指挥官(自己) */
+          if(U.dst(s.px, s.py, t.x, t.y) <= pickR){
+            s.selectedTarget = { type: 'player' };
+            deselectPawn();
+            updateInspectorNow();
+            return;
+          }
+
+          /* 2. 检查是否点击了居民 */
           var hitRes=s.entities.find(function(en){
             return en && en.type===T.RESIDENT && !en.dead && U.dst(en.x,en.y,t.x,t.y)<=pickR;
           });
           if(hitRes){
+            s.selectedTarget = { type: 'resident', entity: hitRes };
             if(s.selectedRid===(hitRes.rid||hitRes.id)){ deselectPawn(); }   /* 再点同一位=解除 */
             else selectPawn(hitRes.rid||hitRes.id);
+            updateInspectorNow();
             return;
           }
+
+          /* 3. 如果已有选中小人，点击地面下达移动令 */
           if(s.selectedRid){
             orderMove(t);
             return;
           }
+
+          /* 4. 检查是否点击了自然实体 (树木/矿石) */
+          var hitFlora=s.entities.find(function(en){
+            return en && en.type===T.FLORA && !en.dead && U.dst(en.x,en.y,t.x,t.y)<=pickR;
+          });
+          if(hitFlora){
+            s.selectedTarget = { type: 'flora', entity: hitFlora };
+            updateInspectorNow();
+            return;
+          }
+
+          /* 5. 检查是否点击了建筑 */
+          var hitBld=s.entities.find(function(en){
+            return en && en.type===T.BUILDING && !en.dead && U.dst(en.x,en.y,t.x,t.y)<=40;
+          });
+          if(hitBld){
+            s.selectedTarget = { type: 'building', entity: hitBld };
+            updateInspectorNow();
+            return;
+          }
+
+          /* 6. 检查是否点击了掉落物堆 */
+          var hitDrop=s.entities.find(function(en){
+            return en && en.type===T.DROPPED && !en.dead && U.dst(en.x,en.y,t.x,t.y)<=28;
+          });
+          if(hitDrop){
+            s.selectedTarget = { type: 'dropped', entity: hitDrop };
+            updateInspectorNow();
+            return;
+          }
+
+          /* 7. 点击空旷地面 → 选中地形，同时保留移动寻路 */
+          s.selectedTarget = { type: 'terrain', x: t.x, y: t.y };
+          updateInspectorNow();
         }
         APH.state.target=t;
         APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
@@ -2254,6 +2311,7 @@ window.APH = window.APH || {};
     s.mode='running';
     APH.UI.hideIntro();
     APH.UI.armProbe();
+    updateInspectorNow();
     APH.state.meta.stats.landings++;
     APH.Save.saveMeta(APH.state.meta);
   }
@@ -2780,16 +2838,20 @@ window.APH = window.APH || {};
     var s=APH.state;
     s.selectedRid=rid;
     var ent=selectedPawnEnt();
+    if(ent) s.selectedTarget={ type:'resident', entity:ent };
     var r=ent?residentOf(ent):null;
     APH.UI.floatText('已选中 '+(r?r.name:'居民')+' · 左键点地下令, Esc 解除', '#59d9ff');
     updateCmdPanel();
+    updateInspectorNow();
   }
   function deselectPawn(){
     var s=APH.state;
     var ent=selectedPawnEnt();
     if(ent) ent.userOrder=null;
     s.selectedRid=null;
+    s.selectedTarget={ type:'player' };
     updateCmdPanel();
+    updateInspectorNow();
   }
   function orderMove(t){
     var ent=selectedPawnEnt();
@@ -2860,6 +2922,18 @@ window.APH = window.APH || {};
       '<button data-cmd="dismiss" style="'+CMD_BTN_CSS+'color:#ff9a9a">✕ 解除</button>'+
       '</div>';
     panel.style.display='block';
+  }
+  function updateInspectorNow(){
+    var insp=document.getElementById('inspector');
+    var s=APH.state;
+    if(insp){
+      if(s.mode==='running' && s.scene==='home' && APH.UI && APH.UI.inspectorHtml){
+        insp.style.display='block';
+        insp.innerHTML=APH.UI.inspectorHtml(s.selectedTarget||{type:'player'}, s);
+      } else {
+        insp.style.display='none';
+      }
+    }
   }
   var CMD_BTN_CSS='background:rgba(89,217,255,.10);border:1px solid rgba(89,217,255,.45);color:#bfe8ff;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;white-space:nowrap';
 

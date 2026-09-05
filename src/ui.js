@@ -1541,6 +1541,129 @@ APH.UI = (function(){
     if(window.APH.Main && APH.Main.toggleDiplomacy) APH.Main.toggleDiplomacy(show);
   }
 
+  /* ================= ADR-28 / Ticket #156: 通用检查器 (Inspector) ================= */
+  function inspectorHtml(target, s){
+    if(!s) s = (window.APH && window.APH.state) || {};
+    var CFG = (window.APH && window.APH.CFG) || {};
+    if(!target || target.type === 'player'){
+      /* 1. 指挥官(玩家) */
+      var m = s.meta || {};
+      var needs = m.playerNeeds || {};
+      var hp = Math.round(s.hp != null ? s.hp : 100);
+      var food = Math.round(needs.food != null ? needs.food : 80);
+      var rest = Math.round(needs.rest != null ? needs.rest : 100);
+      var o2 = Math.round(s.o2 != null ? s.o2 : 100);
+      var statusTxt = needs.downed ? '昏迷击倒' : (needs.isSleeping ? '睡眠休息中' : (s.moving ? '行进中' : '清醒 · 待命'));
+      var statusCol = needs.downed ? '#ff4d4d' : (needs.isSleeping ? '#b39dff' : '#7dffab');
+
+      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<div style="font-size:22px;width:30px;text-align:center">🧑‍🚀</div>' +
+        '<div style="flex:1">' +
+          '<div style="color:#59d9ff;font-weight:800;font-size:12px;letter-spacing:1px">⭐ 指挥官(你)</div>' +
+          '<div style="color:' + statusCol + ';font-size:10px">' + statusTxt + '</div>' +
+        '</div>' +
+      '</div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:10px">' +
+        '<div><span style="color:#8fa3cc">生命 </span><b style="color:#7dffab">' + hp + '</b></div>' +
+        '<div><span style="color:#8fa3cc">饱食 </span><b style="color:#ffc857">' + food + '</b></div>' +
+        '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
+        '<div><span style="color:#8fa3cc">氧气 </span><b style="color:#c5e3f6">' + o2 + '</b></div>' +
+      '</div>';
+      return h;
+    }
+
+    if(target.type === 'resident'){
+      /* 2. 居民(Pawn) */
+      var ent = target.entity || target;
+      var rid = ent.rid || ent.id;
+      var r = (s.meta && s.meta.residents) ? s.meta.residents.find(function(x){ return x.id === rid; }) : null;
+      var name = (r && r.name) || ent.name || '居民';
+      var trait = (r && r.trait) || '勤勉';
+      var job = (r && r.job) ? ((CFG.buildings && CFG.buildings[r.job] && CFG.buildings[r.job].name) || r.job) : '待命中';
+      var mood = Math.round((r && r.mood != null) ? r.mood : (ent.mood || 80));
+      var food = Math.round((r && r.food != null) ? r.food : (ent.food || 80));
+      var rest = Math.round((r && r.rest != null) ? r.rest : (ent.rest || 80));
+      var action = ent.userOrder ? (ent.userOrder.type === 'move' ? '强制移动中' : (ent.userOrder.type === 'gather' ? '执行开采指令' : '执行搬运指令')) : (ent.gathering ? '正在采集中' : (ent.walking ? '走向工作岗位' : '待命'));
+
+      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+        '<div style="font-size:22px;width:30px;text-align:center">👤</div>' +
+        '<div style="flex:1">' +
+          '<div style="color:#ffc857;font-weight:800;font-size:12px">' + name + ' <span style="font-size:10px;color:#8fa3cc;font-weight:400">(' + trait + ')</span></div>' +
+          '<div style="color:#59d9ff;font-size:10px">' + action + ' · ' + job + '</div>' +
+        '</div>' +
+      '</div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 4px;font-size:10px">' +
+        '<div><span style="color:#8fa3cc">心情 </span><b style="color:#ffd54f">' + mood + '%</b></div>' +
+        '<div><span style="color:#8fa3cc">饱食 </span><b style="color:#7dffab">' + food + '</b></div>' +
+        '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
+      '</div>';
+      return h;
+    }
+
+    if(target.type === 'flora'){
+      /* 3. 自然树木/矿石 */
+      var fe = target.entity || target;
+      var kindName = fe.kind === 'tree' ? '高大红树' : (fe.kind === 'rock_stone' ? '花岗岩石' : (fe.kind === 'rock_iron' ? '富铁矿脉' : (fe.kind === 'bush_berry' ? '浆果丛' : '野生灌木')));
+      var icon = fe.kind === 'tree' ? '🌲' : (fe.kind && fe.kind.startsWith('rock') ? '🪨' : '🌿');
+      var hp = Math.round(fe.hp || 0);
+      var maxHp = Math.round(fe.maxHp || 30);
+      var des = (s.designations && s.designations[fe.id]) ? s.designations[fe.id].type : null;
+      var desTxt = des === 'chop' ? '🪓 已标砍伐' : (des === 'mine' ? '⛏ 已标开采' : '未规划');
+      var desCol = des ? '#59d9ff' : '#8fa3cc';
+
+      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+        '<div style="font-size:20px;width:30px;text-align:center">' + icon + '</div>' +
+        '<div style="flex:1">' +
+          '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + kindName + '</div>' +
+          '<div style="color:' + desCol + ';font-size:10px">' + desTxt + '</div>' +
+        '</div>' +
+      '</div>';
+      h += '<div style="font-size:10px;color:#8fa3cc">耐久度: <b style="color:#7dffab">' + hp + '/' + maxHp + '</b></div>';
+      return h;
+    }
+
+    if(target.type === 'building'){
+      /* 4. 建筑 */
+      var be = target.entity || target;
+      var bName = (CFG.buildings && CFG.buildings[be.bid||be.id] && CFG.buildings[be.bid||be.id].name) || be.bid || be.id || '建筑';
+      var lv = be.lv || 1;
+      return '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="font-size:20px;width:30px;text-align:center">🏛️</div>' +
+        '<div style="flex:1">' +
+          '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + bName + ' <span style="color:#ffc857;font-size:10px">Lv.' + lv + '</span></div>' +
+          '<div style="color:#7dffab;font-size:10px">运转正常</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    if(target.type === 'dropped'){
+      /* 5. 掉落物 */
+      var de = target.entity || target;
+      var itName = (CFG.items && CFG.items[de.itemId] && CFG.items[de.itemId].name) || de.itemId;
+      return '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div style="font-size:20px;width:30px;text-align:center">📦</div>' +
+        '<div style="flex:1">' +
+          '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + itName + ' ×' + (de.n||1) + '</div>' +
+          '<div style="color:#8fa3cc;font-size:10px">地上物资</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    /* 6. 地形/地面 */
+    var wx = Math.round(target.x || s.px || 0);
+    var wy = Math.round(target.y || s.py || 0);
+    var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? Math.round(APH.Weather.ambientTemperatureOf(s.meta, s.clock||0)) : 18;
+    return '<div style="display:flex;align-items:center;gap:8px">' +
+      '<div style="font-size:20px;width:30px;text-align:center">🌍</div>' +
+      '<div style="flex:1">' +
+        '<div style="color:#c5e3f6;font-weight:700;font-size:11px">温带平原 (' + wx + ', ' + wy + ')</div>' +
+        '<div style="color:#8fa3cc;font-size:10px">气温 ' + temp + '°C · 室外露天</div>' +
+      '</div>' +
+    '</div>';
+  }
+
   return {
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
@@ -1553,6 +1676,7 @@ APH.UI = (function(){
     moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus,
     renderDiplomacy:renderDiplomacy, doSendTribute:doSendTribute, doSignTradePact:doSignTradePact, doDeterRival:doDeterRival,
     renderTradePanel:renderTradePanel, doTradeRow:doTradeRow, moveTradeSel:moveTradeSel,
-    renderBuildRow:renderBuildRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml
+    renderBuildRow:renderBuildRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml,
+    inspectorHtml:inspectorHtml
   };
 })();

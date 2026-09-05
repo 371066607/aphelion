@@ -33,6 +33,12 @@
     padding:8px 14px;border-radius:18px;min-width:320px;max-width:92vw;
     box-shadow:0 4px 24px rgba(0,0,0,.45);backdrop-filter:blur(6px)}
 
+  /* ADR-28 / Ticket #156: 环世界式左下角检查器 */
+  #inspector{position:fixed;left:14px;bottom:56px;z-index:40;min-width:240px;max-width:300px;
+    display:none;background:rgba(10,14,24,.92);border:1px solid rgba(89,217,255,.35);
+    padding:8px 12px;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.5);
+    backdrop-filter:blur(6px);transition:all .15s ease}
+
   /* ADR-28 / Ticket #155: 环世界式底部主标签条 */
   #mainTabsBar{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:50;
     display:none;align-items:center;gap:6px;background:rgba(10,14,24,.92);border:1px solid rgba(89,217,255,.35);
@@ -114,6 +120,9 @@
 </head>
 <body>
 <canvas id="cv"></canvas>
+
+<!-- 左下角检查器 (ADR-28 / Ticket #156) -->
+<div id="inspector"></div>
 
 <!-- 底部常驻主标签栏 (ADR-28 / Ticket #155) -->
 <div id="mainTabsBar">

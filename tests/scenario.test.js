@@ -2879,7 +2879,45 @@ test('#149 cmd: 袭击中移动令保留(撤离), 非移动令被清除', () => 
   S.war.raidActive = false;
 });
 
+test('#156 inspector: 左下角检查器展示指挥官、居民、植物、建筑与地面', () => {
+  const ents = cmdHomeSetup();
+  // 1. 默认或选中指挥官
+  S.selectedTarget = { type: 'player' };
+  let html = APH.UI.inspectorHtml(S.selectedTarget, S);
+  A(html.indexOf('⭐ 指挥官(你)') !== -1, '默认应为指挥官, got: ' + html);
+  A(html.indexOf('生命') !== -1, '检查器应含生命');
+  A(html.indexOf('饱食') !== -1, '检查器应含饱食');
+
+  // 2. 选中居民
+  const p = ents[0];
+  M.cmd.select(p);
+  A(S.selectedTarget && S.selectedTarget.type === 'resident', '选中居民应写 selectedTarget');
+  html = APH.UI.inspectorHtml(S.selectedTarget, S);
+  A(html.indexOf(p.name) !== -1, '检查器应含居民名字');
+
+  // 3. 选中植物
+  const tree = { type: T.FLORA, kind: 'tree', hp: 30, maxHp: 30, x: S.px + 50, y: S.py };
+  S.selectedTarget = { type: 'flora', entity: tree };
+  html = APH.UI.inspectorHtml(S.selectedTarget, S);
+  A(html.indexOf('红树') !== -1, '检查器应含红树');
+  A(html.indexOf('30/30') !== -1, '检查器应含耐久');
+
+  // 4. 选中建筑
+  const bld = { type: T.BUILDING, bid: 'bl_house', lv: 1, x: S.px, y: S.py };
+  S.selectedTarget = { type: 'building', entity: bld };
+  html = APH.UI.inspectorHtml(S.selectedTarget, S);
+  A(html.indexOf('居住舱') !== -1 || html.indexOf('bl_house') !== -1, '检查器应含建筑名');
+
+  // 5. 选中地面
+  S.selectedTarget = { type: 'terrain', x: 1000, y: 1200 };
+  html = APH.UI.inspectorHtml(S.selectedTarget, S);
+  A(html.indexOf('1000') !== -1 && html.indexOf('1200') !== -1, '检查器应含坐标');
+
+  // 6. Esc 清空回到指挥官
+  M.cmd.deselect();
+  A(S.selectedTarget && S.selectedTarget.type === 'player', '解除后应重置为指挥官');
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
-process.exit(fail?1:0);
 process.exit(fail?1:0);
