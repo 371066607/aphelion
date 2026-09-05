@@ -3433,6 +3433,36 @@ test('#172 right_click: 右键居住舱下达优先休息', () => {
   A(S.playerOrder && S.playerOrder.type==='sleep', '右键居住舱应下达优先休息');
 });
 
+test('#173 pause: 暂停时钟停、倍速加速、暂停时镜头可平移 (#165)', () => {
+  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
+  S.mode='running';
+  S.paused=false;
+  S.timeScale=1;
+  S.keys={};
+  const c0 = S.clock;
+  A(typeof M.simStep === 'function', '应导出 simStep');
+  M.simStep(0.2);
+  A(S.clock > c0 + 0.19, '未暂停时应推进 clock');
+  APH.Input.dispatchAction('TOGGLE_PAUSE');
+  A(S.paused === true, '空格应暂停');
+  const c1 = S.clock;
+  const cam0 = S.camX;
+  S.keys.KeyD = true;
+  const stepped = M.simStep(0.2);
+  A(stepped === 0, '暂停时 simStep 应返回 0');
+  A(S.clock === c1, '暂停时 clock 不得增长');
+  A(S.camX > cam0, '暂停时 WASD 仍应平移镜头');
+  S.keys = {};
+  APH.Input.dispatchAction('TOGGLE_PAUSE');
+  A(S.paused === false, '再按空格应继续');
+  APH.Input.dispatchAction('SET_TIME_SCALE_3');
+  A(S.timeScale === 3, '3 键应为 ×3');
+  const c2 = S.clock;
+  M.simStep(0.1);
+  A(S.clock > c2 + 0.29, '×3 时 0.1s 真实时间应推进约 0.3s 模拟');
+  S.timeScale = 1;
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

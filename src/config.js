@@ -14,7 +14,11 @@ APH.CFG = {
   GRID: 48,                    // ADR-4 逻辑格网
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },
-  DAY_LEN: 210,                // 一天的秒数
+  DAY_LEN: 210,                // 一天的秒数（P0.2 将拉到 ~480；本票不改时长）
+  time: {
+    defaultScale: 1,
+    scales: [1, 2, 3],
+  },
 
   /* 土壤肥力体系 (RimWorld 农业) */
   soil: {
@@ -868,7 +872,10 @@ APH.CFG = {
       KeyE: 'INTERACT',
       KeyF: 'SECONDARY_INTERACT',
       KeyJ: 'FIRE_PLASMA',
-      Space: 'FIRE_PLASMA',
+      Space: 'TOGGLE_PAUSE',
+      Digit1: 'SET_TIME_SCALE_1',
+      Digit2: 'SET_TIME_SCALE_2',
+      Digit3: 'SET_TIME_SCALE_3',
       KeyB: 'TOGGLE_BUILD_MODE',
       KeyP: 'CYCLE_JOB',
       KeyU: 'UPGRADE_NEAREST',

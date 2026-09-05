@@ -13,6 +13,12 @@ APH.UI = (function(){
   /* ---------- HUD ---------- */
   function updHUD(){
     var s = APH.state;
+    var pb = $('pauseBanner');
+    if(pb){
+      if(s.paused){ pb.style.display='block'; pb.textContent='⏸ 暂停'; }
+      else if((s.timeScale||1)!==1){ pb.style.display='block'; pb.textContent='⏱ ×'+(s.timeScale||1); }
+      else pb.style.display='none';
+    }
     $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
     $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';

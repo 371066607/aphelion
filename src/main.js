@@ -21,6 +21,8 @@ window.APH = window.APH || {};
     mode:'intro',                // intro | running | dead | won
     scene:'home',                // home=殖民地(安全) | expedition=星球远征
     clock:0,
+    paused:false,                // ADR-30 暂停模拟（镜头与规划仍可用）
+    timeScale:1,                 // ADR-30 ×1/×2/×3 只乘模拟 dt
     spec:null,                   // 当前 PlanetSpec (ADR-1)
     px:0, py:0, vx:0, vy:0,
     face:-Math.PI/2, walkPh:0, moving:false, run:false,
@@ -1701,6 +1703,26 @@ window.APH = window.APH || {};
 
     if(s.mode!=='running'){ return; }
 
+    /* ADR-30: 暂停只冻模拟；镜头与绘制仍走。倍速只乘模拟 dt。 */
+    if(s.paused){
+      updateCamera(dt);
+      if(s.scene==='home'){
+        APH.World.render(dt, homeDrawers());
+        drawSelectedRing(s.clock);
+        drawDesignations(s.clock);
+        drawOrderDragBox();
+        drawPawnDragBox();
+        drawTutorialArrow(s.clock);
+        drawDebugMark();
+        APH.UI.updHUD();
+      }else{
+        APH.World.render(dt, expeditionDrawers());
+        APH.UI.updHUD();
+      }
+      return;
+    }
+    dt = dt * (s.timeScale || 1);
+
     /* 实体上限护栏 (委托 APH.Ent, ADR-20) */
     var over=guardTrim(s.entities,s.px,s.py,CFG.caps.entitiesHard);
     if(over.length){
@@ -2440,6 +2462,30 @@ window.APH = window.APH || {};
     return true;
   }
 
+  function setTimeScale(n){
+    var s=APH.state;
+    if(s.mode!=='running') return false;
+    var scales=(CFG.time&&CFG.time.scales)||[1,2,3];
+    if(scales.indexOf(n)<0) n=1;
+    s.timeScale=n;
+    s.paused=false;
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('⏱ ×'+n, '#c5e3f6');
+    if(APH.UI&&APH.UI.updHUD) APH.UI.updHUD();
+    return true;
+  }
+  function simStep(realDt){
+    var s=APH.state;
+    if(s.paused){
+      updateCamera(realDt||0);
+      return 0;
+    }
+    var scale=s.timeScale||1;
+    var simDt=(realDt||0)*scale;
+    if(simDt<=0) return 0;
+    s.clock+=simDt;
+    if(s.scene==='home') updateHome(simDt);
+    return simDt;
+  }
   function initInputActions(){
     if(!APH.Input || !APH.Input.registerActions) return;
     APH.Input.registerActions({
@@ -2457,6 +2503,17 @@ window.APH = window.APH || {};
       INTERACT: onPlayerInteract,
       SECONDARY_INTERACT: onSecondaryInteract,
       FIRE_PLASMA: onFirePlasma,
+      TOGGLE_PAUSE: function(){
+        var s=APH.state;
+        if(s.mode!=='running') return false;
+        s.paused = !s.paused;
+        if(APH.UI && APH.UI.floatText) APH.UI.floatText(s.paused ? '⏸ 暂停' : '▶ 继续', '#c5e3f6');
+        if(APH.UI && APH.UI.updHUD) APH.UI.updHUD();
+        return true;
+      },
+      SET_TIME_SCALE_1: function(){ return setTimeScale(1); },
+      SET_TIME_SCALE_2: function(){ return setTimeScale(2); },
+      SET_TIME_SCALE_3: function(){ return setTimeScale(3); },
       TOGGLE_BUILD_MODE: function(){
         var s=APH.state;
         if(s.mode!=='running'||s.scene!=='home'||playerDowned()||playerSleeping()) return false;
@@ -5300,6 +5357,9 @@ window.APH = window.APH || {};
     doSignTradePact:doSignTradePact,
     doDeterRival:doDeterRival,
     updateHome:updateHome,
+    simStep:simStep,
+    setTimeScale:setTimeScale,
+    updateCamera:updateCamera,
     updateSurvival:updateSurvival,
     returnHome:returnHome,
     spawnVisitor:spawnVisitor,

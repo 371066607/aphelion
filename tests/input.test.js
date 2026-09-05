@@ -48,12 +48,18 @@ test('input: resolveAction 在不同上下文中实现按键隔离', () => {
   const Input = window.APH.Input;
   Input.resetContext('game');
 
-  // 1. game 上下文: E 为 INTERACT, J 为 FIRE_PLASMA, 数字不映射
+  // 1. game 上下文: E 为 INTERACT, J 为 FIRE_PLASMA, 空格暂停, 数字切倍速
   const actE = Input.resolveAction('KeyE');
   if (actE !== 'INTERACT') throw new Error('game 下 KeyE 应为 INTERACT, got ' + actE);
 
   const actJ = Input.resolveAction('KeyJ');
   if (actJ !== 'FIRE_PLASMA') throw new Error('game 下 KeyJ 应为 FIRE_PLASMA, got ' + actJ);
+
+  const actSpace = Input.resolveAction('Space');
+  if (actSpace !== 'TOGGLE_PAUSE') throw new Error('game 下 Space 应为 TOGGLE_PAUSE, got ' + actSpace);
+
+  const actScale = Input.resolveAction('Digit2');
+  if (actScale !== 'SET_TIME_SCALE_2') throw new Error('game 下 Digit2 应为 SET_TIME_SCALE_2, got ' + actScale);
 
   // 2. 切换至 modal:roster: Digit1 为 SET_PRIO_1, J 必须被阻断为 null(不能误射击!)
   Input.pushContext('modal:roster');

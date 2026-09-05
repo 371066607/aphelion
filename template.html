@@ -42,6 +42,9 @@
   /* ADR-29 / Ticket #161: 屏幕顶部殖民者头像条 */
   #colonistBar{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:35;
     display:none;align-items:center;gap:8px;max-width:80vw;overflow-x:auto;padding:4px 6px}
+  #pauseBanner{position:fixed;top:12px;right:16px;z-index:36;display:none;
+    background:rgba(10,14,24,.9);border:1px solid rgba(255,200,87,.45);color:#ffc857;
+    padding:6px 12px;border-radius:12px;font-size:13px;letter-spacing:2px;pointer-events:none}
   .aph-colonist-card{
     background:rgba(10,14,24,.88);border:1.5px solid rgba(89,217,255,.3);border-radius:12px;
     padding:4px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
@@ -145,6 +148,7 @@
 
 <!-- 顶部殖民者头像栏 (ADR-29 / Ticket #161) -->
 <div id="colonistBar"></div>
+<div id="pauseBanner"></div>
 
 <!-- 左下角检查器 (ADR-28 / Ticket #156) -->
 <div id="inspector"></div>
