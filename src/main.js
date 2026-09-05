@@ -2524,19 +2524,33 @@ window.APH = window.APH || {};
           return true;
         }
 
-        /* 散兵线走位 */
+        /* 散兵线走位 (仅征召状态响应) */
         var N = activeSquad.length;
+        var anyMoved = false;
         activeSquad.forEach(function(p, idx){
           var offsetX = (idx - (N - 1) / 2) * 26;
           var tx = wx + offsetX, ty = wy;
           if(p.type === 'player' || p.id === 'player'){
-            s0.target = { x: tx, y: ty };
+            if(s0.playerDrafted){
+              s0.target = { x: tx, y: ty };
+              APH.state.parts.push({ t: 'ping', x: tx, y: ty, life: 0.8, max: 0.8 });
+              anyMoved = true;
+            } else {
+              APH.UI.floatText('指挥官未征召 · 点击头像或按 [R] 战备方可调遣', '#8fa3cc');
+            }
           } else {
-            p.userOrder = { type: 'move', x: tx, y: ty };
+            if(p.drafted){
+              p.userOrder = { type: 'move', x: tx, y: ty };
+              APH.state.parts.push({ t: 'ping', x: tx, y: ty, life: 0.8, max: 0.8 });
+              anyMoved = true;
+            } else {
+              APH.UI.floatText((p.name||'居民') + ' 未征召 · 按 [R] 战备方可调遣', '#8fa3cc');
+            }
           }
         });
-        APH.UI.floatText('✔ 战术移动 (' + N + '人)', '#8fd4ff');
-        APH.state.parts.push({ t: 'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
+        if(anyMoved){
+          APH.UI.floatText('✔ 战术移动 (' + N + '人)', '#8fd4ff');
+        }
         updateCmdPanel();
         updateInspectorNow();
         return true;
@@ -2702,12 +2716,15 @@ window.APH = window.APH || {};
             return;
           }
 
-          /* 7. 点击空旷地面 → 选中地形，同时保留移动寻路 */
+          /* 7. 点击空旷地面 → 选中地形，检查器展示地表属性 (未征召绝不移动主角) */
           s.selectedTarget = { type: 'terrain', x: t.x, y: t.y };
           updateInspectorNow();
+          return;
         }
-        APH.state.target=t;
-        APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
+        if(s.scene === 'expedition' && s.playerDrafted){
+          APH.state.target=t;
+          APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
+        }
       }
     });
 
