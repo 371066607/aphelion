@@ -168,5 +168,12 @@ UI.close('buildCatalog');
 assert('roster 默认已注册并能打开', UI.open('roster') === true);
 UI.close('roster');
 
+// 10. ADR-28 补丁: 指挥官(玩家)行出现在命令表
+window.APH.Res = window.APH.Res || { SKILLS: ['sk_build','sk_farm'], SKILL_NAMES: {} };
+assert('prioGridHtml 已导出', typeof UI.prioGridHtml === 'function');
+const gridHtml = UI.prioGridHtml({ residents: [] });
+assert('命令表应含指挥官行', gridHtml.indexOf('指挥官') !== -1);
+assert('指挥官单元格应带 data-prio-r="player"', gridHtml.indexOf('data-prio-r="player"') !== -1);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);

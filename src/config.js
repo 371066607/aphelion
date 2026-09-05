@@ -414,6 +414,8 @@ APH.CFG = {
   gathering: {
     searchRadius: 800,           // 居民采集目标搜索半径 (px)
     gatherSkillKey: 'sk_farm',   // 采集使用的技能键
+    playerGatherDps: 15,         // 玩家脚边自动开采速率 (hp/s, 站立不动时)
+    playerGatherSkills: { sk_farm: 6, sk_craft: 6 },  // 玩家自动开采虚拟技能 (与手动 E 相同)
     regenTicks: { tree: 8, rock_iron: 12, rock_stone: 10, bush_berry: 6, bush_herb: 6 }, // 再生跳数
     regenZoneR: 200,             // 再生位置偏移半径 (px)
     typePriority: ['tree', 'rock_stone', 'rock_iron', 'bush_berry', 'bush_herb'], // 采集目标优先级

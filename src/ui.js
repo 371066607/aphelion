@@ -1355,6 +1355,26 @@ APH.UI = (function(){
         '<div>' + col.name + '</div></td>';
     });
     html += '</tr>';
+    /* ADR-28: 玩家自身作为命令表首行（环世界核心：玩家也是小人） */
+    var playerRow = '<tr><td style="padding:4px 10px;color:#59d9ff;font-weight:700;font-size:12px;white-space:nowrap">' +
+      '⭐ 指挥官(你)</td>';
+    var pPrio = m.playerPrio || (m.playerPrio = {});
+    cols.forEach(function(col){
+      var v = pPrio[col.key] != null ? pPrio[col.key] : 2;
+      var bg = v === 0 ? RW_PRIO_BG[0] : RW_PRIO_BG[v];
+      var tx = v === 0 ? RW_PRIO_TX[0] : RW_PRIO_TX[v];
+      var label = v === 0 ? '✕' : String(v);
+      playerRow += '<td data-prio-r="player" data-prio-c="' + col.key + '" style="padding:4px 0;text-align:center;cursor:pointer;' +
+        'min-width:52px;border-radius:8px;transition:all .15s;' +
+        'background:' + bg + ';color:' + tx + ';' +
+        'border:2px solid ' + (v===0 ? '#1a2334' : 'rgba(89,217,255,.3)') + ';' +
+        (v === 0 ? 'opacity:.45;' : '') + '" ' +
+        'onmouseover="this.style.borderColor=\'#ffc857\'" ' +
+        'onmouseout="this.style.borderColor=\'' + (v===0 ? '#1a2334' : 'rgba(89,217,255,.3)') + '\'"' +
+        ' title="指挥官 · ' + col.name + ' · 优先级 ' + v + ' · 点击切换">' +
+        '<div style="font-size:18px;font-weight:800;line-height:1">' + label + '</div></td>';
+    });
+    html += playerRow + '</tr>';
     (m.residents || []).forEach(function(r, ri){
       html += '<tr><td style="padding:4px 10px;color:#f7f3df;font-weight:700;font-size:12px;white-space:nowrap">' +
         '<span style="color:#8fa3cc;font-size:10px">' + (ri+1) + '.</span> ' + esc(r.name) + '</td>';
@@ -1523,6 +1543,6 @@ APH.UI = (function(){
     moveTechSel:moveTechSel, bindLLMPanel:bindLLMPanel, refreshLLMStatus:refreshLLMStatus,
     renderDiplomacy:renderDiplomacy, doSendTribute:doSendTribute, doSignTradePact:doSignTradePact, doDeterRival:doDeterRival,
     renderTradePanel:renderTradePanel, doTradeRow:doTradeRow, moveTradeSel:moveTradeSel,
-    renderBuildRow:renderBuildRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor
+    renderBuildRow:renderBuildRow, renderResPanel:renderResPanel, movePrioCursor:movePrioCursor, setPrioAtCursor:setPrioAtCursor, prioGridHtml:prioGridHtml
   };
 })();

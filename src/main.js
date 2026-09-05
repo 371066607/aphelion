@@ -593,6 +593,22 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
+    /* ADR-28: 玩家采集优先级>0 且站立不动 → 脚边 flora 自动开采（不寻路、不劫持移动，
+       遵守「玩家永不自动寻路」原则；仅替代连按 E 的重复操作） */
+    var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
+    var hasWASD = s.keys && (s.keys.KeyW||s.keys.KeyA||s.keys.KeyS||s.keys.KeyD||s.keys.ArrowUp||s.keys.ArrowDown||s.keys.ArrowLeft||s.keys.ArrowRight);
+    if(s.scene==='home' && pGatherPrio > 0 && !hasWASD && s.nearFlora && !s.nearFlora.dead &&
+       !playerSleeping() && !playerDowned()){
+      var pG = CFG.gathering || {};
+      var resW = APH.Colony.workOnFlora(s.nearFlora,
+        { skills: pG.playerGatherSkills || {sk_farm:6,sk_craft:6} },
+        pG.playerGatherDps != null ? pG.playerGatherDps : 15);
+      if(resW.done && resW.dropItemId){
+        APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
+        var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
+        APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
+      }
+    }
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
     if(s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearFood && !s.nearPad){
@@ -3739,6 +3755,19 @@ window.APH = window.APH || {};
         var colKey = td.getAttribute('data-prio-c');
         var s = APH.state, m = s.meta;
         if(!m || !m.residents) return;
+        if(rid === 'player'){
+          /* 玩家优先级 */
+          m.playerPrio = m.playerPrio || {};
+          var curP = m.playerPrio[colKey] != null ? m.playerPrio[colKey] : 2;
+          var nextP = (curP + 1) % 4;
+          m.playerPrio[colKey] = nextP;
+          if(APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+          var colNameP = colKey === 'sk_gather' ? '采集' : (colKey === 'sk_haul' ? '搬运' : (APH.Res.SKILL_NAMES[colKey]||colKey));
+          var labelP = nextP === 0 ? '✕ 禁止' : nextP;
+          APH.UI.floatText('指挥官 · ' + colNameP + ' → ' + labelP, '#59d9ff');
+          renderResPanel();
+          return;
+        }
         var r = m.residents.find(function(x){ return x.id === rid; });
         if(!r) return;
         m.workPrio = m.workPrio || {};
