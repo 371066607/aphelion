@@ -3224,8 +3224,11 @@ function commanderSoloSetup(){
   S.meta.playerNeeds.illness=0;
   S.meta.playerNeeds.food=80;
   S.meta.playerNeeds.rest=100;
+  S.meta.playerNeeds.recreation=80;
   S.keys={}; S.target=null; S.joy=null;
   S.designations={};
+  S.playerOrder=null; S.haulCarry=null;
+  S.colony.buildQueue=[];
   S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
   if(!S.colony.buildings.length) S.colony.buildings.push({ id:'bl_landing_pad', x:1100, y:1340 });
   S.entities = (S.entities||[]).filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy' && !(e.type===T.BUILDING && e.bid && e.bid!=='bl_landing_pad'));
@@ -3362,6 +3365,72 @@ test('#168 rest: 困了的居民走去居住舱再睡，不原地瞬睡', () => 
   A(S.meta.residents[0].isSleeping === true, '困倦居民应走到居住舱入睡');
   const d1 = Math.hypot(p.x - house.x, p.y - house.y);
   A(d1 < d0 - 10 || d1 < 50, '应靠近居住舱, d0='+d0.toFixed(0)+' d1='+d1.toFixed(0));
+});
+
+test('#169 joy: 娱乐低的指挥官会走向篝火休闲', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.meta.playerNeeds.recreation = 10;
+  S.playerDrafted = false;
+  S.designations = {};
+  S.colony.buildQueue = [];
+  S.haulCarry = null;
+  S.meta.playerPrio = { sk_build:0, sk_gather:0, sk_haul:0, sk_farm:2 };
+  S.colony.buildings.push({ id:'bl_campfire', x:1400, y:1170 });
+  APH.Colony.placeBuildingEntity('bl_campfire', 1400, 1170, 1);
+  const x0 = S.px;
+  M.updateHome(0.016);
+  A(S.target && S.target.x > x0 + 100, '第一帧应把篝火设为寻路目标, rec='+S.meta.playerNeeds.recreation);
+  let maxX = S.px;
+  for(let i=0; i<250; i++){
+    M.updateHome(0.016);
+    if(S.px > maxX) maxX = S.px;
+  }
+  A(maxX > x0 + 40, '无聊时应走向篝火, maxX='+Math.round(maxX));
+});
+
+test('#170 build: 未征召指挥官会走向施工蓝图', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.meta.playerNeeds.recreation = 80;
+  S.playerDrafted = false;
+  S.meta.playerPrio = { sk_build:1, sk_gather:2, sk_haul:2 };
+  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12, building:false }];
+  const x0 = S.px;
+  for(let i=0; i<700; i++) M.updateHome(0.016);
+  A(S.px > x0 + 40, '有蓝图时应走去施工, px='+Math.round(S.px));
+});
+
+test('#171 haul: 未征召指挥官会拾取地上堆并入库', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.meta.playerNeeds.recreation = 80;
+  S.playerDrafted = false;
+  S.meta.playerPrio = { sk_haul:1, sk_gather:0, sk_build:0 };
+  S.meta.res = S.meta.res || {};
+  S.meta.res.wood = 0;
+  const pile = { id:'dp_cmd_wood', type:T.DROPPED, itemId:'it_wood', x:S.px+80, y:S.py, n:3, dead:false };
+  S.entities.push(pile);
+  for(let i=0; i<900 && !pile.dead; i++) M.updateHome(0.016);
+  A(pile.dead === true || S.haulCarry, '应拾起地上木材');
+  for(let i=0; i<900 && (S.meta.res.wood||0)<3; i++) M.updateHome(0.016);
+  A((S.meta.res.wood||0) >= 3 || S.haulCarry, '木材应入库或正在搬运, wood='+(S.meta.res.wood||0));
+});
+
+test('#172 right_click: 右键居住舱下达优先休息', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.playerDrafted = false;
+  S.selectedRid = null;
+  S.selectedPawns = [];
+  S.colony.buildings.push({ id:'bl_house', x:1300, y:1170, lv:1 });
+  APH.Colony.placeBuildingEntity('bl_house', 1300, 1170, 1);
+  M.cmd.rightClick(1300, 1170);
+  A(S.playerOrder && S.playerOrder.type==='sleep', '右键居住舱应下达优先休息');
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

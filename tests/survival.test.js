@@ -26,6 +26,19 @@ test('rest: needsTick 精力 < 20 标记困倦，不原地瞬睡', function(){
   if (r.isSleeping) throw new Error('有床可去时不应原地瞬睡');
 });
 
+test('rest: 夜间精力未满也想睡 (作息)', function(){
+  var r = APH.Res.generate('night1', 1);
+  r.rest = 50;
+  window.APH = window.APH || APH;
+  window.APH.World = window.APH.World || {};
+  var old = window.APH.World.daylight;
+  window.APH.World.daylight = function(){ return 0.2; };
+  APH.Res.needsTick(r, true);
+  window.APH.World.daylight = old;
+  if (r.rest !== 43) throw new Error('rest 应为 43，实际: ' + r.rest);
+  if (!r.wantSleep) throw new Error('夜间 rest=43 应 wantSleep');
+});
+
 test('rest: 睡眠中在床铺恢复 (+25/跳) 且满 100 醒来', function(){
   var r = APH.Res.generate('test4', 12345);
   r.rest = 18;

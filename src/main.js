@@ -609,9 +609,20 @@ window.APH = window.APH || {};
     if(playerSleeping() || playerDowned()) return;
     if(s.joy && s.joy.active) return;
 
-    var hungry = playerFood() < foodEatBelow();
+    if(s.playerOrder && s.playerOrder.type==='gather' && s.playerOrder.flora && !s.playerOrder.flora.dead){
+      s.cmdIdleWalk=false;
+      s.target={x:s.playerOrder.flora.x, y:s.playerOrder.flora.y};
+      if(s.nearFlora && s.nearFlora.id===s.playerOrder.flora.id) s.playerOrder=null;
+      return;
+    }
+
+    var hungry = playerFood() < foodEatBelow() || (s.playerOrder && s.playerOrder.type==='eat');
     var restNow = (s.meta.playerNeeds && s.meta.playerNeeds.rest != null) ? s.meta.playerNeeds.rest : 100;
     var restSleepAt = (CFG.player && CFG.player.restSleepAt != null) ? CFG.player.restSleepAt : 20;
+    var restNightAt = (CFG.player && CFG.player.restNightAt != null) ? CFG.player.restNightAt : 75;
+    var isNight = !!(window.APH.World && APH.World.daylight && APH.World.daylight() < 0.5);
+    var forceSleep = !!(s.playerOrder && s.playerOrder.type==='sleep');
+    var sleepy = forceSleep || restNow < restSleepAt || (isNight && restNow < restNightAt);
     var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
 
     if(hungry){
@@ -619,6 +630,7 @@ window.APH = window.APH || {};
         tryPlayerEatNearFood();
         s.target = null;
         s.cmdIdleWalk = false;
+        if(s.playerOrder && s.playerOrder.type==='eat') s.playerOrder=null;
         return;
       }
       var meal = nearestMeal({ x: s.px, y: s.py }, 1e9);
@@ -644,13 +656,14 @@ window.APH = window.APH || {};
       }
     }
 
-    /* 环世界: 困了去居住舱上床。镜头平移不唤醒；无床则就地躺。 */
-    if(restNow < restSleepAt){
+    /* 环世界: 困了或夜间作息去居住舱上床。镜头平移不唤醒；无床则就地躺。 */
+    if(sleepy){
       s.cmdIdleWalk = false;
       if(s.nearBed){
         if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
         syncPlayerSleep();
         s.target = null;
+        if(s.playerOrder && s.playerOrder.type==='sleep') s.playerOrder=null;
         if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 上床休息','#b39dff');
         return;
       }
@@ -669,6 +682,77 @@ window.APH = window.APH || {};
       s.target = null;
       if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 太困了，就地躺下','#b39dff');
       return;
+    }
+
+    var pBuild = (s.meta.playerPrio && s.meta.playerPrio.sk_build != null) ? s.meta.playerPrio.sk_build : 2;
+    var pHaul = (s.meta.playerPrio && s.meta.playerPrio.sk_haul != null) ? s.meta.playerPrio.sk_haul : 2;
+    var forceBuild = !!(s.playerOrder && s.playerOrder.type==='build');
+    var forceHaul = !!(s.playerOrder && s.playerOrder.type==='haul');
+    if((pBuild > 0 || forceBuild) && s.colony && s.colony.buildQueue && s.colony.buildQueue.length){
+      var bp = nearestBlueprint(s.px, s.py);
+      if(bp){
+        s.cmdIdleWalk = false;
+        if(U.dst(s.px, s.py, bp.x, bp.y) < 90){
+          s.target = null;
+          if(forceBuild) s.playerOrder = null;
+        } else {
+          s.target = { x: bp.x, y: bp.y };
+        }
+        return;
+      }
+    }
+    if(pHaul > 0 || forceHaul){
+      var grabR = (CFG.haul && CFG.haul.grabR != null) ? CFG.haul.grabR : 18;
+      var dumpR = (CFG.haul && CFG.haul.dumpR != null) ? CFG.haul.dumpR : 36;
+      if(s.haulCarry && s.haulCarry.itemId){
+        var roomsH = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf((s.colony && s.colony.buildings) || []) : [];
+        var spot = (APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(s.haulCarry.itemId, s.colony && s.colony.buildings, roomsH, {x:s.px,y:s.py}) : APH.Colony.stockpileSpot(s.colony && s.colony.buildings);
+        s.cmdIdleWalk = false;
+        if(spot && U.dst(s.px, s.py, spot.x, spot.y) < dumpR){
+          APH.Colony.collectHome(s.meta, s.haulCarry.itemId, s.haulCarry.n || 1);
+          var hn = (CFG.items[s.haulCarry.itemId] && CFG.items[s.haulCarry.itemId].name) || s.haulCarry.itemId;
+          if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 入库 '+hn+'×'+(s.haulCarry.n||1), '#9fe8c8');
+          s.haulCarry = null;
+          if(forceHaul) s.playerOrder = null;
+          s.target = null;
+        } else if(spot){
+          s.target = { x: spot.x, y: spot.y };
+        }
+        return;
+      }
+      var drop = nearestDrop({ x: s.px, y: s.py }, (CFG.haul && CFG.haul.seekR) || 1200);
+      if(drop){
+        s.cmdIdleWalk = false;
+        if(U.dst(s.px, s.py, drop.x, drop.y) < grabR){
+          s.haulCarry = { itemId: drop.itemId, n: drop.n || 1 };
+          drop.dead = true;
+          if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 拾起物资', '#8fd4ff');
+        } else {
+          s.target = { x: drop.x, y: drop.y };
+        }
+        return;
+      } else if(forceHaul){
+        s.playerOrder = null;
+      }
+    }
+    var recNow = (s.meta.playerNeeds && s.meta.playerNeeds.recreation != null) ? s.meta.playerNeeds.recreation : 80;
+    var joyAt = (CFG.residents && CFG.residents.recreationJoyAt != null) ? CFG.residents.recreationJoyAt : 30;
+    if(recNow < joyAt){
+      var joyB = findJoySpot(s.px, s.py);
+      if(joyB){
+        s.cmdIdleWalk = false;
+        if(U.dst(s.px, s.py, joyB.x, joyB.y) < 52){
+          s.target = null;
+          s.cmdJoyT = (s.cmdJoyT || 0) - (dt || 0.016);
+          if(s.cmdJoyT <= 0){
+            s.cmdJoyT = 1.5;
+            if(APH.Res && APH.Res.enjoyRecreation) APH.Res.enjoyRecreation(s.meta.playerNeeds, (CFG.residents && CFG.residents.campfireRecGain) || 10);
+          }
+        } else {
+          s.target = { x: joyB.x, y: joyB.y + 12 };
+        }
+        return;
+      }
     }
 
     if(pGatherPrio > 0){
@@ -720,6 +804,48 @@ window.APH = window.APH || {};
     dest.x = U.clamp(dest.x, 80, CFG.WORLD-80);
     dest.y = U.clamp(dest.y, 80, CFG.WORLD-80);
     return dest;
+  }
+  function findJoySpot(x, y){
+    var s = APH.state;
+    var best=null, bd=900;
+    function consider(b){
+      if(!b || b.dead) return;
+      var bx=b.x, by=b.y;
+      var d=U.dst(x,y,bx,by);
+      if(d<bd){ bd=d; best=b; }
+    }
+    (s.colony && s.colony.buildings || []).forEach(function(b){
+      if(b.id==='bl_campfire' || b.id==='bl_tv' || b.bid==='bl_campfire' || b.bid==='bl_tv') consider(b);
+    });
+    (s.entities||[]).forEach(function(en){
+      if(en && en.type===T.BUILDING && (en.bid==='bl_campfire'||en.bid==='bl_tv')) consider(en);
+    });
+    return best;
+  }
+  function nearestBlueprint(x, y){
+    var q=(APH.state.colony && APH.state.colony.buildQueue) || [];
+    var best=null, bd=1e9;
+    for(var i=0;i<q.length;i++){
+      if(!q[i]) continue;
+      var d=U.dst(x,y,q[i].x,q[i].y);
+      if(d<bd){ bd=d; best=q[i]; }
+    }
+    return best;
+  }
+  function tryResidentJoy(e, r, dt, spdMul){
+    if(!r || r.wantSleep || r.isSleeping || r.downed) return false;
+    var joyAt=(CFG.residents&&CFG.residents.recreationJoyAt!=null)?CFG.residents.recreationJoyAt:30;
+    if((r.recreation!=null?r.recreation:80) >= joyAt) return false;
+    var jy=findJoySpot(e.x,e.y);
+    if(!jy) return false;
+    if(U.dst(e.x,e.y,jy.x,jy.y)<52){
+      if(APH.Res.enjoyRecreation) APH.Res.enjoyRecreation(r, (CFG.residents&&CFG.residents.campfireRecGain)||10);
+      e.walking=false; e.tx=e.x; e.ty=e.y;
+    } else {
+      e.tx=jy.x; e.ty=jy.y+12;
+      APH.Res.walkAround(e,{x:e.tx,y:e.ty},dt,spdMul);
+    }
+    return true;
   }
   function commanderIdleStroll(dt){
     var s = APH.state;
@@ -2700,6 +2826,39 @@ window.APH = window.APH || {};
         return true;
       }
 
+      /* 4a. 右键居住舱 / 食物 (未征召也可优先作息) */
+      var hitHouse = s0.entities.find(function(en){
+        return en && en.type === T.BUILDING && (en.bid === 'bl_house' || en.id === 'bl_house') && !en.dead && U.dst(en.x, en.y, wx, wy) <= 48;
+      });
+      if(!hitHouse && s0.colony && s0.colony.buildings){
+        var hb = s0.colony.buildings.find(function(b){ return b && b.id==='bl_house' && U.dst(b.x,b.y,wx,wy)<=48; });
+        if(hb) hitHouse = hb;
+      }
+      var hitMeal = s0.entities.find(function(en){
+        if(!en || en.dead) return false;
+        if(en.type === T.DROPPED){
+          var it = CFG.items && CFG.items[en.itemId];
+          return it && it.store === 'food' && U.dst(en.x, en.y, wx, wy) <= 36;
+        }
+        if(en.type === T.BUILDING && (en.bid === 'bl_warehouse' || en.id === 'bl_warehouse') && U.dst(en.x, en.y, wx, wy) <= 48) return true;
+        return false;
+      });
+      if(hitHouse || hitMeal){
+        var kind = hitHouse ? 'sleep' : 'eat';
+        var squad = (s0.selectedPawns && s0.selectedPawns.length > 0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
+        if(squad.length){
+          squad.forEach(function(p){
+            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type: kind };
+            else if(p) p.userOrder = { type: kind };
+          });
+        } else {
+          s0.playerOrder = { type: kind };
+        }
+        APH.UI.floatText(kind==='sleep' ? '→ 优先休息' : '→ 优先进食', '#b39dff');
+        APH.state.parts.push({ t:'ping', x: wx, y: wy, life: 0.8, max: 0.8 });
+        return true;
+      }
+
       /* 4. 救护倒地昏迷队友 */
       var hitDowned = s0.entities.find(function(en){
         return en && en.type === T.RESIDENT && !en.dead && en.downed && U.dst(en.x, en.y, wx, wy) <= 42;
@@ -4175,16 +4334,18 @@ window.APH = window.APH || {};
             doHaul(e, r);
           } else {
             e.gathering = false;
-            if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
-              residentIdleStroll(e, dt);
+            if(!raid && !e.drafted && !e.userOrder){
+              if(tryResidentJoy(e, r, dt, spd*sickSpeedMul*wxMul*bagMul)) {}
+              else if(!s.selectedRid || (e.rid||e.id) !== s.selectedRid) residentIdleStroll(e, dt);
             }
           }
         } else if(haulPrio > 0 && (e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)))){
           doHaul(e, r);
         } else {
           e.gathering = false;
-          if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
-            residentIdleStroll(e, dt);
+          if(!raid && !e.drafted && !e.userOrder){
+            if(tryResidentJoy(e, r, dt, spd*sickSpeedMul*wxMul*bagMul)) {}
+            else if(!s.selectedRid || (e.rid||e.id) !== s.selectedRid) residentIdleStroll(e, dt);
           }
         }
       } else if(!seekingMeal && !raid && e.job){
@@ -4526,6 +4687,11 @@ window.APH = window.APH || {};
       /* #66 床边睡眠: 综合精力结算(睡眠恢复/清醒衰减, 委托 homeRestTick) */
       /* #70 医疗舱躺下: hasBed 含医疗舱 — 舱内躺卧按床速恢复(≠#67 地铺 18) */
       APH.Res.playerRestTick(m.playerNeeds, s.scene, !!s.nearBed || !!s.nearClinic);
+    }
+    if(m.playerNeeds && s.scene==='home'){
+      var recDrain=(CFG.residents&&CFG.residents.recreationDrain!=null)?CFG.residents.recreationDrain:5;
+      var rec0=m.playerNeeds.recreation!=null?m.playerNeeds.recreation:80;
+      m.playerNeeds.recreation=Math.max(0, rec0-recDrain);
     }
     if(APH.Res.homeIllnessTick && m.playerNeeds){
       m.playerNeeds.illness = APH.Res.homeIllnessTick(m.playerNeeds.illness, s.scene);

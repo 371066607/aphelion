@@ -66,6 +66,7 @@ APH.CFG = {
     floorRecover: 18,          // #66 床边睡眠: 打地铺恢复 /tick (慢 ~30%)
     restWakeAt: 100,           // #66 床边睡眠: 精力回满自动醒
     restSleepAt: 20,            // 环世界: 精力低于此值去床上睡 (不是平移镜头摇醒)
+    restNightAt: 75,            // 夜间精力低于此值也去睡 (作息，不满血也回舱)
     restCollapseAt: 0,          // #67 累塌: 家园精力见底阈值 (0=精力归零原地睡着)
     downedTime: 90,             // #72 家园击倒: 击倒倒计时秒数 (镜像 CFG.residents.bleedOutTime)
     downedCarrySpeed: 70,       // #72 家园击倒: 送医拖行速度 px/s (小于 walkSpeed 150, 有被拖感)
@@ -310,6 +311,7 @@ APH.CFG = {
     /* 深度生存: 精力/睡眠/床位 (Survival #15) */
     restDrain: 7,              // 生产跳自然精力衰减
     restSleepAt: 20,           // 精力低于此值入睡
+    restNightAt: 75,           // 夜间精力低于此值也去睡
     restWakeAt: 100,           // 精力回满醒来
     bedRecover: 25,            // 床铺睡眠恢复 /跳
     floorRecover: 18,          // 地铺睡眠恢复 /跳 (慢 ~30%)

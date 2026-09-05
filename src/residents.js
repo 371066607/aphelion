@@ -175,6 +175,7 @@ APH.Res = (function(){
     if(meta.playerNeeds.gear == null) meta.playerNeeds.gear = { tool:null, suit:null, head:null };
     /* P1b 玩家暴露: 老档零迁移 (缺失=0 起步; 晴天恒 0 由 tick 消退维持) */
     if(meta.playerNeeds.exposure == null) meta.playerNeeds.exposure = 0;
+    if(meta.playerNeeds.recreation == null) meta.playerNeeds.recreation = 80;
     return meta;
   }
 
@@ -302,7 +303,10 @@ APH.Res = (function(){
       }
     }else{
       r.rest = Math.max(0, r.rest - restDrain);
-      r.wantSleep = r.rest < restSleepAt;
+      var night = false;
+      if(window.APH.World && APH.World.daylight) night = APH.World.daylight() < 0.5;
+      var nightAt = C.restNightAt != null ? C.restNightAt : 75;
+      r.wantSleep = r.rest < restSleepAt || (night && r.rest < nightAt);
       if(r.rest <= 0){
         r.isSleeping = true;
         r.wantSleep = true;
