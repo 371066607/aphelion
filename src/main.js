@@ -780,9 +780,11 @@ window.APH = window.APH || {};
       APH.UI.setHint('击倒昏迷 · ' + (clinicB && hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危'));
     }
 
-    /* 建造入口按钮显隐 */
+    /* 建造/名册入口按钮显隐 */
     var bb=document.getElementById('buildBtn');
     if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
+    var rb=document.getElementById('rosterBtn');
+    if(rb) rb.style.display=(s.scene==='home')?'flex':'none';
 
     /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
@@ -3725,6 +3727,8 @@ window.APH = window.APH || {};
     var btn=document.getElementById('buildBtn');
     if(!btn) return;
     btn.addEventListener('click',function(){ toggleBuildRow(); });
+    var rb=document.getElementById('rosterBtn');
+    if(rb) rb.addEventListener('click',function(){ if(APH.UI&&APH.UI.toggle) APH.UI.toggle('roster'); });
   }
   /* (D) 旧 autoAssign 已被 Colony.assignByPriority 取代 */
   

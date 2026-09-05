@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 > **多人协作**：认领/冲突/收尾约定见 `COLLABORATION.md`。开工前先 `gh issue edit <n> --add-assignee @me` 占位；当前 da123wda 在做 #64，勿碰生病相关改动。
 
