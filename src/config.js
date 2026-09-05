@@ -74,7 +74,11 @@ APH.CFG = {
     foodEatGain: 25,            // 生食/仓库口粮每次E吃回的饱食
   },
 
-  /* 相机 */
+  /* 相机 (ADR-29 / Ticket #160) */
+  camera: {
+    panSpeed: 520,              // 基础平移速度 (px/s)
+    shiftMul: 2.2,              // Shift 加速平移倍率
+  },
   camLerp: 0.002,
   lookAhead: 40,
 

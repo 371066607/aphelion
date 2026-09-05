@@ -472,15 +472,39 @@ window.APH = window.APH || {};
   }
 
   /* ================= 相机 ================= */
+  /* ================= 相机 (ADR-29 全局 RTS 上帝视角平移引擎) ================= */
+  function centerCameraOn(x, y){
+    var s = APH.state;
+    s.camX = U.clamp(x, vpW()/2, CFG.WORLD - vpW()/2);
+    s.camY = U.clamp(y, vpH()/2, CFG.WORLD - vpH()/2);
+  }
+
   function updateCamera(dt){
     var s = APH.state;
-    var lx = s.px+(s.moving?Math.cos(s.face)*CFG.lookAhead:0),
-        ly = s.py+(s.moving?Math.sin(s.face)*CFG.lookAhead:0);
-    s.camX=U.lerp(s.camX,lx,1-Math.pow(CFG.camLerp,dt));
-    s.camY=U.lerp(s.camY,ly,1-Math.pow(CFG.camLerp,dt));
-    s.camX=U.clamp(s.camX,vpW()/2-80,CFG.WORLD-vpW()/2+80);
-    s.camY=U.clamp(s.camY,vpH()/2-80,CFG.WORLD-vpH()/2+80);
-    if(s.shake>0) s.shake-=dt*2.2;
+    var panX = 0, panY = 0;
+    if(s.keys.KeyW || s.keys.ArrowUp) panY -= 1;
+    if(s.keys.KeyS || s.keys.ArrowDown) panY += 1;
+    if(s.keys.KeyA || s.keys.ArrowLeft) panX -= 1;
+    if(s.keys.KeyD || s.keys.ArrowRight) panX += 1;
+
+    var C = (CFG.camera) || {};
+    var baseSpd = C.panSpeed || 520;
+    var mul = (s.keys.ShiftLeft || s.keys.ShiftRight) ? (C.shiftMul || 2.2) : 1;
+    var spd = baseSpd * mul;
+
+    if(panX !== 0 || panY !== 0){
+      var l = Math.sqrt(panX * panX + panY * panY) || 1;
+      s.camX += (panX / l) * spd * dt;
+      s.camY += (panY / l) * spd * dt;
+      s.camFollow = false;
+    } else if(s.camFollow && s.px != null){
+      /* 双击小人或显式设置跟随 */
+      s.camX = U.lerp(s.camX, s.px, 1 - Math.pow(0.001, dt));
+      s.camY = U.lerp(s.camY, s.py, 1 - Math.pow(0.001, dt));
+    }
+    s.camX = U.clamp(s.camX, vpW()/2, CFG.WORLD - vpW()/2);
+    s.camY = U.clamp(s.camY, vpH()/2, CFG.WORLD - vpH()/2);
+    if(s.shake > 0) s.shake -= dt * 2.2;
   }
 
   /* ================= 粒子 ================= */
@@ -1218,7 +1242,6 @@ window.APH = window.APH || {};
     checkBossDown();
     if(s.mode!=='running') return;
     updateCamera(dt);
-    selfCenter();
     updateParticles(dt,s.clock);
     document.getElementById('vig').style.opacity =
       Math.max(
@@ -1316,7 +1339,6 @@ window.APH = window.APH || {};
 
     if(s.scene==='home'){
       updateHome(dt);
-      selfCenter();
       /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
       drawSelectedRing(s.clock);
@@ -4426,6 +4448,7 @@ window.APH = window.APH || {};
     saveRivals:saveRivals,
     saveMetaQuiet:saveMetaQuiet,
     saveColony:saveColony,
+    centerCameraOn:centerCameraOn,
     playerDefPower:playerDefPower,
     haveStock:haveStock,
     toggleCodex:toggleCodex,

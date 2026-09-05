@@ -611,8 +611,8 @@ test('#64 player: 仅家园生病时走路与跑步使用同一减速倍率', ()
   const oldPe={x:pe.x, y:pe.y, face:pe.face, moving:pe.moving, walkPh:pe.walkPh};
   function moved(scene, illness, running){
     S.scene=scene; S.meta.playerNeeds.illness=illness;
-    S.px=400; S.py=400; S.vx=0; S.vy=0; S.target=null; S.parts=[];
-    S.keys={KeyD:true, ShiftLeft:running}; S.joy={active:false,id:null,x:0,y:0};
+    S.px=400; S.py=400; S.vx=0; S.vy=0; S.target={x:800, y:400}; S.parts=[];
+    S.keys={ShiftLeft:running}; S.joy={active:false,id:null,x:0,y:0};
     pe.x=S.px; pe.y=S.py;
     APH.Ent.updatePlayer(0.05);
     return S.px-400;
@@ -1052,18 +1052,18 @@ test('#66: 靠床 E 入睡 → meta+实体俯卧, drawPlayer 不崩', () => {
   A(!threw, '睡中玩家绘制不应崩');
 });
 
-test('#66: WASD 唤醒并同帧移动 (meta+实体同步, px 变化)', () => {
+test('#66: 视口平移按键唤醒 (meta+实体同步, camX 变化)', () => {
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = true;
   S.keys = {};
-  const px0 = S.px;
-  S.keys.KeyA = true;   // 向左(水平方向 px 必变)
+  const camX0 = S.camX;
+  S.keys.KeyA = true;   // 向左平移视口
   M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === false, 'WASD 应唤醒, 实际仍睡');
+  A(S.meta.playerNeeds.isSleeping === false, '按键应唤醒, 实际仍睡');
   const pe = APH.Ent.findPlayer();
   A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
-  A(S.px !== px0, '唤醒帧应同帧移动 (px 应从 ' + px0 + ' 变化, 实际 ' + S.px + ')');
+  A(S.camX < camX0, 'WASD 应向左平移摄像机, 实际 camX=' + S.camX);
   S.keys = {};
 });
 
@@ -1117,19 +1117,19 @@ test('#67: 家园精力归零累塌 → meta+实体俯卧, bedId=null, moving=fa
   A(!threw, '累塌俯卧玩家绘制不应崩');
 });
 
-test('#67: 累塌后 WASD 唤醒并同帧移动 (复用 #66)', () => {
+test('#67: 累塌后按键唤醒 (复用 #66)', () => {
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = true;
   S.meta.playerNeeds.bedId = null;
   S.keys = {};
-  const px0 = S.px;
-  S.keys.KeyA = true;   // 向左(水平方向 px 必变)
+  const camX0 = S.camX;
+  S.keys.KeyA = true;   // 向左平移视口
   M.updateHome(0.016);
   A(S.meta.playerNeeds.isSleeping === false, 'WASD 应唤醒累塌睡眠, 实际仍睡');
   const pe = APH.Ent.findPlayer();
   A(pe && pe.isSleeping === false, '实体标志应同步为清醒');
-  A(S.px !== px0, '唤醒帧应同帧移动 (px 应从 ' + px0 + ' 变化, 实际 ' + S.px + ')');
+  A(S.camX < camX0, 'WASD 应向左平移摄像机');
   S.keys = {};
 });
 
@@ -3003,6 +3003,38 @@ test('#158 orders: 严格无标不采、规划驱动全链路开采入库与右�
   A(prioritized === true, '优先执行应成功');
   A(p.userOrder && p.userOrder.type === 'gather' && p.userOrder.flora === prioRock, '应赋予最高优先级 gather 命令');
   M.cmd.deselect();
+});
+
+test('#160 camera: 键盘 WASD 平移视口、Shift 加速与居中对焦', () => {
+  cmdHomeSetup();
+  S.keys = {};
+  M.centerCameraOn(1000, 1000);
+  A(Math.abs(S.camX - 1000) < 1, 'centerCameraOn 应设置 camX');
+  A(Math.abs(S.camY - 1000) < 1, 'centerCameraOn 应设置 camY');
+
+  // 1. WASD 平移：KeyD 向右，KeyS 向下
+  S.keys.KeyD = true;
+  S.keys.KeyS = true;
+  M.updateHome(0.1);
+  A(S.camX > 1000, '向右平移 camX 应增加');
+  A(S.camY > 1000, '向下平移 camY 应增加');
+  const dx1 = S.camX - 1000;
+  S.keys = {};
+
+  // 2. Shift 加速平移
+  M.centerCameraOn(1000, 1000);
+  S.keys.KeyD = true;
+  S.keys.KeyS = true;
+  S.keys.ShiftLeft = true;
+  M.updateHome(0.1);
+  const dxShift = S.camX - 1000;
+  A(dxShift > dx1 * 1.8, 'Shift 加速平移距离应明显大于基础速度, got ' + dxShift + ' vs ' + dx1);
+  S.keys = {};
+
+  // 3. 边界限制 (不能飞出世界外)
+  M.centerCameraOn(-9999, -9999);
+  A(S.camX >= 0, '视口不得飞出地图左侧');
+  A(S.camY >= 0, '视口不得飞出地图顶部');
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

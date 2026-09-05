@@ -975,13 +975,12 @@ APH.Ent = (function(){
     var downed = !!(needs && needs.downed);
     var pe = findPlayer();
     var ix=0, iy=0;
-    if(s.keys.KeyW||s.keys.ArrowUp) iy-=1;
-    if(s.keys.KeyS||s.keys.ArrowDown) iy+=1;
-    if(s.keys.KeyA||s.keys.ArrowLeft) ix-=1;
-    if(s.keys.KeyD||s.keys.ArrowRight) ix+=1;
-    if(s.joy.active){ ix+=s.joy.x; iy+=s.joy.y; }
+    /* ADR-29: WASD 与方向键改为摄像机平移 (Camera Pan)，不再物理推搡玩家角色；
+       触摸屏虚拟摇杆 (s.joy) 仍可微调 */
+    if(s.joy && s.joy.active){ ix+=s.joy.x; iy+=s.joy.y; }
     s.run = !!(s.keys.ShiftLeft||s.keys.ShiftRight);
     var hasKey=(ix!==0||iy!==0);
+    var hasPanKey = !!(s.keys.KeyW||s.keys.KeyA||s.keys.KeyS||s.keys.KeyD||s.keys.ArrowUp||s.keys.ArrowDown||s.keys.ArrowLeft||s.keys.ArrowRight);
     if(hasKey) s.target=null;
     /* #72 家园击倒: 昏迷无意识 — 不移动、不寻路、WASD 不醒(与睡眠正交) */
     if(downed){
@@ -992,8 +991,8 @@ APH.Ent = (function(){
       if(s.hurtFlash>0) s.hurtFlash-=dt;
       return;
     }
-    /* WASD/方向键唤醒: 先醒后动同一帧(不吞移动输入) */
-    if(sleeping && hasKey){
+    /* 按键/指令唤醒: 先醒后动同一帧 */
+    if(sleeping && (hasKey || hasPanKey || s.target)){
       if(window.APH.Res && APH.Res.playerWake) APH.Res.playerWake(needs);
       sleeping = false;
     }
