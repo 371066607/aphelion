@@ -1940,8 +1940,10 @@ APH.Colony = (function(){
   function workOnFlora(target, resident, dt){
     if(!target || target.hp <= 0) return { done:true, dropItemId:null, dropCount:0 };
     var eff = (window.APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(resident) : 1;
+    if(!isFinite(eff) || eff <= 0) eff = 1;
     var sk = (resident && resident.skills) ? ((target.kind==='tree'||target.kind.startsWith('bush')) ? (resident.skills.sk_farm||0) : (resident.skills.sk_craft||0)) : 0;
     var rate = dt * eff * (1 + sk*0.15);
+    if(!isFinite(rate) || rate < 0) rate = 0;
     target.hp -= rate;
     if(target.hp <= 0){
       target.hp = 0;

@@ -36,6 +36,10 @@ test('gathering: workOnFlora 砍树推进与掉落', () => {
   }
   A(done === true, '多次推进后应砍完');
   A(res.dropItemId === 'it_wood', '树应掉落 it_wood');
+
+  const tree2 = { kind: 'tree', hp: 30, maxHp: 30, dead: false };
+  const res2 = wof(tree2, { skills: { sk_farm: 6 } }, 15);
+  A(isFinite(tree2.hp) && tree2.hp < 30, '缺 mood/food 的虚拟工人不得把 HP 打成 NaN, hp=' + tree2.hp);
   A(res.dropCount === 4, '掉落 4 个木材');
   A(tree.dead === true, '树应标记 dead');
 });

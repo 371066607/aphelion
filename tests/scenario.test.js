@@ -1025,6 +1025,9 @@ test('#66: 靠床近判定 nearBed 且不触发自动寻路 (S.target 保持 nul
   S.scene = 'home';
   APH.Res.ensurePlayerNeeds(S.meta);
   S.meta.playerNeeds.isSleeping = false;
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.playerDrafted = false;
   S.keys = {};
   S.target = null;
   /* 在玩家脚下放一座居住舱(床边判定与真实摆放一致) */
@@ -1165,6 +1168,8 @@ test('#70: 生病近医疗舱不自动躺/不自动寻路 (S.target 保持 null)
   S.meta.playerNeeds.isSleeping = false;
   S.meta.playerNeeds.illness = 50;
   S.meta.playerNeeds.downed = false;
+  S.meta.playerNeeds.food = 80;
+  S.playerDrafted = false;
   S.keys = {};
   S.target = null;
   /* 在玩家脚下放一座医疗舱(近判定与真实摆放一致) */
@@ -1354,10 +1359,9 @@ test('#65: 近粮堆按 E 吃 → 饱食上升且堆-1', () => {
   const pile = APH.Combat.spawnDrop(S.px+40, S.py, 'it_food', 5, {stock:true});
   M.updateHome(0.016);
   A(S.nearFood, '靠粮堆应判定 nearFood');
-  M.debugPressE();
-  A(S.meta.playerNeeds.food > 30, '近粮堆按 E 应涨饱食, 实际: '+S.meta.playerNeeds.food);
+  A(S.meta.playerNeeds.food > 30, '饥饿靠粮堆应自动进食, 实际: '+S.meta.playerNeeds.food);
   A((pile.n||0) === 4, '地上粮堆应 -1, 实际 n='+(pile.n||0));
-  A(S.target === null, '吃粮不得触发自动寻路 (S.target 应保持 null)');
+  A(S.target === null, '已在粮边进食不得再写寻路目标 (S.target 应保持 null)');
   /* 清理残留 */
   S.entities = S.entities.filter(e => e.type!==T.DROPPED);
   S.nearFood = null;
@@ -1380,10 +1384,9 @@ test('#65: 近仓库按 E 吃 → 饱食上升且扣 1 粮', () => {
   APH.Colony.placeBuildingEntity('bl_warehouse', S.px, S.py, 1);
   M.updateHome(0.016);
   A(S.nearFood && S.nearFood.isWarehouse, '靠仓库应判定 nearFood 为仓库');
-  M.debugPressE();
-  A(S.meta.playerNeeds.food > 30, '近仓库按 E 应涨饱食, 实际: '+S.meta.playerNeeds.food);
+  A(S.meta.playerNeeds.food > 30, '饥饿靠仓库应自动进食, 实际: '+S.meta.playerNeeds.food);
   A(S.meta.res.food === 9, '仓库应扣 1 粮, 实际: '+S.meta.res.food);
-  A(S.target === null, '吃仓库口粮不得触发自动寻路 (S.target 应保持 null)');
+  A(S.target === null, '已在仓库口进食不得再写寻路目标 (S.target 应保持 null)');
   /* 清理残留 */
   S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
   S.nearFood = null;
@@ -3195,6 +3198,80 @@ test('#164 idle: 闲置居民在无规划任务时自主漫步休闲与工位作
   for(let i = 0; i < 500; i++) M.updateHome(0.016);
   const movedIdle = Math.hypot(p.x - x2, p.y - y2);
   A(movedIdle > 5, '到达居住点后闲置小人应自主漫步闲逛，实际位移=' + movedIdle);
+});
+
+function commanderSoloSetup(){
+  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
+  A(S.scene==='home', '应在殖民地');
+  S.mode='running';
+  S.playerDrafted=false;
+  S.orderTool=null; S.selectedPawns=[]; S.selectedRid=null;
+  S.selectedTarget={type:'player'};
+  S.war = S.war || {}; S.war.raidActive=false; S.war.raidWarn=0;
+  S.meta.residents = [];
+  S.meta.playerPrio = { sk_gather:2, sk_haul:2, sk_farm:2, sk_build:2 };
+  APH.Res.ensurePlayerNeeds(S.meta);
+  S.meta.playerNeeds.isSleeping=false;
+  S.meta.playerNeeds.downed=false;
+  S.meta.playerNeeds.illness=0;
+  S.keys={}; S.target=null; S.joy=null;
+  S.designations={};
+  S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
+  if(!S.colony.buildings.length) S.colony.buildings.push({ id:'bl_landing_pad', x:1100, y:1340 });
+  S.entities = (S.entities||[]).filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy');
+  if(!S.entities.some(e=>e.type===T.BUILDING&&e.pad)){
+    S.entities.push({ id:'be_pad_cmd_solo', type:T.BUILDING, bid:'bl_landing_pad', pad:true, x:1100, y:1340 });
+  }
+  S.px = 1100; S.py = 1170;
+  const pe = APH.Ent.findPlayer && APH.Ent.findPlayer();
+  if(pe){ pe.x=S.px; pe.y=S.py; pe.isSleeping=false; pe.downed=false; }
+}
+
+test('#165 commander: 未征召饥饿时自动寻路到仓库进食', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 0;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food = 8;
+  APH.Colony.placeBuildingEntity('bl_warehouse', 1400, 1170, 1);
+  const food0 = S.meta.playerNeeds.food;
+  const x0 = S.px;
+  for(let i=0; i<900 && S.meta.playerNeeds.food<=food0; i++) M.updateHome(0.016);
+  A(S.meta.playerNeeds.food > food0, '指挥官饥饿时应自主走到仓库吃饭, 实际饱食='+S.meta.playerNeeds.food+' px='+Math.round(S.px));
+  A(S.px > x0 + 40, '指挥官应向仓库方向移动');
+  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
+});
+
+test('#165 commander: 未征召时按砍伐标记自动前往砍树', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food = 20;
+  const tree = { id:'fl_cmd_chop', type:T.FLORA, kind:'tree', x:1400, y:1170, hp:12, maxHp:12, dead:false };
+  S.entities.push(tree);
+  A(APH.Colony.applyDesignation(S.designations, tree, 'chop')===true, '应成功打上砍伐标记');
+  const x0 = S.px;
+  for(let i=0; i<900 && !tree.dead; i++) M.updateHome(0.016);
+  A(tree.dead===true, '未征召指挥官应按规划标记自主砍倒树木, px='+Math.round(S.px)+' hp='+tree.hp);
+  A(S.px > x0 + 40, '指挥官应向被标记树木移动');
+});
+
+test('#165 hungry: 无口粮时饥饿居民仍执行规划砍伐（避免饿到停工）', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  p.x = S.px; p.y = S.py; p.job=null; p.drafted=false; p.userOrder=null;
+  S.meta.residents[0].job=null;
+  S.meta.residents[0].food=0;
+  S.meta.res = S.meta.res || {};
+  S.meta.res.food=0;
+  S.meta.workPrio = S.meta.workPrio || {};
+  S.meta.workPrio[p.id] = { sk_gather:1, sk_haul:1, sk_farm:0, sk_build:0 };
+  S.designations={}; S.selectedRid=null;
+  S.entities = S.entities.filter(e=>e.type!==T.DROPPED);
+  const tree = { id:'fl_starve_chop', type:T.FLORA, kind:'tree', x:p.x+80, y:p.y, hp:10, maxHp:10, dead:false };
+  S.entities.push(tree);
+  APH.Colony.applyDesignation(S.designations, tree, 'chop');
+  for(let i=0; i<700 && !tree.dead; i++) M.updateHome(0.016);
+  A(tree.dead===true, '饥饿且无口粮时居民仍应执行规划砍伐, gatherTarget='+(p.gatherTarget&&p.gatherTarget.id));
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

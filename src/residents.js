@@ -415,8 +415,11 @@ APH.Res = (function(){
   /* 工作效率系数: 心情 × 饱食 × 病情(超阈值打折, 有地板) */
   function efficiency(r){
     var C=RS();
-    var moodF=0.55+(r.mood/100)*0.75;                         // 0.55~1.30
-    var foodF=r.food>=50?1:(0.5+r.food/100);                  // <50 开始打折
+    r = r || {};
+    var mood = r.mood != null ? r.mood : 80;
+    var food = r.food != null ? r.food : 80;
+    var moodF=0.55+(mood/100)*0.75;                         // 0.55~1.30
+    var foodF=food>=50?1:(0.5+food/100);                  // <50 开始打折
     var ill=r.illness||0;
     var at=C.effSickAt!=null?C.effSickAt:20;
     var floor=C.effSickFloor!=null?C.effSickFloor:0.35;

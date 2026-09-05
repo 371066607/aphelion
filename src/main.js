@@ -582,6 +582,72 @@ window.APH = window.APH || {};
     APH.UI.floatText('🍽 进食 +'+res.gain,'#7dffab');
     return true;
   }
+  function pickDesignatedFloraAt(x, y){
+    var s = APH.state;
+    if(!s.designations) return null;
+    var searchR = (CFG.gathering && CFG.gathering.searchRadius) || 800;
+    var typePrio = (CFG.gathering && CFG.gathering.typePriority) || ['tree','rock_stone','rock_iron','bush_berry','bush_herb'];
+    var best = null, bestD = searchR;
+    for(var tp = 0; tp < typePrio.length; tp++){
+      for(var fi = 0; fi < (s.entities || []).length; fi++){
+        var fe = s.entities[fi];
+        if(!fe || fe.dead || fe.type !== T.FLORA || fe.kind !== typePrio[tp]) continue;
+        var des = s.designations[fe.id];
+        if(!des || (des.type !== 'chop' && des.type !== 'mine')) continue;
+        var fd = U.dst(x, y, fe.x, fe.y);
+        if(fd < bestD){ bestD = fd; best = fe; }
+      }
+      if(best) break;
+    }
+    return best;
+  }
+  /* ADR-29: 未征召指挥官全面自治。饥饿优先寻粮；无口粮则紧急采摘浆果；再执行规划砍伐/开采。 */
+  function updateCommanderAutonomy(){
+    var s = APH.state;
+    if(s.scene !== 'home' || s.mode !== 'running') return;
+    if(s.playerDrafted) return;
+    if(playerSleeping() || playerDowned()) return;
+    if(s.joy && s.joy.active) return;
+
+    var hungry = playerFood() < foodEatBelow();
+    var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
+
+    if(hungry){
+      if(s.nearFood){
+        tryPlayerEatNearFood();
+        s.target = null;
+        return;
+      }
+      var meal = nearestMeal({ x: s.px, y: s.py }, 1e9);
+      if(meal){
+        s.target = { x: meal.x, y: meal.y };
+        return;
+      }
+      var berry = null, berryD = (CFG.gathering && CFG.gathering.searchRadius) || 800;
+      for(var bi = 0; bi < (s.entities || []).length; bi++){
+        var be = s.entities[bi];
+        if(!be || be.dead || be.type !== T.FLORA || be.kind !== 'bush_berry') continue;
+        var bd = U.dst(s.px, s.py, be.x, be.y);
+        if(bd < berryD){ berryD = bd; berry = be; }
+      }
+      if(berry){
+        s.designations = s.designations || {};
+        if(!s.designations[berry.id]) s.designations[berry.id] = { type: 'chop', entityId: berry.id };
+        if(s.nearFlora && s.nearFlora.id === berry.id) s.target = null;
+        else s.target = { x: berry.x, y: berry.y };
+        return;
+      }
+    }
+
+    if(pGatherPrio > 0){
+      var flora = pickDesignatedFloraAt(s.px, s.py);
+      if(flora){
+        if(s.nearFlora && s.nearFlora.id === flora.id) s.target = null;
+        else s.target = { x: flora.x, y: flora.y };
+        return;
+      }
+    }
+  }
   function syncPlayerSleep(){
     var s=APH.state;
     var pe=APH.Ent && APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
@@ -624,17 +690,16 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
-    /* ADR-28: 玩家采集优先级>0 且站立不动 → 脚边被标记的 flora 自动开采（不寻路、不劫持移动，
-       遵守「玩家永不自动寻路」原则；仅替代连按 E 的重复操作） */
+    /* ADR-29: 未征召指挥官按工作优先级自治（饿了去吃、有规划就去砍），征召后才听右键军令 */
     var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
-    var hasWASD = s.keys && (s.keys.KeyW||s.keys.KeyA||s.keys.KeyS||s.keys.KeyD||s.keys.ArrowUp||s.keys.ArrowDown||s.keys.ArrowLeft||s.keys.ArrowRight);
-    if(s.scene==='home' && pGatherPrio > 0 && !hasWASD && s.nearFlora && !s.nearFlora.dead &&
+    if(s.scene==='home' && pGatherPrio > 0 && s.nearFlora && !s.nearFlora.dead &&
        (s.designations && s.designations[s.nearFlora.id]) &&
-       !playerSleeping() && !playerDowned()){
+       !playerSleeping() && !playerDowned() && !s.playerDrafted){
       var pG = CFG.gathering || {};
       var resW = APH.Colony.workOnFlora(s.nearFlora,
-        { skills: pG.playerGatherSkills || {sk_farm:6,sk_craft:6} },
+        { skills: pG.playerGatherSkills || {sk_farm:6,sk_craft:6}, mood:80, food:playerFood() },
         pG.playerGatherDps != null ? pG.playerGatherDps : 15);
+      s.target = null;
       if(resW.done && resW.dropItemId){
         APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
         var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
@@ -642,6 +707,7 @@ window.APH = window.APH || {};
         if(s.designations) delete s.designations[s.nearFlora.id];
       }
     }
+    updateCommanderAutonomy();
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
     if(s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearFood && !s.nearPad){
@@ -827,6 +893,15 @@ window.APH = window.APH || {};
     /* #72 家园击倒: 击倒昏迷提示(盖过一切环境提示; 复活后 needs.downed 为 false 自然失效) */
     if(needs && needs.downed && s.mode==='running'){
       APH.UI.setHint('击倒昏迷 · ' + (clinicB && hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危'));
+    } else if(s.scene==='home' && !s.playerDrafted && playerFood() < foodEatBelow()){
+      if(s.nearFood){
+        var eatSrc = s.nearFood.isWarehouse ? '仓库口粮' : ((CFG.items[s.nearFood.itemId]||{}).name||'食物');
+        APH.UI.setHint('🍽 正在进食 '+eatSrc+' (饱食 '+Math.round(playerFood())+')');
+      } else {
+        var mealHint = nearestMeal({x:s.px, y:s.py}, 1e9);
+        if(mealHint) APH.UI.setHint('🍽 饥饿 · 指挥官正前往进食');
+        else APH.UI.setHint('🍽 没有口粮 · 请用【命令】标记浆果丛采摘，或远征带回食物');
+      }
     }
 
     /* ADR-28 底部主标签栏显隐与高亮同步 (家园显示, 远征隐藏) */
@@ -1746,7 +1821,7 @@ window.APH = window.APH || {};
       return true;
     }
     if(s.scene==='home' && s.nearFlora){
-      var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6} }, 15);
+      var resW = APH.Colony.workOnFlora(s.nearFlora, { skills:{sk_farm:6,sk_craft:6}, mood:80, food:playerFood() }, 15);
       if(resW.done && resW.dropItemId){
         APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
         var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
@@ -3449,6 +3524,11 @@ window.APH = window.APH || {};
     }
     if((s.meta.res&&s.meta.res.food||0)>0){
       var st=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+      (s.entities||[]).forEach(function(b){
+        if(b && !b.dead && b.type===T.BUILDING && b.bid==='bl_warehouse'){
+          st = { x:b.x, y:(b.y||0)+18 };
+        }
+      });
       var d=U.dst(e.x,e.y,st.x,st.y);
       if(d<bd){ bd=d; best={ kind:'stock', x:st.x, y:st.y }; }
     }
@@ -3849,13 +3929,18 @@ window.APH = window.APH || {};
         }
         return;
       }
+      var seekingMeal=false;
       if(!raid && hungry){
-        if(!tryEatHere(e, r, grabR, dumpR) && r.food<eatBelow){
+        if(tryEatHere(e, r, grabR, dumpR)){
+          seekingMeal=true;
+        }else if(r.food<eatBelow){
           var meal=nearestMeal(e, seekR);
-          if(meal){ e.tx=meal.x; e.ty=meal.y; }
+          if(meal){ e.tx=meal.x; e.ty=meal.y; seekingMeal=true; }
         }
-      }else if(!raid && !e.job){
-        /* ADR-28 环世界式自动采集：无建筑岗位 + 采集优先级>0 → 先采集，无目标时搬运 */
+      }
+      if(!seekingMeal && !raid && !e.job){
+        /* ADR-28 环世界式自动采集：无建筑岗位 + 采集优先级>0 → 先采集，无目标时搬运。
+           饥饿但全图无口粮时不阻断采集（否则饿到完全停工，规划砍伐/采果永远不执行）。 */
         var gatherPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_gather != null) ? m.workPrio[r.id].sk_gather : 2;
         var haulPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
 
@@ -3883,23 +3968,8 @@ window.APH = window.APH || {};
             return;
           }
         } else if(gatherPrio > 0){
-          var searchR = (CFG.gathering && CFG.gathering.searchRadius) || 800;
-          var typePrio = (CFG.gathering && CFG.gathering.typePriority) || ['tree','rock_stone','rock_iron','bush_berry','bush_herb'];
-          var bestFlora = null, bestD = searchR;
           /* ADR-28: 严格无标不采 — 仅当自然实体具有 chop 或 mine 规划标记时才自动前往 */
-          if(s.designations){
-            for(var tp = 0; tp < typePrio.length; tp++){
-              for(var fi = 0; fi < s.entities.length; fi++){
-                var fe = s.entities[fi];
-                if(!fe || fe.dead || fe.type !== T.FLORA || fe.kind !== typePrio[tp]) continue;
-                var des = s.designations[fe.id];
-                if(!des || (des.type !== 'chop' && des.type !== 'mine')) continue;
-                var fd = U.dst(e.x, e.y, fe.x, fe.y);
-                if(fd < bestD){ bestD = fd; bestFlora = fe; }
-              }
-              if(bestFlora) break;
-            }
-          }
+          var bestFlora = pickDesignatedFloraAt(e.x, e.y);
           var hasDropToHaul = !!(e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)));
           if(bestFlora){
             e.gatherTarget = bestFlora;
@@ -3956,7 +4026,7 @@ window.APH = window.APH || {};
             }
           }
         }
-      } else if(!raid && e.job){
+      } else if(!seekingMeal && !raid && e.job){
         /* ADR-29 工位自主作业与微巡视 (Workstation Micro-pacing): 在农田/工位周围巡查劳作，拒绝站桩发呆 */
         if(!e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
           e.workPaceT = (e.workPaceT || 0) - dt;
