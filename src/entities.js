@@ -1112,6 +1112,20 @@ APH.Ent = (function(){
       ctx.font='16px sans-serif'; ctx.textAlign='center';
       ctx.fillText(e.socialBubble, 0, iconY-14+bob);
     }
+    /* 工位劳动徽章 (ADR-29) */
+    if(e.job && !e.drafted && !e.downed && !e.isSleeping && !e.socialBubble){
+      var jobIcons = {
+        bl_farm: '🌾', bl_crop_plot: '🌱', bl_mine: '⛏', bl_lab: '🔬',
+        bl_workshop: '🔨', bl_kitchen: '🍳', bl_clinic: '🩺', bl_pasture: '🐑',
+        blueprint: '📐'
+      };
+      var jIcon = jobIcons[e.job];
+      if(jIcon){
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(jIcon, 0, iconY-6+bob);
+      }
+    }
     if(e.breaking){
       ctx.fillStyle='#ff6d7a';
       ctx.font='10px sans-serif'; ctx.textAlign='center';

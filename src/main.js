@@ -624,11 +624,12 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
-    /* ADR-28: 玩家采集优先级>0 且站立不动 → 脚边 flora 自动开采（不寻路、不劫持移动，
+    /* ADR-28: 玩家采集优先级>0 且站立不动 → 脚边被标记的 flora 自动开采（不寻路、不劫持移动，
        遵守「玩家永不自动寻路」原则；仅替代连按 E 的重复操作） */
     var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
     var hasWASD = s.keys && (s.keys.KeyW||s.keys.KeyA||s.keys.KeyS||s.keys.KeyD||s.keys.ArrowUp||s.keys.ArrowDown||s.keys.ArrowLeft||s.keys.ArrowRight);
     if(s.scene==='home' && pGatherPrio > 0 && !hasWASD && s.nearFlora && !s.nearFlora.dead &&
+       (s.designations && s.designations[s.nearFlora.id]) &&
        !playerSleeping() && !playerDowned()){
       var pG = CFG.gathering || {};
       var resW = APH.Colony.workOnFlora(s.nearFlora,
@@ -638,6 +639,7 @@ window.APH = window.APH || {};
         APH.Combat.spawnDrop(s.nearFlora.x, s.nearFlora.y, resW.dropItemId, resW.dropCount, {stock:true});
         var dropName = (CFG.items[resW.dropItemId]&&CFG.items[resW.dropItemId].name)||resW.dropItemId;
         APH.UI.floatText('✔ 采集完成 +'+resW.dropCount+' '+dropName, '#7dffab');
+        if(s.designations) delete s.designations[s.nearFlora.id];
       }
     }
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
@@ -3261,7 +3263,9 @@ window.APH = window.APH || {};
         e.rest=r.rest; e.recreation=r.recreation; e.exposure=r.exposure;
         e.isSleeping=!!r.isSleeping; e.downed=!!r.downed; e.medLying=!!r.medLying;
       }
-      e.tx=tgt.x; e.ty=tgt.y;
+      if(raid || (!e.userOrder && !e.gatherTarget && !e.haulCarry && (!e.wanderT || e.wanderT <= 0))){
+        e.tx=tgt.x; e.ty=tgt.y;
+      }
       keep[r.id]=true;
     });
     s.entities.forEach(function(e){
@@ -3879,33 +3883,75 @@ window.APH = window.APH || {};
               if(bestFlora) break;
             }
           }
+          var hasDropToHaul = !!(e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)));
           if(bestFlora){
             e.gatherTarget = bestFlora;
             e.tx = bestFlora.x; e.ty = bestFlora.y;
             APH.Res.walkAround(e, {x:bestFlora.x, y:bestFlora.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
             return;
-          } else if(haulPrio > 0){
+          } else if(haulPrio > 0 && hasDropToHaul){
             doHaul(e, r);
           } else {
             e.gathering = false;
+            /* ADR-29 闲置自主漫步 (Idle Wander & Stroll): 无任务时在基地生活区漫步散心，绝不原地石化发呆 */
+            if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
+              e.wanderT = (e.wanderT || 0) - dt;
+              if(e.wanderT <= 0){
+                var rand = Math.random();
+                if(rand < 0.35){
+                  e.wanderIdle = true;
+                  e.wanderT = U.rr(3.5, 6.0);
+                  e.walking = false;
+                  e.tx = e.x; e.ty = e.y;
+                } else {
+                  e.wanderIdle = false;
+                  e.wanderT = U.rr(4.5, 7.5);
+                  var wAngle = Math.random() * Math.PI * 2;
+                  var wR = U.rr(30, 160);
+                  e.tx = CFG.HAB.x + Math.cos(wAngle) * wR;
+                  e.ty = CFG.HAB.y + Math.sin(wAngle) * wR;
+                }
+              }
+            }
           }
-        } else if(haulPrio > 0){
+        } else if(haulPrio > 0 && (e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)))){
           doHaul(e, r);
         } else {
           e.gathering = false;
-          if(r && (r.recreation||80)<70){
-            var campfire = (s.colony&&s.colony.buildings||[]).find(function(b){ return b.id==='bl_campfire'; });
-            if(campfire){
-              var cDist = U.dst(e.x, e.y, campfire.x, campfire.y);
-              if(cDist > 30 && cDist < 350){
-                e.tx = campfire.x + Math.sin((s.clock||0)+e.x)*20;
-                e.ty = campfire.y + Math.cos((s.clock||0)+e.y)*20;
+          /* ADR-29 闲置自主漫步 (Idle Wander & Stroll): 无任务时在基地生活区漫步散心，绝不原地石化发呆 */
+          if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
+            e.wanderT = (e.wanderT || 0) - dt;
+            if(e.wanderT <= 0){
+              var rand2 = Math.random();
+              if(rand2 < 0.35){
+                e.wanderIdle = true;
+                e.wanderT = U.rr(3.5, 6.0);
+                e.walking = false;
+                e.tx = e.x; e.ty = e.y;
+              } else {
+                e.wanderIdle = false;
+                e.wanderT = U.rr(4.5, 7.5);
+                var wAngle2 = Math.random() * Math.PI * 2;
+                var wR2 = U.rr(30, 160);
+                e.tx = CFG.HAB.x + Math.cos(wAngle2) * wR2;
+                e.ty = CFG.HAB.y + Math.sin(wAngle2) * wR2;
               }
             }
           }
         }
-      } else if(!raid && e.job && haulPrio > 0){
-        /* 有岗居民顺手搬运 */
+      } else if(!raid && e.job){
+        /* ADR-29 工位自主作业与微巡视 (Workstation Micro-pacing): 在农田/工位周围巡查劳作，拒绝站桩发呆 */
+        if(!e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
+          e.workPaceT = (e.workPaceT || 0) - dt;
+          if(e.workPaceT <= 0){
+            e.workPaceT = U.rr(3.5, 6.0);
+            var bld = (s.colony && s.colony.buildings || []).find(function(b){ return b.id === e.job; });
+            if(bld){
+              e.tx = bld.x + 16 + U.rr(-10, 10);
+              e.ty = bld.y + 20 + U.rr(-8, 8);
+            }
+          }
+        }
         var haulPrioJ = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
         if(haulPrioJ > 0){
           var pickR = H.pickR!=null?H.pickR:52;

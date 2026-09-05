@@ -3174,6 +3174,29 @@ test('#163 right_click: 全局右键交互（出航、开箱、破译、送医�
   A(ally.medLying === true, '送医后应处于医疗舱躺卧治疗态');
 });
 
+test('#164 idle: 闲置居民在无规划任务时自主漫步休闲与工位作业动效', () => {
+  const ents = cmdHomeSetup();
+  const p = ents[0];
+  // 移除工作建筑，锁定为无岗位闲置小人
+  S.colony.buildings = (S.colony.buildings||[]).filter(b => b.id === 'bl_landing_pad' || b.id === 'bl_house');
+  S.meta.residents[0].job = null;
+  S.meta.residents[0].jobLocked = true;
+  p.job = null;
+  p.x = 1000; p.y = 1000; p.tx = 1000; p.ty = 1000;
+  p.userOrder = null; p.drafted = false;
+  S.selectedRid = null; S.orderTool = null; S.designations = {};
+
+  // 等待小人到达居住区
+  for(let i = 0; i < 400; i++) M.updateHome(0.016);
+  A(Math.hypot(p.x - 1000, p.y - 1000) > 10, '小人应走回生活区');
+
+  // 到达生活区后，在无任务时应触发 wander 散步位移 (不再永久定格罚站)
+  const x2 = p.x, y2 = p.y;
+  for(let i = 0; i < 500; i++) M.updateHome(0.016);
+  const movedIdle = Math.hypot(p.x - x2, p.y - y2);
+  A(movedIdle > 5, '到达居住点后闲置小人应自主漫步闲逛，实际位移=' + movedIdle);
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);
