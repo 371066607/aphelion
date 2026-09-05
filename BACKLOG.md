@@ -301,8 +301,8 @@
 
 ## 新建筑与遗迹实体视觉资产补票（2026-09-04，Spec #148 / ADR-26）
 
-- [ ] **V1** codex exec 批量生成 12 张建筑与敌人 sheet PNG (#149)：置物货架/电暖器/制冷空调/等离子重炮/永恒发电机/种植圃/远古石壁/闸门/终端/遗物箱/机械哨兵
-- [ ] **V2** SPRITE_META 注册与实体渲染接线 (#150)：SPRITE_META 实测值 + drawBuilding/drawEnemy sprite 优先 + 闸门力场叠加 + 全量回归
+- [x] **V1** codex exec 批量生成 12 张建筑与敌人 sheet PNG (#149)：置物货架/电暖器/制冷空调/等离子重炮/永恒发电机/种植圃/远古石壁/闸门/终端/遗物箱/机械哨兵
+- [x] **V2** SPRITE_META 注册与实体渲染接线 (#150)：SPRITE_META 实测值 + drawBuilding/drawEnemy sprite 优先 + 闸门力场叠加 + 全量回归
 
 ## 已知不做（用户红线）
 
