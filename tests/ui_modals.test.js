@@ -236,5 +236,25 @@ const draftedBarHtml = UI.colonistBarHtml(mockState.meta.residents, mockState);
 assert('征召指挥官卡片带 drafted 样式', draftedBarHtml.indexOf('drafted') !== -1);
 assert('征召卡片含武器角标', draftedBarHtml.indexOf('aph-card-badge') !== -1);
 
+// 13. ADR-29 工作面板 (Roster) 中无论是否有其他居民，均展示指挥官行与专属角色卡
+createStubElement('resBody');
+createStubElement('resFood');
+createStubElement('resMineral');
+createStubElement('resLeather');
+createStubElement('resMed');
+createStubElement('resPop');
+
+window.APH.state = {
+  hp: 100, o2: 100, scene: 'home',
+  meta: {
+    residents: [], // 开局零居民
+    playerNeeds: { food: 80, rest: 100 }
+  }
+};
+UI.renderResPanel();
+const bodyHtml = elements.resBody.innerHTML;
+assert('开局零居民时工作面板应渲染指挥官角色卡', bodyHtml.indexOf('⭐ 指挥官 (你)') !== -1);
+assert('开局零居民时工作面板应包含指挥官工作表', bodyHtml.indexOf('⭐ 指挥官(你)') !== -1);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);

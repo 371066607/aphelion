@@ -1468,14 +1468,41 @@ APH.UI = (function(){
     var rm = document.getElementById('resMineral'); if(rm) rm.textContent = panelStock('mineral');
     var rl = document.getElementById('resLeather'); if(rl) rl.textContent = panelStock('leather');
     var rmd = document.getElementById('resMed'); if(rmd) rmd.textContent = panelStock('med');
-    var rp = document.getElementById('resPop'); if(rp) rp.textContent = (m.residents || []).length + '/' + housingCap();
-    if(!m.residents || !m.residents.length){
-      body.innerHTML = '<div style="color:#39435c;margin-top:40px;text-align:center">' +
-        '殖民地还没有居民。<br>过客会来拜访家园，走近他们按 [E] 招募。</div>';
-      return;
-    }
+    var popCount = (m.residents || []).length + 1;
+    var rp = document.getElementById('resPop'); if(rp) rp.textContent = popCount + '/' + housingCap();
     var html = prioGridHtml(m);
-    m.residents.forEach(function(r, idx){
+
+    /* 1. 指挥官专属角色卡 (ADR-29: 玩家小人也是殖民地首位成员) */
+    var pNeeds = m.playerNeeds || {};
+    var pHp = Math.max(0, Math.min(100, Math.round(s.hp != null ? s.hp : 100)));
+    var pFood = Math.max(0, Math.min(100, Math.round(pNeeds.food != null ? pNeeds.food : 80)));
+    var pRest = Math.max(0, Math.min(100, Math.round(pNeeds.rest != null ? pNeeds.rest : 100)));
+    var pO2 = Math.max(0, Math.min(100, Math.round(s.o2 != null ? s.o2 : 100)));
+    var pIllness = Math.round(pNeeds.illness || 0);
+    var pStatusTxt = s.playerDrafted ? '<span style="color:#ff4d4d;font-weight:700">[战备征召]</span>' : (pNeeds.downed ? '<span style="color:#ff4757">[昏迷击倒]</span>' : (pNeeds.isSleeping ? '<span style="color:#b39dff">[睡眠中]</span>' : '<span style="color:#7dffab">[全能自治]</span>'));
+
+    var pSkHtml = (APH.Res.SKILLS || []).map(function(sk){
+      var v = (m.playerSkills && m.playerSkills[sk]) || (sk === 'sk_build' ? 6 : (sk === 'sk_farm' ? 6 : (sk === 'sk_lore' ? 6 : 5)));
+      return '<span style="color:#59d9ff">' + (APH.Res.SKILL_NAMES[sk] || sk) + v + '</span>';
+    }).join(' · ');
+
+    html += '<div style="border:1.5px solid rgba(89,217,255,.5);border-radius:10px;padding:12px 16px;margin-bottom:12px;background:rgba(18,34,55,.85);box-shadow:0 0 12px rgba(89,217,255,.15)">' +
+      '<b style="font-size:14px;color:#59d9ff">⭐ 指挥官 (你)</b> ' + pStatusTxt +
+      ' <span style="color:#8fa3cc;font-size:11px">全能拓荒者 · 基地领袖 · 探索队长 · <span style="color:#7dffab">工作效率 1.25</span></span><br>' +
+      '<span style="color:#8fa3cc;font-size:11px">' + pSkHtml + '</span><br>' +
+      '<div style="margin-top:6px;font-size:11px">' +
+      '生命 ' + foodBar(pHp) + '&nbsp;&nbsp;饱食 ' + foodBar(pFood) +
+      '&nbsp;&nbsp;精力 ' + foodBar(pRest) + (pNeeds.isSleeping ? ' <span style="color:#8fd4ff">[睡眠]</span>' : '') +
+      '&nbsp;&nbsp;氧气 ' + foodBar(pO2) +
+      (pIllness > 0 ? ('&nbsp;&nbsp;<span style="color:#ff6d7a">病情 ' + sickBar(pIllness) + '</span>') : '') +
+      '</div>' +
+    '</div>';
+
+    if(!m.residents || !m.residents.length){
+      html += '<div style="color:#5d6f96;margin:16px 0 24px;text-align:center;font-size:12px">' +
+        '暂无其他入籍居民 · 游商与过客会定期拜访家园，走近他们按 [E] 或右键招募。</div>';
+    }
+    (m.residents || []).forEach(function(r, idx){
       var skHtml = (APH.Res.SKILLS || []).map(function(sk){
         var v = (r.skills && r.skills[sk]) || 0;
         var col = sk === r.mainSkill ? '#ffc857' : (sk === r.subSkill ? '#8fd4ff' : '#39435c');
