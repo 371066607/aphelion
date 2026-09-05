@@ -1259,6 +1259,16 @@ APH.UI = (function(){
     render: renderBuildRow
   });
 
+  /* ---------- 规划命令抽屉 (Orders Drawer, ADR-28 / Ticket #157) ---------- */
+  function renderOrdersRow(){
+    /* 在 Ticket #157 中展开完整工具箱 */
+  }
+  registerModal('orders', {
+    elId: 'ordersRow',
+    isOverlay: false,
+    render: renderOrdersRow
+  });
+
   /* ---------- 居民名册面板 (Roster, ADR-18) ---------- */
   function moodFace(m){
     return m >= 75 ? '😊' : (m >= 50 ? '😐' : (m >= 30 ? '😟' : '😫'));

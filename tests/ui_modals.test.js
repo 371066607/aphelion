@@ -155,6 +155,7 @@ createStubElement('codex');
 createStubElement('techMap');
 createStubElement('diplomacyOverlay');
 createStubElement('buildRow');
+createStubElement('ordersRow');
 createStubElement('resPanel');
 
 assert('codex 默认已注册并能打开', UI.open('codex') === true);
@@ -167,6 +168,9 @@ assert('buildCatalog 默认已注册并能打开', UI.open('buildCatalog') === t
 UI.close('buildCatalog');
 assert('roster 默认已注册并能打开', UI.open('roster') === true);
 UI.close('roster');
+assert('orders 默认已注册并能打开', UI.open('orders') === true);
+assert('orders 作为抽屉模态不阻断主循环', UI.hasActiveModal() === false);
+UI.close('orders');
 
 // 10. ADR-28 补丁: 指挥官(玩家)行出现在命令表
 window.APH.Res = window.APH.Res || { SKILLS: ['sk_build','sk_farm'], SKILL_NAMES: {} };

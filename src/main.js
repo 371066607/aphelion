@@ -797,11 +797,21 @@ window.APH = window.APH || {};
       APH.UI.setHint('击倒昏迷 · ' + (clinicB && hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危'));
     }
 
-    /* 建造/名册入口按钮显隐 */
-    var bb=document.getElementById('buildBtn');
-    if(bb) bb.style.display=(s.scene==='home')?'flex':'none';
-    var rb=document.getElementById('rosterBtn');
-    if(rb) rb.style.display=(s.scene==='home')?'flex':'none';
+    /* ADR-28 底部主标签栏显隐与高亮同步 (家园显示, 远征隐藏) */
+    var mb=document.getElementById('mainTabsBar');
+    if(mb){
+      mb.style.display=(s.scene==='home')?'flex':'none';
+      if(s.scene==='home' && APH.UI && APH.UI.isOpen && APH.UI.getActiveModal){
+        var actMod = APH.UI.getActiveModal();
+        var isBuild = APH.UI.isOpen('buildCatalog');
+        var isOrders = APH.UI.isOpen('orders');
+        var tb = document.getElementById('tabBuild'); if(tb) tb.classList.toggle('active', !!isBuild);
+        var tw = document.getElementById('tabWork'); if(tw) tw.classList.toggle('active', actMod==='roster');
+        var tt = document.getElementById('tabTech'); if(tt) tt.classList.toggle('active', actMod==='techMap');
+        var td = document.getElementById('tabDiplo'); if(td) td.classList.toggle('active', actMod==='diplomacy');
+        var to = document.getElementById('tabOrders'); if(to) to.classList.toggle('active', !!isOrders);
+      }
+    }
 
     /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
@@ -3991,9 +4001,21 @@ window.APH = window.APH || {};
   }
   function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
   function bindBuildUI(){
+    /* ADR-28 底部主标签栏事件绑定 */
+    var to = document.getElementById('tabOrders');
+    if(to) to.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('orders'); });
+    var tb = document.getElementById('tabBuild');
+    if(tb) tb.addEventListener('click', function(){ toggleBuildRow(); });
+    var tw = document.getElementById('tabWork');
+    if(tw) tw.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('roster'); });
+    var tt = document.getElementById('tabTech');
+    if(tt) tt.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('techMap'); });
+    var td = document.getElementById('tabDiplo');
+    if(td) td.addEventListener('click', function(){ if(APH.UI && APH.UI.toggle) APH.UI.toggle('diplomacy'); });
+
+    /* 兼容老圆钮(若存在) */
     var btn=document.getElementById('buildBtn');
-    if(!btn) return;
-    btn.addEventListener('click',function(){ toggleBuildRow(); });
+    if(btn) btn.addEventListener('click',function(){ toggleBuildRow(); });
     var rb=document.getElementById('rosterBtn');
     if(rb) rb.addEventListener('click',function(){ if(APH.UI&&APH.UI.toggle) APH.UI.toggle('roster'); });
     /* ADR-29 征召命令面板: 按钮下发各类令 */
