@@ -425,6 +425,22 @@ APH.CFG = {
     typePriority: ['tree', 'rock_stone', 'rock_iron', 'bush_berry', 'bush_herb'], // 采集目标优先级
   },
 
+  /* 环世界式闲置生活 (无任务时院子漫步，禁止罚站) */
+  idle: {
+    firstDelay: 0.45,   // 进院子后先张望再走，避免单帧测试被闲逛写 target
+    wanderRMin: 50,     // 院子漫步最小半径 (相对 HAB)
+    wanderRMax: 220,    // 院子漫步最大半径
+    localRMin: 40,      // 就地溜达最小步长
+    localRMax: 120,     // 就地溜达最大步长
+    strollMin: 2.8,     // 一段散步最短秒
+    strollMax: 5.5,
+    pauseChance: 0.2,   // 停下张望的概率 (其余继续走)
+    pauseMin: 1.0,
+    pauseMax: 2.4,
+    lookFloraR: 420,    // 闲逛时去「看看」附近植株的搜索半径
+    workPace: 28,       // 工位巡视偏移 (px)，过小会像罚站
+  },
+
   /* 环世界式征召与直接命令 (ADR-19) */
   command: {
     pickR: 34,          // 点选居民判定半径 (px)

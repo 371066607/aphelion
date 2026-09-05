@@ -602,7 +602,7 @@ window.APH = window.APH || {};
     return best;
   }
   /* ADR-29: 未征召指挥官全面自治。饥饿优先寻粮；无口粮则紧急采摘浆果；再执行规划砍伐/开采。 */
-  function updateCommanderAutonomy(){
+  function updateCommanderAutonomy(dt){
     var s = APH.state;
     if(s.scene !== 'home' || s.mode !== 'running') return;
     if(s.playerDrafted) return;
@@ -616,11 +616,13 @@ window.APH = window.APH || {};
       if(s.nearFood){
         tryPlayerEatNearFood();
         s.target = null;
+        s.cmdIdleWalk = false;
         return;
       }
       var meal = nearestMeal({ x: s.px, y: s.py }, 1e9);
       if(meal){
         s.target = { x: meal.x, y: meal.y };
+        s.cmdIdleWalk = false;
         return;
       }
       var berry = null, berryD = (CFG.gathering && CFG.gathering.searchRadius) || 800;
@@ -633,6 +635,7 @@ window.APH = window.APH || {};
       if(berry){
         s.designations = s.designations || {};
         if(!s.designations[berry.id]) s.designations[berry.id] = { type: 'chop', entityId: berry.id };
+        s.cmdIdleWalk = false;
         if(s.nearFlora && s.nearFlora.id === berry.id) s.target = null;
         else s.target = { x: berry.x, y: berry.y };
         return;
@@ -642,11 +645,102 @@ window.APH = window.APH || {};
     if(pGatherPrio > 0){
       var flora = pickDesignatedFloraAt(s.px, s.py);
       if(flora){
+        s.cmdIdleWalk = false;
         if(s.nearFlora && s.nearFlora.id === flora.id) s.target = null;
         else s.target = { x: flora.x, y: flora.y };
         return;
       }
     }
+    if(s.gathering){ s.cmdIdleWalk = false; return; }
+    commanderIdleStroll(dt || 0.016);
+  }
+  function pickIdleDest(fromX, fromY){
+    var s = APH.state;
+    var C = CFG.idle || {};
+    var hab = CFG.HAB || {x:1100,y:1100};
+    var roll = Math.random();
+    var dest = null;
+    if(roll < 0.28){
+      var blds = (s.colony && s.colony.buildings) || [];
+      if(blds.length){
+        var b = blds[Math.floor(Math.random()*blds.length)];
+        dest = { x: (b.x||hab.x) + U.rr(-28,28), y: (b.y||hab.y) + U.rr(16,44) };
+      }
+    }
+    if(!dest && roll < 0.52){
+      var floraLook = [];
+      var lookR = C.lookFloraR != null ? C.lookFloraR : 420;
+      (s.entities||[]).forEach(function(e){
+        if(e && !e.dead && e.type===T.FLORA && U.dst(fromX, fromY, e.x, e.y) < lookR) floraLook.push(e);
+      });
+      if(floraLook.length){
+        var f = floraLook[Math.floor(Math.random()*floraLook.length)];
+        dest = { x: f.x + U.rr(-40,40), y: f.y + U.rr(18,42) };
+      }
+    }
+    if(!dest && roll < 0.78){
+      var angL = Math.random()*Math.PI*2;
+      var radL = U.rr(C.localRMin!=null?C.localRMin:40, C.localRMax!=null?C.localRMax:120);
+      dest = { x: fromX + Math.cos(angL)*radL, y: fromY + Math.sin(angL)*radL };
+    }
+    if(!dest){
+      var ang = Math.random()*Math.PI*2;
+      var rad = U.rr(C.wanderRMin!=null?C.wanderRMin:50, C.wanderRMax!=null?C.wanderRMax:220);
+      dest = { x: hab.x + Math.cos(ang)*rad, y: hab.y + Math.sin(ang)*rad };
+    }
+    dest.x = U.clamp(dest.x, 80, CFG.WORLD-80);
+    dest.y = U.clamp(dest.y, 80, CFG.WORLD-80);
+    return dest;
+  }
+  function commanderIdleStroll(dt){
+    var s = APH.state;
+    var C = CFG.idle || {};
+    if(!s.cmdIdleInited){
+      s.cmdIdleInited = true;
+      s.cmdIdleT = C.firstDelay != null ? C.firstDelay : 0.45;
+    }
+    if(s.cmdIdleWalk && s.target){
+      if(U.dst(s.px, s.py, s.target.x, s.target.y) < 12){
+        s.target = null;
+        s.cmdIdleWalk = false;
+        s.cmdIdleT = U.rr(C.pauseMin!=null?C.pauseMin:1.0, C.pauseMax!=null?C.pauseMax:2.4);
+        s.face = Math.random() * Math.PI * 2;
+      }
+      return;
+    }
+    s.cmdIdleT = (s.cmdIdleT || 0) - dt;
+    if(s.cmdIdleT > 0) return;
+    var pauseChance = C.pauseChance != null ? C.pauseChance : 0.2;
+    if(s.cmdIdleHadWalk && Math.random() < pauseChance){
+      s.cmdIdleWalk = false;
+      s.target = null;
+      s.cmdIdleT = U.rr(C.pauseMin!=null?C.pauseMin:1.0, C.pauseMax!=null?C.pauseMax:2.4);
+      s.face = Math.random() * Math.PI * 2;
+      return;
+    }
+    var dest = pickIdleDest(s.px, s.py);
+    s.target = dest;
+    s.cmdIdleWalk = true;
+    s.cmdIdleHadWalk = true;
+    s.cmdIdleT = U.rr(C.strollMin!=null?C.strollMin:2.8, C.strollMax!=null?C.strollMax:5.5);
+  }
+  function residentIdleStroll(e, dt){
+    var C = CFG.idle || {};
+    e.wanderT = (e.wanderT || 0) - dt;
+    if(e.wanderT > 0) return;
+    var pauseChance = C.pauseChance != null ? C.pauseChance : 0.2;
+    if(Math.random() < pauseChance){
+      e.wanderIdle = true;
+      e.wanderT = U.rr(C.pauseMin!=null?C.pauseMin:1.0, C.pauseMax!=null?C.pauseMax:2.4);
+      e.walking = false;
+      e.tx = e.x; e.ty = e.y;
+      e.face = Math.random() * Math.PI * 2;
+      return;
+    }
+    e.wanderIdle = false;
+    e.wanderT = U.rr(C.strollMin!=null?C.strollMin:2.8, C.strollMax!=null?C.strollMax:5.5);
+    var dest = pickIdleDest(e.x, e.y);
+    e.tx = dest.x; e.ty = dest.y;
   }
   /* 采集作业的可见挥砍：面向目标、周期性木屑/石屑、树木震动 */
   function pulseGatherWork(flora, worker, dt){
@@ -743,7 +837,7 @@ window.APH = window.APH || {};
         if(peGather) peGather.gathering = false;
       }
     }
-    updateCommanderAutonomy();
+    updateCommanderAutonomy(dt);
     s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
     s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
     if(s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearFood && !s.nearPad){
@@ -4025,50 +4119,16 @@ window.APH = window.APH || {};
             doHaul(e, r);
           } else {
             e.gathering = false;
-            /* ADR-29 闲置自主漫步 (Idle Wander & Stroll): 无任务时在基地生活区漫步散心，绝不原地石化发呆 */
             if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
-              e.wanderT = (e.wanderT || 0) - dt;
-              if(e.wanderT <= 0){
-                var rand = Math.random();
-                if(rand < 0.35){
-                  e.wanderIdle = true;
-                  e.wanderT = U.rr(3.5, 6.0);
-                  e.walking = false;
-                  e.tx = e.x; e.ty = e.y;
-                } else {
-                  e.wanderIdle = false;
-                  e.wanderT = U.rr(4.5, 7.5);
-                  var wAngle = Math.random() * Math.PI * 2;
-                  var wR = U.rr(30, 160);
-                  e.tx = CFG.HAB.x + Math.cos(wAngle) * wR;
-                  e.ty = CFG.HAB.y + Math.sin(wAngle) * wR;
-                }
-              }
+              residentIdleStroll(e, dt);
             }
           }
         } else if(haulPrio > 0 && (e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)))){
           doHaul(e, r);
         } else {
           e.gathering = false;
-          /* ADR-29 闲置自主漫步 (Idle Wander & Stroll): 无任务时在基地生活区漫步散心，绝不原地石化发呆 */
           if(!raid && !e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
-            e.wanderT = (e.wanderT || 0) - dt;
-            if(e.wanderT <= 0){
-              var rand2 = Math.random();
-              if(rand2 < 0.35){
-                e.wanderIdle = true;
-                e.wanderT = U.rr(3.5, 6.0);
-                e.walking = false;
-                e.tx = e.x; e.ty = e.y;
-              } else {
-                e.wanderIdle = false;
-                e.wanderT = U.rr(4.5, 7.5);
-                var wAngle2 = Math.random() * Math.PI * 2;
-                var wR2 = U.rr(30, 160);
-                e.tx = CFG.HAB.x + Math.cos(wAngle2) * wR2;
-                e.ty = CFG.HAB.y + Math.sin(wAngle2) * wR2;
-              }
-            }
+            residentIdleStroll(e, dt);
           }
         }
       } else if(!seekingMeal && !raid && e.job){
@@ -4079,8 +4139,9 @@ window.APH = window.APH || {};
             e.workPaceT = U.rr(3.5, 6.0);
             var bld = (s.colony && s.colony.buildings || []).find(function(b){ return b.id === e.job; });
             if(bld){
-              e.tx = bld.x + 16 + U.rr(-10, 10);
-              e.ty = bld.y + 20 + U.rr(-8, 8);
+              var pace = (CFG.idle && CFG.idle.workPace != null) ? CFG.idle.workPace : 28;
+              e.tx = bld.x + 16 + U.rr(-pace, pace);
+              e.ty = bld.y + 20 + U.rr(-pace * 0.7, pace * 0.7);
             }
           }
         }

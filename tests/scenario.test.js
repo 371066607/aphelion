@@ -2795,12 +2795,13 @@ test('#149 cmd: 移动令 → 走到目标后自动清令', () => {
   const p = ents[0];
   p.x=S.px; p.y=S.py;
   M.cmd.select(p);
-  M.cmd.orderMove({x:p.x+150, y:p.y});
+  const destX = p.x+150, destY = p.y;
+  M.cmd.orderMove({x:destX, y:destY});
   A(p.userOrder && p.userOrder.type==='move', '应写移动令');
   S.keys={};
   for(let i=0;i<600 && p.userOrder;i++) M.updateHome(0.016);
   A(!p.userOrder, '到达后命令应清除');
-  A(Math.abs(p.x-(S.px+150))<16, '应走到目标点附近, got '+Math.round(p.x)+','+Math.round(S.px));
+  A(Math.abs(p.x-destX)<16, '应走到目标点附近, got '+Math.round(p.x)+' dest='+Math.round(destX));
   M.cmd.deselect();
 });
 
@@ -3286,6 +3287,27 @@ test('#165 hungry: 无口粮时饥饿居民仍执行规划砍伐（避免饿到�
   APH.Colony.applyDesignation(S.designations, tree, 'chop');
   for(let i=0; i<700 && !tree.dead; i++) M.updateHome(0.016);
   A(tree.dead===true, '饥饿且无口粮时居民仍应执行规划砍伐, gatherTarget='+(p.gatherTarget&&p.gatherTarget.id));
+});
+
+test('#167 idle: 未征召无任务指挥官会在院子里自主漫步', () => {
+  commanderSoloSetup();
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.playerDrafted = false;
+  S.designations = {};
+  S.gathering = false;
+  S.target = null;
+  S.cmdIdleInited = false;
+  S.cmdIdleWalk = false;
+  S.cmdIdleT = 0;
+  const x0 = S.px, y0 = S.py;
+  let maxD = 0;
+  for(let i = 0; i < 900; i++){
+    M.updateHome(0.016);
+    const d = Math.hypot(S.px - x0, S.py - y0);
+    if(d > maxD) maxD = d;
+  }
+  A(maxD > 24, '无任务指挥官应在院子漫步，不应原地罚站, 最大位移='+maxD.toFixed(1));
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
