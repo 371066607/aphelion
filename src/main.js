@@ -2770,8 +2770,54 @@ window.APH = window.APH || {};
     return true;
   }
 
+  /* ADR-28: 搬运辅助（从 updateResidents 提取，供采集/纯搬运两条路径复用） */
+  function doHaul(e, r){
+    var s = APH.state;
+    var stock = APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+    var H = CFG.haul||{};
+    var pickR = H.pickR!=null?H.pickR:52;
+    var grabR = H.grabR!=null?H.grabR:18;
+    var dumpR = H.dumpR!=null?H.dumpR:36;
+    var rooms = (window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
+
+    if(e.haulCarry){
+      var carryPiles = Array.isArray(e.haulCarry) ? e.haulCarry : [e.haulCarry];
+      var firstItem = carryPiles[0];
+      if(firstItem && firstItem.itemId){
+        var targetSpot = (APH.Colony && APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(firstItem.itemId, s.colony && s.colony.buildings, rooms, e) : stock;
+        e.tx = targetSpot.x; e.ty = targetSpot.y;
+        if(U.dst(e.x, e.y, targetSpot.x, targetSpot.y) < dumpR){
+          carryPiles.forEach(function(cp){
+            APH.Colony.collectHome(s.meta, cp.itemId, cp.n || 1);
+            var it = (CFG.items && CFG.items[cp.itemId]) || {};
+            APH.UI.floatText((e.name||'居民')+' 入库 '+(it.name||'')+'×'+(cp.n||1),'#9fe8c8');
+          });
+          e.haulCarry = null;
+        }
+      } else {
+        e.haulCarry = null;
+      }
+    } else {
+      var reach = e.job ? pickR : ((CFG.haul && CFG.haul.seekR) || 1200);
+      var drop = nearestDrop(e, reach);
+      if(drop){
+        e.tx = drop.x; e.ty = drop.y;
+        if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
+          var dropsPool = s.entities.filter(function(x){ return x && x.type === T.DROPPED && !x.dead; });
+          var candidates = (APH.Colony && APH.Colony.bulkHaulCandidates) ? APH.Colony.bulkHaulCandidates(drop, dropsPool) : [drop];
+          var bundle = [];
+          candidates.forEach(function(c){
+            bundle.push({ itemId: c.itemId, n: c.n || 1 });
+            c.dead = true;
+          });
+          e.haulCarry = bundle;
+        }
+      }
+    }
+  }
+
   function updateResidents(dt){
-    var s=APH.state;
+    var s=APH.state, m=s.meta;
     if(s.scene!=='home') return;
     syncResidentEntities();
     var spd=(CFG.walk&&CFG.walk.speed)||56;
@@ -2941,40 +2987,55 @@ window.APH = window.APH || {};
           var meal=nearestMeal(e, seekR);
           if(meal){ e.tx=meal.x; e.ty=meal.y; }
         }
-      }else if(!raid){
-        if(e.haulCarry){
-          var carryPiles = Array.isArray(e.haulCarry) ? e.haulCarry : [e.haulCarry];
-          var firstItem = carryPiles[0];
-          if(firstItem && firstItem.itemId){
-            var targetSpot = (APH.Colony && APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(firstItem.itemId, s.colony && s.colony.buildings, rooms, e) : stock;
-            e.tx = targetSpot.x; e.ty = targetSpot.y;
-            if(U.dst(e.x, e.y, targetSpot.x, targetSpot.y) < dumpR){
-              carryPiles.forEach(function(cp){
-                APH.Colony.collectHome(s.meta, cp.itemId, cp.n || 1);
-                var it = (CFG.items && CFG.items[cp.itemId]) || {};
-                APH.UI.floatText((e.name||'居民')+' 入库 '+(it.name||'')+'×'+(cp.n||1),'#9fe8c8');
-              });
-              e.haulCarry = null;
+      }else if(!raid && !e.job){
+        /* ADR-28 环世界式自动采集：无建筑岗位 + 采集优先级>0 → 先采集，无目标时搬运 */
+        var gatherPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_gather != null) ? m.workPrio[r.id].sk_gather : 2;
+        var haulPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
+
+        if(e.gatherTarget){
+          var gt = e.gatherTarget;
+          if(gt.dead || gt.hp <= 0){
+            e.gatherTarget = null;
+          } else if(U.dst(e.x, e.y, gt.x, gt.y) < 48){
+            var gRes = APH.Colony.workOnFlora(gt, r, dt);
+            e.gathering = true;
+            e.walking = false;
+            if(gRes.done && gRes.dropItemId){
+              APH.Combat.spawnDrop(gt.x, gt.y, gRes.dropItemId, gRes.dropCount, {stock:true});
+              var gName = (CFG.items[gRes.dropItemId] && CFG.items[gRes.dropItemId].name) || gRes.dropItemId;
+              APH.UI.floatText((r ? r.name : '居民')+' 采集完成 +'+gRes.dropCount+' '+gName, '#c8e89a');
+              e.gatherTarget = null;
+              e.gathering = false;
             }
           } else {
-            e.haulCarry = null;
+            e.gathering = false;
+            APH.Res.walkAround(e, {x:gt.x, y:gt.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
           }
-        }else{
-          var reach = e.job ? pickR : ((CFG.haul && CFG.haul.seekR) || 1200);
-          var drop = nearestDrop(e, reach);
-          if(drop){
-            e.tx = drop.x; e.ty = drop.y;
-            if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
-              var dropsPool = s.entities.filter(function(x){ return x && x.type === T.DROPPED && !x.dead; });
-              var candidates = (APH.Colony && APH.Colony.bulkHaulCandidates) ? APH.Colony.bulkHaulCandidates(drop, dropsPool) : [drop];
-              var bundle = [];
-              candidates.forEach(function(c){
-                bundle.push({ itemId: c.itemId, n: c.n || 1 });
-                c.dead = true;
-              });
-              e.haulCarry = bundle;
+        } else if(gatherPrio > 0){
+          var searchR = (CFG.gathering && CFG.gathering.searchRadius) || 800;
+          var typePrio = (CFG.gathering && CFG.gathering.typePriority) || ['tree','rock_stone','rock_iron','bush_berry','bush_herb'];
+          var bestFlora = null, bestD = searchR;
+          for(var tp = 0; tp < typePrio.length; tp++){
+            for(var fi = 0; fi < s.entities.length; fi++){
+              var fe = s.entities[fi];
+              if(!fe || fe.dead || fe.type !== T.FLORA || fe.kind !== typePrio[tp]) continue;
+              var fd = U.dst(e.x, e.y, fe.x, fe.y);
+              if(fd < bestD){ bestD = fd; bestFlora = fe; }
             }
-          }else if(!e.job && r && (r.recreation||80)<70){
+            if(bestFlora) break;
+          }
+          if(bestFlora){
+            e.gatherTarget = bestFlora;
+          } else if(haulPrio > 0){
+            doHaul(e, r);
+          } else {
+            e.gathering = false;
+          }
+        } else if(haulPrio > 0){
+          doHaul(e, r);
+        } else {
+          e.gathering = false;
+          if(r && (r.recreation||80)<70){
             var campfire = (s.colony&&s.colony.buildings||[]).find(function(b){ return b.id==='bl_campfire'; });
             if(campfire){
               var cDist = U.dst(e.x, e.y, campfire.x, campfire.y);
@@ -2982,6 +3043,20 @@ window.APH = window.APH || {};
                 e.tx = campfire.x + Math.sin((s.clock||0)+e.x)*20;
                 e.ty = campfire.y + Math.cos((s.clock||0)+e.y)*20;
               }
+            }
+          }
+        }
+      } else if(!raid && e.job && haulPrio > 0){
+        /* 有岗居民顺手搬运 */
+        var haulPrioJ = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
+        if(haulPrioJ > 0){
+          var pickR = H.pickR!=null?H.pickR:52;
+          var drop = nearestDrop(e, pickR);
+          if(drop){
+            e.tx = drop.x; e.ty = drop.y;
+            if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
+              e.haulCarry = { itemId:drop.itemId, n:drop.n||1 };
+              drop.dead = true;
             }
           }
         }

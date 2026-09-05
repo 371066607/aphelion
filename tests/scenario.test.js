@@ -738,7 +738,8 @@ test('home: 居民把脚边的堆搬去仓库入库', () => {
   S.meta.residents = [{
     id:'rs_h1', name:'搬运甲', job:null, skills:{}, mood:80, food:80, illness:0
   }];
-  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT);
+  S.meta.workPrio = { rs_h1: { sk_gather: 0, sk_haul: 1 } };  // 禁采集, 只搬运
+  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT && e.type!==T.FLORA);
   M.syncResidents();
   const e = S.entities.find(x=>x.type===T.RESIDENT && (x.rid==='rs_h1'||x.id==='rs_h1'));
   A(!!e, '应有居民');

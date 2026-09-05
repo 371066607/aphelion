@@ -1290,7 +1290,8 @@ APH.UI = (function(){
     var s = window.APH && window.APH.state, m = s && s.meta;
     if(!m) return;
     var cur = prioCursor();
-    var rows = (m.residents || []).length, cols = (APH.Res && APH.Res.SKILLS) ? APH.Res.SKILLS.length : 6;
+    var rows = (m.residents || []).length;
+    var cols = allWorkCols().length;
     if(!rows) return;
     cur.r = Math.min(cur.r, rows - 1);
     if(code === 'ArrowUp') cur.r = (cur.r + rows - 1) % rows;
@@ -1309,36 +1310,50 @@ APH.UI = (function(){
     if(!r) return;
     m.workPrio = m.workPrio || {};
     if(!m.workPrio[r.id] && APH.Res && APH.Res.defaultPrio) m.workPrio[r.id] = APH.Res.defaultPrio(r);
-    var sk = (APH.Res && APH.Res.SKILLS) ? APH.Res.SKILLS[cur.c] : 'sk_farm';
+    var col = allWorkCols()[cur.c];
+    var sk = col ? col.key : 'sk_farm';
     m.workPrio[r.id][sk] = (APH.U && APH.U.clamp) ? APH.U.clamp(v, 0, 3) : Math.max(0, Math.min(3, v));
     r.jobLocked = false;
     if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
     renderResPanel();
-    floatText(r.name + ' · ' + (APH.Res.SKILL_NAMES[sk] || sk) + ' 优先级 → ' + v, 400, 300, '#8fd4ff');
+    floatText(r.name + ' · ' + (col ? col.name : sk) + ' 优先级 → ' + v, 400, 300, '#8fd4ff');
   }
 
   var PRIO_COLOR = ['#39435c','#ffc857','#cdd9f5','#5d6f96'];
   var PRIO_LABEL = ['禁','优','普','闲'];
+  /* ADR-28: 虚拟工作列（不进 SKILLS 技能数组，只作优先级分配） */
+  var VIRTUAL_WORK = [
+    { key: 'sk_gather', name: '采集' },
+    { key: 'sk_haul', name: '搬运' },
+  ];
+  function allWorkCols(){
+    var cols = [];
+    (APH.Res.SKILLS || []).forEach(function(sk){ cols.push({ key: sk, name: (APH.Res.SKILL_NAMES[sk] || sk) }); });
+    VIRTUAL_WORK.forEach(function(v){ cols.push(v); });
+    return cols;
+  }
 
   function prioGridHtml(m){
     var s = window.APH && window.APH.state;
     var cur = prioCursor();
     var wp = m.workPrio || {};
+    var cols = allWorkCols();
     var html = '<div style="margin-bottom:14px">' +
       '<div style="color:#ffc857;margin-bottom:4px">工作优先级 · 方向键选格, 数字 0~3 设值 ' +
       '<span style="color:#5d6f96">(0禁止 1优先 2普通 3闲时; 列头亮=技能高)</span></div>' +
       '<table style="border-collapse:collapse;font-size:11px"><tr><td></td>';
-    (APH.Res.SKILLS || []).forEach(function(sk){
-      html += '<td style="padding:2px 7px;color:#8fa3cc">' + (APH.Res.SKILL_NAMES[sk] || sk) + '</td>';
+    cols.forEach(function(col){
+      var isVirt = col.key === 'sk_gather' || col.key === 'sk_haul';
+      html += '<td style="padding:2px 7px;color:' + (isVirt ? '#59d9ff' : '#8fa3cc') + '">' + col.name + '</td>';
     });
     html += '</tr>';
     (m.residents || []).forEach(function(r, ri){
       html += '<tr><td style="padding:2px 7px;color:' + (((s && s.resSel) || 0) === ri ? '#ffc857' : '#cdd9f5') + '">' +
         esc(r.name) + '</td>';
       var p = wp[r.id] || (APH.Res && APH.Res.defaultPrio ? APH.Res.defaultPrio(r) : {});
-      (APH.Res.SKILLS || []).forEach(function(sk, ci){
-        var v = p[sk] != null ? p[sk] : 2;
-        var lv = (r.skills && r.skills[sk]) || 0;
+      cols.forEach(function(col, ci){
+        var v = p[col.key] != null ? p[col.key] : 2;
+        var lv = col.key.startsWith('sk_') && r.skills ? (r.skills[col.key] || 0) : 0;
         var isCur = (cur.r === ri && cur.c === ci);
         var bg = lv >= 6 ? 'rgba(125,255,171,.16)' : (lv >= 3 ? 'rgba(125,255,171,.07)' : 'transparent');
         html += '<td style="padding:2px 0;text-align:center"><span style="display:inline-block;' +

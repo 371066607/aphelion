@@ -410,6 +410,16 @@ APH.CFG = {
   },
 
   /* 微环境温度与冷热控制 (ADR-25 / Spec #143) */
+  /* 环世界式自动采集 (ADR-27) */
+  gathering: {
+    searchRadius: 800,           // 居民采集目标搜索半径 (px)
+    gatherSkillKey: 'sk_farm',   // 采集使用的技能键
+    regenTicks: { tree: 8, rock_iron: 12, rock_stone: 10, bush_berry: 6, bush_herb: 6 }, // 再生跳数
+    regenZoneR: 200,             // 再生位置偏移半径 (px)
+    typePriority: ['tree', 'rock_stone', 'rock_iron', 'bush_berry', 'bush_herb'], // 采集目标优先级
+  },
+
+  /* 微环境温度与冷热控制 (ADR-25 / Spec #143) */
   temperature: {
     weatherBaseTemp: {
       wx_clear:       { day: 22, night: 10 },
