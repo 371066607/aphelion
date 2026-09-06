@@ -255,6 +255,24 @@ APH.Nav = (function(){
     return null;
   }
 
+  var ROLE_NAMES = { bedroom:'卧室', dining:'食堂', rec:'娱乐室', hospital:'医院', workshop:'车间', empty:'空房间', none:'室外' };
+  function roomRoleOf(room, buildings){
+    if(!room) return 'none';
+    var tags = {};
+    (buildings || []).forEach(function(b){
+      if(!b) return;
+      if(!roomAt({ x:b.x, y:b.y }, [room])) return;
+      tags[b.id || b.bid] = true;
+    });
+    if(tags.bl_clinic) return 'hospital';
+    if(tags.bl_house) return 'bedroom';
+    if(tags.bl_dining_table) return 'dining';
+    if(tags.bl_tv || tags.bl_campfire) return 'rec';
+    if(tags.bl_workshop || tags.bl_lab) return 'workshop';
+    return 'empty';
+  }
+  function roomRoleName(role){ return ROLE_NAMES[role] || ROLE_NAMES.none; }
   return { GRID: GRID, NC: NC, gridOf: gridOf, astar: astar, followPath: followPath,
-           roomsOf: roomsOf, inRooms: inRooms, roomAt: roomAt };
+           roomsOf: roomsOf, inRooms: inRooms, roomAt: roomAt,
+           roomRoleOf: roomRoleOf, roomRoleName: roomRoleName };
 })();

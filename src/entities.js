@@ -349,10 +349,11 @@ APH.Ent = (function(){
         /* #65: sprite 分支也要画 🍽(脚底锚原点, 头顶≈baseline*sc 之上) */
         drawPlayerHungerMark(e, -((defS&&defS.baseline)||248)*sc + 4);
         drawPlayerSickMark(e, -((defS&&defS.baseline)||248)*sc + 4);
-        if(chopping){
+        var pIcon = chopping ? '🪓' : ((s.playerWorkAnim||e.workAnim)==='build' ? '🔨' : ((s.playerWorkAnim||e.workAnim)==='cook' ? '🍳' : ((s.playerWorkAnim||e.workAnim)==='haul' ? '📦' : '')));
+        if(pIcon && !lying){
           ctx.font='14px sans-serif'; ctx.textAlign='center';
           var pSwing = Math.sin(time * 14);
-          ctx.fillText('🪓', 12 + pSwing * 3, -((defS&&defS.baseline)||248)*sc + 12 + pSwing * 4);
+          ctx.fillText(pIcon, 12 + pSwing * 3, -((defS&&defS.baseline)||248)*sc + 12 + pSwing * 4);
         }
         /* ADR-22: sprite 分支玩家社交气泡 */
         if(e.socialBubble){
@@ -395,10 +396,11 @@ APH.Ent = (function(){
     drawPlayerHungerMark(e, -40+(e.moving?bobbing*0.5:0));
     /* #70 补充: 程序化分支玩家 ✚ */
     drawPlayerSickMark(e, -40+(e.moving?bobbing*0.5:0));
-    if(chopping){
+    var pIcon2 = chopping ? '🪓' : ((s.playerWorkAnim||e.workAnim)==='build' ? '🔨' : ((s.playerWorkAnim||e.workAnim)==='cook' ? '🍳' : ((s.playerWorkAnim||e.workAnim)==='haul' ? '📦' : '')));
+    if(pIcon2 && !lying){
       ctx.font='14px sans-serif'; ctx.textAlign='center';
       var pSwing2 = Math.sin(time * 14);
-      ctx.fillText('🪓', 12 + pSwing2 * 3, -36 + pSwing2 * 4);
+      ctx.fillText(pIcon2, 12 + pSwing2 * 3, -36 + pSwing2 * 4);
     }
     /* ADR-22: 玩家社交微气泡 */
     if(e.socialBubble){
@@ -1133,6 +1135,11 @@ APH.Ent = (function(){
       ctx.font='14px sans-serif'; ctx.textAlign='center';
       var swing = Math.sin((APH.state && APH.state.clock || 0) * 14);
       ctx.fillText('🪓', 12 + swing * 3, iconY - 8 + bob + swing * 2);
+    } else if(e.workAnim && !e.downed && !e.isSleeping){
+      ctx.font='14px sans-serif'; ctx.textAlign='center';
+      var sw = Math.sin((APH.state && APH.state.clock || 0) * 12);
+      var icon = e.workAnim==='build' ? '🔨' : (e.workAnim==='cook' ? '🍳' : (e.workAnim==='haul' ? '📦' : ''));
+      if(icon) ctx.fillText(icon, 12 + sw * 2, iconY - 8 + bob + sw * 2);
     }
     /* 工位劳动徽章 (ADR-29) */
     if(e.job && !e.drafted && !e.downed && !e.isSleeping && !e.socialBubble && !e.gathering){

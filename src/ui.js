@@ -1280,6 +1280,7 @@ APH.UI = (function(){
       { id: 'haul', name: '搬运', icon: '✋', title: '单点或拉框圈选掉落物资进行优先搬运' },
       { id: 'deconstruct', name: '拆除', icon: '🔨', title: '单点或圈选建筑进行拆除退还材料' },
       { id: 'stockpile', name: '仓储', icon: '📦', title: '拉框划仓储区，搬运会优先送入' },
+      { id: 'grow', name: '种植', icon: '🌱', title: '拉框划种植区，农民会播种收获' },
       { id: 'cancel', name: '取消', icon: '✕', title: '单点或拉框清除区域内的规划标记', cancel: true },
     ];
     var h = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">';
@@ -1785,6 +1786,13 @@ APH.UI = (function(){
     if(target.type === 'zone'){
       var z = target.zone || target;
       var n = (z.cells||[]).length;
+      if(z.type==='grow'){
+        var crop = (window.APH.Colony && APH.Colony.ALIEN_CROPS && APH.Colony.ALIEN_CROPS[z.cropType]) || {};
+        var h = '<div style="color:#7dffab;font-weight:700;font-size:12px">🌱 种植区 · '+n+' 格</div>';
+        h += '<div style="font-size:10px;color:#8fa3cc;margin-top:4px">作物: '+(crop.name||z.cropType||'未选')+'</div>';
+        h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleGrowCrop()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(125,255,171,.45);background:rgba(125,255,171,.12);color:#c8e89a;cursor:pointer">换作物</button>';
+        return h;
+      }
       var filt = z.filter || 'all';
       var filtName = filt==='all'?'全部允许':filt;
       var forbids = z.forbid || [];
@@ -1812,11 +1820,20 @@ APH.UI = (function(){
     var wx = Math.round(target.x || s.px || 0);
     var wy = Math.round(target.y || s.py || 0);
     var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? Math.round(APH.Weather.ambientTemperatureOf(s.meta, s.clock||0)) : 18;
+    var roomLine = '室外露天';
+    if(window.APH.Nav && APH.Nav.roomsOf && APH.Nav.roomAt){
+      var rooms = APH.Nav.roomsOf((s.colony && s.colony.buildings) || []);
+      var rm = APH.Nav.roomAt({ x:wx, y:wy }, rooms);
+      if(rm && APH.Nav.roomRoleOf){
+        var role = APH.Nav.roomRoleOf(rm, (s.colony && s.colony.buildings) || []);
+        roomLine = (APH.Nav.roomRoleName && APH.Nav.roomRoleName(role)) || role;
+      }
+    }
     return '<div style="display:flex;align-items:center;gap:8px">' +
       '<div style="font-size:20px;width:30px;text-align:center">🌍</div>' +
       '<div style="flex:1">' +
         '<div style="color:#c5e3f6;font-weight:700;font-size:11px">温带平原 (' + wx + ', ' + wy + ')</div>' +
-        '<div style="color:#8fa3cc;font-size:10px">气温 ' + temp + '°C · 室外露天</div>' +
+        '<div style="color:#8fa3cc;font-size:10px">气温 ' + temp + '°C · ' + roomLine + '</div>' +
       '</div>' +
     '</div>';
   }

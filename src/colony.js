@@ -1064,6 +1064,48 @@ APH.Colony = (function(){
     }
     return storageFilterMatches(zone.filter, itemId);
   }
+  function addGrowZone(zones, cells, cropType){
+    zones = (zones || []).slice();
+    var crops = ALIEN_CROPS || {};
+    var crop = cropType && crops[cropType] ? cropType : 'crop_dew_fruit';
+    if(!crops[crop]){
+      crop = Object.keys(crops)[0] || 'crop_dew_fruit';
+    }
+    var z = {
+      id: 'zn_grow_' + (zones.length + 1),
+      type: 'grow',
+      cells: (cells || []).map(function(c){ return { x:c.x, y:c.y, plant:null }; }),
+      cropType: crop
+    };
+    zones.push(z);
+    return { zones: zones, zone: z };
+  }
+  function tickGrowZones(zones, farmerSkill, eff){
+    var harvested = [];
+    if(farmerSkill == null) return { harvested: harvested };
+    (zones || []).forEach(function(z){
+      if(!z || z.type !== 'grow') return;
+      (z.cells || []).forEach(function(c){
+        if(!c.plant) c.plant = { stage:1, t:0 };
+        if(c.plant.stage >= 3){
+          var h = harvestAlienCrop(z.cropType, farmerSkill);
+          harvested.push({ x:c.x, y:c.y, drop:h, cropType:z.cropType });
+          c.plant = { stage:1, t:0 };
+        } else {
+          c.plant = cropPlotTick(c.plant, farmerSkill, eff, 1, z.cropType);
+        }
+      });
+    });
+    return { harvested: harvested };
+  }
+  function cycleGrowCrop(zone){
+    if(!zone) return null;
+    var ids = Object.keys(ALIEN_CROPS || {});
+    if(!ids.length) return zone.cropType;
+    var i = ids.indexOf(zone.cropType);
+    zone.cropType = ids[(i + 1) % ids.length];
+    return zone.cropType;
+  }
   function eraseZoneCells(zones, cells){
     var drop = {};
     (cells || []).forEach(function(c){ drop[c.x + ',' + c.y] = 1; });
@@ -2418,7 +2460,8 @@ APH.Colony = (function(){
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
-    cellsFromBox:cellsFromBox, addStockpileZone:addStockpileZone,
+    cellsFromBox:cellsFromBox, addStockpileZone:addStockpileZone, addGrowZone:addGrowZone,
+    tickGrowZones:tickGrowZones, cycleGrowCrop:cycleGrowCrop,
     zoneAllowsItem:zoneAllowsItem, eraseZoneCells:eraseZoneCells,
     findNearbySourcedItem:findNearbySourcedItem,
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,

@@ -679,6 +679,8 @@ window.APH = window.APH || {};
     var grabR = (CFG.haul && CFG.haul.grabR != null) ? CFG.haul.grabR : 18;
     var dumpR = (CFG.haul && CFG.haul.dumpR != null) ? CFG.haul.dumpR : 36;
     if(intent.type!=='idle') s.cmdIdleWalk=false;
+    s.playerWorkAnim = (intent.type==='build') ? 'build' : ((intent.type==='haul'||intent.type==='haul_dump') ? 'haul' : (intent.type==='gather' ? null : null));
+    if(intent.type==='eat'||intent.type==='sleep'||intent.type==='idle'||intent.type==='joy'||intent.type==='none') s.playerWorkAnim=null;
     if(intent.type==='eat_now'){
       tryPlayerEatNearFood();
       s.target=null;
@@ -1880,9 +1882,13 @@ window.APH = window.APH || {};
     var g=CFG.GRID||48;
     var sel = s.selectedTarget && s.selectedTarget.type==='zone' && s.selectedTarget.zone;
     zones.forEach(function(z){
-      if(!z || z.type!=='stockpile') return;
-      var col = (sel && sel.id===z.id) ? 'rgba(255,200,87,0.28)' : 'rgba(255,200,87,0.14)';
-      var stroke = (sel && sel.id===z.id) ? '#ffc857' : 'rgba(255,200,87,0.55)';
+      if(!z || (z.type!=='stockpile' && z.type!=='grow')) return;
+      var grow=z.type==='grow';
+      var col = grow
+        ? ((sel && sel.id===z.id) ? 'rgba(125,255,171,0.28)' : 'rgba(125,255,171,0.14)')
+        : ((sel && sel.id===z.id) ? 'rgba(255,200,87,0.28)' : 'rgba(255,200,87,0.14)');
+      var stroke = grow ? ((sel && sel.id===z.id) ? '#7dffab' : 'rgba(125,255,171,0.55)')
+        : ((sel && sel.id===z.id) ? '#ffc857' : 'rgba(255,200,87,0.55)');
       (z.cells||[]).forEach(function(c){
         var sx=c.x - s.camX + vpW()/2;
         var sy=c.y - s.camY + vpH()/2;
@@ -3166,7 +3172,7 @@ window.APH = window.APH || {};
         var s0 = APH.state;
         s0.designations = s0.designations || {};
         var tool = s0.orderTool;
-        if(tool==='stockpile' || (tool==='cancel' && APH.Colony.eraseZoneCells)){
+        if(tool==='stockpile' || tool==='grow' || (tool==='cancel' && APH.Colony.eraseZoneCells)){
           s0.colony.zones = s0.colony.zones || [];
           var zCells = APH.Colony.cellsFromBox(orderFrom.x, orderFrom.y, orderTo.x, orderTo.y);
           if(tool==='stockpile'){
@@ -3174,6 +3180,11 @@ window.APH = window.APH || {};
             s0.colony.zones = added.zones;
             s0.selectedTarget = { type:'zone', zone: added.zone };
             APH.UI.floatText('✔ 仓储区 '+zCells.length+' 格', '#ffc857');
+          } else if(tool==='grow'){
+            var grown = APH.Colony.addGrowZone(s0.colony.zones, zCells);
+            s0.colony.zones = grown.zones;
+            s0.selectedTarget = { type:'zone', zone: grown.zone };
+            APH.UI.floatText('✔ 种植区 '+zCells.length+' 格', '#7dffab');
           } else {
             s0.colony.zones = APH.Colony.eraseZoneCells(s0.colony.zones, zCells);
             APH.UI.floatText('✔ 已擦除划区', '#ff9a9a');
@@ -3279,7 +3290,7 @@ window.APH = window.APH || {};
           var zg=CFG.GRID||48;
           var zx=Math.round(t.x/zg)*zg, zy=Math.round(t.y/zg)*zg;
           ((s.colony && s.colony.zones)||[]).forEach(function(z){
-            if(hitZone || !z || z.type!=='stockpile') return;
+            if(hitZone || !z || (z.type!=='stockpile' && z.type!=='grow')) return;
             (z.cells||[]).forEach(function(c){
               if(c.x===zx && c.y===zy) hitZone=z;
             });
@@ -3992,6 +4003,14 @@ window.APH = window.APH || {};
     if(APH.UI&&APH.UI.floatText) APH.UI.floatText('仓储过滤 → '+(next&&next.name||z.filter), '#ffc857');
     updateInspectorNow(); saveColony();
   }
+  function cycleGrowCrop(){
+    var z=selectedZone();
+    if(!z || z.type!=='grow' || !APH.Colony.cycleGrowCrop) return;
+    var id=APH.Colony.cycleGrowCrop(z);
+    var nm=(APH.Colony.ALIEN_CROPS&&APH.Colony.ALIEN_CROPS[id]&&APH.Colony.ALIEN_CROPS[id].name)||id;
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('种植 → '+nm, '#7dffab');
+    updateInspectorNow(); saveColony();
+  }
   function toggleZoneForbid(cat){
     var z=selectedZone();
     if(!z) return;
@@ -4505,6 +4524,7 @@ window.APH = window.APH || {};
           gathering: !!e.gathering
         };
         var intent=APH.Res.thinkPawn(rpawn, pawnWorldAt(e.x, e.y, e.haulCarry));
+        e.workAnim = (intent.type==='build') ? 'build' : ((intent.type==='haul'||intent.type==='haul_dump') ? 'haul' : ((intent.type==='job' && (e.job==='bl_kitchen'||r.job==='bl_kitchen')) ? 'cook' : null));
         var handled=true;
         if(intent.type==='none'){ e.walking=false; }
         else if(intent.type==='eat_now' || intent.type==='eat'){
@@ -5128,6 +5148,20 @@ window.APH = window.APH || {};
         b.plot={stage:0,t:0};
       }
     });
+    if(s.colony.zones && APH.Colony.tickGrowZones){
+      var growFarmer=farmers.reduce(function(acc,r){
+        return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
+      },null);
+      if(growFarmer){
+        var gz=APH.Colony.tickGrowZones(s.colony.zones, growFarmer.skills.sk_farm||0, APH.Res.efficiency(growFarmer));
+        (gz.harvested||[]).forEach(function(h){
+          if(h.drop && h.drop.dropItemId){
+            APH.Combat.spawnDrop(h.x, h.y, h.drop.dropItemId, h.drop.dropCount||1, {stock:true});
+            APH.UI.floatText('🌾 种植区收获', '#c8e89a');
+          }
+        });
+      }
+    }
     /* U6 畜牧: 羊群自然增长, 产肉/皮(纯函数 ranchTick, 每牧场一调) */
     var pastures=s.colony.buildings.filter(function(b){return b.id==='bl_pasture';});
     var bestRancher=ranchers.reduce(function(acc,r){
@@ -5307,7 +5341,7 @@ window.APH = window.APH || {};
         var s = APH.state;
         s.orderTool = (s.orderTool === toolId) ? null : toolId;
         if(s.orderTool){
-          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', cancel:'✕ 取消' };
+          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', grow:'🌱 种植', cancel:'✕ 取消' };
           APH.UI.setHint('[' + (toolNames[s.orderTool]||s.orderTool) + ' 模式] 鼠标在地图上单点或拉框圈选 · 右键/Esc 退出');
         } else {
           APH.UI.setHint('');
@@ -5547,6 +5581,7 @@ window.APH = window.APH || {};
     addBuildingBill:addBuildingBill,
     cycleZoneFilter:cycleZoneFilter,
     toggleZoneForbid:toggleZoneForbid,
+    cycleGrowCrop:cycleGrowCrop,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,
