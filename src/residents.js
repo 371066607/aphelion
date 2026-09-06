@@ -77,6 +77,21 @@ APH.Res = (function(){
       dead: false
     };
   }
+  function capturePrisoner(meta, enemy){
+    if(!meta || !enemy) return null;
+    meta.prisoners = meta.prisoners || [];
+    var p = { id: enemy.id || ('rv_cap_' + meta.prisoners.length), name: enemy.name || '俘虏', x: enemy.x, y: enemy.y };
+    meta.prisoners.push(p);
+    enemy.dead = true;
+    enemy.prisoner = true;
+    return p;
+  }
+  function releasePrisoner(meta, id){
+    if(!meta) return false;
+    var n = (meta.prisoners || []).length;
+    meta.prisoners = (meta.prisoners || []).filter(function(p){ return p.id !== id; });
+    return meta.prisoners.length < n;
+  }
   function buryCorpse(c){
     if(c) c.dead = true;
     return c;
@@ -2018,5 +2033,6 @@ APH.Res = (function(){
     collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum,
     ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
     makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
+    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner,
   };
 })();

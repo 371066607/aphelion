@@ -2979,6 +2979,14 @@ window.APH = window.APH || {};
         return true;
       }
 
+      var hitDownEn=(s0.entities||[]).find(function(en){
+        return en && en.type===T.ENEMY && !en.dead && (en.downed || (en.hp||1)<=0) && U.dst(en.x,en.y,wx,wy)<=42;
+      });
+      if(hitDownEn && APH.Res.capturePrisoner){
+        APH.Res.capturePrisoner(s0.meta, hitDownEn);
+        APH.UI.floatText('⛓ 已俘虏 '+ (hitDownEn.name||'袭击者') +'（可释放，非奴隶）', '#c5e3f6');
+        return true;
+      }
       var hitCorpse=(s0.entities||[]).find(function(en){
         return en && en.type==='corpse' && !en.dead && U.dst(en.x,en.y,wx,wy)<=40;
       });
@@ -4056,6 +4064,11 @@ window.APH = window.APH || {};
     var next=APH.Colony.cycleStorageFilter(z);
     if(APH.UI&&APH.UI.floatText) APH.UI.floatText('仓储过滤 → '+(next&&next.name||z.filter), '#ffc857');
     updateInspectorNow(); saveColony();
+  }
+  function releasePrisoner(id){
+    if(APH.Res.releasePrisoner) APH.Res.releasePrisoner(APH.state.meta, id);
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('已释放俘虏', '#8fd4ff');
+    updateInspectorNow();
   }
   function assignRestrict(){
     var z=selectedZone();
@@ -5655,6 +5668,7 @@ window.APH = window.APH || {};
     toggleZoneForbid:toggleZoneForbid,
     cycleGrowCrop:cycleGrowCrop,
     assignRestrict:assignRestrict,
+    releasePrisoner:releasePrisoner,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,

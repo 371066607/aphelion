@@ -46,6 +46,15 @@ test('#182 fire: 灭火格熄灭', () => {
   if (fires.length) throw new Error('灭火后应空');
 });
 
+test('#185 prisoner: 俘虏与释放', () => {
+  const meta = { prisoners: [] };
+  const en = { id:'en_1', name:'袭击者', x:10, y:10, dead:false };
+  const p = Res.capturePrisoner(meta, en);
+  if (!p || meta.prisoners.length !== 1) throw new Error('应入监');
+  if (!en.dead) throw new Error('俘虏后战场实体应消失');
+  if (!Res.releasePrisoner(meta, p.id) || meta.prisoners.length !== 0) throw new Error('应释放');
+});
+
 test('#184 animals: 牧场同步出羊', () => {
   const pasture = { id:'bl_pasture', x:600, y:600, herd:2 };
   const ents = Colony.syncPastureAnimals(pasture, []);

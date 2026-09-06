@@ -1713,6 +1713,13 @@ APH.UI = (function(){
       h += needBarsHtml(food, rest, rec);
       h += scheduleRowHtml(m.playerSchedule, s);
       h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
+      if((m.prisoners||[]).length){
+        h += '<div style="margin-top:6px;font-size:9px;color:#8fa3cc">囚犯（非奴隶）</div>';
+        (m.prisoners||[]).forEach(function(p){
+          h += '<div style="font-size:10px;color:#c5e3f6">'+ (p.name||'俘虏') +
+            ' <button type="button" onclick="window.APH.Main&&APH.Main.releasePrisoner(\''+p.id+'\')" style="font-size:9px;padding:1px 6px;border-radius:6px;border:1px solid rgba(89,217,255,.4);background:transparent;color:#8fd4ff;cursor:pointer">释放</button></div>';
+        });
+      }
       return h;
     }
 
