@@ -2745,7 +2745,7 @@ window.APH = window.APH || {};
         }
         s.playerDrafted = !s.playerDrafted;
         if(s.playerDrafted){
-          APH.UI.floatText('⭐ 指挥官战备征召 (立正待命)', '#ff4d4d');
+          APH.UI.floatText('⭐ 已征召 · 点地面走路', '#ff4d4d');
         } else {
           APH.UI.floatText('⭐ 指挥官解除征召 (归队作息)', '#7dffab');
         }
@@ -3176,35 +3176,11 @@ window.APH = window.APH || {};
           return true;
         }
 
-        /* 散兵线走位 (仅征召状态响应) */
-        var N = activeSquad.length;
-        var anyMoved = false;
-        activeSquad.forEach(function(p, idx){
-          var offsetX = (idx - (N - 1) / 2) * 26;
-          var tx = wx + offsetX, ty = wy;
-          if(p.type === 'player' || p.id === 'player'){
-            if(s0.playerDrafted){
-              s0.target = { x: tx, y: ty };
-              APH.state.parts.push({ t: 'ping', x: tx, y: ty, life: 0.8, max: 0.8 });
-              anyMoved = true;
-            } else {
-              APH.UI.floatText('指挥官未征召 · 点击头像或按 [R] 战备方可调遣', '#8fa3cc');
-            }
-          } else {
-            if(p.drafted){
-              p.userOrder = { type: 'move', x: tx, y: ty };
-              APH.state.parts.push({ t: 'ping', x: tx, y: ty, life: 0.8, max: 0.8 });
-              anyMoved = true;
-            } else {
-              APH.UI.floatText((p.name||'居民') + ' 未征召 · 按 [R] 战备方可调遣', '#8fa3cc');
-            }
-          }
-        });
-        if(anyMoved){
-          APH.UI.floatText('✔ 战术移动 (' + N + '人)', '#8fd4ff');
-        }
-        updateCmdPanel();
-        updateInspectorNow();
+        tacticalMoveTo(wx, wy);
+        return true;
+      }
+      if(s0.playerDrafted){
+        tacticalMoveTo(wx, wy);
         return true;
       }
       if(s0.selectedTarget && s0.selectedTarget.type !== 'player'){
@@ -3366,10 +3342,10 @@ window.APH = window.APH || {};
             return;
           }
 
-          /* 3. 如果已有选中小人，点击地面下达移动令 */
+          /* 3. 选中且已征召的居民：点地走路（无右键） */
           if(s.selectedRid){
-            orderMove(t);
-            return;
+            var selEnt = selectedPawnEnt();
+            if(selEnt && selEnt.drafted){ orderMove(t); return; }
           }
 
           /* 4. 检查是否点击了自然实体 (树木/矿石) */
@@ -3418,7 +3394,12 @@ window.APH = window.APH || {};
             return;
           }
 
-          /* 8. 点击空旷地面 → 选中地形，检查器展示地表属性 (未征召绝不移动主角) */
+          /* 8. 空地：征召后点地走路（笔记本无右键）；未征召只看地形 */
+          var draftedHere = !!s.playerDrafted || (s.selectedPawns||[]).some(function(p){ return p && p.drafted; });
+          if(draftedHere){
+            tacticalMoveTo(t.x, t.y);
+            return;
+          }
           s.selectedTarget = { type: 'terrain', x: t.x, y: t.y };
           updateInspectorNow();
           return;
@@ -4046,6 +4027,34 @@ window.APH = window.APH || {};
     APH.state.parts.push({t:'ping',x:t.x,y:t.y,life:.8,max:.8});
     updateCmdPanel();
   }
+  /* 征召后点地走路：笔记本无右键，左键空地同样下达 */
+  function tacticalMoveTo(wx, wy){
+    var s0 = APH.state;
+    var squad = (s0.selectedPawns && s0.selectedPawns.length > 0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
+    if(!squad.length && s0.playerDrafted) squad = [{ type:'player', id:'player' }];
+    if(!squad.length) return false;
+    var N = squad.length, anyMoved = false;
+    squad.forEach(function(p, idx){
+      if(!p) return;
+      var tx = wx + (idx - (N - 1) / 2) * 26, ty = wy;
+      if(p.type === 'player' || p.id === 'player'){
+        if(s0.playerDrafted){
+          s0.target = { x: tx, y: ty };
+          s0.parts.push({ t:'ping', x:tx, y:ty, life:0.8, max:0.8 });
+          anyMoved = true;
+        }
+      } else if(p.drafted){
+        p.userOrder = { type:'move', x:tx, y:ty };
+        s0.parts.push({ t:'ping', x:tx, y:ty, life:0.8, max:0.8 });
+        anyMoved = true;
+      }
+    });
+    if(anyMoved && APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 战术移动 (' + N + '人)', '#8fd4ff');
+    else if(!anyMoved && APH.UI && APH.UI.floatText) APH.UI.floatText('未征召 · 先点征召再点地面走路', '#8fa3cc');
+    updateCmdPanel();
+    updateInspectorNow();
+    return anyMoved;
+  }
   /* 命令面板辅助: 按钮点击下各类令 (bindBuildUI 绑定, CMD_* 键盘等价路径也走这里) */
   function orderGather(){
     var s=APH.state, ent=selectedPawnEnt();
@@ -4198,6 +4207,7 @@ window.APH = window.APH || {};
   function togglePlayerDraft(){
     var s=APH.state;
     s.playerDrafted = !s.playerDrafted;
+    if(APH.UI && APH.UI.floatText) APH.UI.floatText(s.playerDrafted ? '⭐ 已征召 · 点地面走路' : '⭐ 解除征召', s.playerDrafted ? '#ff4d4d' : '#7dffab');
     if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
     updateInspectorNow();
   }
@@ -5733,6 +5743,7 @@ window.APH = window.APH || {};
       selectedRid:function(){ return APH.state.selectedRid||null; },
       selectedEnt:selectedPawnEnt,
       orderMove:orderMove,
+      tacticalMoveTo:tacticalMoveTo,
       orderGather:orderGather,
       orderHaul:orderHaul,
       orderSleep:orderSleep,
@@ -5786,6 +5797,7 @@ window.APH = window.APH || {};
     doDeterRival:doDeterRival,
     cycleSchedule:cycleSchedule,
     setInspTab:setInspTab,
+    tacticalMoveTo:tacticalMoveTo,
     togglePlayerDraft:togglePlayerDraft,
     toggleSelectedDraft:toggleSelectedDraft,
     addBuildingBill:addBuildingBill,

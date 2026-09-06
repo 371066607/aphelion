@@ -3458,6 +3458,18 @@ test('#169 build: 走到蓝图 90px 内工期推进', () => {
   A(S.colony.buildQueue[0].progress > p0, '工期应推进, 实际: '+S.colony.buildQueue[0].progress);
 });
 
+test('征召后点地面走路（笔记本无右键）', () => {
+  commanderSoloSetup();
+  S.playerDrafted = true;
+  S.selectedPawns = [];
+  S.selectedRid = null;
+  S.target = null;
+  const gx = S.px + 90, gy = S.py + 50;
+  A(typeof M.tacticalMoveTo === 'function', '应导出 tacticalMoveTo');
+  A(M.tacticalMoveTo(gx, gy), '征召后点地应走路');
+  A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应走到点击处');
+});
+
 test('#169 right_click: 征召态右键地面是战术移动不是建造', () => {
   commanderSoloSetup();
   S.playerDrafted = true;

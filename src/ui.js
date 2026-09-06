@@ -1734,7 +1734,7 @@ APH.UI = (function(){
       } else if(tab==='sched'){
         h += scheduleRowHtml(m.playerSchedule, s);
       } else {
-        h += '<div style="color:#9a8c70">选中自己 · 空格暂停 · 未征召时自治过日子</div>';
+        h += '<div style="color:#9a8c70">未征召自己过日子。征召后点地面走路（不用右键）</div>';
       }
       if((m.prisoners||[]).length){
         h += '<div style="margin-top:6px;color:#9a8c70">囚犯（非奴隶）</div>';
