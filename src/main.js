@@ -651,6 +651,7 @@ window.APH = window.APH || {};
       drop: nearestDrop({x:x,y:y}, (CFG.haul&&CFG.haul.seekR)||1200),
       flora: pickDesignatedFloraAt(x,y),
       hunt: pickHuntedAnimal(x,y),
+      filth: (APH.Colony && APH.Colony.dirtiestCell) ? APH.Colony.dirtiestCell(s.colony && s.colony.filth) : null,
       berry: berry,
       joy: findJoySpot(x,y),
       storage: storage
@@ -743,6 +744,14 @@ window.APH = window.APH || {};
         s.haulCarry={ itemId:drop.itemId, n:drop.n||1 };
         drop.dead=true;
         if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 拾起物资', '#8fd4ff');
+      } else s.target={ x:intent.x, y:intent.y };
+      return;
+    }
+    if(intent.type==='clean'){
+      if(U.dst(s.px,s.py,intent.x,intent.y)<28){
+        s.target=null;
+        s.colony.filth=APH.Colony.cleanCells(s.colony.filth||{}, [{x:intent.x,y:intent.y}], 18);
+        s.playerWorkAnim='haul';
       } else s.target={ x:intent.x, y:intent.y };
       return;
     }
@@ -4712,6 +4721,14 @@ window.APH = window.APH || {};
             e.tx=intent.x; e.ty=intent.y;
             APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
           }
+        }else if(intent.type==='clean'){
+          if(U.dst(e.x,e.y,intent.x,intent.y)<28){
+            e.walking=false; e.workAnim='haul';
+            s.colony.filth=APH.Colony.cleanCells(s.colony.filth||{}, [{x:intent.x,y:intent.y}], 18);
+          }else{
+            e.tx=intent.x; e.ty=intent.y;
+            APH.Res.walkAround(e, {x:intent.x,y:intent.y}, dt, spdMul, navGrid);
+          }
         }else if(intent.type==='hunt'){
           var an=intent.animal;
           if(!an || an.dead) e.workAnim=null;
@@ -5311,7 +5328,7 @@ window.APH = window.APH || {};
       });
     }
     if(APH.Colony.tickFires){
-      s.colony.fires = APH.Colony.tickFires(s.colony.fires||[], Math.random);
+      s.colony.fires = APH.Colony.tickFires(s.colony.fires||[], Math.random, s.colony.buildings);
       (s.colony.buildings||[]).forEach(function(b){
         if(b.id==='bl_campfire' && Math.random()<0.04){
           s.colony.fires = APH.Colony.addFire(s.colony.fires||[], b.x+CFG.GRID, b.y);

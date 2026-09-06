@@ -1155,7 +1155,7 @@ APH.Colony = (function(){
     fires.push({ x:x, y:y, hp:20 });
     return fires;
   }
-  function tickFires(fires, rng){
+  function tickFires(fires, rng, buildings){
     fires = fires || [];
     rng = rng || Math.random;
     var g = CFG.GRID || 48;
@@ -1176,7 +1176,22 @@ APH.Colony = (function(){
         if(!seen[nk]){ seen[nk] = 1; next.push({ x:nx, y:ny, hp:14 }); }
       }
     });
+    if(buildings && next.length){
+      buildings.forEach(function(b){
+        if(!b || b.id==='bl_landing_pad') return;
+        var bx = Math.round((b.x||0)/g)*g, by = Math.round((b.y||0)/g)*g;
+        if(seen[bx + ',' + by]) decayBuilding(b, 4);
+      });
+    }
     return next;
+  }
+  function dirtiestCell(map){
+    var best=null, amt=0, k, xy, v;
+    for(k in (map||{})){
+      v = map[k]||0;
+      if(v > amt){ amt=v; xy=k.split(','); best={ x:+xy[0], y:+xy[1], amt:v }; }
+    }
+    return best;
   }
   function workOnAnimal(an, dt){
     if(!an || an.dead) return { done:true };
@@ -2599,7 +2614,7 @@ APH.Colony = (function(){
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
-    addFilth:addFilth, filthAt:filthAt, cleanCells:cleanCells,
+    addFilth:addFilth, filthAt:filthAt, cleanCells:cleanCells, dirtiestCell:dirtiestCell,
     decayBuilding:decayBuilding, repairBuilding:repairBuilding, ensureBuildingHp:ensureBuildingHp,
     addFire:addFire, douseFires:douseFires, tickFires:tickFires, workOnAnimal:workOnAnimal,
     addRestrictZone:addRestrictZone, pointAllowed:pointAllowed,

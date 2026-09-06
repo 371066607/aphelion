@@ -1979,6 +1979,9 @@ APH.Res = (function(){
     if(prio.sk_gather > 0 && world.hunt && !world.hunt.dead){
       return { type:'hunt', x:world.hunt.x, y:world.hunt.y, animal:world.hunt };
     }
+    if((prio.sk_haul > 0 || prio.sk_social > 0) && world.filth && world.filth.amt >= 15){
+      return { type:'clean', x:world.filth.x, y:world.filth.y, amt:world.filth.amt };
+    }
     if(pawn.gathering) return { type:'none' };
 
     if(slot !== 'work' && recNow < joyAt && world.joy){

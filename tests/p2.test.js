@@ -39,6 +39,22 @@ test('#181 corpse: 埋葬标记死亡', () => {
   if (!c.dead) throw new Error('埋葬后应 dead');
 });
 
+test('#178 clean: 小人会去最脏格', () => {
+  const cell = Colony.dirtiestCell({ '48,48': 10, '96,96': 40 });
+  if (!cell || cell.x !== 96 || cell.amt !== 40) throw new Error('应挑最脏格');
+  const i = APH.Res.thinkPawn(
+    { food:80, rest:100, recreation:80, prio:{ sk_haul:2, sk_gather:0, sk_build:0 } },
+    { filth:{ x:96, y:96, amt:40 }, eatBelow:60, restSleepAt:20, joyAt:30 }
+  );
+  if (i.type !== 'clean') throw new Error('应去清扫, 实际: '+i.type);
+});
+
+test('#182 fire: 火烧到同格建筑', () => {
+  const b = { id:'bl_house', x:48, y:48, hp:80, maxHp:80 };
+  Colony.tickFires([{ x:48, y:48, hp:20 }], function(){ return 0; }, [b]);
+  if (!(b.hp < 80)) throw new Error('同格建筑应掉血, hp='+b.hp);
+});
+
 test('#182 fire: 火会蔓延或熄灭', () => {
   let fires = Colony.addFire([], 48, 48);
   fires[0].hp = 3;
