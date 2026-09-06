@@ -39,6 +39,20 @@ test('#181 corpse: 埋葬标记死亡', () => {
   if (!c.dead) throw new Error('埋葬后应 dead');
 });
 
+test('#182 fire: 火会蔓延或熄灭', () => {
+  let fires = Colony.addFire([], 48, 48);
+  fires[0].hp = 3;
+  fires = Colony.tickFires(fires, function(){ return 0; });
+  if (fires.length !== 0 && fires[0].hp >= 3) throw new Error('应变弱');
+});
+
+test('#184 hunt: workOnAnimal 猎杀掉肉', () => {
+  const an = { hp: 5, dead: false };
+  const r = Colony.workOnAnimal(an, 1);
+  if (!r.done || r.dropItemId !== 'it_food') throw new Error('应猎获食物');
+  if (!an.dead) throw new Error('羊应倒下');
+});
+
 test('#182 fire: 灭火格熄灭', () => {
   let fires = Colony.addFire([], G, G);
   if (!fires.length) throw new Error('应着火');

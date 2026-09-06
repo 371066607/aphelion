@@ -584,6 +584,19 @@ window.APH = window.APH || {};
     APH.UI.floatText('🍽 进食 +'+res.gain,'#7dffab');
     return true;
   }
+  function pickHuntedAnimal(x, y){
+    var s=APH.state;
+    if(!s.designations) return null;
+    var best=null, bestD=800;
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.type!=='animal') return;
+      var des=s.designations[e.id];
+      if(!des || des.type!=='hunt') return;
+      var d=U.dst(x,y,e.x,e.y);
+      if(d<bestD){ bestD=d; best=e; }
+    });
+    return best;
+  }
   function pickDesignatedFloraAt(x, y){
     var s = APH.state;
     if(!s.designations) return null;
@@ -637,6 +650,7 @@ window.APH = window.APH || {};
       blueprint: nearestBlueprint(x,y),
       drop: nearestDrop({x:x,y:y}, (CFG.haul&&CFG.haul.seekR)||1200),
       flora: pickDesignatedFloraAt(x,y),
+      hunt: pickHuntedAnimal(x,y),
       berry: berry,
       joy: findJoySpot(x,y),
       storage: storage
@@ -732,6 +746,21 @@ window.APH = window.APH || {};
       } else s.target={ x:intent.x, y:intent.y };
       return;
     }
+    if(intent.type==='hunt'){
+      var an=intent.animal;
+      if(!an || an.dead) return;
+      if(U.dst(s.px,s.py,an.x,an.y)<36){
+        s.target=null;
+        var hr=APH.Colony.workOnAnimal?APH.Colony.workOnAnimal(an, dt):{done:false};
+        s.playerWorkAnim='gather';
+        if(hr.done && hr.dropItemId){
+          APH.Combat.spawnDrop(an.x, an.y, hr.dropItemId, hr.dropCount||1, {stock:true});
+          if(s.designations) delete s.designations[an.id];
+          if(APH.UI&&APH.UI.floatText) APH.UI.floatText('🎯 猎获', '#c8e89a');
+        }
+      } else s.target={ x:an.x, y:an.y };
+      return;
+    }
     if(intent.type==='gather'){
       var fl=intent.flora;
       if(intent.emergency && fl){
@@ -795,6 +824,17 @@ window.APH = window.APH || {};
     }
     dest.x = U.clamp(dest.x, 80, CFG.WORLD-80);
     dest.y = U.clamp(dest.y, 80, CFG.WORLD-80);
+    var rid = arguments[2] || (s.meta && s.meta.playerRestrictId);
+    if(rid && APH.Colony.pointAllowed){
+      if(!APH.Colony.pointAllowed(s.colony.zones||[], { restrictId:rid }, dest.x, dest.y)){
+        var z=null;
+        (s.colony.zones||[]).forEach(function(zz){ if(zz && zz.id===rid) z=zz; });
+        if(z && z.cells && z.cells.length){
+          var c=z.cells[Math.floor(Math.random()*z.cells.length)];
+          dest={ x:c.x, y:c.y };
+        }
+      }
+    }
     return dest;
   }
   function findJoySpot(x, y){
@@ -886,7 +926,8 @@ window.APH = window.APH || {};
     }
     e.wanderIdle = false;
     e.wanderT = U.rr(C.strollMin!=null?C.strollMin:2.8, C.strollMax!=null?C.strollMax:5.5);
-    var dest = pickIdleDest(e.x, e.y);
+    var rr = residentOf(e);
+    var dest = pickIdleDest(e.x, e.y, rr && rr.restrictId);
     e.tx = dest.x; e.ty = dest.y;
   }
   /* 采集作业的可见挥砍：面向目标、周期性木屑/石屑、树木震动 */
@@ -1218,6 +1259,11 @@ window.APH = window.APH || {};
 
     /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
+    (s.entities||[]).forEach(function(e){
+      if(e && e.type==='animal' && !e.dead && APH.Res.wanderStep){
+        APH.Res.wanderStep(e, dt, { x:e.x, y:e.y }, 70);
+      }
+    });
     if(APH.Colony && APH.Colony.tickConstruction) APH.Colony.tickConstruction(s, dt);
 
     /* 30s 生产时钟周期 (委托 APH.Colony, ADR-21) */
@@ -4214,7 +4260,10 @@ window.APH = window.APH || {};
       }else{
         APH.UI.floatText((e.name||'居民')+(TBL_FLAG?' 在餐桌吃了饭':' 吃了手里的食物'),'#c8e89a');
       }
-      if(!TBL_FLAG) applyNoTablePenalty(r);
+      if(!TBL_FLAG){
+        applyNoTablePenalty(r);
+        if(APH.Colony.addFilth) APH.state.colony.filth = APH.Colony.addFilth(APH.state.colony.filth||{}, e.x, e.y, 12);
+      }
       e.food=r.food;
       return true;
     }
@@ -4241,7 +4290,10 @@ window.APH = window.APH || {};
         APH.UI.floatText((e.name||'居民')+(TBL_FLAG?' 在餐桌吃了饭':' 吃了地上的食物'),'#c8e89a');
       }
     }
-    if(!TBL_FLAG) applyNoTablePenalty(r);
+    if(!TBL_FLAG){
+      applyNoTablePenalty(r);
+      if(APH.Colony.addFilth) APH.state.colony.filth = APH.Colony.addFilth(APH.state.colony.filth||{}, e.x, e.y, 12);
+    }
     e.food=r.food;
     return true;
   }
@@ -4659,6 +4711,21 @@ window.APH = window.APH || {};
           }else{
             e.tx=intent.x; e.ty=intent.y;
             APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
+          }
+        }else if(intent.type==='hunt'){
+          var an=intent.animal;
+          if(!an || an.dead) e.workAnim=null;
+          else if(U.dst(e.x,e.y,an.x,an.y)<36){
+            e.walking=false; e.workAnim='gather';
+            var hr=APH.Colony.workOnAnimal?APH.Colony.workOnAnimal(an, dt):{done:false};
+            if(hr.done && hr.dropItemId){
+              APH.Combat.spawnDrop(an.x, an.y, hr.dropItemId, hr.dropCount||1, {stock:true});
+              if(s.designations) delete s.designations[an.id];
+              APH.UI.floatText((r&&r.name||'居民')+' 猎获', '#c8e89a');
+            }
+          }else{
+            e.tx=an.x; e.ty=an.y;
+            APH.Res.walkAround(e, {x:an.x,y:an.y}, dt, spdMul, navGrid);
           }
         }else if(intent.type==='gather'){
           var gt=intent.flora || e.gatherTarget;
@@ -5232,6 +5299,25 @@ window.APH = window.APH || {};
         b.plot={stage:0,t:0};
       }
     });
+    (s.colony.buildings||[]).forEach(function(b){
+      if(!b || b.id==='bl_landing_pad') return;
+      if(APH.Colony.ensureBuildingHp) APH.Colony.ensureBuildingHp(b);
+      if(APH.Colony.decayBuilding) APH.Colony.decayBuilding(b, 0.04);
+    });
+    var buildersNear=(m.residents||[]).filter(function(r){ return r && (r.job==='blueprint' || (r.skills && r.skills.sk_build>=3)); });
+    if(buildersNear.length){
+      (s.colony.buildings||[]).forEach(function(b){
+        if(b && b.hp!=null && b.maxHp && b.hp<b.maxHp) APH.Colony.repairBuilding(b, 1.2);
+      });
+    }
+    if(APH.Colony.tickFires){
+      s.colony.fires = APH.Colony.tickFires(s.colony.fires||[], Math.random);
+      (s.colony.buildings||[]).forEach(function(b){
+        if(b.id==='bl_campfire' && Math.random()<0.04){
+          s.colony.fires = APH.Colony.addFire(s.colony.fires||[], b.x+CFG.GRID, b.y);
+        }
+      });
+    }
     if(s.colony.zones && APH.Colony.tickGrowZones){
       var growFarmer=farmers.reduce(function(acc,r){
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;

@@ -532,7 +532,7 @@ APH.Combat = (function(){
 
     var alive = 0;
     s.entities.forEach(function(en){
-      if(en.type !== T.ENEMY || en.dead) return;
+      if(en.type !== T.ENEMY || en.dead || en.downed) return;
       alive++;
 
       /* 驻守士兵: 打袭击敌人, 永不打玩家, 不因离玩家过远回收 */
@@ -955,6 +955,14 @@ APH.Combat = (function(){
 
   /* ---- 击杀: 掉落生成 ---- */
   function killEnemy(en){
+    var s0 = APH.state;
+    if(s0 && s0.scene==='home' && s0.war && s0.war.raidActive && en && !en.isBoss && !en.isSoldier){
+      en.hp = 0;
+      en.downed = true;
+      en.walking = false;
+      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('击倒 · 右键俘虏或补刀', '#c5e3f6');
+      return;
+    }
     en.dead = true;
     var s = APH.state;
     s.meta.stats.kills++;

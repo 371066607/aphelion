@@ -132,6 +132,9 @@ test('阶段E 围攻弹丸: 命中建筑停机', () => {
 });
 
 test('普通敌人: 仍然只掉1件', () => {
+  APH.state.scene='expedition';
+  APH.state.war = APH.state.war || {};
+  APH.state.war.raidActive=false;
   APH.state.entities=[{id:'player',type:T.PLAYER,x:0,y:0}];
   APH.state.parts=[];
   const f=APH.state.spec.enemies.factions[0];

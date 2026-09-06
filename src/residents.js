@@ -1976,6 +1976,9 @@ APH.Res = (function(){
     if(prio.sk_gather > 0 && world.flora){
       return { type:'gather', x:world.flora.x, y:world.flora.y, flora:world.flora };
     }
+    if(prio.sk_gather > 0 && world.hunt && !world.hunt.dead){
+      return { type:'hunt', x:world.hunt.x, y:world.hunt.y, animal:world.hunt };
+    }
     if(pawn.gathering) return { type:'none' };
 
     if(slot !== 'work' && recNow < joyAt && world.joy){

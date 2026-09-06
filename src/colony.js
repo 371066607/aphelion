@@ -1155,6 +1155,38 @@ APH.Colony = (function(){
     fires.push({ x:x, y:y, hp:20 });
     return fires;
   }
+  function tickFires(fires, rng){
+    fires = fires || [];
+    rng = rng || Math.random;
+    var g = CFG.GRID || 48;
+    var next = [], seen = {};
+    fires.forEach(function(f){
+      if(!f) return;
+      f.hp = (f.hp || 20) - 3;
+      if(f.hp <= 0) return;
+      var k = f.x + ',' + f.y;
+      if(seen[k]) return;
+      seen[k] = 1;
+      next.push(f);
+      if(rng() < 0.18){
+        var dirs = [[g,0],[-g,0],[0,g],[0,-g]];
+        var d = dirs[Math.floor(rng() * 4) % 4];
+        var nx = f.x + d[0], ny = f.y + d[1];
+        var nk = nx + ',' + ny;
+        if(!seen[nk]){ seen[nk] = 1; next.push({ x:nx, y:ny, hp:14 }); }
+      }
+    });
+    return next;
+  }
+  function workOnAnimal(an, dt){
+    if(!an || an.dead) return { done:true };
+    an.hp = (an.hp || 20) - 10 * (dt || 1);
+    if(an.hp <= 0){
+      an.dead = true;
+      return { done:true, dropItemId:'it_food', dropCount:2 };
+    }
+    return { done:false, hp: an.hp };
+  }
   function douseFires(fires, cells){
     var drop = {};
     (cells || []).forEach(function(c){ drop[c.x + ',' + c.y] = 1; });
@@ -2569,7 +2601,7 @@ APH.Colony = (function(){
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
     addFilth:addFilth, filthAt:filthAt, cleanCells:cleanCells,
     decayBuilding:decayBuilding, repairBuilding:repairBuilding, ensureBuildingHp:ensureBuildingHp,
-    addFire:addFire, douseFires:douseFires,
+    addFire:addFire, douseFires:douseFires, tickFires:tickFires, workOnAnimal:workOnAnimal,
     addRestrictZone:addRestrictZone, pointAllowed:pointAllowed,
     cellsFromBox:cellsFromBox, addStockpileZone:addStockpileZone, addGrowZone:addGrowZone,
     tickGrowZones:tickGrowZones, cycleGrowCrop:cycleGrowCrop,
