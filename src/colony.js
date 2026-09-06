@@ -296,10 +296,12 @@ APH.Colony = (function(){
     var def = BUILDINGS[bid];
     if(!def) return { ok:false, why:'未知建筑' };
 
+    var freeBuild = arguments.length > 6 && !!arguments[6];
+
     // 1. 如果传入数字作为 research (旧测试/旧调用)，且 def.cost > 0
-    if(typeof techOwned === 'number'){
+    if(!freeBuild && typeof techOwned === 'number'){
       if(def.cost > techOwned) return { ok:false, why:'研究点不足 (需 '+def.cost+')' };
-    }else if(def.reqTech){
+    }else if(!freeBuild && def.reqTech){
       var owned = (techOwned && typeof techOwned==='object') ? techOwned : {};
       if(!owned[def.reqTech]){
         var reqName = TECHS[def.reqTech] ? TECHS[def.reqTech].name : def.reqTech;
@@ -308,10 +310,10 @@ APH.Colony = (function(){
     }
 
     // 2. 建材校验: 支持纯数字 (矿材) 与 对象字典 (多材料)
-    if(typeof resStock === 'number'){
+    if(!freeBuild && typeof resStock === 'number'){
       var needM = def.costMineral || 0;
       if(needM > resStock) return { ok:false, why:'矿材不足 (需 '+needM+')' };
-    }else if(resStock && typeof resStock === 'object'){
+    }else if(!freeBuild && resStock && typeof resStock === 'object'){
       var costRes = def.costRes || {};
       for(var k in costRes){
         var need = costRes[k] || 0;
@@ -323,7 +325,7 @@ APH.Colony = (function(){
       }
     }
 
-    if(!def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
+    if(!freeBuild && !def.pad && colonyBuildings.filter(function(b){return b.id===bid;}).length >= (def.max||99))
       return { ok:false, why:'已达数量上限' };
     var fp = footprintOf(bid), hw = fp.w/2, hh = fp.h/2;
     var isGrid = (def.cells && def.cells[0]===1 && def.cells[1]===1 && GRID_STATICS[bid]);
@@ -353,11 +355,11 @@ APH.Colony = (function(){
     return { x: Math.round(wx/CFG.GRID)*CFG.GRID, y: Math.round(wy/CFG.GRID)*CFG.GRID };
   }
   /* 建造幽灵: 鼠标世界坐标 → 吸附格 + 占位 + 可放判定 (不改世界) */
-  function placementGhost(bid, wx, wy, buildings, tech, res){
+  function placementGhost(bid, wx, wy, buildings, tech, res, freeBuild){
     if(!bid) return null;
     var snap = wallCells(wx, wy);
     var fp = footprintOf(bid);
-    var check = canPlace(buildings || [], tech, bid, snap.x, snap.y, res);
+    var check = canPlace(buildings || [], tech, bid, snap.x, snap.y, res, freeBuild);
     return {
       bid: bid,
       x: snap.x, y: snap.y,

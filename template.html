@@ -68,6 +68,9 @@
   #pauseBanner{position:fixed;top:12px;right:16px;z-index:36;display:none;
     background:rgba(10,14,24,.9);border:1px solid rgba(255,200,87,.45);color:#ffc857;
     padding:6px 12px;border-radius:12px;font-size:13px;letter-spacing:2px;pointer-events:none}
+  #devBanner{position:fixed;top:44px;right:16px;z-index:36;display:none;
+    background:rgba(22,18,14,.92);border:1px solid #ffc857;color:#ffc857;
+    padding:5px 10px;border-radius:2px;font-size:12px;cursor:pointer}
   #alertBar{position:fixed;top:52px;right:16px;z-index:36;display:none;flex-direction:column;gap:4px;
     max-width:240px;pointer-events:auto}
   .aph-alert{background:rgba(18,10,12,.92);border:1px solid rgba(255,90,90,.45);color:#ffd4d4;
@@ -177,6 +180,7 @@
 <!-- 顶部殖民者头像栏 (ADR-29 / Ticket #161) -->
 <div id="colonistBar"></div>
 <div id="pauseBanner"></div>
+<div id="devBanner" onclick="window.APH.Main&&APH.Main.toggleFreeBuild()"></div>
 <div id="alertBar"></div>
 
 <!-- 左下角检查器 (ADR-28 / Ticket #156) -->
@@ -206,6 +210,7 @@
     <span style="margin-left:10px;color:#19c8b9;font-weight:700;font-size:13px" id="brResearch"></span>
     <span style="margin-left:8px;color:#794f27;font-weight:700;font-size:13px" id="brMineral"></span>
     <span id="brQueue" style="margin-left:auto;color:#9f927d;font-size:11px"></span>
+    <button type="button" id="brFreeBuild" onclick="window.APH.Main&&APH.Main.toggleFreeBuild()" style="margin-left:10px;font-size:11px;padding:3px 8px;border-radius:8px;border:1px solid #c4b89e;background:#fff;color:#794f27;cursor:pointer">∞ 无限建造</button>
   </div>
   <div id="brCards" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px"></div>
   <p style="color:#9f927d;font-size:10px;margin:8px 0 0;text-align:center">点击卡片选择 · 再点击地面放置 · Esc取消</p>

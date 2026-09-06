@@ -940,6 +940,7 @@ APH.CFG = {
       KeyT: 'TOGGLE_TECH',
       KeyL: 'TOGGLE_CODEX',
       KeyG: 'TOGGLE_BUILD_ROW',
+      F8: 'TOGGLE_FREE_BUILD',
       Escape: 'CANCEL_OR_CLOSE',
     },
     intro: {

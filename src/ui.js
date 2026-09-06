@@ -19,6 +19,11 @@ APH.UI = (function(){
       else if((s.timeScale||1)!==1){ pb.style.display='block'; pb.textContent='⏱ ×'+(s.timeScale||1); }
       else pb.style.display='none';
     }
+    var db = $('devBanner');
+    if(db){
+      if(s.devFreeBuild){ db.style.display='block'; db.textContent='∞ 无限建造 ON · F8关闭'; }
+      else db.style.display='none';
+    }
     renderAlerts();
     var cvEl = $('cv');
     if(cvEl && cvEl.style) cvEl.style.cursor = (s.scene==='home' && s.buildMode) ? 'cell' : '';
@@ -1219,21 +1224,30 @@ APH.UI = (function(){
     var colors = ['#82d5bb','#f7cd67','#e59266','#889df0','#fc736d','#8ac68a','#b77dee','#d1da49','#e18c6f'];
     var i = 0;
     var CFG = APH.CFG || {};
+    var free = !!(s.devFreeBuild);
+    var fbBtn = document.getElementById('brFreeBuild');
+    if(fbBtn){
+      fbBtn.textContent = free ? '∞ 无限建造 ON' : '∞ 无限建造';
+      fbBtn.style.borderColor = free ? '#ffc857' : 'rgba(255,255,255,.25)';
+      fbBtn.style.color = free ? '#ffc857' : '#c5e3f6';
+    }
     Object.keys(APH.Colony.list()).forEach(function(bid){
       if(bid === 'bl_landing_pad') return;
       var def = APH.Colony.get(bid);
       var nBuilt = s.colony.buildings.filter(function(b){ return b.id === bid; }).length;
       var nQueued = (s.colony.buildQueue || []).filter(function(q){ return q.bid === bid; }).length;
       var n = nBuilt + nQueued;
-      var check = APH.Colony.canPlace(s.colony.buildings, s.meta.tech, bid, s.px, s.py, s.meta.res);
-      var ok = check.ok && n < def.max;
+      var check = APH.Colony.canPlace(s.colony.buildings, s.meta.tech, bid, s.px, s.py, s.meta.res, free);
+      var ok = free || (check.ok && n < def.max);
       var costRes = def.costRes || {};
-      var costPills = Object.keys(costRes).map(function(k){
-        var itName = (CFG.items && CFG.items[k] && CFG.items[k].name) ? CFG.items[k].name : k;
-        return '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;' +
-          'padding:1px 7px;font-size:10px;margin-right:3px">' + costRes[k] + itName + '</span>';
-      }).join('');
-      var reqTag = def.reqTech && (!s.meta.tech || !s.meta.tech[def.reqTech])
+      var costPills = free
+        ? '<span style="display:inline-block;background:#794f27;color:#ffc857;border-radius:50px;padding:1px 7px;font-size:10px">免费</span>'
+        : Object.keys(costRes).map(function(k){
+            var itName = (CFG.items && CFG.items[k] && CFG.items[k].name) ? CFG.items[k].name : k;
+            return '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;' +
+              'padding:1px 7px;font-size:10px;margin-right:3px">' + costRes[k] + itName + '</span>';
+          }).join('');
+      var reqTag = (!free && def.reqTech && (!s.meta.tech || !s.meta.tech[def.reqTech]))
         ? '<div style="color:#ff6d7a;font-size:10px;margin-top:2px">[需研: ' + (APH.Colony.TECHS[def.reqTech] ? APH.Colony.TECHS[def.reqTech].name : def.reqTech) + ']</div>'
         : '';
       var card = document.createElement('div');

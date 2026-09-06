@@ -1976,7 +1976,7 @@ window.APH = window.APH || {};
     var occupied=(s.colony.buildings||[]).concat((s.colony.buildQueue||[]).map(function(q){
       return {id:q.bid, x:q.x, y:q.y};
     }));
-    var ghost=APH.Colony.placementGhost(s.buildMode, s.pointerWx, s.pointerWy, occupied, s.meta&&s.meta.tech, s.meta&&s.meta.res);
+    var ghost=APH.Colony.placementGhost(s.buildMode, s.pointerWx, s.pointerWy, occupied, s.meta&&s.meta.tech, s.meta&&s.meta.res, !!s.devFreeBuild);
     if(!ghost) return;
     var cv2=document.getElementById('cv');
     if(!cv2 || !cv2.getContext) return;
@@ -2197,32 +2197,55 @@ window.APH = window.APH || {};
     var occupied=s.colony.buildings.concat((s.colony.buildQueue||[]).map(function(q){
       return {id:q.bid,x:q.x,y:q.y};
     }));
-    var check=APH.Colony.canPlace(occupied, s.meta.tech, bid, gx, gy, s.meta.res);
+    var free=!!s.devFreeBuild;
+    var check=APH.Colony.canPlace(occupied, s.meta.tech, bid, gx, gy, s.meta.res, free);
     if(!check.ok){ APH.UI.floatText('✕ '+check.why,'#ff9a9a'); return; }
     var def=APH.Colony.get(bid);
-    var costRes=def.costRes||{};
-    s.meta.res = s.meta.res || { mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
-    for(var mat in costRes){
-      var need=Math.max(0, Math.round((costRes[mat]||0)*mul));
-      if(need>0){
-        if(!APH.Colony.ensureStock(s.meta.res, s.entities, mat, need)){
-          var matName=(CFG.items[mat]&&CFG.items[mat].name)?CFG.items[mat].name:mat;
-          APH.UI.floatText('✕ '+matName+'不足','#ff9a9a'); return;
+    if(!free){
+      var costRes=def.costRes||{};
+      s.meta.res = s.meta.res || { mineral:0, food:0, leather:0, wood:0, stone:0, iron:0 };
+      for(var mat in costRes){
+        var need=Math.max(0, Math.round((costRes[mat]||0)*mul));
+        if(need>0){
+          if(!APH.Colony.ensureStock(s.meta.res, s.entities, mat, need)){
+            var matName=(CFG.items[mat]&&CFG.items[mat].name)?CFG.items[mat].name:mat;
+            APH.UI.floatText('✕ '+matName+'不足','#ff9a9a'); return;
+          }
+          s.meta.res[mat]=Math.max(0, (s.meta.res[mat]||0)-need);
         }
-        s.meta.res[mat]=Math.max(0, (s.meta.res[mat]||0)-need);
       }
+      s.colony.buildQueue = s.colony.buildQueue||[];
+      var qpos={x:gx,y:gy};
+      s.colony.buildQueue.push({bid:bid,x:qpos.x,y:qpos.y,
+                                total:def.buildTime||5, progress:0});
+      s.entities.push({id:'bp_'+bid+'_'+s.colony.buildQueue.length,
+        type:T.BLUEPRINT, bid:bid, x:qpos.x, y:qpos.y, progress:0, building:false});
+      APH.Save.saveMeta(s.meta);
+      saveColony();
+      U.emit('queued',{id:bid});
+      APH.UI.floatText('🛠 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
+      s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
+      return;
     }
-    s.colony.buildQueue = s.colony.buildQueue||[];
-    var qpos={x:gx,y:gy};
-    s.colony.buildQueue.push({bid:bid,x:qpos.x,y:qpos.y,
-                              total:def.buildTime||5, progress:0});
-    s.entities.push({id:'bp_'+bid+'_'+s.colony.buildQueue.length,
-      type:T.BLUEPRINT, bid:bid, x:qpos.x, y:qpos.y, progress:0, building:false});
+    var rec={ id:bid, x:gx, y:gy, lv:1 };
+    if(bid==='bl_kitchen'||bid==='bl_workshop'||bid==='bl_campfire') rec.bills=[];
+    if(bid==='bl_wall' && CFG.wall && CFG.wall.hp != null) rec.hp = CFG.wall.hp;
+    s.colony.buildings.push(rec);
+    var isGridStatic = (bid==='bl_wall'||bid==='bl_gate'||bid==='bl_spike_trap'||bid==='bl_sandbag');
+    if(!isGridStatic && APH.Colony.placeBuildingEntity) APH.Colony.placeBuildingEntity(bid, gx, gy, 1);
     APH.Save.saveMeta(s.meta);
     saveColony();
-    U.emit('queued',{id:bid});
-    APH.UI.floatText('🛠 '+def.name+' 开工 ('+(def.buildTime||0)+'s)','#ffc857');
+    U.emit('built',{id:bid});
+    APH.UI.floatText('∞ '+def.name+' 已落下','#ffc857');
     s.parts.push({t:'ping',x:wx,y:wy,life:.9,max:.9});
+  }
+  function toggleFreeBuild(){
+    var s=APH.state;
+    s.devFreeBuild = !s.devFreeBuild;
+    if(APH.UI && APH.UI.floatText) APH.UI.floatText(s.devFreeBuild ? '∞ 无限建造 ON · 点地即成' : '无限建造 OFF', s.devFreeBuild ? '#ffc857' : '#8fa3cc');
+    if(APH.UI && APH.UI.updHUD) APH.UI.updHUD();
+    if(APH.UI && APH.UI.renderBuildRow) APH.UI.renderBuildRow();
+    return true;
   }
   function buildingRecordOf(ent){
     if(!ent) return null;
@@ -2662,6 +2685,7 @@ window.APH = window.APH || {};
         if(APH.UI && APH.UI.updHUD) APH.UI.updHUD();
         return true;
       },
+      TOGGLE_FREE_BUILD: function(){ return toggleFreeBuild(); },
       SET_TIME_SCALE_1: function(){ return setTimeScale(1); },
       SET_TIME_SCALE_2: function(){ return setTimeScale(2); },
       SET_TIME_SCALE_3: function(){ return setTimeScale(3); },
@@ -3634,6 +3658,7 @@ window.APH = window.APH || {};
       /* 调试热键通道(T传送/K刷怪/G东移): 仅显式 ?debugkeys=1 开启(不随autostart隐含),
          玩家默认不可触发 */
       s.debugKeys = _q.indexOf('debugkeys=1')>=0;
+      s.devFreeBuild = _q.indexOf('freebuild=1')>=0;
       if(_q.indexOf('autostart=1')>=0){
         document.title='AUTO: q命中';
         startGame();
@@ -5796,6 +5821,7 @@ window.APH = window.APH || {};
     doSignTradePact:doSignTradePact,
     doDeterRival:doDeterRival,
     cycleSchedule:cycleSchedule,
+    toggleFreeBuild:toggleFreeBuild,
     setInspTab:setInspTab,
     tacticalMoveTo:tacticalMoveTo,
     togglePlayerDraft:togglePlayerDraft,

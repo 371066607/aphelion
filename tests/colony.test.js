@@ -9,6 +9,15 @@ test('建筑目录: 全部 bl_ 前缀, 发射台免费且唯一', () => {
   if(L.bl_landing_pad.cost !== 0) throw new Error('发射台应免费');
 });
 
+test('canPlace: 无限建造跳过材料和科技', () => {
+  const noMat = Colony.canPlace([], {}, 'bl_warehouse', 600, 600, { wood:0, iron:0 }, true);
+  if(!noMat.ok) throw new Error('freeBuild 没木头也应放, 原因: '+noMat.why);
+  const noTech = Colony.canPlace([], {}, 'bl_spike_trap', 500, 500, { stone:0, wood:0 }, true);
+  if(!noTech.ok) throw new Error('freeBuild 没科技也应放, 原因: '+noTech.why);
+  const overlap = Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], {}, 'bl_warehouse', 600, 600, {}, true);
+  if(overlap.ok) throw new Error('freeBuild 仍不可重叠');
+});
+
 test('canPlace: 建材不足拒绝', () => {
   const r = Colony.canPlace([], {}, 'bl_warehouse', 600, 600, { wood:0, iron:0 });
   if(r.ok) throw new Error('木材0 < 20 应拒绝');
