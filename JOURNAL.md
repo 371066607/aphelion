@@ -1030,3 +1030,7 @@
   - APH.Res.thinkPawn 纯函数：饿→困→建造/搬运→岗位/规划采集→娱乐→闲逛；征召返回 none。
   - updateCommanderAutonomy 薄封装；居民日常块改走同一意图。
   - 验证：think_pawn 15；run.js 710；scenario 146；构建成功。
+
+- **2026-09-06 03:50 · 班次(会话内)**: ✅ 建造幽灵：选建筑后蓝图黏鼠标、吸附 48px 格、可放青/不可放红。
+  - APH.Colony.placementGhost 纯函数；暂停时仍画。
+  - 验证：placement 6；run.js 716；构建成功。

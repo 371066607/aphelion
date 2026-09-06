@@ -20,6 +20,8 @@ APH.UI = (function(){
       else pb.style.display='none';
     }
     renderAlerts();
+    var cvEl = $('cv');
+    if(cvEl && cvEl.style) cvEl.style.cursor = (s.scene==='home' && s.buildMode) ? 'cell' : '';
     $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
     $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';

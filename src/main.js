@@ -1696,6 +1696,7 @@ window.APH = window.APH || {};
         APH.World.render(dt, homeDrawers());
         drawSelectedRing(s.clock);
         drawDesignations(s.clock);
+        drawPlacementGhost();
         drawOrderDragBox();
         drawPawnDragBox();
         drawTutorialArrow(s.clock);
@@ -1721,10 +1722,10 @@ window.APH = window.APH || {};
 
     if(s.scene==='home'){
       updateHome(dt);
-      /* 建造模式幽灵跟随鼠标(渲染在 world.render 之后) */
       APH.World.render(dt, homeDrawers());
       drawSelectedRing(s.clock);
       drawDesignations(s.clock);
+      drawPlacementGhost();
       drawOrderDragBox();
       drawPawnDragBox();
       drawTutorialArrow(s.clock);
@@ -1863,6 +1864,44 @@ window.APH = window.APH || {};
   }
 
   /* ADR-28 / Ticket #157: 规划标记悬浮徽章与框选选框渲染 */
+  function drawPlacementGhost(){
+    var s = APH.state;
+    if(!s || s.scene!=='home' || !s.buildMode) return;
+    if(s.pointerWx==null || s.pointerWy==null) return;
+    if(!APH.Colony || !APH.Colony.placementGhost) return;
+    var occupied=(s.colony.buildings||[]).concat((s.colony.buildQueue||[]).map(function(q){
+      return {id:q.bid, x:q.x, y:q.y};
+    }));
+    var ghost=APH.Colony.placementGhost(s.buildMode, s.pointerWx, s.pointerWy, occupied, s.meta&&s.meta.tech, s.meta&&s.meta.res);
+    if(!ghost) return;
+    var cv2=document.getElementById('cv');
+    if(!cv2 || !cv2.getContext) return;
+    var ctx2=cv2.getContext('2d');
+    if(!ctx2) return;
+    var sx=ghost.x - s.camX + vpW()/2;
+    var sy=ghost.y - s.camY + vpH()/2;
+    var ok=!!ghost.ok;
+    ctx2.save();
+    ctx2.fillStyle=ok?'rgba(89,217,255,0.18)':'rgba(255,80,80,0.22)';
+    ctx2.strokeStyle=ok?'#59d9ff':'#ff6d7a';
+    ctx2.lineWidth=2;
+    ctx2.setLineDash([6,5]);
+    ctx2.fillRect(sx-ghost.w/2, sy-ghost.h/2, ghost.w, ghost.h);
+    ctx2.strokeRect(sx-ghost.w/2, sy-ghost.h/2, ghost.w, ghost.h);
+    ctx2.setLineDash([]);
+    var def=(APH.Colony.get&&APH.Colony.get(ghost.bid))||{};
+    ctx2.font='12px sans-serif';
+    ctx2.textAlign='center';
+    ctx2.textBaseline='bottom';
+    ctx2.fillStyle=ok?'#c8f0ff':'#ffd0d0';
+    ctx2.fillText((ok?'':'✕ ')+(def.name||ghost.bid), sx, sy-ghost.h/2-6);
+    if(!ok && ghost.why){
+      ctx2.font='11px sans-serif';
+      ctx2.fillStyle='#ff9a9a';
+      ctx2.fillText(ghost.why, sx, sy+ghost.h/2+16);
+    }
+    ctx2.restore();
+  }
   function drawDesignations(time){
     var s = APH.state;
     if(!s.designations || s.scene !== 'home') return;
@@ -3013,6 +3052,8 @@ window.APH = window.APH || {};
     cv.addEventListener('pointermove',function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
+      APH.state.pointerWx = e.clientX-vpW()/2+APH.state.camX;
+      APH.state.pointerWy = e.clientY-vpH()/2+APH.state.camY;
       if(orderDrag){
         orderTo = { x: e.clientX-vpW()/2+APH.state.camX, y: e.clientY-vpH()/2+APH.state.camY };
       }

@@ -351,6 +351,20 @@ APH.Colony = (function(){
   function wallCells(wx, wy){
     return { x: Math.round(wx/CFG.GRID)*CFG.GRID, y: Math.round(wy/CFG.GRID)*CFG.GRID };
   }
+  /* 建造幽灵: 鼠标世界坐标 → 吸附格 + 占位 + 可放判定 (不改世界) */
+  function placementGhost(bid, wx, wy, buildings, tech, res){
+    if(!bid) return null;
+    var snap = wallCells(wx, wy);
+    var fp = footprintOf(bid);
+    var check = canPlace(buildings || [], tech, bid, snap.x, snap.y, res);
+    return {
+      bid: bid,
+      x: snap.x, y: snap.y,
+      w: fp.w, h: fp.h,
+      ok: !!(check && check.ok),
+      why: (check && check.why) || ''
+    };
+  }
   /* 从 a 到 b 的沿线格序列(拖拽连续铺墙): 取主导轴, 逐格推进 */
   function wallLine(a, b){
     var ax=Math.round(a.x/CFG.GRID), ay=Math.round(a.y/CFG.GRID);
@@ -2273,6 +2287,7 @@ APH.Colony = (function(){
     canPlace:canPlace, footprintOf:footprintOf, productionTick:productionTick,
     /* T2 墙/闸门格网(ADR-13) */
     wallCells:wallCells, wallLine:wallLine, wallNeighbors:wallNeighbors,
+    placementGhost:placementGhost,
     /* T6 电网核心 (#79) */
     powerNets:powerNets, powerSettle:powerSettle,
     powerSolarOutput:powerSolarOutput, powerWoodOutput:powerWoodOutput,
