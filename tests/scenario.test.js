@@ -3436,6 +3436,49 @@ test('#172 right_click: 右键居住舱下达优先休息', () => {
   A(S.playerOrder && S.playerOrder.type==='sleep', '右键居住舱应下达优先休息');
 });
 
+test('#169 right_click: 右键蓝图下达优先建造', () => {
+  commanderSoloSetup();
+  S.playerDrafted = false;
+  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12, building:false }];
+  S.entities.push({ id:'bp_house', type:T.BLUEPRINT, bid:'bl_house', x:1450, y:1170, progress:0.1 });
+  M.cmd.rightClick(1450, 1170);
+  A(S.playerOrder && S.playerOrder.type==='build', '右键蓝图应下达优先建造, 实际: '+JSON.stringify(S.playerOrder));
+});
+
+test('#169 build: 走到蓝图 90px 内工期推进', () => {
+  commanderSoloSetup();
+  S.px = 1400; S.py = 1170;
+  S.playerDrafted = false;
+  S.playerOrder = { type:'build', x:1450, y:1170 };
+  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12, building:false }];
+  const p0 = S.colony.buildQueue[0].progress;
+  M.updateHome(0.5);
+  A(S.colony.buildQueue[0] && S.colony.buildQueue[0].building === true, '90px 内应施工');
+  A(S.colony.buildQueue[0].progress > p0, '工期应推进, 实际: '+S.colony.buildQueue[0].progress);
+});
+
+test('#169 right_click: 征召态右键地面是战术移动不是建造', () => {
+  commanderSoloSetup();
+  S.playerDrafted = true;
+  const pe = APH.Ent.findPlayer && APH.Ent.findPlayer();
+  A(!!pe, '应有指挥官实体');
+  S.selectedPawns = [pe];
+  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12 }];
+  S.entities.push({ id:'bp_house2', type:T.BLUEPRINT, bid:'bl_house', x:1450, y:1170 });
+  const gx = S.px + 80, gy = S.py + 40;
+  M.cmd.rightClick(gx, gy);
+  A(!S.playerOrder || S.playerOrder.type!=='build', '征召点地不应下建造令');
+  A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应战术移动到点击处');
+});
+
+test('#169 right_click: 发射台右键仍是出航', () => {
+  commanderSoloSetup();
+  S.playerDrafted = false;
+  const pad = (S.colony.buildings||[]).find(b=>b.id==='bl_landing_pad') || { x:1100, y:1340 };
+  M.cmd.rightClick(pad.x, pad.y);
+  A(!S.playerOrder || S.playerOrder.type!=='build', '发射台右键不应被建造抢走');
+});
+
 test('#173 pause: 暂停时钟停、倍速加速、暂停时镜头可平移 (#165)', () => {
   if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
   S.mode='running';

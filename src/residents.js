@@ -1800,6 +1800,9 @@ APH.Res = (function(){
 
     var forceBuild = ot === 'build';
     var forceHaul = ot === 'haul';
+    if(forceBuild && order.x != null && order.y != null){
+      return { type:'build', x:order.x, y:order.y };
+    }
     if((prio.sk_build > 0 || forceBuild) && world.blueprint){
       return { type:'build', x:world.blueprint.x, y:world.blueprint.y };
     }

@@ -2021,7 +2021,9 @@ APH.Colony = (function(){
     });
 
     (s.entities || []).forEach(function(en){
+      if(!en || en.dead) return;
       if(en.type === T.RESIDENT && builders[en.rid || en.id]) near.push({ x: en.x, y: en.y });
+      else if(en.userOrder && en.userOrder.type==='build') near.push({ x: en.x, y: en.y });
     });
 
     var qr = queueTick(s.colony.buildQueue, dt, near, bb);

@@ -2908,6 +2908,30 @@ window.APH = window.APH || {};
         return true;
       }
 
+      /* 4. 右键未完成蓝图 → 优先建造 (未征召; 征召点地仍走战术移动) */
+      var hitBp = (s0.entities||[]).find(function(en){
+        return en && en.type===T.BLUEPRINT && !en.dead && U.dst(en.x,en.y,wx,wy)<=48;
+      });
+      if(!hitBp && s0.colony && s0.colony.buildQueue){
+        hitBp = (s0.colony.buildQueue||[]).find(function(q){ return q && U.dst(q.x,q.y,wx,wy)<=48; });
+      }
+      var squadNow = (s0.selectedPawns && s0.selectedPawns.length>0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
+      var draftedNow = !!s0.playerDrafted || squadNow.some(function(p){ return p && p.drafted; });
+      if(hitBp && s0.scene==='home' && !draftedNow){
+        var bpx=hitBp.x, bpy=hitBp.y;
+        if(squadNow.length){
+          squadNow.forEach(function(p){
+            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type:'build', x:bpx, y:bpy };
+            else if(p) p.userOrder = { type:'build', x:bpx, y:bpy };
+          });
+        } else {
+          s0.playerOrder = { type:'build', x:bpx, y:bpy };
+        }
+        APH.UI.floatText('→ 优先建造', '#ffc857');
+        APH.state.parts.push({ t:'ping', x:bpx, y:bpy, life:0.8, max:0.8 });
+        return true;
+      }
+
       /* 4a. 右键居住舱 / 食物 (未征召也可优先作息) */
       var hitHouse = s0.entities.find(function(en){
         return en && en.type === T.BUILDING && (en.bid === 'bl_house' || en.id === 'bl_house') && !en.dead && U.dst(en.x, en.y, wx, wy) <= 48;
@@ -4308,6 +4332,21 @@ window.APH = window.APH || {};
             var um=nearestMeal(e, 1e9);
             e.tx=um.x; e.ty=um.y;
             APH.Res.walkAround(e, {x:um.x,y:um.y}, dt, spdO, navGrid);
+          }
+          return;
+        }
+        else if(uo.type==='build'){
+          var bx=uo.x, by=uo.y;
+          if(bx==null){
+            var nbp=nearestBlueprint(e.x,e.y);
+            if(nbp){ bx=nbp.x; by=nbp.y; }
+          }
+          if(bx==null){ e.userOrder=null; }
+          else if(U.dst(e.x,e.y,bx,by)<90){
+            e.walking=false; e.tx=e.x; e.ty=e.y;
+          }else{
+            e.tx=bx; e.ty=by;
+            APH.Res.walkAround(e, {x:bx,y:by}, dt, spdO, navGrid);
           }
           return;
         }

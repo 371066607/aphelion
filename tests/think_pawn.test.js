@@ -68,6 +68,11 @@ test('#168 thinkPawn: 贴床就睡', () => {
   if (i.type !== 'sleep_now') throw new Error('贴床应 sleep_now, 实际: ' + i.type);
 });
 
+test('#169 thinkPawn: 强制建造走指定蓝图坐标', () => {
+  const i = Res.thinkPawn(pawn({ order: { type: 'build', x: 1250, y: 1180 } }), world());
+  if (i.type !== 'build' || i.x !== 1250 || i.y !== 1180) throw new Error('右键蓝图应强制走该坐标, 实际: ' + JSON.stringify(i));
+});
+
 test('#168 thinkPawn: 不饿不困去建造', () => {
   const i = Res.thinkPawn(pawn(), world());
   if (i.type !== 'build') throw new Error('有蓝图应 build, 实际: ' + i.type);
