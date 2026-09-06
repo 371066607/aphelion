@@ -259,6 +259,7 @@ APH.Colony = (function(){
       type:T.BUILDING, bid:bid, x:x, y:y, def:def, lv:lv||1,
       cd:0,
       recipe: rec && rec.recipe,
+      bills: rec && rec.bills,
       crop: rec && rec.crop,
       plot: rec && rec.plot,
       analysisTarget: rec && rec.analysisTarget,
@@ -1669,9 +1670,46 @@ APH.Colony = (function(){
     it_medkit_adv:    { name:'复合急救包', costRes:{ herb:4, it_glow_fluid:2 }, craftTime:10, reqTech:'te_herbal_remedies' },
   };
 
+  function activeBill(bldg){
+    var bills = bldg && bldg.bills;
+    if(!bills || !bills.length) return null;
+    var i, b;
+    for(i=0;i<bills.length;i++){
+      b = bills[i];
+      if(b && (b.done||0) < (b.target||0)) return b;
+    }
+    return null;
+  }
+  function addBill(bldg, recipe, target){
+    if(!bldg) return null;
+    if(!bldg.bills) bldg.bills = [];
+    var bill = {
+      id: 'bi_' + (bldg.bills.length+1) + '_' + (recipe||'x'),
+      recipe: recipe,
+      target: target > 0 ? target : 1,
+      done: 0
+    };
+    bldg.bills.push(bill);
+    return bill;
+  }
+  function finishBillUnit(bldg, count){
+    var bill = activeBill(bldg);
+    if(!bill) return;
+    bill.done = (bill.done||0) + (count||1);
+  }
+  function billGate(bldg){
+    if(!bldg || !Array.isArray(bldg.bills)) return { ok:true };
+    var bill = activeBill(bldg);
+    if(!bill) return { ok:false, why:'无工单' };
+    bldg.recipe = bill.recipe;
+    return { ok:true, bill:bill };
+  }
+
   /* 工坊制作推进(纯函数) (Craft #47) */
   function workshopCraftTick(workshop, crafterSkill, eff, resStock, techOwned, dt){
     if(!workshop || crafterSkill == null) return { done:false };
+    var gate = billGate(workshop);
+    if(!gate.ok) return { done:false, why:gate.why };
     var recipeKey = workshop.recipe || 'it_pickaxe';
     var rec = CRAFT_RECIPES[recipeKey];
     if(!rec) return { done:false, why:'未知配方' };
@@ -1701,6 +1739,7 @@ APH.Colony = (function(){
         }
       }
       workshop.craftProgress = 0;
+      finishBillUnit(workshop, 1);
       return { done:true, producedItemId:recipeKey, count:1 };
     }
     return { done:false, progress:workshop.craftProgress, total:rec.craftTime };
@@ -1774,6 +1813,8 @@ APH.Colony = (function(){
   /* 烹饪制作推进(纯函数) (Cooking #49) */
   function cookingTick(bldg, chefSkill, eff, resStock, techOwned, dt){
     if(!bldg) return { done:false };
+    var gate = billGate(bldg);
+    if(!gate.ok) return { done:false, why:gate.why };
     var bId = bldg.id || bldg.bid;
     var recipeKey = bldg.recipe || ((bId === 'bl_campfire') ? 'it_roasted_meat' : 'it_roasted_meat');
     var rec = COOK_RECIPES[recipeKey];
@@ -1807,6 +1848,7 @@ APH.Colony = (function(){
         deductCookRes(resStock, mat, costRes[mat] || 0);
       }
       bldg.cookProgress = 0;
+      finishBillUnit(bldg, 1);
       return { done:true, producedItemId:recipeKey, count:1 };
     }
     return { done:false, progress:bldg.cookProgress, total:rec.cookTime };
@@ -2051,6 +2093,7 @@ APH.Colony = (function(){
 
     qr.done.forEach(function(d){
       var b = { id: d.bid, x: d.x, y: d.y, lv: 1 };
+      if(d.bid==='bl_kitchen'||d.bid==='bl_workshop'||d.bid==='bl_campfire') b.bills=[];
       if(d.bid === 'bl_wall' && CFG.wall && CFG.wall.hp != null) b.hp = CFG.wall.hp;
       s.colony.buildings.push(b);
 
@@ -2331,6 +2374,7 @@ APH.Colony = (function(){
     cycleAnalyzedCrop:cycleAnalyzedCrop, cycleAnalysisTarget:cycleAnalysisTarget,
     specimenCodexEntries:specimenCodexEntries,
     COOK_RECIPES:COOK_RECIPES, cookingTick:cookingTick,
+    addBill:addBill, activeBill:activeBill,
     equipGear:equipGear, gearBonusOf:gearBonusOf,
     tickConstruction:tickConstruction, tickProduction:tickProduction,
   };

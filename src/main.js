@@ -3921,6 +3921,22 @@ window.APH = window.APH || {};
       '</div>';
     panel.style.display='block';
   }
+  function addBuildingBill(recipe, n){
+    var s=APH.state;
+    if(!s || !s.selectedTarget || s.selectedTarget.type!=='building') return false;
+    var ent=s.selectedTarget.entity||s.selectedTarget;
+    var rec=buildingRecordOf(ent);
+    if(!rec){
+      rec={ id:ent.bid||ent.id, x:ent.x, y:ent.y, lv:ent.lv||1, bills:[] };
+      s.colony.buildings.push(rec);
+    }
+    if(!APH.Colony || !APH.Colony.addBill) return false;
+    APH.Colony.addBill(rec, recipe, n||4);
+    ent.bills=rec.bills;
+    updateInspectorNow();
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('✔ 已加工单','#ffc857');
+    return true;
+  }
   function cycleSchedule(hour){
     var s=APH.state;
     if(!s || !s.meta || !APH.Res) return;
@@ -5447,6 +5463,7 @@ window.APH = window.APH || {};
     doSignTradePact:doSignTradePact,
     doDeterRival:doDeterRival,
     cycleSchedule:cycleSchedule,
+    addBuildingBill:addBuildingBill,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,

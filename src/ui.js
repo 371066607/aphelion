@@ -1658,6 +1658,22 @@ APH.UI = (function(){
     h += '</div>';
     return h;
   }
+  function billsHtml(bldg, bid){
+    var bills = (bldg && bldg.bills) || [];
+    var h = '<div style="margin-top:6px;font-size:9px;color:#8fa3cc;letter-spacing:1px">工单</div>';
+    if(!bills.length) h += '<div style="font-size:10px;color:#5d6f96;margin-top:2px">无工单 · 不会生产</div>';
+    bills.forEach(function(bill){
+      var rec = (window.APH.Colony && ((bid==='bl_workshop'?APH.Colony.CRAFT_RECIPES:APH.Colony.COOK_RECIPES)||{})[bill.recipe]) || {};
+      var nm = rec.name || bill.recipe;
+      var done = bill.done||0, tgt=bill.target||0;
+      var col = done>=tgt ? '#7dffab' : '#ffc857';
+      h += '<div style="font-size:10px;color:#c5e3f6;margin-top:2px">'+nm+' <span style="color:'+col+'">'+done+'/'+tgt+'</span></div>';
+    });
+    var addRecipe = bid==='bl_workshop' ? 'it_pickaxe' : 'it_roasted_meat';
+    var addName = bid==='bl_workshop' ? '采矿斧×4' : '烤肉×4';
+    h += '<button type="button" onclick="window.APH.Main&&APH.Main.addBuildingBill(\''+addRecipe+'\',4)" style="margin-top:4px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">+ '+addName+'</button>';
+    return h;
+  }
   function inspectorHtml(target, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var CFG = (window.APH && window.APH.CFG) || {};
@@ -1745,15 +1761,24 @@ APH.UI = (function(){
     if(target.type === 'building'){
       /* 4. 建筑 */
       var be = target.entity || target;
-      var bName = (CFG.buildings && CFG.buildings[be.bid||be.id] && CFG.buildings[be.bid||be.id].name) || be.bid || be.id || '建筑';
+      var bid = be.bid || be.id;
+      var bName = (CFG.buildings && CFG.buildings[bid] && CFG.buildings[bid].name) || bid || '建筑';
       var lv = be.lv || 1;
-      return '<div style="display:flex;align-items:center;gap:8px">' +
+      var rec = null;
+      ((s.colony && s.colony.buildings) || []).forEach(function(b){
+        if(b && b.id===bid && Math.abs((b.x||0)-(be.x||0))<2 && Math.abs((b.y||0)-(be.y||0))<2) rec=b;
+      });
+      var h = '<div style="display:flex;align-items:center;gap:8px">' +
         '<div style="font-size:20px;width:30px;text-align:center">🏛️</div>' +
         '<div style="flex:1">' +
           '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + bName + ' <span style="color:#ffc857;font-size:10px">Lv.' + lv + '</span></div>' +
           '<div style="color:#7dffab;font-size:10px">运转正常</div>' +
         '</div>' +
       '</div>';
+      if(bid==='bl_kitchen'||bid==='bl_campfire'||bid==='bl_workshop'){
+        h += billsHtml(rec || be, bid);
+      }
+      return h;
     }
 
     if(target.type === 'dropped'){
