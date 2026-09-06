@@ -1026,24 +1026,87 @@ APH.Colony = (function(){
     return res;
   }
 
-  function findBestStorageSpot(itemId, buildings, rooms, fromPos){
+  function cellsFromBox(x0, y0, x1, y1){
+    var g = CFG.GRID || 48;
+    var minX = Math.round(Math.min(x0, x1) / g) * g;
+    var maxX = Math.round(Math.max(x0, x1) / g) * g;
+    var minY = Math.round(Math.min(y0, y1) / g) * g;
+    var maxY = Math.round(Math.max(y0, y1) / g) * g;
+    var cells = [], x, y;
+    for(x = minX; x <= maxX; x += g){
+      for(y = minY; y <= maxY; y += g){
+        cells.push({ x: x, y: y });
+      }
+    }
+    if(!cells.length) cells.push({ x: minX, y: minY });
+    return cells;
+  }
+  function addStockpileZone(zones, cells, opts){
+    zones = (zones || []).slice();
+    var z = {
+      id: 'zn_stock_' + (zones.length + 1),
+      type: 'stockpile',
+      cells: cells || [],
+      filter: (opts && opts.filter) || 'all',
+      forbid: (opts && opts.forbid) ? opts.forbid.slice() : []
+    };
+    zones.push(z);
+    return { zones: zones, zone: z };
+  }
+  function zoneAllowsItem(zone, itemId){
+    if(!zone) return false;
+    var forbids = zone.forbid || [];
+    var i, f;
+    for(i = 0; i < forbids.length; i++){
+      f = forbids[i];
+      if(!f || f === 'all') continue;
+      if(storageFilterMatches(f, itemId)) return false;
+    }
+    return storageFilterMatches(zone.filter, itemId);
+  }
+  function eraseZoneCells(zones, cells){
+    var drop = {};
+    (cells || []).forEach(function(c){ drop[c.x + ',' + c.y] = 1; });
+    return (zones || []).map(function(z){
+      var kept = (z.cells || []).filter(function(c){ return !drop[c.x + ',' + c.y]; });
+      return Object.assign({}, z, { cells: kept });
+    }).filter(function(z){ return z.cells && z.cells.length; });
+  }
+  function findBestStorageSpot(itemId, buildings, rooms, fromPos, zones){
     var bList = buildings || [];
     var best = null, bestDist = 1e9;
+    var zi, z, ci, cell, d;
+    var zList = zones || [];
+    for(zi = 0; zi < zList.length; zi++){
+      z = zList[zi];
+      if(!z || z.type !== 'stockpile') continue;
+      if(!zoneAllowsItem(z, itemId)) continue;
+      for(ci = 0; ci < (z.cells || []).length; ci++){
+        cell = z.cells[ci];
+        if(!cell) continue;
+        d = fromPos ? U.dst(fromPos.x, fromPos.y, cell.x, cell.y) : 0;
+        if(d < bestDist){
+          bestDist = d;
+          best = { x: cell.x, y: cell.y, zone: z, container: null };
+        }
+      }
+    }
+    if(best) return best;
 
     for(var i = 0; i < bList.length; i++){
       var b = bList[i];
       if(!b || (b.id !== 'bl_storage_shelf' && b.id !== 'bl_warehouse')) continue;
       if(storageFilterMatches(b.filter, itemId)){
-        var d = fromPos ? U.dst(fromPos.x, fromPos.y, b.x, b.y) : 0;
+        d = fromPos ? U.dst(fromPos.x, fromPos.y, b.x, b.y) : 0;
         if(d < bestDist){
           bestDist = d;
-          best = b;
+          best = { x: b.x, y: b.y, container: b };
         }
       }
     }
 
     if(best){
-      return { x: best.x, y: best.y, container: best };
+      return { x: best.x, y: best.y, container: best.container || best };
     }
     var fallback = stockpileSpot(bList);
     return { x: fallback.x, y: fallback.y, container: null };
@@ -2355,6 +2418,8 @@ APH.Colony = (function(){
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
+    cellsFromBox:cellsFromBox, addStockpileZone:addStockpileZone,
+    zoneAllowsItem:zoneAllowsItem, eraseZoneCells:eraseZoneCells,
     findNearbySourcedItem:findNearbySourcedItem,
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     floraRespawnTick:floraRespawnTick,

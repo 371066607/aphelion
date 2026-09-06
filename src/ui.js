@@ -1279,6 +1279,7 @@ APH.UI = (function(){
       { id: 'mine', name: '开采', icon: '⛏', title: '单点或拉框圈选岩石与矿脉进行开采' },
       { id: 'haul', name: '搬运', icon: '✋', title: '单点或拉框圈选掉落物资进行优先搬运' },
       { id: 'deconstruct', name: '拆除', icon: '🔨', title: '单点或圈选建筑进行拆除退还材料' },
+      { id: 'stockpile', name: '仓储', icon: '📦', title: '拉框划仓储区，搬运会优先送入' },
       { id: 'cancel', name: '取消', icon: '✕', title: '单点或拉框清除区域内的规划标记', cancel: true },
     ];
     var h = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">';
@@ -1781,6 +1782,19 @@ APH.UI = (function(){
       return h;
     }
 
+    if(target.type === 'zone'){
+      var z = target.zone || target;
+      var n = (z.cells||[]).length;
+      var filt = z.filter || 'all';
+      var filtName = filt==='all'?'全部允许':filt;
+      var forbids = z.forbid || [];
+      var h = '<div style="color:#ffc857;font-weight:700;font-size:12px">📦 仓储区 · '+n+' 格</div>';
+      h += '<div style="font-size:10px;color:#8fa3cc;margin-top:4px">过滤: '+filtName+'</div>';
+      h += '<div style="font-size:10px;color:#ff9a9a;margin-top:2px">禁止: '+(forbids.length?forbids.join(','):'无')+'</div>';
+      h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleZoneFilter()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">循环过滤</button> ';
+      h += '<button type="button" onclick="window.APH.Main&&APH.Main.toggleZoneForbid(\'food\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(255,154,154,.45);background:rgba(255,80,80,.12);color:#ffd0d0;cursor:pointer">禁止口粮</button>';
+      return h;
+    }
     if(target.type === 'dropped'){
       /* 5. 掉落物 */
       var de = target.entity || target;

@@ -620,7 +620,7 @@ window.APH = window.APH || {};
     var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
     var storage=null;
     if(haulCarry && haulCarry.itemId && APH.Colony.findBestStorageSpot){
-      storage=APH.Colony.findBestStorageSpot(haulCarry.itemId, s.colony&&s.colony.buildings, rooms, {x:x,y:y});
+      storage=APH.Colony.findBestStorageSpot(haulCarry.itemId, s.colony&&s.colony.buildings, rooms, {x:x,y:y}, s.colony&&s.colony.zones);
     } else if(APH.Colony.stockpileSpot){
       storage=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
     }
@@ -1699,6 +1699,7 @@ window.APH = window.APH || {};
         drawSelectedRing(s.clock);
         drawDesignations(s.clock);
         drawPlacementGhost();
+        drawZones();
         drawOrderDragBox();
         drawPawnDragBox();
         drawTutorialArrow(s.clock);
@@ -1728,6 +1729,7 @@ window.APH = window.APH || {};
       drawSelectedRing(s.clock);
       drawDesignations(s.clock);
       drawPlacementGhost();
+      drawZones();
       drawOrderDragBox();
       drawPawnDragBox();
       drawTutorialArrow(s.clock);
@@ -1866,6 +1868,32 @@ window.APH = window.APH || {};
   }
 
   /* ADR-28 / Ticket #157: 规划标记悬浮徽章与框选选框渲染 */
+  function drawZones(){
+    var s=APH.state;
+    if(!s || s.scene!=='home') return;
+    var zones=s.colony && s.colony.zones;
+    if(!zones || !zones.length) return;
+    var cv2=document.getElementById('cv');
+    if(!cv2 || !cv2.getContext) return;
+    var ctx2=cv2.getContext('2d');
+    if(!ctx2) return;
+    var g=CFG.GRID||48;
+    var sel = s.selectedTarget && s.selectedTarget.type==='zone' && s.selectedTarget.zone;
+    zones.forEach(function(z){
+      if(!z || z.type!=='stockpile') return;
+      var col = (sel && sel.id===z.id) ? 'rgba(255,200,87,0.28)' : 'rgba(255,200,87,0.14)';
+      var stroke = (sel && sel.id===z.id) ? '#ffc857' : 'rgba(255,200,87,0.55)';
+      (z.cells||[]).forEach(function(c){
+        var sx=c.x - s.camX + vpW()/2;
+        var sy=c.y - s.camY + vpH()/2;
+        ctx2.fillStyle=col;
+        ctx2.fillRect(sx-g/2, sy-g/2, g, g);
+        ctx2.strokeStyle=stroke;
+        ctx2.lineWidth=1;
+        ctx2.strokeRect(sx-g/2+0.5, sy-g/2+0.5, g-1, g-1);
+      });
+    });
+  }
   function drawPlacementGhost(){
     var s = APH.state;
     if(!s || s.scene!=='home' || !s.buildMode) return;
@@ -3138,6 +3166,22 @@ window.APH = window.APH || {};
         var s0 = APH.state;
         s0.designations = s0.designations || {};
         var tool = s0.orderTool;
+        if(tool==='stockpile' || (tool==='cancel' && APH.Colony.eraseZoneCells)){
+          s0.colony.zones = s0.colony.zones || [];
+          var zCells = APH.Colony.cellsFromBox(orderFrom.x, orderFrom.y, orderTo.x, orderTo.y);
+          if(tool==='stockpile'){
+            var added = APH.Colony.addStockpileZone(s0.colony.zones, zCells);
+            s0.colony.zones = added.zones;
+            s0.selectedTarget = { type:'zone', zone: added.zone };
+            APH.UI.floatText('✔ 仓储区 '+zCells.length+' 格', '#ffc857');
+          } else {
+            s0.colony.zones = APH.Colony.eraseZoneCells(s0.colony.zones, zCells);
+            APH.UI.floatText('✔ 已擦除划区', '#ff9a9a');
+          }
+          saveColony();
+          updateInspectorNow();
+          return;
+        }
         var dDist = Math.abs(orderTo.x - orderFrom.x) + Math.abs(orderTo.y - orderFrom.y);
         var changed = 0;
         if(dDist < 14){
@@ -3230,7 +3274,23 @@ window.APH = window.APH || {};
             return;
           }
 
-          /* 7. 点击空旷地面 → 选中地形，检查器展示地表属性 (未征召绝不移动主角) */
+          /* 7. 仓储划区 */
+          var hitZone=null;
+          var zg=CFG.GRID||48;
+          var zx=Math.round(t.x/zg)*zg, zy=Math.round(t.y/zg)*zg;
+          ((s.colony && s.colony.zones)||[]).forEach(function(z){
+            if(hitZone || !z || z.type!=='stockpile') return;
+            (z.cells||[]).forEach(function(c){
+              if(c.x===zx && c.y===zy) hitZone=z;
+            });
+          });
+          if(hitZone){
+            s.selectedTarget = { type:'zone', zone: hitZone };
+            updateInspectorNow();
+            return;
+          }
+
+          /* 8. 点击空旷地面 → 选中地形，检查器展示地表属性 (未征召绝不移动主角) */
           s.selectedTarget = { type: 'terrain', x: t.x, y: t.y };
           updateInspectorNow();
           return;
@@ -3921,6 +3981,27 @@ window.APH = window.APH || {};
       '</div>';
     panel.style.display='block';
   }
+  function selectedZone(){
+    var t=APH.state.selectedTarget;
+    return (t && t.type==='zone' && t.zone) ? t.zone : null;
+  }
+  function cycleZoneFilter(){
+    var z=selectedZone();
+    if(!z || !APH.Colony.cycleStorageFilter) return;
+    var next=APH.Colony.cycleStorageFilter(z);
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('仓储过滤 → '+(next&&next.name||z.filter), '#ffc857');
+    updateInspectorNow(); saveColony();
+  }
+  function toggleZoneForbid(cat){
+    var z=selectedZone();
+    if(!z) return;
+    z.forbid = z.forbid || [];
+    var i=z.forbid.indexOf(cat);
+    if(i>=0) z.forbid.splice(i,1);
+    else z.forbid.push(cat);
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText(i>=0?'允许 '+cat:'禁止 '+cat, '#ff9a9a');
+    updateInspectorNow(); saveColony();
+  }
   function addBuildingBill(recipe, n){
     var s=APH.state;
     if(!s || !s.selectedTarget || s.selectedTarget.type!=='building') return false;
@@ -4080,7 +4161,7 @@ window.APH = window.APH || {};
       var carryPiles = Array.isArray(e.haulCarry) ? e.haulCarry : [e.haulCarry];
       var firstItem = carryPiles[0];
       if(firstItem && firstItem.itemId){
-        var targetSpot = (APH.Colony && APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(firstItem.itemId, s.colony && s.colony.buildings, rooms, e) : stock;
+        var targetSpot = (APH.Colony && APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(firstItem.itemId, s.colony && s.colony.buildings, rooms, e, s.colony && s.colony.zones) : stock;
         e.tx = targetSpot.x; e.ty = targetSpot.y;
         if(U.dst(e.x, e.y, targetSpot.x, targetSpot.y) < dumpR){
           carryPiles.forEach(function(cp){
@@ -4333,7 +4414,7 @@ window.APH = window.APH || {};
             return;
           }
           /* 已抓取 → 送最近兼容仓储点入库 (同 doHaul 逻辑) */
-          var uSpot=(APH.Colony.findBestStorageSpot)?APH.Colony.findBestStorageSpot(e.haulCarry.itemId, s.colony&&s.colony.buildings, rooms, e):stock;
+          var uSpot=(APH.Colony.findBestStorageSpot)?APH.Colony.findBestStorageSpot(e.haulCarry.itemId, s.colony&&s.colony.buildings, rooms, e, s.colony&&s.colony.zones):stock;
           if(U.dst(e.x,e.y,uSpot.x,uSpot.y)<=dumpR){
             APH.Colony.collectHome(s.meta, e.haulCarry.itemId, e.haulCarry.n||1);
             var uhName=(CFG.items[e.haulCarry.itemId]&&CFG.items[e.haulCarry.itemId].name)||e.haulCarry.itemId;
@@ -5226,7 +5307,7 @@ window.APH = window.APH || {};
         var s = APH.state;
         s.orderTool = (s.orderTool === toolId) ? null : toolId;
         if(s.orderTool){
-          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', cancel:'✕ 取消' };
+          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', cancel:'✕ 取消' };
           APH.UI.setHint('[' + (toolNames[s.orderTool]||s.orderTool) + ' 模式] 鼠标在地图上单点或拉框圈选 · 右键/Esc 退出');
         } else {
           APH.UI.setHint('');
@@ -5464,6 +5545,8 @@ window.APH = window.APH || {};
     doDeterRival:doDeterRival,
     cycleSchedule:cycleSchedule,
     addBuildingBill:addBuildingBill,
+    cycleZoneFilter:cycleZoneFilter,
+    toggleZoneForbid:toggleZoneForbid,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,
