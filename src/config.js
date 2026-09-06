@@ -29,6 +29,13 @@ APH.CFG = {
     prio: { raid: 100, downed: 90, no_food: 80, hungry: 70, sleepy: 60, missing: 50 }
   },
 
+  /* 作息表 (#170): 24 格; 本世界 clock0=白天, 12–23=夜 */
+  schedule: {
+    hours: 24,
+    restStayInBed: 95,         // 睡眠格精力低于此才强制去睡，避免睡饱循环
+    kinds: ['work', 'joy', 'sleep', 'any']
+  },
+
   /* 土壤肥力体系 (RimWorld 农业) */
   soil: {
     rich: 1.40,                // 沃土(湖畔/沼泽)

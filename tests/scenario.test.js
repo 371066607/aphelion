@@ -3231,6 +3231,7 @@ function commanderSoloSetup(){
   S.keys={}; S.target=null; S.joy=null;
   S.designations={};
   S.playerOrder=null; S.haulCarry=null;
+  S.meta.playerSchedule = Array(24).fill('any');
   S.colony.buildQueue=[];
   S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id==='bl_landing_pad');
   if(!S.colony.buildings.length) S.colony.buildings.push({ id:'bl_landing_pad', x:1100, y:1340 });
@@ -3469,6 +3470,17 @@ test('#169 right_click: 征召态右键地面是战术移动不是建造', () =>
   M.cmd.rightClick(gx, gy);
   A(!S.playerOrder || S.playerOrder.type!=='build', '征召点地不应下建造令');
   A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应战术移动到点击处');
+});
+
+test('#170 schedule: 检查器循环作息格', () => {
+  commanderSoloSetup();
+  S.meta.playerSchedule = APH.Res.defaultSchedule();
+  S.selectedTarget = { type:'player' };
+  A(typeof M.cycleSchedule === 'function', '应导出 cycleSchedule');
+  const h = 3;
+  const before = S.meta.playerSchedule[h];
+  M.cycleSchedule(h);
+  A(S.meta.playerSchedule[h] === APH.Res.cycleScheduleSlot(before), '点击应循环该格');
 });
 
 test('#169 right_click: 发射台右键仍是出航', () => {

@@ -24,6 +24,41 @@ APH.Res = (function(){
   var LAST=['·一号','·二号','·三号','·四号','·五号','·六号','·七号','·八号'];
   var ORIGINS=['地球难民船','第一代殖民者','轨道站出生','冷冻舱幸存者','游商后代','本地出生'];
 
+  var SCHED_KINDS = ['work', 'joy', 'sleep', 'any'];
+  function defaultSchedule(){
+    var out=[], h;
+    for(h=0;h<24;h++){
+      if(h>=12 && h<=23) out.push('sleep');
+      else if(h===11) out.push('joy');
+      else out.push('work');
+    }
+    return out;
+  }
+  function ensureSchedule(sch){
+    if(!sch || !sch.length) return defaultSchedule();
+    var out=[], i, v;
+    for(i=0;i<24;i++){
+      v = sch[i];
+      out.push(SCHED_KINDS.indexOf(v)>=0 ? v : (defaultSchedule()[i]));
+    }
+    return out;
+  }
+  function hourOfDay(clock, dayLen){
+    dayLen = dayLen != null ? dayLen : (CFG.DAY_LEN || 3600);
+    var t = ((clock % dayLen) + dayLen) % dayLen;
+    return Math.floor(t / dayLen * 24) % 24;
+  }
+  function cycleScheduleSlot(kind){
+    var i = SCHED_KINDS.indexOf(kind);
+    if(i<0) i=0;
+    return SCHED_KINDS[(i+1)%SCHED_KINDS.length];
+  }
+  function scheduleAt(sch, hour){
+    sch = ensureSchedule(sch);
+    hour = ((hour % 24) + 24) % 24;
+    return sch[hour] || 'any';
+  }
+
   /* ---------- U1: 居民生成(纯函数) ----------
      每人: 一个主技能(高) + 一个副技能(中) + 其余低;
      心情/饱食度初始健康。 */
@@ -68,6 +103,7 @@ APH.Res = (function(){
       bleedOutTimer:null,                                    // 濒死失血倒计时 (s)
       rescuedBy:null,                                        // 救援人 ID
       job:null,                                              // 指派岗位 bl_xxx|null
+      schedule: defaultSchedule(),
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
     };
@@ -176,6 +212,7 @@ APH.Res = (function(){
     /* P1b 玩家暴露: 老档零迁移 (缺失=0 起步; 晴天恒 0 由 tick 消退维持) */
     if(meta.playerNeeds.exposure == null) meta.playerNeeds.exposure = 0;
     if(meta.playerNeeds.recreation == null) meta.playerNeeds.recreation = 80;
+    meta.playerSchedule = ensureSchedule(meta.playerSchedule);
     return meta;
   }
 
@@ -1782,6 +1819,10 @@ APH.Res = (function(){
       return { type:'gather', x:order.flora.x, y:order.flora.y, flora:order.flora, force:true };
     }
 
+    var slot = 'any';
+    if(pawn.schedule && world.hour != null) slot = scheduleAt(pawn.schedule, world.hour);
+    var restStay = (CFG.schedule && CFG.schedule.restStayInBed != null) ? CFG.schedule.restStayInBed : 95;
+
     var hungry = (pawn.food != null && pawn.food < eatBelow) || ot === 'eat';
     if(hungry){
       if(pawn.nearFood) return { type:'eat_now' };
@@ -1791,7 +1832,8 @@ APH.Res = (function(){
 
     var sleepy = ot === 'sleep' || !!pawn.wantSleep ||
       (pawn.rest != null && pawn.rest < restSleepAt) ||
-      (!!world.night && pawn.rest != null && pawn.rest < restNightAt);
+      (!!world.night && pawn.rest != null && pawn.rest < restNightAt) ||
+      (slot === 'sleep' && pawn.rest != null && pawn.rest < restStay);
     if(sleepy){
       if(pawn.nearBed) return { type:'sleep_now', bed:true };
       if(world.house) return { type:'sleep', x:world.house.x, y:(world.house.y||0)+18 };
@@ -1816,12 +1858,17 @@ APH.Res = (function(){
       }
     }
 
+    var recNow = pawn.recreation != null ? pawn.recreation : 80;
+    if(slot === 'joy' && recNow < 95 && world.joy){
+      return { type:'joy', x:world.joy.x, y:(world.joy.y||0)+12 };
+    }
+
     if(prio.sk_gather > 0 && world.flora){
       return { type:'gather', x:world.flora.x, y:world.flora.y, flora:world.flora };
     }
     if(pawn.gathering) return { type:'none' };
 
-    if((pawn.recreation != null ? pawn.recreation : 80) < joyAt && world.joy){
+    if(slot !== 'work' && recNow < joyAt && world.joy){
       return { type:'joy', x:world.joy.x, y:(world.joy.y||0)+12 };
     }
     return { type:'idle' };
@@ -1871,5 +1918,7 @@ APH.Res = (function(){
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,
     thinkPawn:thinkPawn,
+    defaultSchedule:defaultSchedule, ensureSchedule:ensureSchedule,
+    hourOfDay:hourOfDay, cycleScheduleSlot:cycleScheduleSlot, scheduleAt:scheduleAt,
   };
 })();

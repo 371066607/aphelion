@@ -1604,6 +1604,23 @@ APH.UI = (function(){
   }
 
   /* ================= ADR-28 / Ticket #156: 通用检查器 (Inspector) ================= */
+  function scheduleRowHtml(sch, s){
+    var Res = window.APH.Res;
+    sch = (Res && Res.ensureSchedule) ? Res.ensureSchedule(sch) : (sch || []);
+    var hourNow = (Res && Res.hourOfDay) ? Res.hourOfDay((s && s.clock) || 0, (window.APH.CFG && APH.CFG.DAY_LEN) || 3600) : 0;
+    var col = { work:'#ffc857', joy:'#7dffab', sleep:'#b39dff', any:'#6a7a94' };
+    var lab = { work:'工', joy:'乐', sleep:'睡', any:'任' };
+    var h = '<div style="margin-top:6px;font-size:9px;color:#8fa3cc;letter-spacing:1px">作息</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;max-width:220px">';
+    var i, k, ring;
+    for(i=0;i<24;i++){
+      k = sch[i] || 'any';
+      ring = (i===hourNow) ? 'outline:1px solid #fff;' : '';
+      h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleSchedule('+i+')" title="'+i+'时 '+k+'" style="width:16px;height:16px;padding:0;font-size:8px;line-height:16px;border:none;border-radius:3px;cursor:pointer;background:'+(col[k]||'#6a7a94')+';color:#0b0f14;'+ring+'">'+ (lab[k]||'·') +'</button>';
+    }
+    h += '</div>';
+    return h;
+  }
   function inspectorHtml(target, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var CFG = (window.APH && window.APH.CFG) || {};
@@ -1632,6 +1649,7 @@ APH.UI = (function(){
         '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
         '<div><span style="color:#8fa3cc">氧气 </span><b style="color:#c5e3f6">' + o2 + '</b></div>' +
       '</div>';
+      h += scheduleRowHtml(m.playerSchedule, s);
       return h;
     }
 
@@ -1661,6 +1679,7 @@ APH.UI = (function(){
         '<div><span style="color:#8fa3cc">饱食 </span><b style="color:#7dffab">' + food + '</b></div>' +
         '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
       '</div>';
+      h += scheduleRowHtml(r && r.schedule, s);
       return h;
     }
 

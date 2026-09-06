@@ -631,6 +631,7 @@ window.APH = window.APH || {};
       restSleepAt: (CFG.player&&CFG.player.restSleepAt!=null)?CFG.player.restSleepAt:20,
       restNightAt: (CFG.player&&CFG.player.restNightAt!=null)?CFG.player.restNightAt:75,
       joyAt: (CFG.residents&&CFG.residents.recreationJoyAt!=null)?CFG.residents.recreationJoyAt:30,
+      hour: (APH.Res && APH.Res.hourOfDay) ? APH.Res.hourOfDay(s.clock||0, CFG.DAY_LEN) : 0,
       meal: nearestMeal({x:x,y:y}, 1e9),
       house: house,
       blueprint: nearestBlueprint(x,y),
@@ -656,6 +657,7 @@ window.APH = window.APH || {};
         sk_haul: prio.sk_haul!=null?prio.sk_haul:2
       },
       order: s.playerOrder,
+      schedule: (s.meta && s.meta.playerSchedule) || null,
       haulCarry: s.haulCarry,
       nearFood: !!s.nearFood,
       nearBed: !!s.nearBed,
@@ -3919,6 +3921,25 @@ window.APH = window.APH || {};
       '</div>';
     panel.style.display='block';
   }
+  function cycleSchedule(hour){
+    var s=APH.state;
+    if(!s || !s.meta || !APH.Res) return;
+    hour = hour|0;
+    if(hour<0 || hour>23) return;
+    var tgt=s.selectedTarget;
+    if(!tgt || tgt.type==='player'){
+      s.meta.playerSchedule=APH.Res.ensureSchedule(s.meta.playerSchedule);
+      s.meta.playerSchedule[hour]=APH.Res.cycleScheduleSlot(s.meta.playerSchedule[hour]);
+    }else if(tgt.type==='resident'){
+      var ent=tgt.entity||tgt;
+      var rid=ent.rid||ent.id;
+      var r=(s.meta.residents||[]).filter(function(x){ return x.id===rid; })[0];
+      if(!r) return;
+      r.schedule=APH.Res.ensureSchedule(r.schedule);
+      r.schedule[hour]=APH.Res.cycleScheduleSlot(r.schedule[hour]);
+    }
+    updateInspectorNow();
+  }
   function updateInspectorNow(){
     var insp=document.getElementById('inspector');
     var s=APH.state;
@@ -4373,6 +4394,7 @@ window.APH = window.APH || {};
         var rpawn={
           id:r.id, x:e.x, y:e.y, drafted:!!e.drafted,
           food:r.food, rest:r.rest, recreation:r.recreation,
+          schedule: r.schedule,
           wantSleep:!!r.wantSleep, isSleeping:!!r.isSleeping, downed:!!r.downed, medLying:!!r.medLying,
           prio:{
             sk_gather: wp.sk_gather!=null?wp.sk_gather:2,
@@ -5424,6 +5446,7 @@ window.APH = window.APH || {};
     doSendTribute:doSendTribute,
     doSignTradePact:doSignTradePact,
     doDeterRival:doDeterRival,
+    cycleSchedule:cycleSchedule,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,
