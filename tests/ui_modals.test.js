@@ -198,6 +198,8 @@ const playerHtml = UI.inspectorHtml({ type: 'player' }, mockState);
 assert('指挥官检查器含标题', playerHtml.indexOf('⭐ 指挥官(你)') !== -1);
 assert('指挥官检查器含生命', playerHtml.indexOf('85') !== -1);
 assert('指挥官检查器含饱食', playerHtml.indexOf('75') !== -1);
+assert('指挥官检查器含娱乐条', playerHtml.indexOf('娱乐') !== -1);
+assert('指挥官需求是进度条', playerHtml.indexOf('width:') !== -1);
 
 // 2) 居民检查器
 const resHtml = UI.inspectorHtml({
@@ -206,6 +208,7 @@ const resHtml = UI.inspectorHtml({
 }, mockState);
 assert('居民检查器含姓名', resHtml.indexOf('阿尔法') !== -1);
 assert('居民检查器含特质', resHtml.indexOf('勤勉') !== -1);
+assert('居民检查器含娱乐条', resHtml.indexOf('娱乐') !== -1);
 
 // 3) 自然实体/树木检查器
 const floraHtml = UI.inspectorHtml({

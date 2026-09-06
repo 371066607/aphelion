@@ -1309,6 +1309,13 @@ APH.UI = (function(){
     return m >= 75 ? '😊' : (m >= 50 ? '😐' : (m >= 30 ? '😟' : '😫'));
   }
 
+  function needBarsHtml(food, rest, rec){
+    return '<div style="margin-top:6px;font-size:10px">' +
+      '<div style="margin-top:3px;color:#8fa3cc">饱食 ' + foodBar(food) + '</div>' +
+      '<div style="margin-top:3px;color:#8fa3cc">精力 ' + foodBar(rest) + '</div>' +
+      '<div style="margin-top:3px;color:#8fa3cc">娱乐 ' + foodBar(rec) + '</div>' +
+    '</div>';
+  }
   function foodBar(f){
     var col = f >= 60 ? '#7dffab' : (f >= 35 ? '#ffc857' : '#ff6d7a');
     return '<span style="display:inline-block;width:70px;height:7px;background:#1a2334;' +
@@ -1673,12 +1680,12 @@ APH.UI = (function(){
         '</div>' +
       '</div>';
 
+      var rec = Math.round(needs.recreation != null ? needs.recreation : 80);
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:10px">' +
         '<div><span style="color:#8fa3cc">生命 </span><b style="color:#7dffab">' + hp + '</b></div>' +
-        '<div><span style="color:#8fa3cc">饱食 </span><b style="color:#ffc857">' + food + '</b></div>' +
-        '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
         '<div><span style="color:#8fa3cc">氧气 </span><b style="color:#c5e3f6">' + o2 + '</b></div>' +
       '</div>';
+      h += needBarsHtml(food, rest, rec);
       h += scheduleRowHtml(m.playerSchedule, s);
       h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
       return h;
@@ -1695,6 +1702,7 @@ APH.UI = (function(){
       var mood = Math.round((r && r.mood != null) ? r.mood : (ent.mood || 80));
       var food = Math.round((r && r.food != null) ? r.food : (ent.food || 80));
       var rest = Math.round((r && r.rest != null) ? r.rest : (ent.rest || 80));
+      var rec = Math.round((r && r.recreation != null) ? r.recreation : (ent.recreation != null ? ent.recreation : 80));
       var action = ent.userOrder ? (ent.userOrder.type === 'move' ? '战术行军中' : (ent.userOrder.type === 'gather' ? '执行开采指令' : '执行搬运指令')) : (ent.drafted ? '战备戒备中' : (ent.gathering ? '正在采集中' : (ent.walking ? (ent.job ? '工位巡视劳作' : '基地漫步闲逛') : (ent.job ? '工位作业中' : '休闲散步中'))));
 
       var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
@@ -1705,11 +1713,8 @@ APH.UI = (function(){
         '</div>' +
       '</div>';
 
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 4px;font-size:10px">' +
-        '<div><span style="color:#8fa3cc">心情 </span><b style="color:#ffd54f">' + mood + '%</b></div>' +
-        '<div><span style="color:#8fa3cc">饱食 </span><b style="color:#7dffab">' + food + '</b></div>' +
-        '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
-      '</div>';
+      h += '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">心情 <b style="color:#ffd54f">' + mood + '%</b></div>';
+      h += needBarsHtml(food, rest, rec);
       h += scheduleRowHtml(r && r.schedule, s);
       h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
       return h;
