@@ -1315,12 +1315,35 @@ APH.UI = (function(){
     return m >= 75 ? '😊' : (m >= 50 ? '😐' : (m >= 30 ? '😟' : '😫'));
   }
 
-  function needBarsHtml(food, rest, rec){
-    return '<div style="margin-top:6px;font-size:10px">' +
-      '<div style="margin-top:3px;color:#8fa3cc">饱食 ' + foodBar(food) + '</div>' +
-      '<div style="margin-top:3px;color:#8fa3cc">精力 ' + foodBar(rest) + '</div>' +
-      '<div style="margin-top:3px;color:#8fa3cc">娱乐 ' + foodBar(rec) + '</div>' +
-    '</div>';
+  function inspNeedRow(lab, val, colHi){
+    val = Math.max(0, Math.min(100, val || 0));
+    var col = val >= 60 ? (colHi || '#6bcf8e') : (val >= 35 ? '#d4a84a' : '#d06060');
+    return '<div class="insp-need"><span class="insp-need-lab">' + lab + '</span>' +
+      '<div class="insp-need-track"><div class="insp-need-fill" style="width:' + val + '%;background:' + col + '"></div></div>' +
+      '<span class="insp-need-val">' + Math.round(val) + '</span></div>';
+  }
+  function needBarsHtml(food, rest, rec, mood){
+    var h = '<div style="padding:4px 10px 6px;border-top:1px solid #3a3428">';
+    h += inspNeedRow('饱食', food, '#6bcf8e');
+    h += inspNeedRow('精力', rest, '#59a8d9');
+    h += inspNeedRow('娱乐', rec, '#b48ae0');
+    if(mood != null) h += inspNeedRow('心情', mood, '#e8c84a');
+    return h + '</div>';
+  }
+  function inspTabsHtml(tab, keys){
+    tab = tab || 'needs';
+    var h = '<div class="insp-tabs">';
+    keys.forEach(function(k){
+      h += '<div class="insp-tab' + (tab===k.id ? ' on' : '') + '" onclick="window.APH.Main&&APH.Main.setInspTab(\'' + k.id + '\')">' + k.name + '</div>';
+    });
+    return h + '</div>';
+  }
+  function inspHead(face, name, sub, subCol, cmds){
+    return '<div class="insp-top"><div class="insp-port">' + face + '</div><div class="insp-id">' +
+      '<div class="insp-name">' + name + '</div>' +
+      '<div class="insp-sub" style="color:' + (subCol||'#b8a888') + '">' + sub + '</div>' +
+      (cmds ? '<div class="insp-cmds">' + cmds + '</div>' : '') +
+      '</div></div>';
   }
   function foodBar(f){
     var col = f >= 60 ? '#7dffab' : (f >= 35 ? '#ffc857' : '#ff6d7a');
@@ -1697,29 +1720,30 @@ APH.UI = (function(){
       var statusTxt = needs.downed ? '昏迷击倒' : (needs.isSleeping ? '睡眠休息中' : (s.moving ? '行进中' : '清醒 · 待命'));
       var statusCol = needs.downed ? '#ff4d4d' : (needs.isSleeping ? '#b39dff' : '#7dffab');
 
-      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-        '<div style="font-size:22px;width:30px;text-align:center">🧑‍🚀</div>' +
-        '<div style="flex:1">' +
-          '<div style="color:#59d9ff;font-weight:800;font-size:12px;letter-spacing:1px">⭐ 指挥官(你)</div>' +
-          '<div style="color:' + statusCol + ';font-size:10px">' + statusTxt + '</div>' +
-        '</div>' +
-      '</div>';
-
       var rec = Math.round(needs.recreation != null ? needs.recreation : 80);
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:10px">' +
-        '<div><span style="color:#8fa3cc">生命 </span><b style="color:#7dffab">' + hp + '</b></div>' +
-        '<div><span style="color:#8fa3cc">氧气 </span><b style="color:#c5e3f6">' + o2 + '</b></div>' +
-      '</div>';
+      var tab = s.inspTab || 'needs';
+      var cmds = '<button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.togglePlayerDraft()">'+(s.playerDrafted?'解除征召':'征召')+'</button>';
+      var h = inspHead('🧑‍🚀', '⭐ 指挥官(你)', statusTxt + ' · 生命 '+hp+' · 氧 '+o2, statusCol, cmds);
       h += needBarsHtml(food, rest, rec);
-      h += scheduleRowHtml(m.playerSchedule, s);
-      h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
+      h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
+      h += '<div class="insp-body">';
+      if(tab==='thoughts'){
+        h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
+      } else if(tab==='health'){
+        h += '<div>生命 '+hp+' / 氧 '+o2+(needs.illness?' · 病情 '+Math.round(needs.illness):'')+'</div>';
+      } else if(tab==='sched'){
+        h += scheduleRowHtml(m.playerSchedule, s);
+      } else {
+        h += '<div style="color:#9a8c70">选中自己 · 空格暂停 · 未征召时自治过日子</div>';
+      }
       if((m.prisoners||[]).length){
-        h += '<div style="margin-top:6px;font-size:9px;color:#8fa3cc">囚犯（非奴隶）</div>';
+        h += '<div style="margin-top:6px;color:#9a8c70">囚犯（非奴隶）</div>';
         (m.prisoners||[]).forEach(function(p){
-          h += '<div style="font-size:10px;color:#c5e3f6">'+ (p.name||'俘虏') +
-            ' <button type="button" onclick="window.APH.Main&&APH.Main.releasePrisoner(\''+p.id+'\')" style="font-size:9px;padding:1px 6px;border-radius:6px;border:1px solid rgba(89,217,255,.4);background:transparent;color:#8fd4ff;cursor:pointer">释放</button></div>';
+          h += '<div>'+ (p.name||'俘虏') +
+            ' <button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.releasePrisoner(\''+p.id+'\')">释放</button></div>';
         });
       }
+      h += '</div>';
       return h;
     }
 
@@ -1736,24 +1760,27 @@ APH.UI = (function(){
       var rest = Math.round((r && r.rest != null) ? r.rest : (ent.rest || 80));
       var rec = Math.round((r && r.recreation != null) ? r.recreation : (ent.recreation != null ? ent.recreation : 80));
       var action = ent.userOrder ? (ent.userOrder.type === 'move' ? '战术行军中' : (ent.userOrder.type === 'gather' ? '执行开采指令' : '执行搬运指令')) : (ent.drafted ? '战备戒备中' : (ent.gathering ? '正在采集中' : (ent.walking ? (ent.job ? '工位巡视劳作' : '基地漫步闲逛') : (ent.job ? '工位作业中' : '休闲散步中'))));
-
-      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-        '<div style="font-size:22px;width:30px;text-align:center">👤</div>' +
-        '<div style="flex:1">' +
-          '<div style="color:#ffc857;font-weight:800;font-size:12px">' + name + ' <span style="font-size:10px;color:#8fa3cc;font-weight:400">(' + trait + ')</span></div>' +
-          '<div style="color:#59d9ff;font-size:10px">' + action + ' · ' + job + '</div>' +
-        '</div>' +
-      '</div>';
-
-      h += '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">心情 <b style="color:#ffd54f">' + mood + '%</b></div>';
-      h += needBarsHtml(food, rest, rec);
-      if(r && r.parts){
-        var pn=[];
-        Object.keys(r.parts).forEach(function(p){ pn.push(p+':'+Math.round(r.parts[p]*100)+'%'); });
-        h += '<div style="font-size:9px;color:#8fa3cc;margin-top:4px">部位 '+pn.join(' · ')+'</div>';
+      var tab = s.inspTab || 'needs';
+      var cmds = '<button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.toggleSelectedDraft()">'+(ent.drafted?'解除征召':'征召')+'</button>';
+      var h = inspHead('👤', name, trait + ' · ' + action + ' · ' + job, ent.drafted ? '#ff6d6d' : '#b8a888', cmds);
+      h += needBarsHtml(food, rest, rec, mood);
+      h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
+      h += '<div class="insp-body">';
+      if(tab==='thoughts'){
+        h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
+      } else if(tab==='health'){
+        if(r && r.parts){
+          Object.keys(r.parts).forEach(function(p){
+            var v=Math.round(r.parts[p]*100);
+            h += inspNeedRow(p, v, v>=70?'#6bcf8e':'#d06060');
+          });
+        } else h += '<div>健康</div>';
+      } else if(tab==='sched'){
+        h += scheduleRowHtml(r && r.schedule, s);
+      } else {
+        h += '<div style="color:#9a8c70">' + action + '</div>';
       }
-      h += scheduleRowHtml(r && r.schedule, s);
-      h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
+      h += '</div>';
       return h;
     }
 
@@ -1768,14 +1795,9 @@ APH.UI = (function(){
       var desTxt = des === 'chop' ? '🪓 已标砍伐' : (des === 'mine' ? '⛏ 已标开采' : '未规划');
       var desCol = des ? '#59d9ff' : '#8fa3cc';
 
-      var h = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-        '<div style="font-size:20px;width:30px;text-align:center">' + icon + '</div>' +
-        '<div style="flex:1">' +
-          '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + kindName + '</div>' +
-          '<div style="color:' + desCol + ';font-size:10px">' + desTxt + '</div>' +
-        '</div>' +
-      '</div>';
-      h += '<div style="font-size:10px;color:#8fa3cc">耐久度: <b style="color:#7dffab">' + hp + '/' + maxHp + '</b></div>';
+      var h = inspHead(icon, kindName, desTxt + ' · ' + hp + '/' + maxHp, desCol, '');
+      var pct = maxHp ? Math.round(hp/maxHp*100) : 0;
+      h += '<div style="padding:6px 10px 10px"><div class="insp-need"><span class="insp-need-lab">耐久</span><div class="insp-need-track"><div class="insp-need-fill" style="width:'+pct+'%;background:#6bcf8e"></div></div><span class="insp-need-val">'+hp+'</span></div></div>';
       return h;
     }
 
@@ -1789,15 +1811,13 @@ APH.UI = (function(){
       ((s.colony && s.colony.buildings) || []).forEach(function(b){
         if(b && b.id===bid && Math.abs((b.x||0)-(be.x||0))<2 && Math.abs((b.y||0)-(be.y||0))<2) rec=b;
       });
-      var h = '<div style="display:flex;align-items:center;gap:8px">' +
-        '<div style="font-size:20px;width:30px;text-align:center">🏛️</div>' +
-        '<div style="flex:1">' +
-          '<div style="color:#c5e3f6;font-weight:700;font-size:12px">' + bName + ' <span style="color:#ffc857;font-size:10px">Lv.' + lv + '</span></div>' +
-          '<div style="color:#7dffab;font-size:10px">运转正常</div>' +
-        '</div>' +
-      '</div>';
+      var hp = rec && rec.hp != null ? rec.hp : (be.hp != null ? be.hp : 80);
+      var maxHp = rec && rec.maxHp != null ? rec.maxHp : (be.maxHp != null ? be.maxHp : 80);
+      var pct = maxHp ? Math.round(hp/maxHp*100) : 100;
+      var h = inspHead('🏛️', bName, 'Lv.'+lv+' · 运转正常', '#7dffab', '');
+      h += '<div style="padding:6px 10px"><div class="insp-need"><span class="insp-need-lab">耐久</span><div class="insp-need-track"><div class="insp-need-fill" style="width:'+pct+'%;background:#6bcf8e"></div></div><span class="insp-need-val">'+Math.round(hp)+'</span></div></div>';
       if(bid==='bl_kitchen'||bid==='bl_campfire'||bid==='bl_workshop'){
-        h += billsHtml(rec || be, bid);
+        h += '<div class="insp-body">' + billsHtml(rec || be, bid) + '</div>';
       }
       return h;
     }

@@ -4191,6 +4191,25 @@ window.APH = window.APH || {};
     }
     updateInspectorNow();
   }
+  function setInspTab(tab){
+    APH.state.inspTab = tab || 'needs';
+    updateInspectorNow();
+  }
+  function togglePlayerDraft(){
+    var s=APH.state;
+    s.playerDrafted = !s.playerDrafted;
+    if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+    updateInspectorNow();
+  }
+  function toggleSelectedDraft(){
+    var s=APH.state;
+    var ent = selectedPawnEnt && selectedPawnEnt();
+    if(ent && (ent.type==='resident' || ent.type===T.RESIDENT)){
+      ent.drafted = !ent.drafted;
+    }
+    if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+    updateInspectorNow();
+  }
   function updateInspectorNow(){
     var insp=document.getElementById('inspector');
     var s=APH.state;
@@ -5766,6 +5785,9 @@ window.APH = window.APH || {};
     doSignTradePact:doSignTradePact,
     doDeterRival:doDeterRival,
     cycleSchedule:cycleSchedule,
+    setInspTab:setInspTab,
+    togglePlayerDraft:togglePlayerDraft,
+    toggleSelectedDraft:toggleSelectedDraft,
     addBuildingBill:addBuildingBill,
     cycleZoneFilter:cycleZoneFilter,
     toggleZoneForbid:toggleZoneForbid,
