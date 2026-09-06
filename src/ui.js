@@ -1281,6 +1281,9 @@ APH.UI = (function(){
       { id: 'deconstruct', name: '拆除', icon: '🔨', title: '单点或圈选建筑进行拆除退还材料' },
       { id: 'stockpile', name: '仓储', icon: '📦', title: '拉框划仓储区，搬运会优先送入' },
       { id: 'grow', name: '种植', icon: '🌱', title: '拉框划种植区，农民会播种收获' },
+      { id: 'clean', name: '清扫', icon: '🧹', title: '拉框清扫污秽' },
+      { id: 'extinguish', name: '灭火', icon: '💧', title: '拉框灭火' },
+      { id: 'restrict', name: '活动区', icon: '🚧', title: '拉框活动区，选中小人可限制在区内' },
       { id: 'cancel', name: '取消', icon: '✕', title: '单点或拉框清除区域内的规划标记', cancel: true },
     ];
     var h = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">';
@@ -1640,7 +1643,10 @@ APH.UI = (function(){
       raid: !!(s.war && s.war.raidActive),
       night: night,
       temp: temp,
-      exposed: !!(s.meta && s.meta.playerNeeds && (s.meta.playerNeeds.exposure||0) > 20)
+      exposed: !!(s.meta && s.meta.playerNeeds && (s.meta.playerNeeds.exposure||0) > 20),
+      filth: (window.APH.Colony && APH.Colony.filthAt) ? APH.Colony.filthAt((s.colony&&s.colony.filth)||{}, s.px||0, s.py||0) : 0,
+      corpseNearby: !!(s.entities||[]).some(function(en){ return en && en.type==='corpse' && !en.dead; }),
+      fireNearby: !!(s.colony && s.colony.fires && s.colony.fires.length)
     };
   }
   function scheduleRowHtml(sch, s){
@@ -1733,6 +1739,11 @@ APH.UI = (function(){
 
       h += '<div style="font-size:10px;color:#8fa3cc;margin-top:2px">心情 <b style="color:#ffd54f">' + mood + '%</b></div>';
       h += needBarsHtml(food, rest, rec);
+      if(r && r.parts){
+        var pn=[];
+        Object.keys(r.parts).forEach(function(p){ pn.push(p+':'+Math.round(r.parts[p]*100)+'%'); });
+        h += '<div style="font-size:9px;color:#8fa3cc;margin-top:4px">部位 '+pn.join(' · ')+'</div>';
+      }
       h += scheduleRowHtml(r && r.schedule, s);
       h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
       return h;
@@ -1786,6 +1797,11 @@ APH.UI = (function(){
     if(target.type === 'zone'){
       var z = target.zone || target;
       var n = (z.cells||[]).length;
+      if(z.type==='restrict'){
+        var h = '<div style="color:#8fd4ff;font-weight:700;font-size:12px">🚧 活动区 · '+n+' 格</div>';
+        h += '<button type="button" onclick="window.APH.Main&&APH.Main.assignRestrict()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">限制选中小人</button>';
+        return h;
+      }
       if(z.type==='grow'){
         var crop = (window.APH.Colony && APH.Colony.ALIEN_CROPS && APH.Colony.ALIEN_CROPS[z.cropType]) || {};
         var h = '<div style="color:#7dffab;font-weight:700;font-size:12px">🌱 种植区 · '+n+' 格</div>';

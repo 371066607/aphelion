@@ -61,7 +61,11 @@ APH.CFG = {
     th_dark:       { text:'摸黑干活', mood:-2 },
     th_lonely:     { text:'没人说话', mood:-2 },
     th_social:     { text:'刚和人聊过', mood:2 },
-    th_safe:       { text:'家里暂时安全', mood:1 }
+    th_safe:       { text:'家里暂时安全', mood:1 },
+    th_filthy:     { text:'这儿脏得要命', mood:-4 },
+    th_saw_corpse: { text:'看见了尸体', mood:-10 },
+    th_hurt:       { text:'身上在疼', mood:-6 },
+    th_fire:       { text:'着火了', mood:-12 }
   },
 
   /* 土壤肥力体系 (RimWorld 农业) */
@@ -262,6 +266,8 @@ APH.CFG = {
     RESIDENT: 'resident',
     VISITOR: 'visitor',
     FLORA: 'flora',
+    CORPSE: 'corpse',
+    ANIMAL: 'animal',
   },
 
   /* 经营（矿材盖房 / 开局赠矿 / 袭击掠夺） */

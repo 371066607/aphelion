@@ -1106,6 +1106,80 @@ APH.Colony = (function(){
     zone.cropType = ids[(i + 1) % ids.length];
     return zone.cropType;
   }
+  function filthKey(x, y){
+    var g = CFG.GRID || 48;
+    return Math.round(x / g) * g + ',' + Math.round(y / g) * g;
+  }
+  function addFilth(map, x, y, n){
+    map = map || {};
+    var k = filthKey(x, y);
+    map[k] = (map[k] || 0) + (n || 1);
+    return map;
+  }
+  function filthAt(map, x, y){
+    if(!map) return 0;
+    return map[filthKey(x, y)] || 0;
+  }
+  function cleanCells(map, cells, amt){
+    map = map || {};
+    amt = amt != null ? amt : 20;
+    (cells || []).forEach(function(c){
+      var k = c.x + ',' + c.y;
+      if(map[k] == null) k = filthKey(c.x, c.y);
+      map[k] = Math.max(0, (map[k] || 0) - amt);
+      if(map[k] <= 0) delete map[k];
+    });
+    return map;
+  }
+  function ensureBuildingHp(b){
+    if(!b) return b;
+    var def = BUILDINGS[b.id] || {};
+    if(b.maxHp == null) b.maxHp = def.hp || (CFG.wall && b.id==='bl_wall' && CFG.wall.hp) || 80;
+    if(b.hp == null) b.hp = b.maxHp;
+    return b;
+  }
+  function decayBuilding(b, rate){
+    ensureBuildingHp(b);
+    b.hp = Math.max(0, (b.hp || 0) - (rate || 0));
+    return b;
+  }
+  function repairBuilding(b, amt){
+    ensureBuildingHp(b);
+    b.hp = Math.min(b.maxHp, (b.hp || 0) + (amt || 0));
+    return b;
+  }
+  function addFire(fires, x, y){
+    fires = (fires || []).slice();
+    var g = CFG.GRID || 48;
+    x = Math.round(x / g) * g; y = Math.round(y / g) * g;
+    fires.push({ x:x, y:y, hp:20 });
+    return fires;
+  }
+  function douseFires(fires, cells){
+    var drop = {};
+    (cells || []).forEach(function(c){ drop[c.x + ',' + c.y] = 1; });
+    return (fires || []).filter(function(f){ return !drop[f.x + ',' + f.y]; });
+  }
+  function addRestrictZone(zones, cells){
+    zones = (zones || []).slice();
+    var z = { id:'zn_area_' + (zones.length + 1), type:'restrict', cells: cells || [] };
+    zones.push(z);
+    return { zones: zones, zone: z };
+  }
+  function pointAllowed(zones, pawn, x, y){
+    if(!pawn || !pawn.restrictId) return true;
+    var z = null;
+    (zones || []).forEach(function(zz){ if(zz && zz.id === pawn.restrictId) z = zz; });
+    if(!z) return true;
+    var g = CFG.GRID || 48;
+    var px = Math.round(x / g) * g, py = Math.round(y / g) * g;
+    var i, c;
+    for(i = 0; i < (z.cells || []).length; i++){
+      c = z.cells[i];
+      if(c && c.x === px && c.y === py) return true;
+    }
+    return false;
+  }
   function eraseZoneCells(zones, cells){
     var drop = {};
     (cells || []).forEach(function(c){ drop[c.x + ',' + c.y] = 1; });
@@ -2460,6 +2534,10 @@ APH.Colony = (function(){
     storageFilterMatches:storageFilterMatches, cycleStorageFilter:cycleStorageFilter,
     deteriorationTick:deteriorationTick,
     bulkHaulCandidates:bulkHaulCandidates, findBestStorageSpot:findBestStorageSpot,
+    addFilth:addFilth, filthAt:filthAt, cleanCells:cleanCells,
+    decayBuilding:decayBuilding, repairBuilding:repairBuilding, ensureBuildingHp:ensureBuildingHp,
+    addFire:addFire, douseFires:douseFires,
+    addRestrictZone:addRestrictZone, pointAllowed:pointAllowed,
     cellsFromBox:cellsFromBox, addStockpileZone:addStockpileZone, addGrowZone:addGrowZone,
     tickGrowZones:tickGrowZones, cycleGrowCrop:cycleGrowCrop,
     zoneAllowsItem:zoneAllowsItem, eraseZoneCells:eraseZoneCells,

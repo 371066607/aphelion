@@ -48,6 +48,39 @@ APH.Res = (function(){
     var t = ((clock % dayLen) + dayLen) % dayLen;
     return Math.floor(t / dayLen * 24) % 24;
   }
+  var BODY_PARTS = ['head','torso','armL','armR','legL','legR'];
+  function ensureParts(r){
+    if(!r) return r;
+    r.parts = r.parts || {};
+    BODY_PARTS.forEach(function(p){ if(r.parts[p] == null) r.parts[p] = 1; });
+    return r;
+  }
+  function hurtPart(r, part, dmg){
+    ensureParts(r);
+    if(!r.parts[part]) r.parts[part] = 1;
+    r.parts[part] = Math.max(0, r.parts[part] - (dmg || 0));
+    return r;
+  }
+  function partsMoveMul(r){
+    if(!r || !r.parts) return 1;
+    var a = r.parts.legL != null ? r.parts.legL : 1;
+    var b = r.parts.legR != null ? r.parts.legR : 1;
+    return Math.max(0.2, Math.min(a, b));
+  }
+  function makeCorpse(r, x, y){
+    return {
+      id: 'cr_' + ((r && r.id) || 'unk'),
+      type: (CFG.entType && CFG.entType.CORPSE) || 'corpse',
+      name: (r && r.name) || '无名',
+      rid: r && r.id,
+      x: x || 0, y: y || 0,
+      dead: false
+    };
+  }
+  function buryCorpse(c){
+    if(c) c.dead = true;
+    return c;
+  }
   function collectThoughts(pawn, ctx){
     pawn = pawn || {};
     ctx = ctx || {};
@@ -94,6 +127,14 @@ APH.Res = (function(){
     if(ctx.night && !ctx.sheltered) add('th_dark');
     if(ctx.lonely) add('th_lonely');
     if(ctx.socialRecent) add('th_social');
+    if((ctx.filth || 0) > 20) add('th_filthy');
+    if(ctx.corpseNearby) add('th_saw_corpse');
+    if(ctx.fireNearby) add('th_fire');
+    if(pawn.parts){
+      var hurt=false;
+      Object.keys(pawn.parts).forEach(function(p){ if(pawn.parts[p] < 0.7) hurt=true; });
+      if(hurt) add('th_hurt');
+    }
     return out;
   }
   function thoughtMoodSum(list){
@@ -156,6 +197,7 @@ APH.Res = (function(){
       bleedOutTimer:null,                                    // 濒死失血倒计时 (s)
       rescuedBy:null,                                        // 救援人 ID
       job:null,                                              // 指派岗位 bl_xxx|null
+      parts:{ head:1, torso:1, armL:1, armR:1, legL:1, legR:1 },
       schedule: defaultSchedule(),
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
@@ -1974,5 +2016,7 @@ APH.Res = (function(){
     defaultSchedule:defaultSchedule, ensureSchedule:ensureSchedule,
     hourOfDay:hourOfDay, cycleScheduleSlot:cycleScheduleSlot, scheduleAt:scheduleAt,
     collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum,
+    ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
+    makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
   };
 })();

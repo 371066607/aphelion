@@ -1899,6 +1899,19 @@ window.APH = window.APH || {};
         ctx2.strokeRect(sx-g/2+0.5, sy-g/2+0.5, g-1, g-1);
       });
     });
+    var filth=s.colony.filth||{};
+    Object.keys(filth).forEach(function(k){
+      var amt=filth[k]; if(!amt) return;
+      var xy=k.split(','); var fx=+xy[0], fy=+xy[1];
+      var sx=fx - s.camX + vpW()/2, sy=fy - s.camY + vpH()/2;
+      ctx2.fillStyle='rgba(110,70,30,'+Math.min(0.45, amt/80)+')';
+      ctx2.beginPath(); ctx2.arc(sx, sy+4, 6, 0, Math.PI*2); ctx2.fill();
+    });
+    (s.colony.fires||[]).forEach(function(f){
+      var sx=f.x - s.camX + vpW()/2, sy=f.y - s.camY + vpH()/2;
+      ctx2.fillStyle='rgba(255,120,40,0.7)';
+      ctx2.beginPath(); ctx2.arc(sx, sy, 10, 0, Math.PI*2); ctx2.fill();
+    });
   }
   function drawPlacementGhost(){
     var s = APH.state;
@@ -2070,6 +2083,17 @@ window.APH = window.APH || {};
       resident:function(e,t){ APH.Ent.drawResident(e,t); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       flora:function(e,t){ APH.Ent.drawFlora(e,t); },
+      corpse:function(e,t){
+        if(!e || e.dead) return;
+        var ctx=document.getElementById('cv') && document.getElementById('cv').getContext('2d');
+        if(!ctx) return;
+        ctx.save(); ctx.translate(e.x,e.y);
+        ctx.fillStyle='rgba(80,40,40,0.85)';
+        ctx.beginPath(); ctx.ellipse(0,4,16,8,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#c5a3a3'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('☠', 0, 2);
+        ctx.restore();
+      },
       walls:function(t){ APH.Ent.drawWalls(t); },
       particles:particlesDrawer,
       crystalGlow:function(){},
@@ -2944,6 +2968,14 @@ window.APH = window.APH || {};
         return true;
       }
 
+      var hitCorpse=(s0.entities||[]).find(function(en){
+        return en && en.type==='corpse' && !en.dead && U.dst(en.x,en.y,wx,wy)<=40;
+      });
+      if(hitCorpse && APH.Res.buryCorpse){
+        APH.Res.buryCorpse(hitCorpse);
+        APH.UI.floatText('⚰ 已埋葬', '#b39dff');
+        return true;
+      }
       /* 4. 右键未完成蓝图 → 优先建造 (未征召; 征召点地仍走战术移动) */
       var hitBp = (s0.entities||[]).find(function(en){
         return en && en.type===T.BLUEPRINT && !en.dead && U.dst(en.x,en.y,wx,wy)<=48;
@@ -3172,7 +3204,7 @@ window.APH = window.APH || {};
         var s0 = APH.state;
         s0.designations = s0.designations || {};
         var tool = s0.orderTool;
-        if(tool==='stockpile' || tool==='grow' || (tool==='cancel' && APH.Colony.eraseZoneCells)){
+        if(tool==='stockpile' || tool==='grow' || tool==='clean' || tool==='extinguish' || tool==='restrict' || (tool==='cancel' && APH.Colony.eraseZoneCells)){
           s0.colony.zones = s0.colony.zones || [];
           var zCells = APH.Colony.cellsFromBox(orderFrom.x, orderFrom.y, orderTo.x, orderTo.y);
           if(tool==='stockpile'){
@@ -3185,6 +3217,17 @@ window.APH = window.APH || {};
             s0.colony.zones = grown.zones;
             s0.selectedTarget = { type:'zone', zone: grown.zone };
             APH.UI.floatText('✔ 种植区 '+zCells.length+' 格', '#7dffab');
+          } else if(tool==='clean'){
+            s0.colony.filth = APH.Colony.cleanCells(s0.colony.filth||{}, zCells, 40);
+            APH.UI.floatText('✔ 清扫', '#c8e89a');
+          } else if(tool==='extinguish'){
+            s0.colony.fires = APH.Colony.douseFires(s0.colony.fires||[], zCells);
+            APH.UI.floatText('✔ 灭火', '#59d9ff');
+          } else if(tool==='restrict'){
+            var area = APH.Colony.addRestrictZone(s0.colony.zones, zCells);
+            s0.colony.zones = area.zones;
+            s0.selectedTarget = { type:'zone', zone: area.zone };
+            APH.UI.floatText('✔ 活动区 '+zCells.length+' 格', '#8fd4ff');
           } else {
             s0.colony.zones = APH.Colony.eraseZoneCells(s0.colony.zones, zCells);
             APH.UI.floatText('✔ 已擦除划区', '#ff9a9a');
@@ -4003,6 +4046,19 @@ window.APH = window.APH || {};
     if(APH.UI&&APH.UI.floatText) APH.UI.floatText('仓储过滤 → '+(next&&next.name||z.filter), '#ffc857');
     updateInspectorNow(); saveColony();
   }
+  function assignRestrict(){
+    var z=selectedZone();
+    if(!z || z.type!=='restrict') return;
+    var s=APH.state;
+    if(s.selectedRid){
+      var r=(s.meta.residents||[]).filter(function(x){ return x.id===s.selectedRid; })[0];
+      if(r) r.restrictId=z.id;
+    } else {
+      s.meta.playerRestrictId=z.id;
+    }
+    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('✔ 已限制活动区', '#8fd4ff');
+    updateInspectorNow(); saveColony();
+  }
   function cycleGrowCrop(){
     var z=selectedZone();
     if(!z || z.type!=='grow' || !APH.Colony.cycleGrowCrop) return;
@@ -4506,7 +4562,7 @@ window.APH = window.APH || {};
           if(dH<houseND){ houseND=dH; houseN=hb; }
         });
         var sleepArrive=(CFG.command&&CFG.command.sleepArriveR!=null)?CFG.command.sleepArriveR:40;
-        var spdMul=spd*sickSpeedMul*wxMul*bagMul;
+        var spdMul=spd*sickSpeedMul*wxMul*bagMul*((APH.Res.partsMoveMul&&APH.Res.partsMoveMul(r))||1);
         var rpawn={
           id:r.id, x:e.x, y:e.y, drafted:!!e.drafted,
           food:r.food, rest:r.rest, recreation:r.recreation,
@@ -5045,6 +5101,10 @@ window.APH = window.APH || {};
         }
         if(rr.dead.length){
           APH.UI.floatText('☠ '+r.name+' 救治不及时, 去世了','#ff9a9a');
+          var entDead=s.entities.filter(function(en){ return en && (en.rid||en.id)===r.id; })[0];
+          if(APH.Res.makeCorpse){
+            s.entities.push(APH.Res.makeCorpse(r, entDead?entDead.x:s.px, entDead?entDead.y:s.py));
+          }
           m.residents=m.residents.filter(function(x){ return x.id!==r.id; });
           saveMetaQuiet();                       /* syncResidentEntities 下一帧移除实体 */
         }
@@ -5341,7 +5401,7 @@ window.APH = window.APH || {};
         var s = APH.state;
         s.orderTool = (s.orderTool === toolId) ? null : toolId;
         if(s.orderTool){
-          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', grow:'🌱 种植', cancel:'✕ 取消' };
+          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', grow:'🌱 种植', clean:'🧹 清扫', extinguish:'💧 灭火', restrict:'🚧 活动区', cancel:'✕ 取消' };
           APH.UI.setHint('[' + (toolNames[s.orderTool]||s.orderTool) + ' 模式] 鼠标在地图上单点或拉框圈选 · 右键/Esc 退出');
         } else {
           APH.UI.setHint('');
@@ -5582,6 +5642,7 @@ window.APH = window.APH || {};
     cycleZoneFilter:cycleZoneFilter,
     toggleZoneForbid:toggleZoneForbid,
     cycleGrowCrop:cycleGrowCrop,
+    assignRestrict:assignRestrict,
     updateHome:updateHome,
     simStep:simStep,
     setTimeScale:setTimeScale,
