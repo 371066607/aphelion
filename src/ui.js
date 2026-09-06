@@ -1604,6 +1604,36 @@ APH.UI = (function(){
   }
 
   /* ================= ADR-28 / Ticket #156: 通用检查器 (Inspector) ================= */
+  function thoughtsHtml(pawn, ctx){
+    var Res = window.APH.Res;
+    if(!Res || !Res.collectThoughts) return '';
+    var list = Res.collectThoughts(pawn, ctx || {});
+    if(!list.length) return '';
+    var sum = Res.thoughtMoodSum(list);
+    var sumCol = sum>=0 ? '#7dffab' : '#ff9a9a';
+    var sign = sum>0 ? '+' : '';
+    var h = '<div style="margin-top:6px;font-size:9px;color:#8fa3cc;letter-spacing:1px">念头 <span style="color:'+sumCol+'">'+sign+sum+'</span></div>';
+    var i, t, col, m;
+    var max = Math.min(8, list.length);
+    for(i=0;i<max;i++){
+      t=list[i];
+      m=t.mood||0;
+      col = m>=0 ? '#7dffab' : '#ff9a9a';
+      h += '<div style="font-size:10px;color:#c5e3f6;margin-top:1px">'+t.text+' <span style="color:'+col+'">'+(m>0?'+':'')+m+'</span></div>';
+    }
+    return h;
+  }
+  function thoughtCtxOf(s){
+    s = s || {};
+    var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(s.meta, s.clock||0) : null;
+    var night = !!(window.APH.World && APH.World.daylight && APH.World.daylight() < 0.5);
+    return {
+      raid: !!(s.war && s.war.raidActive),
+      night: night,
+      temp: temp,
+      exposed: !!(s.meta && s.meta.playerNeeds && (s.meta.playerNeeds.exposure||0) > 20)
+    };
+  }
   function scheduleRowHtml(sch, s){
     var Res = window.APH.Res;
     sch = (Res && Res.ensureSchedule) ? Res.ensureSchedule(sch) : (sch || []);
@@ -1650,6 +1680,7 @@ APH.UI = (function(){
         '<div><span style="color:#8fa3cc">氧气 </span><b style="color:#c5e3f6">' + o2 + '</b></div>' +
       '</div>';
       h += scheduleRowHtml(m.playerSchedule, s);
+      h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
       return h;
     }
 
@@ -1680,6 +1711,7 @@ APH.UI = (function(){
         '<div><span style="color:#8fa3cc">精力 </span><b style="color:#59d9ff">' + rest + '</b></div>' +
       '</div>';
       h += scheduleRowHtml(r && r.schedule, s);
+      h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
       return h;
     }
 

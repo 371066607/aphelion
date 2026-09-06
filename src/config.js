@@ -36,6 +36,34 @@ APH.CFG = {
     kinds: ['work', 'joy', 'sleep', 'any']
   },
 
+  /* 念头 (#171): 解释心情，不是聊天 */
+  thoughts: {
+    th_starving:   { text:'快饿死了', mood:-12 },
+    th_hungry:     { text:'肚子饿了', mood:-5 },
+    th_well_fed:   { text:'吃得很饱', mood:2 },
+    th_ate_raw:    { text:'吃了生食', mood:-3 },
+    th_ate_meal:   { text:'吃了一顿热饭', mood:5 },
+    th_ate_table:  { text:'坐着吃饭真好', mood:3 },
+    th_floor_sleep:{ text:'打地铺腰酸', mood:-6 },
+    th_slept_bed:  { text:'床很舒服', mood:4 },
+    th_tired:      { text:'困得睁不开眼', mood:-4 },
+    th_rested:     { text:'精力充沛', mood:2 },
+    th_bored:      { text:'无聊得发慌', mood:-8 },
+    th_joy:        { text:'玩得很开心', mood:3 },
+    th_campfire:   { text:'篝火边很暖和', mood:2 },
+    th_pretty_room:{ text:'这屋子真漂亮', mood:3 },
+    th_cold:       { text:'冻得发抖', mood:-6 },
+    th_hot:        { text:'热得发昏', mood:-5 },
+    th_sick:       { text:'身体不舒服', mood:-4 },
+    th_downed:     { text:'倒在地上起不来', mood:-15 },
+    th_raid:       { text:'遭到袭击', mood:-8 },
+    th_exposed:    { text:'暴露在恶劣天气里', mood:-5 },
+    th_dark:       { text:'摸黑干活', mood:-2 },
+    th_lonely:     { text:'没人说话', mood:-2 },
+    th_social:     { text:'刚和人聊过', mood:2 },
+    th_safe:       { text:'家里暂时安全', mood:1 }
+  },
+
   /* 土壤肥力体系 (RimWorld 农业) */
   soil: {
     rich: 1.40,                // 沃土(湖畔/沼泽)

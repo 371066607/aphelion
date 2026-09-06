@@ -48,6 +48,59 @@ APH.Res = (function(){
     var t = ((clock % dayLen) + dayLen) % dayLen;
     return Math.floor(t / dayLen * 24) % 24;
   }
+  function collectThoughts(pawn, ctx){
+    pawn = pawn || {};
+    ctx = ctx || {};
+    var cat = CFG.thoughts || {};
+    var out = [];
+    function add(id){
+      var d = cat[id];
+      if(!d) return;
+      out.push({ id:id, text:d.text, mood:d.mood });
+    }
+    var food = pawn.food;
+    if(food != null){
+      if(food < 30) add('th_starving');
+      else if(food < 60) add('th_hungry');
+      else if(food > 80) add('th_well_fed');
+    }
+    if(ctx.ateRaw) add('th_ate_raw');
+    if(ctx.ateCooked) add('th_ate_meal');
+    if(ctx.ateTable) add('th_ate_table');
+    if(pawn.isSleeping){
+      if(pawn.bedId) add('th_slept_bed');
+      else add('th_floor_sleep');
+    }
+    if(pawn.rest != null){
+      if(pawn.rest < 20) add('th_tired');
+      else if(pawn.rest > 85 && !pawn.isSleeping) add('th_rested');
+    }
+    var rec = pawn.recreation;
+    if(rec != null){
+      if(rec < 30) add('th_bored');
+      else if(rec > 70) add('th_joy');
+    }
+    if(ctx.atJoy) add('th_campfire');
+    if(ctx.roomPretty) add('th_pretty_room');
+    if(ctx.temp != null){
+      if(ctx.temp < 5) add('th_cold');
+      else if(ctx.temp > 32) add('th_hot');
+    }
+    if((pawn.illness || 0) > 40) add('th_sick');
+    if(pawn.downed) add('th_downed');
+    if(ctx.raid) add('th_raid');
+    else if(!pawn.downed) add('th_safe');
+    if(ctx.exposed) add('th_exposed');
+    if(ctx.night && !ctx.sheltered) add('th_dark');
+    if(ctx.lonely) add('th_lonely');
+    if(ctx.socialRecent) add('th_social');
+    return out;
+  }
+  function thoughtMoodSum(list){
+    var n=0, i;
+    for(i=0;i<(list||[]).length;i++) n += (list[i].mood || 0);
+    return n;
+  }
   function cycleScheduleSlot(kind){
     var i = SCHED_KINDS.indexOf(kind);
     if(i<0) i=0;
@@ -1920,5 +1973,6 @@ APH.Res = (function(){
     thinkPawn:thinkPawn,
     defaultSchedule:defaultSchedule, ensureSchedule:ensureSchedule,
     hourOfDay:hourOfDay, cycleScheduleSlot:cycleScheduleSlot, scheduleAt:scheduleAt,
+    collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum,
   };
 })();
