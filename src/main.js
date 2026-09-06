@@ -603,171 +603,157 @@ window.APH = window.APH || {};
     }
     return best;
   }
-  /* ADR-29: 未征召指挥官全面自治。饥饿优先寻粮；无口粮则紧急采摘浆果；再执行规划砍伐/开采。 */
+  function pawnWorldAt(x, y, haulCarry){
+    var s = APH.state;
+    var house=null, hd=Infinity;
+    (s.colony && s.colony.buildings || []).forEach(function(b){
+      if(!b || b.dead || b.id!=='bl_house') return;
+      var d=U.dst(x,y,b.x,b.y);
+      if(d<hd){ hd=d; house=b; }
+    });
+    var berry=null, berryD=(CFG.gathering&&CFG.gathering.searchRadius)||800;
+    (s.entities||[]).forEach(function(be){
+      if(!be || be.dead || be.type!==T.FLORA || be.kind!=='bush_berry') return;
+      var bd=U.dst(x,y,be.x,be.y);
+      if(bd<berryD){ berryD=bd; berry=be; }
+    });
+    var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
+    var storage=null;
+    if(haulCarry && haulCarry.itemId && APH.Colony.findBestStorageSpot){
+      storage=APH.Colony.findBestStorageSpot(haulCarry.itemId, s.colony&&s.colony.buildings, rooms, {x:x,y:y});
+    } else if(APH.Colony.stockpileSpot){
+      storage=APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
+    }
+    return {
+      raid: !!(s.war&&s.war.raidActive),
+      night: !!(window.APH.World && APH.World.daylight && APH.World.daylight()<0.5),
+      eatBelow: foodEatBelow(),
+      restSleepAt: (CFG.player&&CFG.player.restSleepAt!=null)?CFG.player.restSleepAt:20,
+      restNightAt: (CFG.player&&CFG.player.restNightAt!=null)?CFG.player.restNightAt:75,
+      joyAt: (CFG.residents&&CFG.residents.recreationJoyAt!=null)?CFG.residents.recreationJoyAt:30,
+      meal: nearestMeal({x:x,y:y}, 1e9),
+      house: house,
+      blueprint: nearestBlueprint(x,y),
+      drop: nearestDrop({x:x,y:y}, (CFG.haul&&CFG.haul.seekR)||1200),
+      flora: pickDesignatedFloraAt(x,y),
+      berry: berry,
+      joy: findJoySpot(x,y),
+      storage: storage
+    };
+  }
+  function commanderPawn(){
+    var s=APH.state;
+    var n=s.meta.playerNeeds||{};
+    var prio=s.meta.playerPrio||{};
+    return {
+      id:'player', x:s.px, y:s.py,
+      drafted: !!s.playerDrafted,
+      food: n.food, rest: n.rest, recreation: n.recreation,
+      wantSleep: !!n.wantSleep, isSleeping: !!n.isSleeping, downed: !!n.downed,
+      prio: {
+        sk_gather: prio.sk_gather!=null?prio.sk_gather:2,
+        sk_build: prio.sk_build!=null?prio.sk_build:2,
+        sk_haul: prio.sk_haul!=null?prio.sk_haul:2
+      },
+      order: s.playerOrder,
+      haulCarry: s.haulCarry,
+      nearFood: !!s.nearFood,
+      nearBed: !!s.nearBed,
+      gathering: !!s.gathering
+    };
+  }
+  /* ADR-30 / #168: 指挥官是 id=player 的小人，决策走 thinkPawn。 */
   function updateCommanderAutonomy(dt){
     var s = APH.state;
     if(s.scene !== 'home' || s.mode !== 'running') return;
-    if(s.playerDrafted) return;
     if(playerSleeping() || playerDowned()) return;
     if(s.joy && s.joy.active) return;
-
-    if(s.playerOrder && s.playerOrder.type==='gather' && s.playerOrder.flora && !s.playerOrder.flora.dead){
-      s.cmdIdleWalk=false;
-      s.target={x:s.playerOrder.flora.x, y:s.playerOrder.flora.y};
-      if(s.nearFlora && s.nearFlora.id===s.playerOrder.flora.id) s.playerOrder=null;
+    if(!APH.Res || !APH.Res.thinkPawn) return;
+    applyCommanderIntent(APH.Res.thinkPawn(commanderPawn(), pawnWorldAt(s.px, s.py, s.haulCarry)), dt||0.016);
+  }
+  function applyCommanderIntent(intent, dt){
+    var s = APH.state;
+    if(!intent || intent.type==='none') return;
+    var grabR = (CFG.haul && CFG.haul.grabR != null) ? CFG.haul.grabR : 18;
+    var dumpR = (CFG.haul && CFG.haul.dumpR != null) ? CFG.haul.dumpR : 36;
+    if(intent.type!=='idle') s.cmdIdleWalk=false;
+    if(intent.type==='eat_now'){
+      tryPlayerEatNearFood();
+      s.target=null;
+      if(s.playerOrder && s.playerOrder.type==='eat') s.playerOrder=null;
       return;
     }
-
-    var hungry = playerFood() < foodEatBelow() || (s.playerOrder && s.playerOrder.type==='eat');
-    var restNow = (s.meta.playerNeeds && s.meta.playerNeeds.rest != null) ? s.meta.playerNeeds.rest : 100;
-    var restSleepAt = (CFG.player && CFG.player.restSleepAt != null) ? CFG.player.restSleepAt : 20;
-    var restNightAt = (CFG.player && CFG.player.restNightAt != null) ? CFG.player.restNightAt : 75;
-    var isNight = !!(window.APH.World && APH.World.daylight && APH.World.daylight() < 0.5);
-    var forceSleep = !!(s.playerOrder && s.playerOrder.type==='sleep');
-    var sleepy = forceSleep || restNow < restSleepAt || (isNight && restNow < restNightAt);
-    var pGatherPrio = (s.meta.playerPrio && s.meta.playerPrio.sk_gather != null) ? s.meta.playerPrio.sk_gather : 2;
-
-    if(hungry){
-      if(s.nearFood){
-        tryPlayerEatNearFood();
-        s.target = null;
-        s.cmdIdleWalk = false;
-        if(s.playerOrder && s.playerOrder.type==='eat') s.playerOrder=null;
-        return;
-      }
-      var meal = nearestMeal({ x: s.px, y: s.py }, 1e9);
-      if(meal){
-        s.target = { x: meal.x, y: meal.y };
-        s.cmdIdleWalk = false;
-        return;
-      }
-      var berry = null, berryD = (CFG.gathering && CFG.gathering.searchRadius) || 800;
-      for(var bi = 0; bi < (s.entities || []).length; bi++){
-        var be = s.entities[bi];
-        if(!be || be.dead || be.type !== T.FLORA || be.kind !== 'bush_berry') continue;
-        var bd = U.dst(s.px, s.py, be.x, be.y);
-        if(bd < berryD){ berryD = bd; berry = be; }
-      }
-      if(berry){
-        s.designations = s.designations || {};
-        if(!s.designations[berry.id]) s.designations[berry.id] = { type: 'chop', entityId: berry.id };
-        s.cmdIdleWalk = false;
-        if(s.nearFlora && s.nearFlora.id === berry.id) s.target = null;
-        else s.target = { x: berry.x, y: berry.y };
-        return;
-      }
+    if(intent.type==='eat'){
+      s.target={ x:intent.x, y:intent.y };
+      return;
     }
-
-    /* 环世界: 困了或夜间作息去居住舱上床。镜头平移不唤醒；无床则就地躺。 */
-    if(sleepy){
-      s.cmdIdleWalk = false;
-      if(s.nearBed){
-        if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, true);
-        syncPlayerSleep();
-        s.target = null;
-        if(s.playerOrder && s.playerOrder.type==='sleep') s.playerOrder=null;
-        if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 上床休息','#b39dff');
-        return;
-      }
-      var house=null, hd=Infinity;
-      (s.colony && s.colony.buildings || []).forEach(function(b){
-        if(!b || b.dead || b.id!=='bl_house') return;
-        var d=U.dst(s.px,s.py,b.x,b.y);
-        if(d<hd){ hd=d; house=b; }
-      });
-      if(house){
-        s.target = { x: house.x, y: house.y + 18 };
-        return;
-      }
-      if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, false);
+    if(intent.type==='sleep_now'){
+      if(APH.Res && APH.Res.setPlayerSleeping) APH.Res.setPlayerSleeping(s.meta.playerNeeds, true, !!intent.bed);
       syncPlayerSleep();
-      s.target = null;
-      if(APH.UI && APH.UI.floatText) APH.UI.floatText('😴 太困了，就地躺下','#b39dff');
+      s.target=null;
+      if(s.playerOrder && s.playerOrder.type==='sleep') s.playerOrder=null;
+      if(APH.UI && APH.UI.floatText) APH.UI.floatText(intent.bed?'😴 上床休息':'😴 太困了，就地躺下','#b39dff');
       return;
     }
-
-    var pBuild = (s.meta.playerPrio && s.meta.playerPrio.sk_build != null) ? s.meta.playerPrio.sk_build : 2;
-    var pHaul = (s.meta.playerPrio && s.meta.playerPrio.sk_haul != null) ? s.meta.playerPrio.sk_haul : 2;
-    var forceBuild = !!(s.playerOrder && s.playerOrder.type==='build');
-    var forceHaul = !!(s.playerOrder && s.playerOrder.type==='haul');
-    if((pBuild > 0 || forceBuild) && s.colony && s.colony.buildQueue && s.colony.buildQueue.length){
-      var bp = nearestBlueprint(s.px, s.py);
-      if(bp){
-        s.cmdIdleWalk = false;
-        if(U.dst(s.px, s.py, bp.x, bp.y) < 90){
-          s.target = null;
-          if(forceBuild) s.playerOrder = null;
-        } else {
-          s.target = { x: bp.x, y: bp.y };
-        }
-        return;
-      }
+    if(intent.type==='sleep'){
+      s.target={ x:intent.x, y:intent.y };
+      return;
     }
-    if(pHaul > 0 || forceHaul){
-      var grabR = (CFG.haul && CFG.haul.grabR != null) ? CFG.haul.grabR : 18;
-      var dumpR = (CFG.haul && CFG.haul.dumpR != null) ? CFG.haul.dumpR : 36;
-      if(s.haulCarry && s.haulCarry.itemId){
-        var roomsH = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf((s.colony && s.colony.buildings) || []) : [];
-        var spot = (APH.Colony.findBestStorageSpot) ? APH.Colony.findBestStorageSpot(s.haulCarry.itemId, s.colony && s.colony.buildings, roomsH, {x:s.px,y:s.py}) : APH.Colony.stockpileSpot(s.colony && s.colony.buildings);
-        s.cmdIdleWalk = false;
-        if(spot && U.dst(s.px, s.py, spot.x, spot.y) < dumpR){
-          APH.Colony.collectHome(s.meta, s.haulCarry.itemId, s.haulCarry.n || 1);
-          var hn = (CFG.items[s.haulCarry.itemId] && CFG.items[s.haulCarry.itemId].name) || s.haulCarry.itemId;
+    if(intent.type==='build'){
+      if(U.dst(s.px,s.py,intent.x,intent.y)<90){
+        s.target=null;
+        if(s.playerOrder && s.playerOrder.type==='build') s.playerOrder=null;
+      } else s.target={ x:intent.x, y:intent.y };
+      return;
+    }
+    if(intent.type==='haul_dump'){
+      if(U.dst(s.px,s.py,intent.x,intent.y)<dumpR){
+        if(s.haulCarry){
+          APH.Colony.collectHome(s.meta, s.haulCarry.itemId, s.haulCarry.n||1);
+          var hn=(CFG.items[s.haulCarry.itemId]&&CFG.items[s.haulCarry.itemId].name)||s.haulCarry.itemId;
           if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 入库 '+hn+'×'+(s.haulCarry.n||1), '#9fe8c8');
-          s.haulCarry = null;
-          if(forceHaul) s.playerOrder = null;
-          s.target = null;
-        } else if(spot){
-          s.target = { x: spot.x, y: spot.y };
+          s.haulCarry=null;
         }
-        return;
+        if(s.playerOrder && s.playerOrder.type==='haul') s.playerOrder=null;
+        s.target=null;
+      } else s.target={ x:intent.x, y:intent.y };
+      return;
+    }
+    if(intent.type==='haul'){
+      var drop=intent.drop;
+      if(drop && U.dst(s.px,s.py,drop.x,drop.y)<grabR){
+        s.haulCarry={ itemId:drop.itemId, n:drop.n||1 };
+        drop.dead=true;
+        if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 拾起物资', '#8fd4ff');
+      } else s.target={ x:intent.x, y:intent.y };
+      return;
+    }
+    if(intent.type==='gather'){
+      var fl=intent.flora;
+      if(intent.emergency && fl){
+        s.designations=s.designations||{};
+        if(!s.designations[fl.id]) s.designations[fl.id]={ type:'chop', entityId:fl.id };
       }
-      var drop = nearestDrop({ x: s.px, y: s.py }, (CFG.haul && CFG.haul.seekR) || 1200);
-      if(drop){
-        s.cmdIdleWalk = false;
-        if(U.dst(s.px, s.py, drop.x, drop.y) < grabR){
-          s.haulCarry = { itemId: drop.itemId, n: drop.n || 1 };
-          drop.dead = true;
-          if(APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 拾起物资', '#8fd4ff');
-        } else {
-          s.target = { x: drop.x, y: drop.y };
+      if(fl && s.nearFlora && s.nearFlora.id===fl.id){
+        s.target=null;
+        if(s.playerOrder && s.playerOrder.type==='gather') s.playerOrder=null;
+      } else if(fl) s.target={ x:fl.x, y:fl.y };
+      else s.target={ x:intent.x, y:intent.y };
+      return;
+    }
+    if(intent.type==='joy'){
+      var jx=intent.x, jy=intent.y;
+      if(U.dst(s.px,s.py,jx,jy-12)<52){
+        s.target=null;
+        s.cmdJoyT=(s.cmdJoyT||0)-(dt||0.016);
+        if(s.cmdJoyT<=0){
+          s.cmdJoyT=1.5;
+          if(APH.Res && APH.Res.enjoyRecreation) APH.Res.enjoyRecreation(s.meta.playerNeeds, (CFG.residents&&CFG.residents.campfireRecGain)||10);
         }
-        return;
-      } else if(forceHaul){
-        s.playerOrder = null;
-      }
+      } else s.target={ x:jx, y:jy };
+      return;
     }
-    var recNow = (s.meta.playerNeeds && s.meta.playerNeeds.recreation != null) ? s.meta.playerNeeds.recreation : 80;
-    var joyAt = (CFG.residents && CFG.residents.recreationJoyAt != null) ? CFG.residents.recreationJoyAt : 30;
-    if(recNow < joyAt){
-      var joyB = findJoySpot(s.px, s.py);
-      if(joyB){
-        s.cmdIdleWalk = false;
-        if(U.dst(s.px, s.py, joyB.x, joyB.y) < 52){
-          s.target = null;
-          s.cmdJoyT = (s.cmdJoyT || 0) - (dt || 0.016);
-          if(s.cmdJoyT <= 0){
-            s.cmdJoyT = 1.5;
-            if(APH.Res && APH.Res.enjoyRecreation) APH.Res.enjoyRecreation(s.meta.playerNeeds, (CFG.residents && CFG.residents.campfireRecGain) || 10);
-          }
-        } else {
-          s.target = { x: joyB.x, y: joyB.y + 12 };
-        }
-        return;
-      }
-    }
-
-    if(pGatherPrio > 0){
-      var flora = pickDesignatedFloraAt(s.px, s.py);
-      if(flora){
-        s.cmdIdleWalk = false;
-        if(s.nearFlora && s.nearFlora.id === flora.id) s.target = null;
-        else s.target = { x: flora.x, y: flora.y };
-        return;
-      }
-    }
-    if(s.gathering){ s.cmdIdleWalk = false; return; }
-    commanderIdleStroll(dt || 0.016);
+    commanderIdleStroll(dt||0.016);
   }
   function pickIdleDest(fromX, fromY){
     var s = APH.state;
@@ -4292,142 +4278,144 @@ window.APH = window.APH || {};
         var rSleepy = r && r.wantSleep && !r.isSleeping;
         if(!rHungry && !rSleepy){ e.walking=false; e.tx=e.x; e.ty=e.y; return; }
       }
-      /* 环世界: 困了走去居住舱上床，不要原地瞬睡 */
-      if(!raid && r && r.wantSleep && !r.isSleeping && !e.drafted){
-        var houseR=null, houseD=Infinity;
+      /* ADR-30 / #168: 与指挥官同一套 thinkPawn */
+      if(!raid && r && !e.drafted && APH.Res && APH.Res.thinkPawn){
+        var wp = (m.workPrio && m.workPrio[r.id]) || {};
+        var mealN = nearestMeal(e, 1e9);
+        var houseN=null, houseND=Infinity;
         (s.colony.buildings||[]).forEach(function(hb){
           if(!hb || hb.dead || hb.id!=='bl_house') return;
           var dH=U.dst(e.x,e.y,hb.x,hb.y);
-          if(dH<houseD){ houseD=dH; houseR=hb; }
+          if(dH<houseND){ houseND=dH; houseN=hb; }
         });
         var sleepArrive=(CFG.command&&CFG.command.sleepArriveR!=null)?CFG.command.sleepArriveR:40;
-        if(!houseR){
-          r.isSleeping=true; e.isSleeping=true; e.walking=false;
-          return;
-        }
-        if(houseD<=sleepArrive){
-          r.isSleeping=true; e.isSleeping=true; e.walking=false;
-          e.x=houseR.x+8; e.y=houseR.y+18;
-          return;
-        }
-        e.tx=houseR.x+8; e.ty=houseR.y+18;
-        APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
-        return;
-      }
-      var hungry=r && r.food!=null && r.food<eatBelow;
-      /* T8: 有桌有座 → 优先去最近空椅坐吃 (座次分配已在本帧 seatMap) */
-      var seat=!raid && hungry ? (seatMap[r.id]||null) : null;
-      if(seat && seat.chair){
-        /* 到椅坐下: 椅子位置+小偏移(避叠); 到达后坐在椅上吃 */
-        var seatX=seat.chair.x+8, seatY=seat.chair.y-2;
-        var dSeat=U.dst(e.x,e.y,seatX,seatY);
-        if(dSeat>((CFG.residents&&CFG.residents.diningArriveR!=null)?CFG.residents.diningArriveR:6)){
-          e.tx=seatX; e.ty=seatY;
-          APH.Res.walkAround(e, {x:seatX,y:seatY}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
-          /* 坐下后脸朝桌 (坐着吃=站姿, 只转脸) */
-          if(APH.Res.faceTable && U.dst(e.x,e.y,seatX,seatY)<=10) e.face=APH.Res.faceTable(seat.chair, seat.table);
-        }else{
-          e.x=seatX; e.y=seatY; e.walking=false;
-          e.face=APH.Res.faceTable(seat.chair, seat.table);
-          /* 在餐桌用餐: atTable=true → 心情增益+😊浮标+不罚无桌 */
-          var ateAtTable=tryEatHere(e, r, grabR, dumpR, true, ((CFG.residents&&CFG.residents.diningTableEatR!=null)?CFG.residents.diningTableEatR:90));
-          if(!ateAtTable && r.food<eatBelow){
-            /* 桌旁无粮兜底: 转最近粮堆/仓库(此时算无桌吃, 出惩罚) */
-            var meal2=nearestMeal(e, seekR);
-            if(meal2){ e.tx=meal2.x; e.ty=meal2.y; APH.Res.walkAround(e, meal2, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid); }
+        var spdMul=spd*sickSpeedMul*wxMul*bagMul;
+        var rpawn={
+          id:r.id, x:e.x, y:e.y, drafted:!!e.drafted,
+          food:r.food, rest:r.rest, recreation:r.recreation,
+          wantSleep:!!r.wantSleep, isSleeping:!!r.isSleeping, downed:!!r.downed, medLying:!!r.medLying,
+          prio:{
+            sk_gather: wp.sk_gather!=null?wp.sk_gather:2,
+            sk_build: wp.sk_build!=null?wp.sk_build:2,
+            sk_haul: wp.sk_haul!=null?wp.sk_haul:2
+          },
+          order:null, haulCarry:e.haulCarry,
+          nearFood: !!(mealN && U.dst(e.x,e.y,mealN.x,mealN.y)<=grabR),
+          nearBed: !!(houseN && houseND<=sleepArrive),
+          job: e.job || r.job,
+          gathering: !!e.gathering
+        };
+        var intent=APH.Res.thinkPawn(rpawn, pawnWorldAt(e.x, e.y, e.haulCarry));
+        var handled=true;
+        if(intent.type==='none'){ e.walking=false; }
+        else if(intent.type==='eat_now' || intent.type==='eat'){
+          var seat=seatMap[r.id]||null;
+          if(seat && seat.chair){
+            var seatX=seat.chair.x+8, seatY=seat.chair.y-2;
+            var dSeat=U.dst(e.x,e.y,seatX,seatY);
+            if(dSeat>((CFG.residents&&CFG.residents.diningArriveR!=null)?CFG.residents.diningArriveR:6)){
+              e.tx=seatX; e.ty=seatY;
+              APH.Res.walkAround(e, {x:seatX,y:seatY}, dt, spdMul, navGrid);
+              if(APH.Res.faceTable && U.dst(e.x,e.y,seatX,seatY)<=10) e.face=APH.Res.faceTable(seat.chair, seat.table);
+            }else{
+              e.x=seatX; e.y=seatY; e.walking=false;
+              e.face=APH.Res.faceTable(seat.chair, seat.table);
+              tryEatHere(e, r, grabR, dumpR, true, ((CFG.residents&&CFG.residents.diningTableEatR!=null)?CFG.residents.diningTableEatR:90));
+            }
+          }else if(intent.type==='eat_now'){
+            tryEatHere(e, r, grabR, dumpR);
+            e.walking=false;
+          }else{
+            e.tx=intent.x; e.ty=intent.y;
+            APH.Res.walkAround(e, {x:intent.x,y:intent.y}, dt, spdMul, navGrid);
           }
-        }
-        return;
-      }
-      var seekingMeal=false;
-      if(!raid && hungry){
-        if(tryEatHere(e, r, grabR, dumpR)){
-          seekingMeal=true;
-        }else if(r.food<eatBelow){
-          var meal=nearestMeal(e, seekR);
-          if(meal){ e.tx=meal.x; e.ty=meal.y; seekingMeal=true; }
-        }
-      }
-      if(!seekingMeal && !raid && !e.job){
-        /* ADR-28 环世界式自动采集：无建筑岗位 + 采集优先级>0 → 先采集，无目标时搬运。
-           饥饿但全图无口粮时不阻断采集（否则饿到完全停工，规划砍伐/采果永远不执行）。 */
-        var gatherPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_gather != null) ? m.workPrio[r.id].sk_gather : 2;
-        var haulPrio = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
-
-        if(e.gatherTarget){
-          var gt = e.gatherTarget;
-          if(gt.dead || gt.hp <= 0){
-            e.gatherTarget = null;
-          } else if(U.dst(e.x, e.y, gt.x, gt.y) < 48){
-            var gRes = APH.Colony.workOnFlora(gt, r, dt);
+        }else if(intent.type==='sleep_now'){
+          r.isSleeping=true; e.isSleeping=true; e.walking=false;
+          if(intent.bed && houseN){ e.x=houseN.x+8; e.y=houseN.y+18; }
+        }else if(intent.type==='sleep'){
+          e.tx=intent.x; e.ty=intent.y;
+          APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
+        }else if(intent.type==='build'){
+          if(U.dst(e.x,e.y,intent.x,intent.y)<90){ e.walking=false; e.tx=e.x; e.ty=e.y; }
+          else { e.tx=intent.x; e.ty=intent.y; APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid); }
+        }else if(intent.type==='haul_dump'){
+          if(U.dst(e.x,e.y,intent.x,intent.y)<=dumpR){
+            if(e.haulCarry){
+              APH.Colony.collectHome(s.meta, e.haulCarry.itemId, e.haulCarry.n||1);
+              var rhName=(CFG.items[e.haulCarry.itemId]&&CFG.items[e.haulCarry.itemId].name)||e.haulCarry.itemId;
+              if(APH.UI&&APH.UI.floatText) APH.UI.floatText((e.name||'居民')+' 入库 '+rhName+'×'+(e.haulCarry.n||1),'#9fe8c8');
+              e.haulCarry=null;
+            }
+            e.walking=false;
+          }else{
+            e.tx=intent.x; e.ty=intent.y;
+            APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
+          }
+        }else if(intent.type==='haul'){
+          var hDrop=intent.drop;
+          if(hDrop && U.dst(e.x,e.y,hDrop.x,hDrop.y)<=grabR){
+            e.haulCarry={itemId:hDrop.itemId, n:hDrop.n||1};
+            hDrop.dead=true;
+            if(APH.UI&&APH.UI.floatText) APH.UI.floatText((e.name||'居民')+' 拾起物资','#8fd4ff');
+          }else{
+            e.tx=intent.x; e.ty=intent.y;
+            APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
+          }
+        }else if(intent.type==='gather'){
+          var gt=intent.flora || e.gatherTarget;
+          if(intent.emergency && gt){
+            s.designations=s.designations||{};
+            if(!s.designations[gt.id]) s.designations[gt.id]={ type:'chop', entityId:gt.id };
+          }
+          e.gatherTarget=gt;
+          if(!gt || gt.dead || gt.hp<=0){ e.gatherTarget=null; e.gathering=false; }
+          else if(U.dst(e.x,e.y,gt.x,gt.y)<48){
+            var gRes=APH.Colony.workOnFlora(gt, r, dt);
             pulseGatherWork(gt, e, dt);
-            e.gathering = true;
-            e.walking = false;
+            e.gathering=true; e.walking=false;
             if(gRes.done && gRes.dropItemId){
               APH.Combat.spawnDrop(gt.x, gt.y, gRes.dropItemId, gRes.dropCount, {stock:true});
-              var gName = (CFG.items[gRes.dropItemId] && CFG.items[gRes.dropItemId].name) || gRes.dropItemId;
-              APH.UI.floatText((r ? r.name : '居民')+' 采集完成 +'+gRes.dropCount+' '+gName, '#c8e89a');
-              e.gatherTarget = null;
-              e.gathering = false;
+              var gName=(CFG.items[gRes.dropItemId]&&CFG.items[gRes.dropItemId].name)||gRes.dropItemId;
+              APH.UI.floatText((r?r.name:'居民')+' 采集完成 +'+gRes.dropCount+' '+gName, '#c8e89a');
+              e.gatherTarget=null; e.gathering=false;
               if(s.designations) delete s.designations[gt.id];
             }
-            return;
-          } else {
-            e.gathering = false;
-            e.tx = gt.x; e.ty = gt.y;
-            APH.Res.walkAround(e, {x:gt.x, y:gt.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
-            return;
+          }else{
+            e.gathering=false; e.tx=gt.x; e.ty=gt.y;
+            APH.Res.walkAround(e, {x:gt.x,y:gt.y}, dt, spdMul, navGrid);
           }
-        } else if(gatherPrio > 0){
-          /* ADR-28: 严格无标不采 — 仅当自然实体具有 chop 或 mine 规划标记时才自动前往 */
-          var bestFlora = pickDesignatedFloraAt(e.x, e.y);
-          var hasDropToHaul = !!(e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)));
-          if(bestFlora){
-            e.gatherTarget = bestFlora;
-            e.tx = bestFlora.x; e.ty = bestFlora.y;
-            APH.Res.walkAround(e, {x:bestFlora.x, y:bestFlora.y}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
-            return;
-          } else if(haulPrio > 0 && hasDropToHaul){
-            doHaul(e, r);
-          } else {
-            e.gathering = false;
-            if(!raid && !e.drafted && !e.userOrder){
-              if(tryResidentJoy(e, r, dt, spd*sickSpeedMul*wxMul*bagMul)) {}
-              else if(!s.selectedRid || (e.rid||e.id) !== s.selectedRid) residentIdleStroll(e, dt);
-            }
-          }
-        } else if(haulPrio > 0 && (e.haulCarry || nearestDrop(e, ((CFG.haul && CFG.haul.seekR) || 1200)))){
-          doHaul(e, r);
+        }else if(intent.type==='joy'){
+          tryResidentJoy(e, r, dt, spdMul);
+        }else if(intent.type==='job'){
+          handled=false;
+        }else if(intent.type==='idle'){
+          if(!s.selectedRid || (e.rid||e.id)!==s.selectedRid) residentIdleStroll(e, dt);
+          else { e.walking=false; e.tx=e.x; e.ty=e.y; }
+        }
+        if(handled){
+          /* fall through to traps + walkAround for leftover tx */
         } else {
-          e.gathering = false;
-          if(!raid && !e.drafted && !e.userOrder){
-            if(tryResidentJoy(e, r, dt, spd*sickSpeedMul*wxMul*bagMul)) {}
-            else if(!s.selectedRid || (e.rid||e.id) !== s.selectedRid) residentIdleStroll(e, dt);
-          }
-        }
-      } else if(!seekingMeal && !raid && e.job){
-        /* ADR-29 工位自主作业与微巡视 (Workstation Micro-pacing): 在农田/工位周围巡查劳作，拒绝站桩发呆 */
-        if(!e.drafted && !e.userOrder && (!s.selectedRid || (e.rid||e.id) !== s.selectedRid)){
-          e.workPaceT = (e.workPaceT || 0) - dt;
-          if(e.workPaceT <= 0){
-            e.workPaceT = U.rr(3.5, 6.0);
-            var bld = (s.colony && s.colony.buildings || []).find(function(b){ return b.id === e.job; });
-            if(bld){
-              var pace = (CFG.idle && CFG.idle.workPace != null) ? CFG.idle.workPace : 28;
-              e.tx = bld.x + 16 + U.rr(-pace, pace);
-              e.ty = bld.y + 20 + U.rr(-pace * 0.7, pace * 0.7);
+          /* 工位微巡视 */
+          if(!e.userOrder && (!s.selectedRid || (e.rid||e.id)!==s.selectedRid)){
+            e.workPaceT=(e.workPaceT||0)-dt;
+            if(e.workPaceT<=0){
+              e.workPaceT=U.rr(3.5, 6.0);
+              var bld=(s.colony&&s.colony.buildings||[]).find(function(b){ return b.id===e.job; });
+              if(bld){
+                var pace=(CFG.idle&&CFG.idle.workPace!=null)?CFG.idle.workPace:28;
+                e.tx=bld.x+16+U.rr(-pace,pace);
+                e.ty=bld.y+20+U.rr(-pace*0.7, pace*0.7);
+              }
             }
           }
-        }
-        var haulPrioJ = (r && m.workPrio && m.workPrio[r.id] && m.workPrio[r.id].sk_haul != null) ? m.workPrio[r.id].sk_haul : 2;
-        if(haulPrioJ > 0){
-          var pickR = H.pickR!=null?H.pickR:52;
-          var drop = nearestDrop(e, pickR);
-          if(drop){
-            e.tx = drop.x; e.ty = drop.y;
-            if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
-              e.haulCarry = { itemId:drop.itemId, n:drop.n||1 };
-              drop.dead = true;
+          if((wp.sk_haul!=null?wp.sk_haul:2)>0){
+            var nearDrop=nearestDrop(e, H.pickR!=null?H.pickR:52);
+            if(nearDrop){
+              e.tx=nearDrop.x; e.ty=nearDrop.y;
+              if(U.dst(e.x,e.y,nearDrop.x,nearDrop.y)<grabR){
+                e.haulCarry={ itemId:nearDrop.itemId, n:nearDrop.n||1 };
+                nearDrop.dead=true;
+              }
             }
           }
         }

@@ -1765,6 +1765,65 @@ APH.Res = (function(){
   }
 
   /* T9: 组合避难判定 — 房间内(true) > 房间外回退 isSheltered(建筑半径) */
+  /* ADR-30 / #168: 指挥官与居民共用决策。只出意图，不走路。 */
+  function thinkPawn(pawn, world){
+    pawn = pawn || {};
+    world = world || {};
+    if(pawn.drafted || pawn.isSleeping || pawn.downed || pawn.medLying) return { type:'none' };
+    var eatBelow = world.eatBelow != null ? world.eatBelow : 60;
+    var restSleepAt = world.restSleepAt != null ? world.restSleepAt : 20;
+    var restNightAt = world.restNightAt != null ? world.restNightAt : 75;
+    var joyAt = world.joyAt != null ? world.joyAt : 30;
+    var prio = pawn.prio || {};
+    var order = pawn.order || null;
+    var ot = order && order.type;
+
+    if(ot === 'gather' && order.flora && !order.flora.dead){
+      return { type:'gather', x:order.flora.x, y:order.flora.y, flora:order.flora, force:true };
+    }
+
+    var hungry = (pawn.food != null && pawn.food < eatBelow) || ot === 'eat';
+    if(hungry){
+      if(pawn.nearFood) return { type:'eat_now' };
+      if(world.meal) return { type:'eat', x:world.meal.x, y:world.meal.y };
+      if(world.berry) return { type:'gather', x:world.berry.x, y:world.berry.y, flora:world.berry, emergency:true };
+    }
+
+    var sleepy = ot === 'sleep' || !!pawn.wantSleep ||
+      (pawn.rest != null && pawn.rest < restSleepAt) ||
+      (!!world.night && pawn.rest != null && pawn.rest < restNightAt);
+    if(sleepy){
+      if(pawn.nearBed) return { type:'sleep_now', bed:true };
+      if(world.house) return { type:'sleep', x:world.house.x, y:(world.house.y||0)+18 };
+      return { type:'sleep_now', bed:false };
+    }
+
+    var forceBuild = ot === 'build';
+    var forceHaul = ot === 'haul';
+    if((prio.sk_build > 0 || forceBuild) && world.blueprint){
+      return { type:'build', x:world.blueprint.x, y:world.blueprint.y };
+    }
+    if(pawn.haulCarry && (prio.sk_haul > 0 || forceHaul) && world.storage){
+      return { type:'haul_dump', x:world.storage.x, y:world.storage.y, carry:pawn.haulCarry };
+    }
+    if(pawn.job && pawn.job !== 'blueprint' && !forceHaul && !forceBuild) return { type:'job' };
+    if(prio.sk_haul > 0 || forceHaul){
+      if(world.drop){
+        return { type:'haul', x:world.drop.x, y:world.drop.y, drop:world.drop };
+      }
+    }
+
+    if(prio.sk_gather > 0 && world.flora){
+      return { type:'gather', x:world.flora.x, y:world.flora.y, flora:world.flora };
+    }
+    if(pawn.gathering) return { type:'none' };
+
+    if((pawn.recreation != null ? pawn.recreation : 80) < joyAt && world.joy){
+      return { type:'joy', x:world.joy.x, y:(world.joy.y||0)+12 };
+    }
+    return { type:'idle' };
+  }
+
   function shelteredFor(pos, buildings, rooms){
     var rr = roomShelter(pos, rooms);
     if(rr === true) return true;
@@ -1808,5 +1867,6 @@ APH.Res = (function(){
     makeTraderStock:makeTraderStock, tradeOnce:tradeOnce, defaultPrio:defaultPrio,
     globalBonuses:globalBonuses,
     fallbackBio:fallbackBio, enrichBio:enrichBio,
+    thinkPawn:thinkPawn,
   };
 })();

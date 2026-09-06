@@ -1025,3 +1025,8 @@
 - **2026-09-06 02:40 · 班次(会话内)**: ✅ #167 警报条。APH.Alerts.collect/focus 纯函数；右侧重绘；暂停仍更新。
   - 覆盖：饥饿、困倦、倒地、仓库没粮、袭击、蓝图缺料；点击跳镜头。
   - 验证：alerts 10；run.js 695；scenario 145；构建成功。
+
+- **2026-09-06 03:20 · 班次(会话内)**: ✅ #168 指挥官与居民统一 thinkPawn。
+  - APH.Res.thinkPawn 纯函数：饿→困→建造/搬运→岗位/规划采集→娱乐→闲逛；征召返回 none。
+  - updateCommanderAutonomy 薄封装；居民日常块改走同一意图。
+  - 验证：think_pawn 15；run.js 710；scenario 146；构建成功。

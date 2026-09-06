@@ -3492,6 +3492,26 @@ test('#167 alerts: 饥饿警报可点跳镜头，没事则空', () => {
   S.paused=false;
 });
 
+test('#168 thinkPawn: 征召指挥官不闲逛，解征召后恢复自治', () => {
+  commanderSoloSetup();
+  S.playerDrafted = true;
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.meta.playerNeeds.recreation = 80;
+  S.designations = {};
+  S.colony.buildQueue = [];
+  S.haulCarry = null;
+  S.target = null;
+  S.cmdIdleWalk = false;
+  M.updateHome(0.5);
+  A(!S.target && !S.cmdIdleWalk, '征召中不应自己闲逛');
+  S.playerDrafted = false;
+  S.cmdIdleInited = true;
+  S.cmdIdleT = 0;
+  M.updateHome(0.05);
+  A(S.cmdIdleWalk || S.target, '解征召后应恢复自治');
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);
