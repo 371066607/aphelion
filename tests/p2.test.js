@@ -46,6 +46,13 @@ test('#182 fire: 灭火格熄灭', () => {
   if (fires.length) throw new Error('灭火后应空');
 });
 
+test('#184 animals: 牧场同步出羊', () => {
+  const pasture = { id:'bl_pasture', x:600, y:600, herd:2 };
+  const ents = Colony.syncPastureAnimals(pasture, []);
+  const sheep = ents.filter(e => e.type==='animal');
+  if (sheep.length !== 2) throw new Error('应有 2 只羊, 实际: '+sheep.length);
+});
+
 test('#183 restrict: 活动区外不允许', () => {
   const z = Colony.addRestrictZone([], [{ x: G, y: G }]).zone;
   const pawn = { restrictId: z.id };

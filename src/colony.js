@@ -2496,7 +2496,40 @@ APH.Colony = (function(){
       return false;
     }
 
+    if(tool === 'hunt'){
+      if(entity.type === (T.ANIMAL || 'animal') && !entity.dead){
+        designations[id] = { type: 'hunt', entityId: id };
+        return true;
+      }
+      return false;
+    }
+
     return false;
+  }
+  function makeAnimal(pasture, i){
+    var px = (pasture && pasture.x) || 1100, py = (pasture && pasture.y) || 1100;
+    return {
+      id: 'an_' + ((pasture && pasture.id) || 'p') + '_' + i,
+      type: (CFG.entType && CFG.entType.ANIMAL) || 'animal',
+      kind: 'sheep',
+      x: px + ((i % 3) - 1) * 18,
+      y: py + 16 + Math.floor(i / 3) * 14,
+      hp: 20, maxHp: 20,
+      pastureId: pasture && (pasture.id + '@' + Math.round(px) + ',' + Math.round(py))
+    };
+  }
+  function syncPastureAnimals(pasture, entities){
+    entities = entities || [];
+    var want = Math.max(0, (pasture && pasture.herd) || 0);
+    var pid = pasture && (pasture.id + '@' + Math.round(pasture.x||0) + ',' + Math.round(pasture.y||0));
+    var have = entities.filter(function(e){ return e && e.type==='animal' && !e.dead && e.pastureId===pid; });
+    while(have.length < want){
+      var a = makeAnimal(pasture, have.length);
+      a.pastureId = pid;
+      entities.push(a);
+      have.push(a);
+    }
+    return entities;
   }
 
   return {
@@ -2545,6 +2578,7 @@ APH.Colony = (function(){
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     floraRespawnTick:floraRespawnTick,
     boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
+    makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,

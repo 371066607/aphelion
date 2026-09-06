@@ -2083,6 +2083,17 @@ window.APH = window.APH || {};
       resident:function(e,t){ APH.Ent.drawResident(e,t); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       flora:function(e,t){ APH.Ent.drawFlora(e,t); },
+      animal:function(e,t){
+        if(!e || e.dead) return;
+        var cv=document.getElementById('cv'); if(!cv||!cv.getContext) return;
+        var ctx=cv.getContext('2d');
+        ctx.save(); ctx.translate(e.x,e.y);
+        ctx.fillStyle='#e8e0d4';
+        ctx.beginPath(); ctx.ellipse(0,2,10,7,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#333'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+        ctx.fillText('🐑', 0, 4);
+        ctx.restore();
+      },
       corpse:function(e,t){
         if(!e || e.dead) return;
         var ctx=document.getElementById('cv') && document.getElementById('cv').getContext('2d');
@@ -5239,6 +5250,7 @@ window.APH = window.APH || {};
         APH.Combat.spawnDrop(b.x-10, b.y+18, 'it_leather', out.leatherGain, {stock:true});
       if(out.leatherGain>0)
         APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+'肉 +'+out.leatherGain+'皮','#c8e89a');
+      if(APH.Colony.syncPastureAnimals) APH.Colony.syncPastureAnimals(b, s.entities);
       else if(out.foodGain>0)
         APH.UI.floatText('🐑 畜牧产出堆在地上 +'+out.foodGain+' 食物','#c8e89a');
     });
@@ -5401,7 +5413,7 @@ window.APH = window.APH || {};
         var s = APH.state;
         s.orderTool = (s.orderTool === toolId) ? null : toolId;
         if(s.orderTool){
-          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', grow:'🌱 种植', clean:'🧹 清扫', extinguish:'💧 灭火', restrict:'🚧 活动区', cancel:'✕ 取消' };
+          var toolNames = { chop:'🪓 砍伐', mine:'⛏ 开采', haul:'✋ 搬运', deconstruct:'🔨 拆除', stockpile:'📦 仓储', grow:'🌱 种植', clean:'🧹 清扫', extinguish:'💧 灭火', restrict:'🚧 活动区', hunt:'🎯 打猎', cancel:'✕ 取消' };
           APH.UI.setHint('[' + (toolNames[s.orderTool]||s.orderTool) + ' 模式] 鼠标在地图上单点或拉框圈选 · 右键/Esc 退出');
         } else {
           APH.UI.setHint('');

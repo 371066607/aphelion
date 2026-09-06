@@ -1284,6 +1284,7 @@ APH.UI = (function(){
       { id: 'clean', name: '清扫', icon: '🧹', title: '拉框清扫污秽' },
       { id: 'extinguish', name: '灭火', icon: '💧', title: '拉框灭火' },
       { id: 'restrict', name: '活动区', icon: '🚧', title: '拉框活动区，选中小人可限制在区内' },
+      { id: 'hunt', name: '打猎', icon: '🎯', title: '圈选动物打猎' },
       { id: 'cancel', name: '取消', icon: '✕', title: '单点或拉框清除区域内的规划标记', cancel: true },
     ];
     var h = '<div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">';
