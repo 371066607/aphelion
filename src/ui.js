@@ -19,6 +19,7 @@ APH.UI = (function(){
       else if((s.timeScale||1)!==1){ pb.style.display='block'; pb.textContent='⏱ ×'+(s.timeScale||1); }
       else pb.style.display='none';
     }
+    renderAlerts();
     $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
     $('vO2').textContent = Math.round(Math.max(0,s.o2));
     $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
@@ -1770,6 +1771,31 @@ APH.UI = (function(){
     return h;
   }
 
+  function renderAlerts(){
+    var bar = $('alertBar');
+    if(!bar) return;
+    var s = APH.state;
+    if(!s || s.scene !== 'home' || s.mode !== 'running' || !APH.Alerts){
+      bar.style.display='none';
+      bar.innerHTML='';
+      return;
+    }
+    var list = APH.Alerts.collect(s);
+    if(!list.length){
+      bar.style.display='none';
+      bar.innerHTML='';
+      return;
+    }
+    bar.style.display='flex';
+    bar.innerHTML='';
+    list.forEach(function(a){
+      var d=document.createElement('div');
+      d.className='aph-alert';
+      d.textContent=a.text;
+      d.onclick=function(){ APH.Alerts.focus(APH.state, a); };
+      bar.appendChild(d);
+    });
+  }
   function renderColonistBar(){
     var bar = document.getElementById('colonistBar');
     var s = (window.APH && window.APH.state);

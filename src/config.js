@@ -21,6 +21,14 @@ APH.CFG = {
     prodTick: 30,              // 生产跳秒数（与 tickProduction 一致）
   },
 
+  /* HUD 警报条 (#167) */
+  alerts: {
+    commander: '指挥官',
+    noFood: '仓库没有口粮',
+    raid: '袭击进行中',
+    prio: { raid: 100, downed: 90, no_food: 80, hungry: 70, sleepy: 60, missing: 50 }
+  },
+
   /* 土壤肥力体系 (RimWorld 农业) */
   soil: {
     rich: 1.40,                // 沃土(湖畔/沼泽)

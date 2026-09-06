@@ -80,7 +80,7 @@ ASSET_IDS.forEach(function(id){
   new Function(line)();
 });
 for(const f of ['config.js','utils.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','alerts.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
@@ -3464,6 +3464,32 @@ test('#173 pause: 暂停时钟停、倍速加速、暂停时镜头可平移 (#16
   M.simStep(0.1);
   A(S.clock > c2 + 0.29, '×3 时 0.1s 真实时间应推进约 0.3s 模拟');
   S.timeScale = 1;
+});
+
+test('#167 alerts: 饥饿警报可点跳镜头，没事则空', () => {
+  A(typeof APH.Alerts.collect === 'function', '应导出 Alerts.collect');
+  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
+  S.mode='running';
+  S.paused=true;
+  const food0 = S.meta.playerNeeds.food;
+  S.meta.playerNeeds.food = 20;
+  const list = APH.Alerts.collect(S);
+  const hungry = list.find(a => a.kind==='hungry');
+  A(!!hungry, '指挥官饥饿应出现警报');
+  A(hungry.text === '指挥官饥饿', '文案应锁定, 实际: '+hungry.text);
+  APH.Alerts.focus(S, { x: 1500, y: 1600 });
+  A(S.camX===1500 && S.camY===1600, '点击警报应跳镜头');
+  S.meta.playerNeeds.food = 80;
+  S.meta.playerNeeds.rest = 100;
+  S.meta.playerNeeds.wantSleep = false;
+  S.meta.playerNeeds.downed = false;
+  S.meta.res = Object.assign({}, S.meta.res, { food: 20 });
+  S.war = Object.assign({}, S.war, { raidActive: false });
+  S.colony.buildQueue = [];
+  const empty = APH.Alerts.collect(S);
+  A(empty.length===0, '没事应无警报, 实际: '+JSON.stringify(empty));
+  S.meta.playerNeeds.food = food0;
+  S.paused=false;
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

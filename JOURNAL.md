@@ -1021,3 +1021,7 @@
 - **2026-09-06 02:10 · 班次(会话内)**: ✅ #166 一天改为 60 分钟并校准饿/困/娱乐。
   - DAY_LEN / weather.dayLen = 3600；foodDrain 0.35 / restDrain 0.42 / recreationDrain 0.4 / 床恢复 0.65。
   - 验证：run.js 685；scenario 144；ui_modals 65；perf 4；boss 7；构建成功。
+
+- **2026-09-06 02:40 · 班次(会话内)**: ✅ #167 警报条。APH.Alerts.collect/focus 纯函数；右侧重绘；暂停仍更新。
+  - 覆盖：饥饿、困倦、倒地、仓库没粮、袭击、蓝图缺料；点击跳镜头。
+  - 验证：alerts 10；run.js 695；scenario 145；构建成功。

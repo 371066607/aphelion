@@ -28,6 +28,7 @@ MODULE_ORDER = [
     "nav.js",
     "weather.js",
     "residents.js",
+    "alerts.js",
     "combat.js",
     "world.js",
     "entities.js",
