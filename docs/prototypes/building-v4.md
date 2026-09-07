@@ -1,15 +1,15 @@
 # 房间试建 v4（#186）
 
-状态：独立、可丢弃的玩法原型。正式建造系统迁移须等玩家验收后另拆任务。
+状态：独立入口的玩法原型，已按玩家要求合入 main。正式建造系统迁移须等玩家验收后另拆任务。
 
 ## 打开
 
-在 `prototype/building-v4` 分支执行 `python3 build.py`。浏览器打开本目录对应的 `game.html`，地址末尾加 `?prototype=building-v4`。
+在 `main` 分支执行 `python3 build.py`。浏览器打开本目录对应的 `game.html`，地址末尾加 `?prototype=building-v4`。
 
 本次工作区的完整地址：
 
 ```text
-file:///Users/mac/aphelion-building-v4/game.html?prototype=building-v4
+file:///Users/mac/aphelion/game.html?prototype=building-v4
 ```
 
 入口在 `main.js` 的整个初始化之前返回。原型状态只存在内存；不读取、迁移或写回任何正式存档。刷新恢复示范，“空地重建”清除的仅是本次试建。
@@ -81,4 +81,4 @@ NODE_PATH=/tmp/aphelion-building-qa/node_modules node tests/building_proto_canva
 
 浏览器本地 URL 自动访问被安全策略拒绝，未使用其他浏览器、代理 URL 或服务器绕过。因此浏览器实机视觉和操作手感仍由玩家在上述入口验收，Node / 离线绘图结果不等同于浏览器验收。
 
-建议验收顺序：旋转床贴墙摆放 → 三人穿门使用床/工作台 → 拆共用墙观察合并 → 补墙观察分间 → 断一格导线观察停工 → 雨天拆外墙观察失去屋顶保护 → 空地重建一间房。确认后再转正式规格和实施票据，不能直接把此原型合入主线当作完成迁移。
+建议验收顺序：旋转床贴墙摆放 → 三人穿门使用床/工作台 → 拆共用墙观察合并 → 补墙观察分间 → 断一格导线观察停工 → 雨天拆外墙观察失去屋顶保护 → 空地重建一间房。确认后再转正式规格和实施票据；入口合入主线不代表正式建造系统迁移完成。
