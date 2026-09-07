@@ -196,6 +196,27 @@ window.APH = window.APH || {};
   }
 
   /* 返回殖民地(发射台交互) */
+  /* T5: 通关 —— 呼叫救援离开这颗星球。 */
+  function launchRescue(){
+    var s=APH.state, m=s.meta;
+    if(s.mode!=='running') return false;
+    s.mode='won';
+    if(m.stats) m.stats.won = (m.stats.won||0) + 1;
+    m.colonyWon = true;
+    APH.Save.saveMeta(m);
+    U.emit('colonyWon', {});
+    if(APH.UI && APH.UI.showWin){
+      APH.UI.showWin({
+        clock: s.clock, cry: s.cry,
+        days: (s.clock||0)/(CFG.DAY_LEN||3600),
+        survivors: ((m.residents)||[]).length + 1,
+        lost: (m.stats && m.stats.colonistsLost) || 0,
+        rescue: true,
+      });
+    }
+    return true;
+  }
+
   function returnHome(){
     var s=APH.state;
     if(s.scene!=='expedition') return;
@@ -977,12 +998,18 @@ window.APH = window.APH || {};
       pe.downed = !!s.meta.playerNeeds.downed;   // #72 家园击倒: 实体俯卧标志同步(送医复活后清)
     }
   }
-  function updateHome(dt){
+  /* ============================================================
+     家园每帧: 感知 → 模拟 → 提示 → UI 同步 (ADR-32)
+     以前这四件事挤在一个 300 行的 updateHome 里, 提示语的优先级
+     靠「后一次 setHint 覆盖前一次」隐式决定 —— 谁在函数里写得靠后
+     谁就赢, 读代码看不出来。现在拆开, 优先级写成一张显式的表。
+     ============================================================ */
+
+  /* 感知: 只把「附近有什么」写进 state, 不做决策、不发提示。 */
+  function senseHome(){
     var s=APH.state;
     /* #72 家园击倒: 首帧保证 playerNeeds 存在(否则击倒/送医无挂载点) */
     if(!s.meta.playerNeeds && APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(s.meta);
-    APH.Ent.updatePlayer(dt);
-    updateCamera(dt);
 
     /* 发射台 / 过客接近检测 (委托 APH.Ent 空间检索接缝, ADR-20) */
     var pad = APH.Ent.findNearestBuilding(s.entities, 'bl_landing_pad', s.px, s.py, 90) ||
@@ -1011,6 +1038,31 @@ window.APH = window.APH || {};
     var needs = s.meta && s.meta.playerNeeds;
     s.downed = !!(needs && needs.downed);
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 48);
+    /* T5 终局: 发射器 */
+    s.nearTransmitter = (s.scene === 'home')
+      ? APH.Ent.findNearestBuilding(s.entities, 'bl_transmitter', s.px, s.py, 70) : null;
+    s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
+    s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
+    s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
+    s.nearAncientTerminal = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_terminal', s.px, s.py, 60) : null;
+    s.nearAncientVault = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_vault', s.px, s.py, 60) : null;
+
+    /* 破损居民(供提示与右键安抚) */
+    if(s.nearResident){
+      var rProf = residentOf(s.nearResident);
+      s.nearBrokenResident = (rProf && APH.Res && APH.Res.isBroken && APH.Res.isBroken(rProf))
+        ? { entity: s.nearResident, resident: rProf } : null;
+    } else {
+      s.nearBrokenResident = null;
+    }
+  }
+
+  /* 模拟: 推进世界。返回提示层需要的环境量(诊所距离/天气播报等)。 */
+  function simHome(dt){
+    var s=APH.state;
+    APH.Ent.updatePlayer(dt);
+    updateCamera(dt);
+
     /* ADR-29: 未征召指挥官按工作优先级自治。贴树后按真实 dt 持续作业（禁止把 hp/s 误当 dt 一帧砍倒）。 */
     var peGather = APH.Ent.findPlayer ? APH.Ent.findPlayer() : null;
     if(peGather) peGather.gathering = false;
@@ -1035,33 +1087,7 @@ window.APH = window.APH || {};
       }
     }
     updateCommanderAutonomy(dt);
-    s.nearStorageContainer = APH.Ent.findNearestBuilding(s.entities, ['bl_storage_shelf', 'bl_warehouse'], s.px, s.py, 60);
-    s.nearCooler = (s.scene === 'home') ? APH.Ent.findNearestBuilding(s.entities, 'bl_cooler', s.px, s.py, 60) : null;
-    if(s.nearCooler && !s.nearBrokenResident && !s.nearResident && !s.nearBed && !s.nearClinic && !s.nearFood && !s.nearPad){
-      var cMode = (s.nearCooler.mode === 'freezer') ? '❄ 冷库模式 (-5°C)' : '🌤 避暑模式 (20°C)';
-      APH.UI.setHint('[E] 切换空调模式: 当前为 ' + cMode);
-    }
-    s.nearAncientGate = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_gate', s.px, s.py, 60) : null;
-    s.nearAncientTerminal = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_terminal', s.px, s.py, 60) : null;
-    s.nearAncientVault = (s.scene === 'expedition') ? APH.Ent.findNearestBuilding(s.entities, 'ancient_vault', s.px, s.py, 60) : null;
-    if(s.nearAncientVault){
-      var vObj = s.nearAncientVault.vault || s.nearAncientVault;
-      if(vObj.opened){
-        APH.UI.setHint('远古遗物箱 · 已开启');
-      } else {
-        APH.UI.setHint('[E] 开启远古遗物箱');
-      }
-    } else if(s.nearAncientTerminal){
-      var tObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
-      if(tObj.hacked){
-        APH.UI.setHint('古代数据终端 · 破译完成 [系统已接管]');
-      } else {
-        var loreLv = (s.meta && s.meta.loreSkill) || 3;
-        APH.UI.setHint('[E] 破译古代终端 (学识 Lv' + loreLv + ')');
-      }
-    } else if(s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
-      APH.UI.setHint('[E] 破译能量闸门 (亦可用等离子枪轰击破门)');
-    }
+
     if(s.scene === 'expedition' && s.ruins && !s.ruins.revealed){
       if(U.dst(s.px, s.py, s.ruins.cx, s.ruins.cy) < 140){
         s.ruins.revealed = true;
@@ -1073,104 +1099,6 @@ window.APH = window.APH || {};
     /* C: 游商走了/离远了自动收面板 */
     var tpO=document.getElementById('tradePanel');
     if(tpO && tpO.style.display!=='none' && !currentTrader()) toggleTradePanel(false);
-    if(s.nearVisitor){
-      var vp=s.nearVisitor.profile||s.nearVisitor;
-      var skn=APH.Res.SKILL_NAMES[vp.mainSkill]||'';
-      var ctxH=makeRecruitCtx(s.nearVisitor);
-      var intent=APH.Res.joinIntentOf(vp);
-      var tag=intent==='refugee'?'难民':(intent==='trader'?'游商':'过路客');
-      var mealCost=(CFG.recruit&&CFG.recruit.mealCost)||2;
-      var imp=Math.round(s.nearVisitor.impression!=null?s.nearVisitor.impression:50);
-      var mealBit='';
-      if(!s.nearVisitor.fed){
-        mealBit=haveStock('food')>=mealCost
-          ? '  [F] 请客(-'+mealCost+'粮)'
-          : '  [F] 没粮请客';
-      }
-      if(s.nearVisitor.trade) mealBit+='  [E] 交易';
-      if((s.nearVisitor.askCd||0)>0){
-        APH.UI.setHint(vp.name+' 还想再看看… · 印象'+imp+mealBit);
-      }else{
-        var ch=APH.Res.joinChance(vp, ctxH);
-        var extra=ch.ok
-          ? (intent==='refugee'?' · 会留下':' · '+APH.Res.chanceLabel(ch.chance))
-          : ' — '+ch.why;
-        APH.UI.setHint((intent==='trader'?'[E] ':'[E] 招募 ')+
-          (vp.name||'过客')+' · '+tag+
-          (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
-          (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit);
-      }
-    }else if(s.nearResident){
-      var rProfile = residentOf(s.nearResident);
-      if(rProfile && APH.Res && APH.Res.isBroken && APH.Res.isBroken(rProfile)){
-        s.nearBrokenResident = { entity: s.nearResident, resident: rProfile };
-        APH.UI.setHint('[E] 安抚情绪 (' + (rProfile.name || '居民') + ' 正在 ' + (APH.Res.BREAK_NAMES[rProfile.breakType] || rProfile.breakType) + ')');
-      } else if(rProfile){
-        s.nearBrokenResident = null;
-        var rTier = (APH.Res && APH.Res.relationshipTierOf) ? APH.Res.relationshipTierOf((s.meta && s.meta.bonds && s.meta.bonds['player|' + rProfile.id]) || 50) : { name:'平淡', icon:'😐' };
-        APH.UI.setHint('[E] 打招呼  [F] 请客 · ' + (rProfile.name || '居民') + ' (' + rTier.icon + ' ' + rTier.name + ')');
-      }
-    }else if(s.nearBed){
-      /* #66 床边睡眠: 优先于发射台提示 */
-      var restN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.rest!=null)
-        ? s.meta.playerNeeds.rest : 100;
-      var bedHint = playerSleeping()
-        ? '[E] 起床 (按方向键或受伤也会醒)'
-        : '[E] 上床睡觉 (精力 '+Math.round(restN)+')';
-      APH.UI.setHint(bedHint);
-    }else if(s.nearClinic && (playerSleeping() || playerSick())){
-      /* #70 医疗舱躺下: 靠近医疗舱且生病/躺舱中的 E 提示(早于'医疗舱·缓慢治疗') */
-      var illN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness!=null)
-        ? s.meta.playerNeeds.illness : 0;
-      var podHint = playerSleeping()
-        ? '[E] 起床 (按方向键或受伤也会醒)'
-        : '[E] 躺进医疗舱 (病情 '+Math.round(illN)+')';
-      APH.UI.setHint(podHint);
-    }else if(s.nearFood && playerFood() < foodEatBelow()){
-      /* #65 走到粮边吃: 饥饿时近粮堆/仓库的 E 提示(插在近医疗舱之后、厨房之前) */
-      var srcName65 = s.nearFood.isWarehouse ? '仓库口粮' : ((CFG.items[s.nearFood.itemId]||{}).name||'食物');
-      APH.UI.setHint('[E] 吃 '+srcName65+' (饱食 '+Math.round(playerFood())+')');
-    }else if(s.nearKitchen){
-      var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
-      var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
-      APH.UI.setHint('烹饪灶台 · [F] 切换菜谱 (' + kName + ')');
-    }else if(s.nearCampfire){
-      var cRec = (s.nearCampfire.recipe || 'it_roasted_meat');
-      var cName = (APH.Colony.COOK_RECIPES[cRec] && APH.Colony.COOK_RECIPES[cRec].name) || cRec;
-      APH.UI.setHint('石料篝火 · 取暖保暖 · [F] 切换配方 (' + cName + ')');
-    }else if(s.nearLab){
-      var labRec = buildingRecordOf(s.nearLab);
-      var labT = (labRec && labRec.analysisTarget) || s.nearLab.analysisTarget || 'specimen_flora_glow';
-      var labDef = APH.Colony.SPECIMEN_ANALYSIS[labT];
-      var labNm = (labDef && labDef.name) || labT;
-      var labHave = (s.meta.res && s.meta.res[labT]) || 0;
-      var labProg = (labRec && labRec.analysisProgress != null) ? labRec.analysisProgress
-        : (s.nearLab.analysisProgress || 0);
-      var labPct = labDef ? Math.min(100, Math.floor(100*labProg/(labDef.craftTime||15))) : 0;
-      APH.UI.setHint('科研站 · [F] 切换化验 ('+labNm+' '+labPct+'% · 库存×'+labHave+')');
-    }else if(s.nearCropPlot){
-      var plotCrop = s.nearCropPlot.crop;
-      var plotNm = (plotCrop && APH.Colony.ALIEN_CROPS[plotCrop] && APH.Colony.ALIEN_CROPS[plotCrop].name) || '未选定';
-      APH.UI.setHint('种植圃 · [F] 切换已化验作物 ('+plotNm+')');
-    }else if(s.nearWorkshop){
-      var wRec = s.nearWorkshop.recipe || 'it_pickaxe';
-      var wName = (APH.Colony.CRAFT_RECIPES[wRec] && APH.Colony.CRAFT_RECIPES[wRec].name) || wRec;
-      APH.UI.setHint('工坊 · [F] 切换配方 ('+wName+')');
-    }else if(s.nearPad && !s.war.raidActive && !(s.war.raidWarn>0)){
-      var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
-      APH.UI.setHint('[E] 登船 · '+shPad.mission);
-    }else if(!s.war.raidActive && !(s.war.raidWarn>0)){
-      var objH = window.APH.Opening && APH.Opening.objective
-        ? APH.Opening.objective(s.meta&&s.meta.opening, (s.colony&&s.colony.buildings)||[])
-        : null;
-      if(objH) APH.UI.setHint(objH.text);
-      else {
-        var hintEl=document.getElementById('hint');
-        var cur=hintEl&&hintEl.textContent||'';
-        if(cur.indexOf('[E] 登船')===0 || cur.indexOf('[E] 招募')===0)
-          APH.UI.setHint('');
-      }
-    }
 
     /* 家园: 氧气始终补; 生命只在靠近医疗舱时缓慢回 */
     var clinicB=null;
@@ -1181,6 +1109,7 @@ window.APH = window.APH || {};
     /* #72 家园击倒: 送医拖行(世界侧 lerp) → 每帧结算(送医复活/倒计时死亡)。
        顺序固定: updatePlayer → carry(拖近) → tick(用拖后位置判 inClinic)。 */
     carryPlayerToClinic(dt);
+    var needs = s.meta && s.meta.playerNeeds;
     var healR72=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
     var hasRes72=(s.meta.residents||[]).length>0;
     var res72=APH.Res.playerDownedTick(needs, s.scene, dt, {
@@ -1201,45 +1130,250 @@ window.APH = window.APH || {};
       s.downed=false;
       if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✚ 居民把你抬进医疗舱 · 脱离危险','#7dffab');
     }
-    var healR=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
-    if(clinicB && cDist<healR && s.hp<CFG.player.hpMax &&
-       !s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
-      APH.UI.setHint('医疗舱 · 缓慢治疗');
-    }else if(!s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
+
+    /* 天气播报(有副作用: 首次进入才浮字), 提示文本交给 hintForHome */
+    var weatherHint=null;
+    var quiet = !s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0);
+    if(quiet){
       var nightW=APH.World.daylight()<.5;
       var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW);
-      if(wx.storm && !s._stormOn)
-        APH.UI.floatText('⚡ 磁暴来袭 · 实验室停摆','#c39bff');
-      if(wx.acid && !s._acidOn)
-        APH.UI.floatText('🌧 酸雨 · 农田减半','#7dffab');
+      if(wx.storm && !s._stormOn) APH.UI.floatText('⚡ 磁暴来袭 · 实验室停摆','#c39bff');
+      if(wx.acid && !s._acidOn) APH.UI.floatText('🌧 酸雨 · 农田减半','#7dffab');
       s._stormOn=!!wx.storm; s._acidOn=!!wx.acid;
-      if(wx.storm) APH.UI.setHint('⚡ 磁暴 · 实验室停摆');
-      else if(wx.acid) APH.UI.setHint('🌧 酸雨 · 农田减半');
+      if(wx.storm) weatherHint='⚡ 磁暴 · 实验室停摆';
+      else if(wx.acid) weatherHint='🌧 酸雨 · 农田减半';
     }
 
-    /* #72 家园击倒: 击倒昏迷提示(盖过一切环境提示; 复活后 needs.downed 为 false 自然失效) */
+    /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
+    updateResidents(dt);
+    (s.entities||[]).forEach(function(e){
+      if(e && e.type==='animal' && !e.dead && APH.Res.wanderStep){
+        APH.Res.wanderStep(e, dt, { x:e.x, y:e.y }, 70);
+      }
+    });
+    if(APH.Colony && APH.Colony.tickConstruction) APH.Colony.tickConstruction(s, dt);
+    /* 30s 生产时钟周期 (委托 APH.Colony, ADR-21) */
+    /* ADR-38: 生产跳的编排归 main.js —— colony 只报告「这一跳发生了」,
+       敌对/叙事/居民三跳在这里按固定顺序推进, 不再由 colony 反向调用。 */
+    if(APH.Colony && APH.Colony.tickProduction && APH.Colony.tickProduction(s, dt)){
+      tickRivals(30 / 60);
+      storyTick(30 / 60);
+      residentsTick();
+    }
+    /* 战争防务与波次推进 (委托 APH.Combat, ADR-21)
+       ADR-38: 围攻推进在这里由 main 自己驱动, 顺序同以前(tickRaid 内部先跑 siege) */
+    siegeTick(dt);
+    if(APH.Combat && APH.Combat.tickRaid) APH.Combat.tickRaid(s, dt);
+    /* 掉落拾取不绑袭击: 末波击杀当帧清 raid 后地上战利品仍能捡 */
+    APH.Combat.updateDropped(dt);
+
+    return { clinicB:clinicB, cDist:cDist, needs:needs, hasRes72:hasRes72,
+             weatherHint:weatherHint, quiet:quiet };
+  }
+
+  /* ---- 提示语候选: 从高到低, 命中即用 ----
+     返回 null = 这一档没意见, 交给下一档; 返回 '' = 明确要求清空。 */
+  function hintNearbyThing(s){
+    if(s.nearTransmitter){
+      var txRec = buildingRecordOf(s.nearTransmitter);
+      var txPowered = !(txRec && txRec.powered === false);
+      return txPowered
+        ? '[E] 呼叫救援 · 离开这颗星球'
+        : '深空发射器 · 未通电（需接入导线并有足够发电）';
+    }
+    if(s.nearVisitor){
+      var vp=s.nearVisitor.profile||s.nearVisitor;
+      var skn=APH.Res.SKILL_NAMES[vp.mainSkill]||'';
+      var ctxH=makeRecruitCtx(s.nearVisitor);
+      var intent=APH.Res.joinIntentOf(vp);
+      var tag=intent==='refugee'?'难民':(intent==='trader'?'游商':'过路客');
+      var mealCost=(CFG.recruit&&CFG.recruit.mealCost)||2;
+      var imp=Math.round(s.nearVisitor.impression!=null?s.nearVisitor.impression:50);
+      var mealBit='';
+      if(!s.nearVisitor.fed){
+        mealBit=haveStock('food')>=mealCost
+          ? '  [F] 请客(-'+mealCost+'粮)'
+          : '  [F] 没粮请客';
+      }
+      if(s.nearVisitor.trade) mealBit+='  [E] 交易';
+      if((s.nearVisitor.askCd||0)>0) return vp.name+' 还想再看看… · 印象'+imp+mealBit;
+      var ch=APH.Res.joinChance(vp, ctxH);
+      var extra=ch.ok
+        ? (intent==='refugee'?' · 会留下':' · '+APH.Res.chanceLabel(ch.chance))
+        : ' — '+ch.why;
+      return (intent==='trader'?'[E] ':'[E] 招募 ')+
+        (vp.name||'过客')+' · '+tag+
+        (skn?' · '+skn+(vp.skills&&vp.skills[vp.mainSkill]||''):'')+
+        (vp.trait?' · '+vp.trait:'')+ extra+' · 印象'+imp+mealBit;
+    }
+    if(s.nearResident){
+      var rProfile = residentOf(s.nearResident);
+      if(rProfile && APH.Res && APH.Res.isBroken && APH.Res.isBroken(rProfile)){
+        return '[E] 安抚情绪 (' + (rProfile.name || '居民') + ' 正在 ' + (APH.Res.BREAK_NAMES[rProfile.breakType] || rProfile.breakType) + ')';
+      }
+      if(rProfile){
+        var rTier = (APH.Res && APH.Res.relationshipTierOf) ? APH.Res.relationshipTierOf((s.meta && s.meta.bonds && s.meta.bonds['player|' + rProfile.id]) || 50) : { name:'平淡', icon:'😐' };
+        return '[E] 打招呼  [F] 请客 · ' + (rProfile.name || '居民') + ' (' + rTier.icon + ' ' + rTier.name + ')';
+      }
+      return null;
+    }
+    if(s.nearBed){
+      /* #66 床边睡眠: 优先于发射台提示 */
+      var restN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.rest!=null)
+        ? s.meta.playerNeeds.rest : 100;
+      return playerSleeping()
+        ? '[E] 起床 (按方向键或受伤也会醒)'
+        : '[E] 上床睡觉 (精力 '+Math.round(restN)+')';
+    }
+    if(s.nearClinic && (playerSleeping() || playerSick())){
+      /* #70 医疗舱躺下 */
+      var illN = (s.meta && s.meta.playerNeeds && s.meta.playerNeeds.illness!=null)
+        ? s.meta.playerNeeds.illness : 0;
+      return playerSleeping()
+        ? '[E] 起床 (按方向键或受伤也会醒)'
+        : '[E] 躺进医疗舱 (病情 '+Math.round(illN)+')';
+    }
+    if(s.nearFood && playerFood() < foodEatBelow()){
+      /* #65 走到粮边吃 */
+      var srcName65 = s.nearFood.isWarehouse ? '仓库口粮' : ((CFG.items[s.nearFood.itemId]||{}).name||'食物');
+      return '[E] 吃 '+srcName65+' (饱食 '+Math.round(playerFood())+')';
+    }
+    if(s.nearKitchen){
+      var kRec = (s.nearKitchen.recipe || 'it_roasted_meat');
+      var kName = (APH.Colony.COOK_RECIPES[kRec] && APH.Colony.COOK_RECIPES[kRec].name) || kRec;
+      return '烹饪灶台 · [F] 切换菜谱 (' + kName + ')';
+    }
+    if(s.nearCampfire){
+      var cRec = (s.nearCampfire.recipe || 'it_roasted_meat');
+      var cName = (APH.Colony.COOK_RECIPES[cRec] && APH.Colony.COOK_RECIPES[cRec].name) || cRec;
+      return '石料篝火 · 取暖保暖 · [F] 切换配方 (' + cName + ')';
+    }
+    if(s.nearLab){
+      var labRec = buildingRecordOf(s.nearLab);
+      var labT = (labRec && labRec.analysisTarget) || s.nearLab.analysisTarget || 'specimen_flora_glow';
+      var labDef = APH.Colony.SPECIMEN_ANALYSIS[labT];
+      var labNm = (labDef && labDef.name) || labT;
+      var labHave = (s.meta.res && s.meta.res[labT]) || 0;
+      var labProg = (labRec && labRec.analysisProgress != null) ? labRec.analysisProgress
+        : (s.nearLab.analysisProgress || 0);
+      var labPct = labDef ? Math.min(100, Math.floor(100*labProg/(labDef.craftTime||15))) : 0;
+      return '科研站 · [F] 切换化验 ('+labNm+' '+labPct+'% · 库存×'+labHave+')';
+    }
+    if(s.nearCropPlot){
+      var plotCrop = s.nearCropPlot.crop;
+      var plotNm = (plotCrop && APH.Colony.ALIEN_CROPS[plotCrop] && APH.Colony.ALIEN_CROPS[plotCrop].name) || '未选定';
+      return '种植圃 · [F] 切换已化验作物 ('+plotNm+')';
+    }
+    if(s.nearWorkshop){
+      var wRec = s.nearWorkshop.recipe || 'it_pickaxe';
+      var wName = (APH.Colony.CRAFT_RECIPES[wRec] && APH.Colony.CRAFT_RECIPES[wRec].name) || wRec;
+      return '工坊 · [F] 切换配方 ('+wName+')';
+    }
+    if(s.nearCooler && !s.nearBrokenResident){
+      return '[E] 切换空调模式: 当前为 ' + ((s.nearCooler.mode === 'freezer') ? '❄ 冷库模式 (-5°C)' : '🌤 避暑模式 (20°C)');
+    }
+    if(s.nearPad && !s.war.raidActive && !(s.war.raidWarn>0)){
+      var shPad=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+      return '[E] 登船 · '+shPad.mission;
+    }
+    return null;
+  }
+
+  /* 最低一档: 目标提示 / 清掉已失效的旧提示。
+     殖民地优先 T2: 第一夜由 opening 负责; 之后交给 colonyGoal 阶梯 ——
+     以前这里过了第一夜就返回 null, 游戏从此再不向玩家要任何东西。 */
+  function hintObjective(s){
+    if(s.war.raidActive || (s.war.raidWarn>0)) return null;
+    var buildings = (s.colony && s.colony.buildings) || [];
+    var objH = window.APH.Opening && APH.Opening.objective
+      ? APH.Opening.objective(s.meta&&s.meta.opening, buildings)
+      : null;
+    if(objH) return objH.text;
+    if(APH.Colony && APH.Colony.colonyGoal){
+      var goal = APH.Colony.colonyGoal(s.meta, buildings);
+      if(goal && goal.text) return '◈ ' + goal.text;
+    }
+    var hintEl=document.getElementById('hint');
+    var cur=hintEl&&hintEl.textContent||'';
+    if(cur.indexOf('[E] 登船')===0 || cur.indexOf('[E] 招募')===0) return '';
+    return null;
+  }
+
+  function hintAncient(s){
+    if(s.nearAncientVault){
+      var vObj = s.nearAncientVault.vault || s.nearAncientVault;
+      return vObj.opened ? '远古遗物箱 · 已开启' : '[E] 开启远古遗物箱';
+    }
+    if(s.nearAncientTerminal){
+      var tObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
+      if(tObj.hacked) return '古代数据终端 · 破译完成 [系统已接管]';
+      return '[E] 破译古代终端 (学识 Lv' + ((s.meta && s.meta.loreSkill) || 3) + ')';
+    }
+    if(s.nearAncientGate && s.nearAncientGate.gate && !s.nearAncientGate.gate.broken){
+      return '[E] 破译能量闸门 (亦可用等离子枪轰击破门)';
+    }
+    return null;
+  }
+
+  function hintSelfState(s, env){
+    var needs = env.needs;
+    /* #72 家园击倒: 昏迷盖过一切 */
     if(needs && needs.downed && s.mode==='running'){
-      APH.UI.setHint('击倒昏迷 · ' + (clinicB && hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危'));
-    } else if(s.scene==='home' && !s.playerDrafted && playerFood() < foodEatBelow()){
+      return '击倒昏迷 · ' + (env.clinicB && env.hasRes72 ? '正在被送往医疗舱…' : '无人救援 · 生命垂危');
+    }
+    if(s.scene==='home' && !s.playerDrafted && playerFood() < foodEatBelow()){
       if(s.nearFood){
         var eatSrc = s.nearFood.isWarehouse ? '仓库口粮' : ((CFG.items[s.nearFood.itemId]||{}).name||'食物');
-        APH.UI.setHint('🍽 正在进食 '+eatSrc+' (饱食 '+Math.round(playerFood())+')');
-      } else {
-        var mealHint = nearestMeal({x:s.px, y:s.py}, 1e9);
-        if(mealHint) APH.UI.setHint('🍽 饥饿 · 指挥官正前往进食');
-        else APH.UI.setHint('🍽 没有口粮 · 请用【命令】标记浆果丛采摘，或远征带回食物');
+        return '🍽 正在进食 '+eatSrc+' (饱食 '+Math.round(playerFood())+')';
       }
-    } else if(playerSleeping()){
-      APH.UI.setHint('😴 睡眠中 · 精力 '+Math.round((s.meta.playerNeeds&&s.meta.playerNeeds.rest)||0)+' · 征召或受伤可醒');
-    } else if(s.scene==='home' && !s.playerDrafted && s.meta.playerNeeds && s.meta.playerNeeds.rest < ((CFG.player&&CFG.player.restSleepAt)!=null?CFG.player.restSleepAt:20)){
-      APH.UI.setHint('😴 困了 · 正前往居住舱休息');
-    } else if(s.gathering && s.nearFlora){
+      return nearestMeal({x:s.px, y:s.py}, 1e9)
+        ? '🍽 饥饿 · 指挥官正前往进食'
+        : '🍽 没有口粮 · 请用【命令】标记浆果丛采摘，或远征带回食物';
+    }
+    if(playerSleeping()){
+      return '😴 睡眠中 · 精力 '+Math.round((s.meta.playerNeeds&&s.meta.playerNeeds.rest)||0)+' · 征召或受伤可醒';
+    }
+    var sleepAt = (CFG.player&&CFG.player.restSleepAt)!=null?CFG.player.restSleepAt:20;
+    if(s.scene==='home' && !s.playerDrafted && s.meta.playerNeeds && s.meta.playerNeeds.rest < sleepAt){
+      return '😴 困了 · 正前往居住舱休息';
+    }
+    if(s.gathering && s.nearFlora){
       var gKind = s.nearFlora.kind || 'tree';
       var gName = gKind === 'tree' ? '树木' : (gKind.indexOf('rock')===0 ? '矿石' : '植株');
       var gPct = s.nearFlora.maxHp ? Math.max(0, Math.round(100 * s.nearFlora.hp / s.nearFlora.maxHp)) : 0;
-      APH.UI.setHint('🪓 正在砍伐' + gName + ' · 剩余 ' + gPct + '%');
+      return '🪓 正在砍伐' + gName + ' · 剩余 ' + gPct + '%';
     }
+    return null;
+  }
 
+  /* 家园提示优先级表 (高 → 低)。改优先级改这里, 不要再靠调用顺序。 */
+  function hintForHome(s, env){
+    var h;
+    /* 1. 物资告急: 最要命, 盖过一切 */
+    if(env.quiet){
+      var shH=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+      if(shH.urgent) return shH.text;
+    }
+    /* 2. 指挥官自身状态(昏迷/饥饿/睡眠/困倦/作业) */
+    h = hintSelfState(s, env);
+    if(h != null) return h;
+    /* 3. 站在旁边能按键交互的东西 —— 玩家真正要用的提示 */
+    h = hintNearbyThing(s);
+    if(h != null) return h;
+    /* 4. 远古遗迹(远征) */
+    h = hintAncient(s);
+    if(h != null) return h;
+    /* 5. 环境播报: 治疗中 / 天气 —— 不许再盖掉上面的交互提示 */
+    var healR=(CFG.player.clinicHealR!=null)?CFG.player.clinicHealR:80;
+    if(env.clinicB && env.cDist<healR && s.hp<CFG.player.hpMax && env.quiet) return '医疗舱 · 缓慢治疗';
+    if(env.weatherHint) return env.weatherHint;
+    /* 6. 开场目标唠叨: 垫底, 没别的可说时才说 */
+    return hintObjective(s);
+  }
+
+  /* UI 同步: 底栏标签高亮与失效规划标记清理 */
+  function syncHomeChrome(){
+    var s=APH.state;
     /* ADR-28 底部主标签栏显隐与高亮同步 (家园显示, 远征隐藏) */
     var mb=document.getElementById('mainTabsBar');
     if(mb){
@@ -1255,38 +1389,22 @@ window.APH = window.APH || {};
         var to = document.getElementById('tabOrders'); if(to) to.classList.toggle('active', !!isOrders);
       }
     }
-
     /* ADR-28: 自动清除已死亡/已入库实体的规划标记 */
     if(s.designations){
       for(var did in s.designations){
         var de = s.entities.find(function(en){ return en && en.id === did; });
-        if(!de || de.dead){
-          delete s.designations[did];
-        }
+        if(!de || de.dead) delete s.designations[did];
       }
     }
+  }
 
-    /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
-    updateResidents(dt);
-    (s.entities||[]).forEach(function(e){
-      if(e && e.type==='animal' && !e.dead && APH.Res.wanderStep){
-        APH.Res.wanderStep(e, dt, { x:e.x, y:e.y }, 70);
-      }
-    });
-    if(APH.Colony && APH.Colony.tickConstruction) APH.Colony.tickConstruction(s, dt);
-
-    /* 30s 生产时钟周期 (委托 APH.Colony, ADR-21) */
-    if(APH.Colony && APH.Colony.tickProduction) APH.Colony.tickProduction(s, dt);
-
-    /* 战争防务与波次推进 (委托 APH.Combat, ADR-21) */
-    if(APH.Combat && APH.Combat.tickRaid) APH.Combat.tickRaid(s, dt);
-
-    /* 掉落拾取不绑袭击: 末波击杀当帧清 raid 后地上战利品仍能捡 */
-    APH.Combat.updateDropped(dt);
-    if(!s.nearPad && !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0)){
-      var shH=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
-      if(shH.urgent) APH.UI.setHint(shH.text);
-    }
+  function updateHome(dt){
+    var s=APH.state;
+    senseHome();
+    var env = simHome(dt);
+    var hint = hintForHome(s, env);
+    if(hint != null) APH.UI.setHint(hint);
+    syncHomeChrome();
   }
 
   /* ---- AI殖民地成长 + 袭击决策 ---- */
@@ -2295,6 +2413,17 @@ window.APH = window.APH || {};
       APH.UI.floatText('😊 醒来','#8fd4ff');
       return true;
     }
+    /* T5 终局: 通电的发射器 → 呼叫救援, 通关。
+       这是整局唯一的胜利出口 —— 攒下来的财富最后全花在它身上。 */
+    if(s.scene==='home' && s.nearTransmitter){
+      var txR = buildingRecordOf(s.nearTransmitter);
+      if(txR && txR.powered === false){
+        APH.UI.floatText('✕ 发射器没电 · 接导线或加发电机','#ff9a9a');
+        return true;
+      }
+      launchRescue();
+      return true;
+    }
     if(s.scene==='expedition' && s.nearFlora){
       var loadW=APH.Combat.carryWeight(s.carry);
       var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
@@ -2934,7 +3063,30 @@ window.APH = window.APH || {};
     }
 
     var cv=document.getElementById('cv'), downX=0,downY=0,downT=0,downMoved=0,wallDrag=false,wallFrom=null,wallLast=null,wallPlaced={};
-    cv.addEventListener('pointerdown',function(e){
+
+    /* ADR-33: 画布指针改走 APH.Input —— 与键盘同一套上下文栈与动作分发。
+       处理器体不变(仍是玩法), 变的是「谁来监听、什么时候该被模态挡住」。
+       onPointer 把 (payload)=>fn(payload.event) 适配成旧的事件签名。 */
+    function onPointer(action, fn){
+      if(APH.Input && APH.Input.onAction){
+        APH.Input.onAction(action, function(p){ return fn(p && p.event); });
+      } else if(cv && cv.addEventListener){
+        var type = { POINTER_DOWN:'pointerdown', POINTER_MOVE:'pointermove',
+                     POINTER_UP:'pointerup', POINTER_CONTEXT:'contextmenu' }[action];
+        if(type) cv.addEventListener(type, fn);
+      }
+    }
+    /* 单一真源: 当前指针工具仍住在 state 里, Input 只是来问 */
+    if(APH.Input && APH.Input.setToolProvider){
+      APH.Input.setToolProvider(function(){
+        var st = APH.state;
+        if(st.orderTool) return 'order:' + st.orderTool;
+        if(st.buildMode) return 'build:' + st.buildMode;
+        return 'select';
+      });
+    }
+    if(APH.Input && APH.Input.bindPointer) APH.Input.bindPointer(cv);
+    onPointer('POINTER_DOWN', function(e){
       downX=e.clientX; downY=e.clientY; downT=performance.now(); downMoved=0;
       /* ADR-28: 规划划区拖拽框选 — 按下开始 */
       var s0=APH.state;
@@ -3214,8 +3366,8 @@ window.APH = window.APH || {};
       }
       return false;
     }
-    cv.addEventListener('contextmenu', handleContextMenu);
-    cv.addEventListener('pointermove',function(e){
+    onPointer('POINTER_CONTEXT', handleContextMenu);
+    onPointer('POINTER_MOVE', function(e){
       downMoved+=Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY);
       downX=e.clientX; downY=e.clientY;
       APH.state.pointerWx = e.clientX-vpW()/2+APH.state.camX;
@@ -3242,7 +3394,7 @@ window.APH = window.APH || {};
         if(!line.length) wallLast=cur;
       }
     });
-    cv.addEventListener('pointerup',function(e){
+    onPointer('POINTER_UP', function(e){
       wallDrag=false; wallFrom=null; wallLast=null; wallPlaced={};
       if(e.button===2) return;   /* 右键已在 contextmenu 处理 */
       if(pawnDrag){
@@ -3506,6 +3658,15 @@ window.APH = window.APH || {};
   }
 
   /* ================= 事件订阅 (ADR-8 示范) ================= */
+  U.on('built', onBuilt);          /* ADR-38: 建筑落成副作用 */
+  /* ADR-38: 围攻扎营/撤营与战况存档 —— 世界侧操作归 main.js, combat 只广播 */
+  U.on('raidBegan', function(ev){
+    if(ev && ev.tactic === 'siege') setupSiegeCamp();
+  });
+  U.on('raidEnded', function(ev){
+    clearSiegeCamp();
+    if(ev && ev.routed === false) saveWar();
+  });
   U.on('crystalPicked', function(){ /* Phase1: 音效挂这里 */ });
   U.on('beaconScanned', function(b){ /* Phase2: 动态档案生成挂这里 */ });
   /* 阶段E: 袭击伤亡计数(溃退判定依据) */
@@ -3534,6 +3695,20 @@ window.APH = window.APH || {};
   });
 
   /* ================= 启动 ================= */
+  /* ADR-38: 建筑落成的副作用由 main.js 订阅事件处理, 取代 colony 的反向调用。 */
+  function onBuilt(ev){
+    var s = APH.state;
+    saveColony();
+    if(ev && ev.id === 'bl_house' && window.APH.Opening && APH.Opening.noteHouse){
+      var fOpening = firstNightOpening();
+      if(fOpening){
+        APH.Opening.noteHouse(fOpening, s.clock || 0);
+        applyFirstNightHint();
+      }
+      try{ if(APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta); }catch(e){}
+    }
+  }
+
   function boot(){
     try{
       var meta=APH.Save.loadMeta();
@@ -5117,6 +5292,40 @@ window.APH = window.APH || {};
   function housingCap(){
     return APH.Colony.housingCapacity(APH.state.colony.buildings);
   }
+  /* ADR-37: 念头上下文已收口到 APH.Res —— 这里只做转发, 不再自留一份。 */
+  function thoughtCtxAt(x, y, env){
+    return (APH.Res && APH.Res.thoughtCtxAt) ? APH.Res.thoughtCtxAt(x, y, env) : {};
+  }
+
+  /* 殖民地覆灭: 有过居民再归零 —— 这是本作第一个「会输」的状态。
+     在此之前殖民地不可能失败, 于是威胁阶梯只是烟花(见 docs/colony-first-redesign.md)。 */
+  function colonyFounded(m){
+    var need = (CFG.colony && CFG.colony.foundedAtResidents != null) ? CFG.colony.foundedAtResidents : 1;
+    if(!m) return false;
+    if(m.colonyFounded) return true;
+    if((m.residents || []).length >= need){ m.colonyFounded = true; return true; }
+    return false;
+  }
+  function checkColonyFall(){
+    var s = APH.state, m = s.meta;
+    if(!m || s.mode !== 'running' || s.scene !== 'home') return false;
+    if(!colonyFounded(m)) return false;                 // 还没立过, 谈不上覆灭
+    if((m.residents || []).length > 0) return false;    // 还有人活着
+    if(m.colonyFallen) return false;                    // 已结算过, 不重复
+    m.colonyFallen = true;
+    s.mode = 'dead';
+    U.emit('gameOver', {});
+    APH.Save.saveMeta(m);
+    if(APH.UI && APH.UI.showDeath){
+      APH.UI.showDeath('最后一个人也倒下了。新曙光殖民地无人生还。', {
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry,
+        runLoot:s.runLoot, survived:s.clock-(s.landedAt||0), colonyFall:true,
+        lost:(m.stats && m.stats.colonistsLost)||0, days:(s.clock||0)/(CFG.DAY_LEN||3600),
+      });
+    }
+    return true;
+  }
+
   function residentsTick(){
     var s=APH.state, m=s.meta;
     /* W3 天气效果: 当前天气 id(读 meta.weather, 老档兜底 wx_clear); 极端清单以 exposureGain>0 为准 */
@@ -5128,15 +5337,27 @@ window.APH = window.APH || {};
     /* 深度生存: 床位分配 (Survival #15) */
     APH.Res.assignBeds(s.colony.buildings, m.residents);
 
-    /* U4 需求结算: 生产跳只掉饱食; 吃饭要走到仓库或粮堆 */
-    m.residents.forEach(function(r){
-      APH.Res.needsTick(r, false);
-    });
-
-    /* ADR-25 温度与体温失调结算 */
+    /* ADR-25 温度与体温失调结算 (念头上下文也要用, 故先算) */
     var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
-    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxId, isDay) : 22;
+    /* T3 季节: 环境气温叠加季节偏移(冬天 -18°C) */
+    var season = (window.APH.Weather && APH.Weather.seasonAt)
+      ? APH.Weather.seasonAt(s.clock, CFG.DAY_LEN) : null;
+    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf)
+      ? APH.Weather.ambientTemperatureOf(wxId, isDay, season && season.id) : 22;
     var campfire = (s.colony && s.colony.buildings || []).find(function(b){ return b && (b.id==='bl_campfire'||b.bid==='bl_campfire'); });
+    /* ADR-37: 环境量与 ui.js 用同一个构造器, 复用本跳已算好的 rooms/ambT */
+    var thEnv = APH.Res.thoughtEnvOf(s);
+    thEnv.rooms = T9_rooms; thEnv.ambT = ambT; thEnv.night = !isDay;
+    thEnv.wxExtreme = wxExtreme; thEnv.campfire = campfire;
+
+    /* U4 需求结算: 生产跳只掉饱食; 吃饭要走到仓库或粮堆
+       ADR-31: 带上念头上下文 —— 心情由 collectThoughts 结算, 检查器同源。 */
+    m.residents.forEach(function(r){
+      var rEnt = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
+      thEnv.self = r; thEnv.residents = m.residents; thEnv.bonds = m.bonds;
+      var ctx = rEnt ? thoughtCtxAt(rEnt.x, rEnt.y, thEnv) : { raid: !!(s.war&&s.war.raidActive) };
+      APH.Res.needsTick(r, false, ctx);
+    });
     m.residents.forEach(function(r){
       var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
       var rTemp = ambT;
@@ -5162,6 +5383,13 @@ window.APH = window.APH || {};
       APH.Res.thermalStressTick(m.playerNeeds, pTemp, pSuit, 30, pNearFire);
     }
     if(APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(m);
+    /* 殖民地优先 T1: 指挥官的心情与居民走同一条路(ADR-31 念头驱动)。
+       在此之前 playerNeeds 根本没有 mood —— 检查器给指挥官看的念头面板
+       是纯展示, 现在它同样在推动一个真数字。 */
+    if(m.playerNeeds && s.scene==='home' && APH.Res.moodFromThoughts){
+      thEnv.self = null; thEnv.residents = null; thEnv.bonds = null;
+      APH.Res.moodFromThoughts(m.playerNeeds, thoughtCtxAt(s.px, s.py, thEnv));
+    }
     if(APH.Res.homeFoodTick && m.playerNeeds){
       m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);
     }
@@ -5229,26 +5457,7 @@ window.APH = window.APH || {};
       APH.Res.exposureTick(r,
         ent ? APH.Res.shelteredFor({x:ent.x, y:ent.y}, s.colony.buildings, T9_rooms) : true,
         wxExtreme, wxId);
-      /* T9 卧室级房间心情增益: 所在房间含居住舱 → +roomMoodGain/跳 */
-      if(ent){
-        var rmGain=APH.Res.roomMoodGain({x:ent.x,y:ent.y}, T9_rooms, s.colony.buildings);
-        if(rmGain>0) r.mood=Math.min((CFG.residents&&CFG.residents.moodCap)||95, (r.mood||70)+rmGain);
-        /* ADR-22 生产岗位同室死敌避嫌心情减益 */
-        if(APH.Res && APH.Res.roomFrictionOf && APH.Nav && APH.Nav.roomAt && T9_rooms && T9_rooms.length){
-          var curRoom = APH.Nav.roomAt({x:ent.x, y:ent.y}, T9_rooms);
-          if(curRoom){
-            var roommates = (m.residents||[]).filter(function(o){
-              if(!o || o.id === r.id) return false;
-              var oEnt = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && e.id===o.id; });
-              return oEnt && APH.Nav.roomAt({x:oEnt.x, y:oEnt.y}, T9_rooms) === curRoom;
-            });
-            var fric = APH.Res.roomFrictionOf(r, roommates, m.bonds);
-            if(fric < 0){
-              r.mood = Math.max(0, (r.mood||70) + fric);
-            }
-          }
-        }
-      }
+      /* ADR-31: 房间品质(T9)与同室死敌(ADR-22)已并入念头, 见 thoughtCtxAt。 */
       /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
       if(r.medLying && !hasClinic) r.medLying = false;
       /* #69 击倒判定+送医(接线孤儿 checkDowned/rescueTick; 生产跳=30s) */
@@ -5263,6 +5472,8 @@ window.APH = window.APH || {};
         }
         if(rr.dead.length){
           APH.UI.floatText('☠ '+r.name+' 救治不及时, 去世了','#ff9a9a');
+          /* 殖民地优先 T1: 居民之死要被记住 —— 覆灭结算页要说出代价 */
+          if(m.stats) m.stats.colonistsLost = (m.stats.colonistsLost||0) + 1;
           var entDead=s.entities.filter(function(en){ return en && (en.rid||en.id)===r.id; })[0];
           if(APH.Res.makeCorpse){
             s.entities.push(APH.Res.makeCorpse(r, entDead?entDead.x:s.px, entDead?entDead.y:s.py));
@@ -5272,6 +5483,11 @@ window.APH = window.APH || {};
         }
       }
     });
+    /* 殖民地优先 T1: 殖民地覆灭判定。
+       立过殖民地(名册到过 foundedAtResidents 人)之后又归零 = 本局结束。
+       新档开局本来就是 0 人, 所以必须先立过, 否则开局即覆灭。 */
+    checkColonyFall();
+
     /* B: 心情崩溃状态机(seeded) + 崩溃行为落地 */
     var breakRng=U.makeRng((tickSeed^0x5EED2B)>>>0);
     var CB=CFG.residents||{};
@@ -5341,6 +5557,9 @@ window.APH = window.APH || {};
     var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
     var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
     var farmWx=(wxFx.farmMul!=null)?wxFx.farmMul:1;   // W3: 天气农产乘子(雨+30%/酸雨×0.5/雪停滞) 乘入 harvestMods 链
+    /* T3 季节生长乘子: 冬天为 0 —— 冬天种不出东西, 只能吃存粮 */
+    var seasonGrow = (window.APH.Weather && APH.Weather.seasonAt)
+      ? APH.Weather.seasonAt(s.clock, CFG.DAY_LEN).growMul : 1;
     farms.forEach(function(b){
       if(!b.plot) b.plot={stage:0,t:0};
       if(!b.crop){
@@ -5356,7 +5575,7 @@ window.APH = window.APH || {};
       var farmSk=bestFarmer?(bestFarmer.skills.sk_farm||0):0;
       /* T7: 无电农场减产 (powered===false 时×0.5; 未激活默认通电) */
       var powMul=APH.Colony.farmPowerMul(b.powered);
-      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx*powMul, b.crop);
+      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx*powMul*seasonGrow, b.crop);
       if((b.plot.stage||0) >= 3){
         var h=APH.Colony.harvestAlienCrop(b.crop, farmSk);
         if(h.dropItemId && h.dropCount>0){
@@ -5394,7 +5613,9 @@ window.APH = window.APH || {};
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
       },null);
       if(growFarmer){
-        var gz=APH.Colony.tickGrowZones(s.colony.zones, growFarmer.skills.sk_farm||0, APH.Res.efficiency(growFarmer));
+        var gzSeason=(window.APH.Weather && APH.Weather.seasonAt)
+          ? APH.Weather.seasonAt(s.clock, CFG.DAY_LEN).growMul : 1;
+        var gz=APH.Colony.tickGrowZones(s.colony.zones, growFarmer.skills.sk_farm||0, APH.Res.efficiency(growFarmer), gzSeason);
         (gz.harvested||[]).forEach(function(h){
           if(h.drop && h.drop.dropItemId){
             APH.Combat.spawnDrop(h.x, h.y, h.drop.dropItemId, h.drop.dropCount||1, {stock:true});
@@ -5754,7 +5975,8 @@ window.APH = window.APH || {};
     tryBuySelectedTech:tryBuySelectedTech,
     renderCodex:renderCodex,
     renderResPanel:renderResPanel,
-    residentsTick:residentsTick,
+    residentsTick:residentsTick, checkColonyFall:checkColonyFall, colonyFounded:colonyFounded,
+    launchRescue:launchRescue,
     syncResidents:syncResidentEntities,
     updateResidents:updateResidents,
     /* ADR-29 征召与直接命令 (场景测试/程序化验证通道) */

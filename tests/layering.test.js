@@ -1,0 +1,94 @@
+/* tests/layering.test.js — 模块层级铁律 (ADR-38)
+   MODULE_ORDER 声明了加载顺序; 排在前面的模块**不得**反向引用排在后面的。
+   曾经 colony.js / combat.js 共 12 处调用 APH.Main, 使模拟循环没有唯一归属者
+   (main → colony → main), 是本项目最深的一处结构问题。 */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const SRC = path.join(__dirname, '..', 'src');
+
+/* 去掉注释与字符串字面量, 避免把说明文字误判成调用 */
+function codeOf(file) {
+  let t = fs.readFileSync(path.join(SRC, file), 'utf-8');
+  t = t.replace(/\/\*[\s\S]*?\*\//g, ' ');      // 块注释
+  t = t.replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');  // 行注释
+  t = t.replace(/'(?:[^'\\]|\\.)*'/g, "''");    // 单引号串
+  t = t.replace(/"(?:[^"\\]|\\.)*"/g, '""');    // 双引号串
+  return t;
+}
+
+/* build.py 的 MODULE_ORDER (含 DOM 层); main.js 是入口, 排最后 */
+const ORDER = [
+  'config.js','utils.js','input.js','humanoid.js','save.js','opening.js',
+  'planet.js','llm.js','colony.js','rivals.js','events.js','nav.js','weather.js',
+  'residents.js','alerts.js','combat.js','world.js','entities.js','sfx.js',
+  'sprites.js','ui.js','main.js',
+];
+
+/* 反向调用 main 的历史债: 棘轮式登记 —— 只许减少, 不许增加。
+   修掉一处就把数字调小; 想新增会直接让用例变红。
+   ui.js 的 27 处分三类, 待 ADR-38 后续拆解:
+     存档类(saveMetaQuiet/saveRivals/saveColony) → 应直接走 APH.Save
+     领域查询(haveStock/playerDefPower/applyTech) → 应下沉到 Colony/Res
+     命令派发(toggle / cycle 系列)               → 视图→控制器, 应走事件或命令表 */
+const MAIN_DEBT = { 'ui.js': 27 };
+
+test('layering: 反向调用 main 的次数只减不增 (棘轮)', () => {
+  const grew = [];
+  ORDER.forEach(f => {
+    if (f === 'main.js') return;
+    const hits = (codeOf(f).match(/APH\.Main\./g) || []).length;
+    const budget = MAIN_DEBT[f] || 0;
+    if (hits > budget)
+      grew.push(`${f}: ${hits} 处 > 允许的 ${budget}`);
+  });
+  if (grew.length)
+    throw new Error('层级倒置增加了 —— 低层模块不得反向调用 main: ' + grew.join('; '));
+});
+
+test('layering: 模拟层(colony/combat)已彻底不再反向调用 main (ADR-38)', () => {
+  ['colony.js', 'combat.js'].forEach(f => {
+    const hits = (codeOf(f).match(/APH\.Main\./g) || []).length;
+    if (hits)
+      throw new Error(f + ' 仍有 ' + hits + ' 处反向调用 main —— 模拟循环必须只有一个归属者');
+  });
+});
+
+test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
+  const NS = {
+    'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
+    'weather.js':'Weather','residents.js':'Res','alerts.js':'Alerts','combat.js':'Combat',
+    'world.js':'World','entities.js':'Ent','sfx.js':'SFX','sprites.js':'Sprites',
+    'ui.js':'UI','main.js':'Main','planet.js':'Planet','llm.js':'LLM','save.js':'Save',
+    'opening.js':'Opening','input.js':'Input','humanoid.js':'Humanoid',
+  };
+  /* 已知的、暂时容忍的向后引用: 这些是本轮之后仍待处理的债, 列在此处使其可见。
+     新增违规会让本用例变红; 修好一处就从这里删掉一行。 */
+  const ALLOWED = {
+    'colony.js':  ['Ent','Res','Combat','UI','Weather','World','Save','Nav','Opening'],
+    'combat.js':  ['Ent','Res','UI','Weather','World','Save','Nav','Rivals','Colony'],
+    'residents.js':['Combat','World','Nav','Colony'],
+    'entities.js':['Res','Sprites','World','Weather','Colony'],
+    'events.js':  ['Weather','Colony'],
+    'world.js':   ['Ent','Weather'],
+    'alerts.js':  ['Colony','Weather'],
+    'save.js':    ['Res'],
+    'sfx.js':     ['Save'],
+    'ui.js':      ['Main'],
+    'llm.js':     ['Planet','Save'],
+    'opening.js': ['OpeningData','OpeningVideo'],
+  };
+  const problems = [];
+  ORDER.forEach((f, i) => {
+    const code = codeOf(f);
+    const later = ORDER.slice(i + 1).map(x => NS[x]).filter(Boolean);
+    later.forEach(ns => {
+      if (ns === 'Main') return;                       // 上一条用例专门管它
+      if (!new RegExp('APH\\.' + ns + '\\.').test(code)) return;
+      if ((ALLOWED[f] || []).indexOf(ns) >= 0) return; // 已登记的历史债
+      problems.push(`${f} → APH.${ns}`);
+    });
+  });
+  if (problems.length)
+    throw new Error('新增的向后依赖(未登记): ' + problems.join(', '));
+});

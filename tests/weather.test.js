@@ -201,3 +201,68 @@ test('#92 forecast: 确定性 — 同输入重复调用结果一致(不消费rng
   /* 雷暴转移: wx_rain:3, wx_clear:3, wx_blizzard:1 → 最高=rain(先到者) */
   if (a !== 'wx_rain') throw new Error('雷暴转移最高应rain: ' + a);
 });
+
+/* ---------- 殖民地优先 T3: 季节 (docs/colony-first-redesign.md) ---------- */
+test('T3 season: 按世界时钟推导季节, 一年循环', () => {
+  const S = APH.CFG.seasons, DL = APH.CFG.DAY_LEN;
+  const per = S.daysPerSeason, order = S.order;
+  const at = d => APH.Weather.seasonAt(d * DL, DL);
+
+  if (at(0).id !== order[0]) throw new Error('第 0 天应是 ' + order[0]);
+  if (at(per).id !== order[1]) throw new Error('第 ' + per + ' 天应换季到 ' + order[1]);
+  if (at(per * 3).id !== 'winter') throw new Error('第四季应是冬天');
+
+  const yearLen = per * order.length;
+  if (at(yearLen).id !== order[0]) throw new Error('满一年应回到 ' + order[0]);
+  if (at(yearLen + per * 3).id !== 'winter') throw new Error('第二年冬天也应是冬天');
+
+  const w = at(per * 3);
+  if (!w.isWinter) throw new Error('冬天 isWinter 应为 true');
+  if (w.growMul !== 0) throw new Error('冬天生长乘子必须为 0 —— 这是压力的来源');
+  if (!(at(per).growMul > 0)) throw new Error('非冬季应能生长');
+});
+
+test('T3 season: daysUntilWinter 正确倒数, 入冬即 0', () => {
+  const S = APH.CFG.seasons, DL = APH.CFG.DAY_LEN;
+  const per = S.daysPerSeason;
+  const d2w = d => APH.Weather.daysUntilWinter(d * DL, DL);
+  if (d2w(per * 3) !== 0) throw new Error('冬天当天应为 0, got ' + d2w(per * 3));
+  if (d2w(per * 3 - 1) !== 1) throw new Error('入冬前一天应为 1, got ' + d2w(per * 3 - 1));
+  if (d2w(0) !== per * 3) throw new Error('开年距冬应为 ' + per * 3 + ', got ' + d2w(0));
+  const mid = d2w(per * 3 + 1);
+  if (mid !== 0) throw new Error('冬季中途仍应为 0, got ' + mid);
+});
+
+test('T3 season: 气温叠加季节偏移, 省略季节时行为不变', () => {
+  const amb = APH.Weather.ambientTemperatureOf;
+  const base = amb('wx_clear', true);
+  const winter = amb('wx_clear', true, 'winter');
+  const summer = amb('wx_clear', true, 'summer');
+  if (winter >= base) throw new Error('冬天应更冷: ' + winter + ' vs ' + base);
+  if (summer <= base) throw new Error('夏天应更热: ' + summer + ' vs ' + base);
+  const off = APH.CFG.seasons.tempOffset.winter;
+  if (winter !== base + off) throw new Error('冬天应正好是基础+偏移');
+  if (amb('wx_clear', true, null) !== base) throw new Error('省略季节应与老行为一致');
+});
+
+test('T3 season: 冬天的作物生长乘子会让田停长', () => {
+  const winterMul = APH.CFG.seasons.growMul.winter;
+  const plot = { stage: 0, t: 0 };
+  const out = APH.Colony.cropPlotTick(plot, 9, 1, winterMul, 'crop_glow_shroom');
+  if (out.t !== 0) throw new Error('冬天不应累积生长进度, got ' + out.t);
+  if (out.stage !== 0) throw new Error('冬天不应推进生长阶段');
+  const summer = APH.Colony.cropPlotTick({ stage: 0, t: 0 }, 9, 1, APH.CFG.seasons.growMul.summer, 'crop_glow_shroom');
+  if (!(summer.t > 0 || summer.stage > 0)) throw new Error('夏天应该长');
+});
+
+test('T3 season: tickGrowZones 冬天不长, 省略参数时按 1', () => {
+  const mk = () => ([{ type:'grow', cropType:'crop_glow_shroom', cells:[{ x:0, y:0, plant:{ stage:1, t:0 } }] }]);
+  const zw = mk();
+  APH.Colony.tickGrowZones(zw, 9, 1, 0);
+  if (zw[0].cells[0].plant.t !== 0) throw new Error('冬天划区田不应生长');
+  const zn = mk();
+  APH.Colony.tickGrowZones(zn, 9, 1);
+  const p = zn[0].cells[0].plant;
+  /* 技能 9 一跳就够推进一个阶段, 推进时 t 会归零 —— 所以看 stage 或 t 任一前进 */
+  if (!(p.stage > 1 || p.t > 0)) throw new Error('省略 seasonMul 应按 1 生长(老调用零改动)');
+});

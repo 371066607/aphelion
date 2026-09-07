@@ -117,6 +117,34 @@ APH.Alerts = (function(){
       push(out, 'sleepy', (r.name || r.id) + '需要睡觉', p.x, p.y, 'sleepy:' + r.id);
     });
 
+    /* T3 入冬预警: 冬天作物停长, 靠的是入冬前囤的粮。
+       只在「有人要养 + 存粮不足以过冬」时出现, 否则是噪音。 */
+    var W = window.APH.Weather;
+    if(W && W.seasonAt){
+      var season = W.seasonAt(s.clock, CFG.DAY_LEN);
+      var pop = (meta.residents || []).length + 1;          // +1 = 指挥官
+      var need = (APH.Colony && APH.Colony.winterFoodNeed) ? APH.Colony.winterFoodNeed(pop) : pop * 12;
+      var food = res.food || 0;
+      var hx = hab().x, hy = hab().y;
+      if(season.isWinter){
+        if(food < need){
+          push(out, 'winter',
+            (A().winterNow || '寒冬 · 只能吃存粮（{food}）')
+              .replace('{food}', Math.round(food)).replace('{need}', need),
+            hx, hy, 'winter');
+        }
+      } else if(W.daysUntilWinter){
+        var toW = W.daysUntilWinter(s.clock, CFG.DAY_LEN);
+        var warnD = (CFG.seasons && CFG.seasons.winterWarnDays != null) ? CFG.seasons.winterWarnDays : 2;
+        if(toW != null && toW <= warnD && food < need){
+          push(out, 'winter',
+            (A().winterSoon || '{n} 天后入冬 · 存粮 {food}/{need}')
+              .replace('{n}', toW).replace('{food}', Math.round(food)).replace('{need}', need),
+            hx, hy, 'winter');
+        }
+      }
+    }
+
     var queue = (s.colony && s.colony.buildQueue) || [];
     queue.forEach(function(q, qi){
       if(!q || !q.bid) return;

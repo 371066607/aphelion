@@ -38,6 +38,30 @@ function stubEl(){
   };
 }
 global.window = global;
+
+/* ---------- 确定性 RNG (ADR-5 可复现性) ----------
+   spawnDrop 的落点抖动等逻辑路径会读 Math.random(), 落点是否进入搬运抓取半径
+   直接改变断言结果 —— 未固定种子时本套件会随机红/绿。这里把 Math.random 换成
+   mulberry32, 并在每个用例前重播种, 使用例与执行顺序无关。 */
+const SEED0 = 0x9E3779B9;
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/* 时间也要确定: 远征种子取自 Date.now()%100000, 真实时钟会让每次运行生成
+   不同的世界(信标/晶体落点各异), 而 cmdHomeSetup 并不清理这些类型的实体 ——
+   它们会漂进后续家园用例的框选范围, 造成低频假红。 */
+const FAKE_T0 = 1757200000000;
+let fakeT = FAKE_T0;
+function reclock(){ fakeT = FAKE_T0; }
+Date.now = function(){ fakeT += 16; return fakeT; };
+
+function reseed(seed){ Math.random = mulberry32(seed == null ? SEED0 : seed); reclock(); }
+reseed();
 global.localStorage = (()=>{ const m={};
   return { getItem:k=>m[k]??null, setItem:(k,v)=>{m[k]=String(v);},
     removeItem:k=>{delete m[k];}, get length(){return Object.keys(m).length;},
@@ -52,7 +76,7 @@ global.document = {
 global.addEventListener = function(){};
 global.innerWidth = 800; global.innerHeight = 600;
 global.devicePixelRatio = 1;
-global.performance = { now:()=>Date.now() };
+global.performance = { now:()=>fakeT - FAKE_T0 };
 global.requestAnimationFrame = ()=>0;          // 不启动真实循环
 global.location = { search:'', reload(){} };
 global.Image = class ImageStub {
@@ -88,7 +112,7 @@ for(const f of ['config.js','utils.js','input.js','humanoid.js','save.js','openi
 /* ---------- 极简断言器 ---------- */
 let pass=0, fail=0;
 function test(name, fn){
-  try{ fn(); pass++; console.log('  ✓ '+name); }
+  try{ reseed(); fn(); pass++; console.log('  ✓ '+name); }
   catch(e){ fail++; console.log('  ✗ '+name+'\n      '+e.message); }
 }
 const A = (cond,msg)=>{ if(!cond) throw new Error(msg||'断言失败'); };
@@ -876,7 +900,13 @@ test('home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救
   A(!!r1.bedId, 'r1 应分配到居住舱床位');
   A(r1.wantSleep, 'r1 rest<20 应困倦想睡');
   A(!r1.isSleeping, 'r1 应走去床再睡，不应原地瞬睡');
-  A(r1.mood >= 80, 'r1 高娱乐+舒适床位应维持高心情');
+  /* ADR-31: 心情=基线+念头之和。r1 精力 15 会挂上「困得睁不开眼」,
+     所以心情从 80 向 (基线+吃饱+愉悦+安全-困倦) 缓降是正确行为;
+     这里断言正向念头确实在场, 且没有被拖到低落区间。 */
+  A(r1.mood >= 70, 'r1 高娱乐+吃饱不应跌到低落区间, mood ' + r1.mood);
+  A((r1.thoughts||[]).some(t => t.id === 'th_joy'), 'r1 高娱乐应挂 th_joy');
+  A((r1.thoughts||[]).some(t => t.id === 'th_well_fed'), 'r1 吃得饱应挂 th_well_fed');
+  A((r1.thoughts||[]).some(t => t.id === 'th_tired'), 'r1 精力15 应挂 th_tired');
 
   // 2. r2 严重疫病机能损毁与击倒判定
   const cap2 = Res.capacitiesOf(r2);
@@ -2182,8 +2212,11 @@ test('#82 home: 圈房免疫极端天气暴露 (房间内 residentsTick 不累�
     M.residentsTick();
     const r=S.meta.residents[0];
     A(r.exposure===0, '房间内酸雨暴露应 0, got '+r.exposure);
-    /* 卧室级心情增益: 房间含居住舱 → +roomMoodGain */
-    A(r.mood>80, '卧室房间应心情增益, mood '+r.mood);
+    /* ADR-31: 卧室级增益now以念头形式表达(th_room), 幅度来自 roomMoodGain。
+       心情本身是「基线+念头之和」的缓动目标, 不再一跳直加。 */
+    const roomTh = (r.thoughts||[]).find(t => t.id === 'th_room');
+    A(!!roomTh, '卧室房间应挂上 th_room 念头');
+    A(roomTh.mood > 0, '卧室 th_room 应为正增益, got '+roomTh.mood);
   }finally{
     S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
     S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
@@ -2516,9 +2549,12 @@ test('#97 home: 家具房间心情 > 普通房间 (生产跳 roomMoodGain 聚合
     const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_p3');
     e.x=48*32+24; e.y=48*32+24;
     M.residentsTick();
-    /* 卧室2 + 电视1 + 书架1 = +4 (70→74) */
-    const actualMood=S.meta.residents[0].mood;
-    A(actualMood>=74, '家具房间应 +4 心情, mood '+actualMood);
+    /* 卧室2 + 电视1 + 书架1 = +4, 现以 th_room 念头的幅度体现 (ADR-31) */
+    const r97=S.meta.residents[0];
+    const roomTh97=(r97.thoughts||[]).find(t => t.id === 'th_room');
+    A(!!roomTh97, '家具房间应挂上 th_room 念头');
+    A(roomTh97.mood>=4, '卧室2+电视1+书架1 应聚合为 +4, got '+roomTh97.mood);
+    A(r97.mood>70, '心情应朝更高目标上行, mood '+r97.mood);
   }finally{
     S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
     S.colony.buildings=oldBuildings; S.war=oldWar;
@@ -3007,8 +3043,11 @@ test('#158 orders: 严格无标不采、规划驱动全链路开采入库与右�
   A(!S.designations['fl_wild_1'], '目标完成后标记应自动从 designations 清除');
 
   // 3. 掉落物存在 → 搬运工自主入库
+  //    注意: 落点抖动可能把木材直接丢进砍伐者的抓取半径, 当帧就被抓起 —— 这同样是
+  //    合法链路, 故断言「木材已产出」(在地上或已在背包), 而非「必须躺在地上」。
   const woodDrops = S.entities.filter(e => e.type === 'dropped' && e.itemId === 'it_wood');
-  A(woodDrops.length >= 1, '砍倒后应掉落木材堆');
+  const woodCarried = S.entities.some(e => e.haulCarry && e.haulCarry.itemId === 'it_wood');
+  A(woodDrops.length >= 1 || woodCarried, '砍倒后应产出木材(掉落在地或已被搬运工抓起)');
   const woodBefore = S.meta.res.wood || 0;
   for(let i = 0; i < 800 && woodDrops.some(d => !d.dead); i++) M.updateHome(0.016);
   A((S.meta.res.wood || 0) > woodBefore || S.entities.some(e => e.haulCarry), '木材应入库或正在搬运入库');
@@ -3577,6 +3616,132 @@ test('#168 thinkPawn: 征召指挥官不闲逛，解征召后恢复自治', () =
   S.cmdIdleT = 0;
   M.updateHome(0.05);
   A(S.cmdIdleWalk || S.target, '解征召后应恢复自治');
+});
+
+
+/* ---------- ADR-32: 家园提示优先级(显式表, 不再靠 setHint 后写覆盖) ---------- */
+function hintScene(setup){
+  var s=S;
+  s.scene='home'; s.mode='running';
+  s.war={ raidActive:false, raidWarn:0, angerMin:0, wins:0, raids:0 };
+  s.colony.buildings=[{id:'bl_landing_pad', x:1100, y:1340}];
+  s.colony.buildQueue=[]; s.colony.fires=[]; s.colony.filth={};
+  s.entities=s.entities.filter(e=>e && e.type==='player');
+  s.meta.residents=[]; s.meta.res={ food:50, mineral:50, med:5, wood:50 };
+  s.designations={}; s.playerDrafted=false; s.gathering=false;
+  s.px=1100; s.py=1100; s.hp=100; s.o2=100;
+  APH.Res.ensurePlayerNeeds(s.meta);
+  var n=s.meta.playerNeeds;
+  n.food=90; n.rest=90; n.illness=0; n.downed=false; n.isSleeping=false; n.recreation=80;
+  document.getElementById('hint').textContent='';
+  setup(s);
+  M.updateHome(0.016);
+  return document.getElementById('hint').textContent || '';
+}
+
+test('#ADR32 hint: 站在建筑旁, 交互提示压过天气播报', () => {
+  const h = hintScene(s => {
+    s.entities.push({id:'be_k',type:'building',bid:'bl_kitchen',x:1100,y:1120,recipe:'it_roasted_meat'});
+  });
+  A(h.indexOf('烹饪灶台') >= 0, '灶台旁应给出灶台提示, got: ' + h);
+  A(h.indexOf('磁暴') < 0 && h.indexOf('酸雨') < 0, '天气播报不得盖掉交互提示, got: ' + h);
+});
+
+test('#ADR32 hint: 没东西可交互时不出交互键提示', () => {
+  /* 兜底档(天气/开场目标)是否有话说取决于开场进度与当前天气, 不做断言;
+     这里锁的是「附近没有可交互物时, 不许冒出 [F]/[E] 交互提示」。 */
+  const h = hintScene(() => {});
+  A(h.indexOf('[F]') < 0, '空场景不应出现 [F] 交互提示, got: ' + h);
+  A(h.indexOf('[E] 切换') < 0, '空场景不应出现空调等 [E] 交互提示, got: ' + h);
+});
+
+test('#ADR32 hint: 物资告急压过交互提示', () => {
+  const h = hintScene(s => {
+    s.meta.res={ food:0, mineral:0, med:0, wood:0 };
+    s.entities.push({id:'be_k2',type:'building',bid:'bl_kitchen',x:1100,y:1120,recipe:'it_roasted_meat'});
+  });
+  A(h.indexOf('烹饪灶台') < 0, '告急时不应还在显示灶台提示, got: ' + h);
+});
+
+test('#ADR32 hint: 击倒昏迷压过一切', () => {
+  const h = hintScene(s => {
+    s.meta.playerNeeds.downed = true;
+    s.entities.push({id:'be_k3',type:'building',bid:'bl_kitchen',x:1100,y:1120,recipe:'it_roasted_meat'});
+  });
+  A(h.indexOf('击倒昏迷') >= 0, '昏迷提示应最高优先, got: ' + h);
+});
+
+test('#ADR32 hint: 空调提示不再被开场目标淹没', () => {
+  const h = hintScene(s => {
+    s.entities.push({id:'be_cl',type:'building',bid:'bl_cooler',x:1100,y:1120,mode:'freezer'});
+  });
+  A(h.indexOf('空调') >= 0, '空调旁应给出空调提示, got: ' + h);
+});
+
+
+/* ---------- 殖民地优先 T1: 覆灭判定与指挥官心情 ---------- */
+test('#T1 fall: 没立过殖民地(开局0人)不算覆灭', () => {
+  S.scene='home'; S.mode='running';
+  S.meta.residents=[]; S.meta.colonyFounded=false; S.meta.colonyFallen=false;
+  const fell = M.checkColonyFall();
+  A(fell === false, '开局 0 人不应判覆灭');
+  A(S.mode === 'running', '开局不应结束游戏');
+});
+
+test('#T1 fall: 立过殖民地后归零 = 本局结束', () => {
+  S.scene='home'; S.mode='running';
+  S.meta.colonyFounded=false; S.meta.colonyFallen=false;
+  S.meta.residents=[{id:'r1',name:'甲',skills:{},mood:70,food:80,rest:80,recreation:80}];
+  A(M.colonyFounded(S.meta) === true, '有 1 人应算殖民地已建立');
+  A(M.checkColonyFall() === false, '有人活着不应覆灭');
+  S.meta.residents=[];
+  const fell = M.checkColonyFall();
+  A(fell === true, '最后一人死后应判覆灭');
+  A(S.mode === 'dead', '覆灭应结束本局');
+  A(S.meta.colonyFallen === true, '应打上覆灭标记');
+  A(M.checkColonyFall() === false, '不应重复结算');
+  S.mode='running'; S.meta.colonyFallen=false; S.meta.colonyFounded=false;
+});
+
+test('#T1 commander: 指挥官有心情, 且由念头驱动', () => {
+  S.scene='home'; S.mode='running';
+  APH.Res.ensurePlayerNeeds(S.meta);
+  const n = S.meta.playerNeeds;
+  A(n.mood != null, 'playerNeeds 应有 mood 字段(此前完全没有)');
+  n.food = 5; n.rest = 5; n.recreation = 5;
+  const before = n.mood;
+  APH.Res.moodFromThoughts(n, {});
+  A(Array.isArray(n.thoughts), '指挥官也应挂上念头清单');
+  A(n.mood < before, '饥饿困倦无聊应拉低指挥官心情: ' + before + ' -> ' + n.mood);
+  A((n.thoughts||[]).some(t => t.id === 'th_starving'), '应挂 th_starving');
+});
+
+
+/* ---------- 殖民地优先 T5: 发射器终局 ---------- */
+test('#T5 win: 通电发射器 → 呼叫救援通关', () => {
+  S.scene='home'; S.mode='running';
+  S.meta.colonyWon=false;
+  S.meta.stats = S.meta.stats || {};
+  const before = S.meta.stats.won || 0;
+  const ok = M.launchRescue();
+  A(ok === true, '应通关');
+  A(S.mode === 'won', '通关后 mode 应为 won, got ' + S.mode);
+  A(S.meta.colonyWon === true, '应写入通关标记');
+  A((S.meta.stats.won || 0) === before + 1, '应记一次通关');
+  A(M.launchRescue() === false, '已通关不应重复结算');
+  S.mode='running'; S.meta.colonyWon=false;
+});
+
+test('#T5 win: 发射器是唯一胜利出口, 且需通电', () => {
+  const def = APH.Colony.get('bl_transmitter');
+  A(!!def, '应存在 bl_transmitter 建筑定义');
+  A(def.max === 1, '发射器应唯一');
+  A(def.reqTech === 'te_deep_signal', '应由终局科技解锁');
+  const con = APH.CFG.power.consumers.bl_transmitter;
+  A(!!con, '发射器应登记为耗电建筑 —— 否则「通电才能起飞」是空话');
+  A(con.load > 0, '发射器应有实际电力负荷');
+  const tech = APH.Colony.TECH ? APH.Colony.TECH.te_deep_signal : null;
+  if (tech) A(tech.cost >= 200, '终局科技应昂贵, got ' + tech.cost);
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

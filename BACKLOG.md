@@ -207,7 +207,7 @@
 - [x] W3 效果接线（#88）：✅ exposureTick 复活 + 农场乘子 + 玩家减速 + HUD 天气行 + 雾天敌感知 + 装备减免
 - [x] W4 粒子渲染（#89）：✅ 雨/雪/雾粒子 + 天色 tint + fxParams 纯函数 + caps 预算
 - [x] 天气系统收尾：W1-W4 全链完成合入（3ad9a9f→63cdde2）；三票已关（#86/#87/#88/#89），Spec #85 已关（2026-08-31）
-- [ ] 数值全进 CFG（ADR-10）；solarMul 预留供建筑 v3 T6 太阳能板读取；玩家不新增 exposure 条（显式裁剪）
+- [x] 数值全进 CFG（ADR-10）；solarMul 已被 `colony.js:487 powerSolarOutput` 读取；玩家不新增 exposure 条（显式裁剪）
 
 ## 新排期 · 家园纵深轮（2026-08-31 定，基建/天气闭环之后）
 
@@ -313,10 +313,102 @@
 
 总计划：`docs/rimworld-full-alignment-plan.md`（先拍板第 3 节五个分叉，再拆票）。
 
-- [ ] P0 暂停/倍速 + 一天时长 + 警报条 + 指挥官/居民同一套 thinkPawn
-- [ ] P1 作息表、念头、工单、仓储/种植划区、房间职能、工作动画
-- [ ] P2 美观清洁、修理、部位伤、尸体葬礼、动物个体、火灾、活动区
-- [ ] P3 可选深度（更多崩溃/热情/囚犯非奴隶）；奴隶与四大 DLC 不做
+> **对账（2026-09-07）**：这四行长期挂着未勾，但代码里绝大部分早已落地——
+> 勾选没跟上实现，看起来像「什么都没做」。下面按逐项核对结果重写，
+> 每项附证据位置；只有确实没做的才留空框。
+
+**P0 — 能看着过日子：已完成**
+
+- [x] 暂停 / 倍速（空格 + ×1/×2/×3）：`main.js` `s.paused` / `s.timeScale`，`setTimeScale`
+- [x] 警报条（可点击跳镜头）：`alerts.js` → `ui.js` `APH.Alerts.collect/focus`
+- [x] 指挥官与居民同一套大脑：`residents.js thinkPawn`，指挥官与居民共用（`updateCommanderAutonomy` / `updateResidents`）
+- [x] 一天时长对齐：`config.js dayLen: 3600`（60 分钟）
+- [x] 右键上下文：`handleContextMenu`（出航/开箱/破译/送医/返航/强制微操）
+
+**P1 — 生活与生产闭环：已完成**
+
+- [x] 作息表 24 格：`residents.js scheduleAt / cycleScheduleSlot`，`tests/schedule.test.js`
+- [x] 念头 Thought（28 条）：`CFG.thoughts` + `collectThoughts`
+      —— **2026-09-07 起真正驱动心情**（ADR-31），此前只在检查器里显示，不影响模拟
+- [x] 检查器需求条：`ui.js inspNeedRow`（饱食/精力/娱乐）
+- [x] 工单 Bills：`tests/bills.test.js`，厨房/工坊工单
+- [x] 仓储划区 + 禁止物品：`colony.js` zones + `zone.forbid`，`tests/zones.test.js`
+- [x] 种植划区：同 zones（`type:'grow'`）
+- [x] 房间职能判定：`nav.js roomsOf/roomAt`，`tests/rooms.test.js`
+- [x] 工作动画：`entities.js` workAnim（🪓 砍 / 🔨 建 / 🍳 炊 / 📦 搬）
+
+**P2 — 质量、身体、动物、火：多数完成**
+
+- [x] 清洁与清扫工作：`colony.js addFilth/filthAt/cleanCells` + 清扫工作
+- [x] 修理与建筑掉耐久：`colony.js decayBuilding/repairBuilding`（`main.js` 每跳修 1.2）
+- [x] 部位伤与机能：`residents.js BODY_PARTS / capacitiesOf`
+- [x] 尸体与埋葬：`corpse` 实体 + 埋葬交互 + `th_saw_corpse` 念头
+- [x] 动物个体：`colony.js makeAnimal / syncPastureAnimals`
+- [x] 火灾与灭火：`colony.js addFire/tickFires/douseFires`
+- [x] 活动区 Restrict：`colony.js` `type:'restrict'` 区 + `pawn.restrictId`
+- [x] 打猎规划：`pickHuntedAnimal` + 打猎工作
+- [x] **美观 Beauty**：`Res.roomBeauty` —— 正分复用 `roomMoodGain`，负分为工业设施
+      （发电机/采矿机 −3）、污秽（−0.6/单位）、尸体（−5/具）；汇入 ADR-31 念头，
+      一个房间只挂一条。`th_pretty_room` 终于有了来源，「别把发电机塞进卧室」成为真决策
+- [ ] **屠宰台**：⚠ **需先拍板**——本作动物死亡直接掉 `it_food`（`workOnAnimal`），
+      根本不产生尸体；唯一会变成尸体的是**殖民者**。所以「屠宰台」当前只有两种落法：
+      (a) 对动物 = 与现有掉落重复，(b) 对殖民者尸体 = 食人。后者是很重的黑暗机制，
+      不像用户想要的东西，故不擅自实现
+
+**P3 — 可选深度**
+
+- [x] 囚犯（非奴隶）：`residents.js releasePrisoner` + 囚犯状态
+- [x] 性格崩溃：4 种（`BREAK_NAMES`）——环世界有数十种，按需再扩
+- [ ] 技能热情 Passion：未实现（只有技能数字，没有学得快/爱做的区分）
+- [ ] 更多崩溃类型 / 义体 / 装备磨损
+- 奴隶与四大 DLC：**不做**（用户红线）
+
+## 殖民地优先重设计（2026-09-07 拍板）
+
+> 诊断与完整计划：`docs/colony-first-redesign.md`
+> **拍板：殖民地是游戏本体**；远征降级为「只带回种不出来的东西」的短程补给跑。
+>
+> 根因不是缺系统，是缺循环：过了第一夜 `objective()` 永远返回 null（游戏不再要求
+> 任何东西），且**没有任何失败条件**——殖民地不可能覆灭、死亡只是换个星球。
+> 威胁阶梯造得很好，但在不可能输的游戏里只是烟花。
+
+- [x] **T1 赌注成立**：殖民地覆灭判定（立过殖民地再归零 = 本局结束，研究/科技/库存
+      随之失去）+ 指挥官获得 `mood` 并由念头驱动（此前 `playerNeeds` 根本没有 mood）
+      + 覆灭结算页「重建殖民地」清档重来
+- [x] **T2 目标阶梯**：`APH.Colony.colonyGoal` 按真实殖民地状态逐级发问
+      （招人 → 农场 → 囤粮 → 通电 → 防线 → 医疗舱 → 发射器），永不枯竭
+- [x] **T3 季节**：`Weather.seasonAt` 纯函数（一年 4×6=24 天）；冬天 `growMul=0`
+      田里不长 + 气温 −18°C；入冬预警进警报条；过冬存粮由 `Colony.winterFoodNeed`
+      从真实经济推导（**拍脑袋的 40/人与 120 存粮分别高了 4× 与 12×，已实测纠正**）
+- [x] **T4 远征降级**：掉落表进 `CFG.expedition.lootTable`，只留晶体矿/遗件（换研究点）；
+      散装资源禁入（`bulkStores` 测试钉死）；种荚仍只来自实验室化验；
+      任务简报不再承诺「出门补给食物/矿材」
+- [x] **T5 结局**：`te_deep_signal` → `bl_transmitter`（max:1，耗电 80）→ 通电按 E
+      呼叫救援通关；通关页讲这一局的故事（存续天数/登船人数/失去的同伴）
+
+### T1 之后仍悬而未决（需要设计拍板，不要闷头写）
+
+- **指挥官死亡时控制权归谁**：现在指挥官一死就本局结束，但殖民地优先意味着
+  「还有人活着，殖民地就还在」。要么让镜头脱离指挥官（ADR-29 本来就是上帝视角），
+  要么保留「指挥官即本局」的设定。**这条会牵动整个操控范式，先别动手。**
+
+## 架构债（2026-09-07 复盘，逐项有护栏）
+
+> 详见 `docs/adr/0029-module-layering.md`；护栏在 `tests/layering.test.js`。
+> 这些**不是**游戏跑不起来的原因，是让「下一个十个功能」变贵的原因。
+
+- [x] **ADR-37 念头上下文收口**：main 与 ui 各有一份且已分叉（ui 少了美观/房间/同室/篝火），
+      指挥官检查器又开始撒谎。统一挂 `APH.Res`
+- [x] **ADR-38 模拟循环单一归属**：colony/combat 的 12 处 `APH.Main` 反向调用清零；
+      `tickProduction` 改为返回「本跳是否发生」，编排归还 main；落成/围攻改走事件总线
+- [ ] **ui.js → APH.Main 27 处**（棘轮已锁死不许增长）：
+      存档类 → 直接走 `APH.Save`；领域查询 → 下沉 Colony/Res；命令派发 → 事件或命令表
+- [ ] **模拟层直接驱动 UI**：`combat.js` 38 处、`colony.js` 5 处 `APH.UI.*`，
+      应改为 emit 事件由 ui 订阅（ADR-8 总线已具备）
+- [ ] **main.js 仍 6100+ 行**：提示层与殖民地跳编排应各自独立成模块。
+      **注意排序**：这一项要放在上面两项之后 —— 先把依赖方向理顺，
+      才知道哪些代码天然属于哪里
+- [ ] **CFG 1110 行单层对象**：按域拆命名空间
 
 ## 已知不做（用户红线）
 

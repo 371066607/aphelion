@@ -58,6 +58,19 @@ LLM 驱动每颗星球的差异化（法则/信标档案/敌人基因），无 A
 | ADR-28 | 环世界式底栏标签、检查器与规划划区系统 | 底部常驻环世界标准主标签栏（命令/建筑/工作/研究/外交），替换左侧悬浮圆钮；左下角常驻检查器（Inspector），选中小人/指挥官/建筑/地面展示头像、状态条与行为；规划工具箱（砍伐/开采/搬运/拆除/取消）支持单点与鼠标拉框圈选（矩形选框与头顶悬浮图标）；严格无标不采派工规则；选中小人右键点击实体触发最高优先级强制执行。详见 `docs/adr/0020-rimworld-bottom-tabs-inspector-designation-system.md` | 2026-09-05 沙盒交互：全景底栏、规划划区与检查器完整闭环 |
 | ADR-29 | 全局上帝视角、Pawn 自主化与纯征召战备控制架构 | WASD/方向键全面接管摄像机平移（Camera Pan），中键拖拽与双击居中；屏幕顶部常驻殖民者头像栏（Colonist Bar），单选/居中/R键征召；指挥官全面融入名册作为第1号自主公民（自治生活、作息、开采、社交）；鼠标框选多小人编队（Box Select Squad），R键战备拔枪，右键集结与自动索敌/掩体集火；通用右键上下文交互全面替代走近按E；远征副本与家园双端统一为纯征召探险。详见 `docs/adr/0021-rts-pawn-draft-camera-control-architecture.md` | 2026-09-05 架构范式蜕变：彻底告别 WASD 动作单人走位，迈入纯正沙盒 RTS 征召控制 |
 
+| ADR-31 | 念头驱动心情 | 心情从「各处零散加减的累加器」改为「中性基线 + 当前念头偏移之和」的目标值, 每生产跳按 `moodLerp` 缓动逼近; `collectThoughts` 成为唯一权威, `needsTick` 内所有 `r.mood ±= n` 与 residentsTick 的两处事后加减(房间品质/同室死敌)全部改写成念头; 当跳清单挂 `pawn.thoughts`, 检查器直接渲染它 —— 面板与模拟不可能再分叉。详见 `docs/adr/0023-thought-driven-mood.md` | 2026-09-07 修好「检查器对玩家撒谎」: 此前念头只在 UI 显示, main.js 零引用 |
+| ADR-32 | 家园每帧四段式 | `updateHome`(311行) 拆成 `senseHome`(只写 s.nearX) / `simHome`(推进世界并返回环境量) / `hintForHome`(显式优先级表) / `syncHomeChrome`(标签与标记清理); 提示优先级从「后一次 setHint 覆盖前一次」的隐式副产物, 变成一张命中即停的表。详见 `docs/adr/0024-home-frame-seams.md` | 2026-09-07 顺带修好: 磁暴/酸雨期间站在灶台/工坊/床/空调旁看不到交互提示 |
+| ADR-33 | 指针输入并入统一分发器 | 画布 pointerdown/move/up/contextmenu 四个裸监听改走 `APH.Input`, 派发 `POINTER_*` 动作; 工具经 `setToolProvider` 反查(单一真源, 不复制 `s.orderTool`/`s.buildMode`); 模态阻断与键盘一致, 但 up/move 永远放行以免拖拽卡死; 处理器体不变。详见 `docs/adr/0025-pointer-input-dispatch.md` | 2026-09-07 补上 ADR-19 缺的另一半: 环世界手感主要在指针, 却是唯一没抽象的一半 |
+
+| ADR-34 | 季节(压力发生器) | `Weather.seasonAt(clock,dayLen)` 纯函数由时钟推导, 不进存档; 季节给出 `tempOffset`(冬 −18°C, 复用体温失调链)与 `growMul`(**冬天=0**, 田里不长); 入冬预警进警报条(排在挨饿之下/缺料之上); 过冬存粮由 `Colony.winterFoodNeed(pop)` 从 foodDrain/eatGain/prodTick/DAY_LEN 推导, 不写死。详见 `docs/adr/0026-seasons.md` | 2026-09-07 让「今天该干什么」每天都有答案: 囤, 否则死 |
+
+| ADR-35 | 远征降级与发射器终局 | 掉落表移进 `CFG.expedition.lootTable` 且只留换研究点的独有物(晶体矿/遗件), 散装粮木石铁矿皮草药一律禁入(`bulkStores` 由测试钉死); 种荚仍只来自实验室化验, 不直接掉落; 任务简报改口(缺粮→种田, 缺矿→采矿), 不再承诺远征能补给。终局三级: `te_deep_signal` 研发 → `bl_transmitter` 建造(max:1) → 通电按 E 呼叫救援通关; 发射器登记为耗电建筑(load:35, prio:2)使「通电才能起飞」成为真约束(80W 经实测夜间不可能满足, 已纠正); `te_deep_signal` 补进 `TECH_COLUMNS`(漏了就等于玩家买不到)。详见 `docs/adr/0027-expedition-demotion-and-ending.md` | 2026-09-07 补上全项目唯一的胜利出口, 并关掉「刷远征绕过殖民地」的后门 |
+
+| ADR-36 | 美观 Beauty | `Res.roomBeauty(pos,rooms,buildings,{filth,corpses})` 纯函数: 正分复用 `roomMoodGain`(家具+卧室), 负分为工业设施(`CFG.residents.beauty.ugly`, 发电机/采矿机 −3)、污秽 −0.6/单位、尸体 −5/具; 结果汇入 ADR-31 可变幅度念头, 一个房间只挂一条(`th_pretty_room`/`th_room`/`th_room_bad`)。此前 `th_pretty_room` 在目录里躺着无人赋值, 且只有正分 —— 把发电机堆进卧室毫无代价。详见 `docs/adr/0028-beauty.md` | 2026-09-07 P2 最后一处零实现; 实测纠正了「moodDiv 砍半既有平衡」与「跨入漂亮档反而心情更差」两处 |
+
+| ADR-37 | 念头上下文收口 | `thoughtCtxAt`/`thoughtEnvOf` 统一挂 `APH.Res`; main 与 ui 各留三行转发壳。此前 main 与 ui 各有一份且已分叉(ui 少了美观/房间/同室/篝火四项), 指挥官检查器又开始对玩家撒谎 —— 即 ADR-31 修过的同一个 bug 被重新造出。详见 `docs/adr/0029-module-layering.md` | 2026-09-07 |
+| ADR-38 | 模拟循环单一归属 | `Colony.tickProduction` 改为返回「本跳是否发生」, rivals/story/residents 编排归还 main.js; 建筑落成与围攻起止改走 `U.emit`(同步, 顺序不变)。colony/combat 的 `APH.Main` 引用 12 → 0。新增 `tests/layering.test.js`: 模拟层零反向调用 + 其余模块棘轮式只减不增(现登记 ui.js:27) + 向后依赖白名单。详见 `docs/adr/0029-module-layering.md` | 2026-09-07 修掉 main→colony→main 环, 模拟循环终于有唯一归属者 |
+
 **暂缓决策**（改动成本不随时间增长）：渲染特效、UI 布局、平衡数值、敌人行为参数、音频、瞄准方式。
 
 

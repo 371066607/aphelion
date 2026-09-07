@@ -102,11 +102,12 @@ test('tech: 先化验硅壳后研发水培则补发化验钥匙', function(){
   if ((r.granted || []).indexOf('te_bio_adaptation') < 0) throw new Error('granted 应含 te_bio_adaptation');
 });
 
-test('tech: 全屏图四列不含旧档别名 te_weaponry', function(){
+test('tech: 全屏图列表完整、不重复、不含旧档别名 te_weaponry', function(){
   var cols = APH.Colony.TECH_COLUMNS;
-  if (!cols || cols.length !== 4) throw new Error('应为四列, 实际: ' + (cols && cols.length));
+  if (!cols || !cols.length) throw new Error('科技图不应为空');
   var names = cols.map(function(c){ return c.name; }).join(',');
-  if (names !== '农业,工业,医学,安防') throw new Error('列名应为 农业|工业|医学|安防, 实际: ' + names);
+  if (names.indexOf('农业,工业,医学,安防') !== 0)
+    throw new Error('前四列应为 农业|工业|医学|安防, 实际: ' + names);
   var seen = {};
   cols.forEach(function(c){
     c.ids.forEach(function(id){
@@ -120,6 +121,21 @@ test('tech: 全屏图四列不含旧档别名 te_weaponry', function(){
   if (!seen.te_exosuit) throw new Error('外骨骼应挂在工业列');
   if (!seen.te_radar) throw new Error('雷达应挂在安防列');
   if (!seen.te_bio_adaptation) throw new Error('化验钥匙叶子应画在树上');
+  if (!seen.te_deep_signal) throw new Error('终局科技应画在树上, 否则玩家买不到, 发射器成死路');
+});
+
+test('tech: 每个科技都必须出现在某一列(否则 UI 根本不渲染它)', function(){
+  /* 科技图只从 TECH_COLUMNS 渲染 —— 漏进表的科技在 UI 里不存在, 永远买不到。
+     te_deep_signal 就曾这样漏掉一次, 使整条终局链形同虚设。 */
+  var cols = APH.Colony.TECH_COLUMNS, TECHS = APH.Colony.TECHS;
+  var inCol = {};
+  cols.forEach(function(c){ c.ids.forEach(function(id){ inCol[id] = 1; }); });
+  var ALIASES = { te_weaponry: 1 };          // 旧档别名, 故意不上树
+  var missing = Object.keys(TECHS).filter(function(id){
+    return !inCol[id] && !ALIASES[id];
+  });
+  if (missing.length)
+    throw new Error('这些科技不在任何一列, UI 不会渲染: ' + missing.join(', '));
 });
 
 test('tech: 等离子等级取 ballistics 与旧档 weaponry 的较大值', function(){

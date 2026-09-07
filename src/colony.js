@@ -111,6 +111,13 @@ APH.Colony = (function(){
     bl_solar_panel: { name:'太阳能板', cost:0, costMineral:25, reqTech:'te_machining', costRes:{ iron:25, stone:10 }, size:52, max:6, buildTime:22,
       dispH:74, cells:[1,1],
       desc:'白天发电，功率随天气打折(雨/雷暴/暴雪/雾)。需接入导线。' },
+    /* 殖民地优先 T5: 终局超级工程。
+       这是整局唯一「把财富一次性花光」的去处 —— 攒东西终于有了意义。
+       造好 + 通电 → 走过去按 E 呼叫救援, 通关。 */
+    bl_transmitter: { name:'深空发射器', cost:0, costMineral:200, reqTech:'te_deep_signal',
+      costRes:{ iron:180, stone:120, wood:80 }, size:64, max:1, buildTime:120,
+      dispH:150, cells:[3,3], power:true,
+      desc:'终局工程：呼叫救援离开这颗星球。造价高昂且必须通电。' },
     bl_battery: { name:'蓄电池', cost:0, costMineral:15, reqTech:'te_machining', costRes:{ iron:15, wood:8 }, size:44, max:4, buildTime:18,
       dispH:84, cells:[1,1],
       desc:'存储富余电力；停电时兜底供电。需接入导线。' },
@@ -1082,7 +1089,8 @@ APH.Colony = (function(){
     zones.push(z);
     return { zones: zones, zone: z };
   }
-  function tickGrowZones(zones, farmerSkill, eff){
+  /* T3: seasonMul 省略时按 1 (老调用零改动); 冬天传 0 → 田里不长 */
+  function tickGrowZones(zones, farmerSkill, eff, seasonMul){
     var harvested = [];
     if(farmerSkill == null) return { harvested: harvested };
     (zones || []).forEach(function(z){
@@ -1094,7 +1102,7 @@ APH.Colony = (function(){
           harvested.push({ x:c.x, y:c.y, drop:h, cropType:z.cropType });
           c.plant = { stage:1, t:0 };
         } else {
-          c.plant = cropPlotTick(c.plant, farmerSkill, eff, 1, z.cropType);
+          c.plant = cropPlotTick(c.plant, farmerSkill, eff, (seasonMul == null ? 1 : seasonMul), z.cropType);
         }
       });
     });
@@ -1490,13 +1498,14 @@ APH.Colony = (function(){
     var sick=((meta.residents)||[]).some(function(r){ return (r.illness||0)>40; });
     var urgent = food < Math.max(warnF, pop*warnF) || mineral < warnM;
     var text = '矿材'+mineral+' · 食物还能撑'+days+'跳 · 闲人'+idle;
-    var mission = '此行目标：晶体与遗件';
+    /* T4: 远征只带回研究点与独有物, 不再产出散装粮食/矿材 ——
+       所以缺粮缺矿的出路是「回家种/回家挖」, 不是「出门搜刮」。
+       任务简报必须说实话, 否则等于把玩家往错误解法上推。 */
+    var mission = '此行目标：研究与遗物（粮食矿材带不回来）';
     if(food < Math.max(warnF, pop*warnF)){
-      text = '食物将尽 — 该种田或出门找补给';
-      mission = '此行目标：补给食物';
+      text = '食物将尽 — 该种田了（远征带不回粮食）';
     }else if(mineral < warnM){
-      text = '矿材不足 — 派人采矿或出门搜刮';
-      mission = '此行目标：矿材';
+      text = '矿材不足 — 派人采矿或造采矿机（远征带不回矿材）';
     }else if(sick && med<=0){
       text = '有人在生病 — 工坊把矿做成药';
     }
@@ -1660,6 +1669,10 @@ APH.Colony = (function(){
                           desc:'解锁防御炮塔' },
     te_plasma_grid:     { name:'等离子电网重炮', cost:200, max:1, requires:['te_turret_tech'],
                           desc:'' },
+    /* 殖民地优先 T5: 终局科技 —— 攒下来的一切最后花在这里 */
+    te_deep_signal:     { name:'深空信标阵列', cost:400, max:1,
+                          requires:['te_deep_drilling', 'te_plasma_grid'],
+                          desc:'解锁深空发射器：造好并通电即可呼叫救援，离开这颗星球。' },
     te_heavy_plasma:    { name:'等离子重炮与史前能源', cost:100, max:1, requires:['te_ballistics'],
                           desc:'史前遗迹科技：解锁等离子重炮与史前永恒发电机' },
 
@@ -1677,6 +1690,9 @@ APH.Colony = (function(){
     { name:'工业', ids:['te_stonecutting','te_machining','te_deep_drilling','te_exosuit'] },
     { name:'医学', ids:['te_herbal_remedies','te_medicine','te_bionics'] },
     { name:'安防', ids:['te_o2tank','te_ballistics','te_turret_tech','te_plasma_grid','te_heavy_plasma','te_radar'] },
+    /* 殖民地优先 T5: 终局列。不进这张表 = 科技树 UI 根本不渲染它,
+       玩家永远买不到 —— 那样发射器就是死路。 */
+    { name:'终局', ids:['te_deep_signal'] },
   ];
 
   function techDepth(techId){
@@ -2351,15 +2367,8 @@ APH.Colony = (function(){
         }
       }
 
-      if(window.APH.Main && APH.Main.saveColony) APH.Main.saveColony();
-      if(d.bid === 'bl_house' && window.APH.Opening && APH.Opening.noteHouse){
-        var fOpening = (window.APH.Main && APH.Main.firstNightOpening) ? APH.Main.firstNightOpening() : null;
-        if(fOpening){
-          APH.Opening.noteHouse(fOpening, s.clock || 0);
-          if(window.APH.Main && APH.Main.applyFirstNightHint) APH.Main.applyFirstNightHint();
-        }
-        try{ if(window.APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta); }catch(eH){}
-      }
+      /* ADR-38: 存档与开场推进由 main.js 订阅 'built' 事件处理(ADR-8 事件总线),
+         colony 不再反向调用 APH.Main。 */
       if(U.emit) U.emit('built', { id: d.bid });
       var bdef = get(d.bid);
       if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ ' + (bdef ? bdef.name : d.bid) + ' 建造完成', '#9fe8c8');
@@ -2368,10 +2377,15 @@ APH.Colony = (function(){
   }
 
   /* ================= 生产结算高阶接缝 (ADR-21) ================= */
+  /* ADR-38: 生产跳只做「生产」, 并把「这一跳是否发生」报给调用方。
+     此前它反过来调 APH.Main.tickRivals / storyTick / residentsTick ——
+     colony 在 MODULE_ORDER 里排在 main 之前, 那是一条反向依赖,
+     使整个模拟循环没有唯一的归属者(main → colony → main)。
+     现在编排权归还给 main.js, 本函数不再向上调用。 */
   function tickProduction(s, dt){
-    if(!s) return;
+    if(!s) return false;
     s.prodT = (s.prodT || 0) + dt;
-    if(s.prodT < 30) return;
+    if(s.prodT < 30) return false;
 
     s.prodT -= 30;
     (s.colony && s.colony.buildings || []).forEach(function(b){
@@ -2412,7 +2426,10 @@ APH.Colony = (function(){
 
     /* ADR-25: 推进封闭房间室内气温与温控电器结算 */
     var wxId = (window.APH.Weather && APH.Weather.currentId) ? APH.Weather.currentId(s.meta) : 'wx_clear';
-    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxId, isDay) : 22;
+    var seasonC = (window.APH.Weather && APH.Weather.seasonAt)
+      ? APH.Weather.seasonAt(s.clock, CFG.DAY_LEN) : null;
+    var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf)
+      ? APH.Weather.ambientTemperatureOf(wxId, isDay, seasonC && seasonC.id) : 22;
     var allBlds = s.colony && s.colony.buildings || [];
     var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(allBlds) : [];
     rooms.forEach(function(rm){
@@ -2474,12 +2491,71 @@ APH.Colony = (function(){
       s.floraRespawn.push({ kind: en.kind, x: en.x, y: en.y, ticksLeft: ticks });
     });
 
-    if(window.APH.Main && APH.Main.tickRivals) APH.Main.tickRivals(30 / 60);
-    if(window.APH.Main && APH.Main.storyTick) APH.Main.storyTick(30 / 60);
-    if(window.APH.Main && APH.Main.residentsTick) APH.Main.residentsTick();
+    /* ADR-38: 敌对/叙事/居民三跳的编排已上移到 main.js —— 见 simHome。 */
+    return true;
   }
 
   /* ---------- ADR-28 / Ticket #157: 规划划区与框选判定纯函数 ---------- */
+  /* T3: 过冬所需存粮 (纯函数, 由真实经济推导, 不写死)。
+     居民一跳掉 foodDrain 饱食; 从库存吃一次 = 1 单位存粮换 eatGain 饱食。
+     → 每人每天存粮 = foodDrain × (DAY_LEN/prodTick) / eatGain
+     实测口径: 0.35 × 120 / 25 = 1.68 /人/天 → 6 天冬天约 10 /人。 */
+  function winterFoodNeed(pop){
+    var R = CFG.residents || {};
+    var S = CFG.seasons || {};
+    var drain = (R.foodDrain != null) ? R.foodDrain : 0.35;
+    var gain = (R.eatGain != null) ? R.eatGain : 25;
+    var prodTick = (CFG.time && CFG.time.prodTick) || 30;
+    var dayLen = CFG.DAY_LEN || 3600;
+    var days = (S.daysPerSeason != null) ? S.daysPerSeason : 6;
+    var safety = (S.winterFoodSafety != null) ? S.winterFoodSafety : 1.25;
+    if(!(gain > 0) || !(prodTick > 0)) return 0;
+    var perHeadPerDay = drain * (dayLen / prodTick) / gain;
+    return Math.ceil(perHeadPerDay * days * safety * Math.max(0, pop || 0));
+  }
+
+  /* 殖民地优先 T2: 目标阶梯 (纯函数)。
+     第一夜之后 opening.objective 永远返回 null —— 游戏从此不再向玩家要任何
+     东西, 这正是「玩不下去」的字面原因。这里接手, 按真实殖民地状态逐级发问,
+     每一级达成才让位给下一级; 全部达成后指向终局工程, 因此永不枯竭。
+     纯函数, 不碰 DOM, node 直测。 */
+  function colonyGoal(meta, buildings){
+    meta = meta || {};
+    buildings = buildings || [];
+    var C = (CFG.colony) || {};
+    var TXT = C.goalTexts || {};
+    function has(id){
+      for(var i=0;i<buildings.length;i++){
+        var b = buildings[i];
+        if(b && !b.dead && (b.id === id || b.bid === id)) return true;
+      }
+      return false;
+    }
+    var residents = meta.residents || [];
+    var res = meta.res || {};
+
+    if(residents.length < 1)
+      return { id:'recruit', text: TXT.recruit || '招募第一位同伴' };
+    if(!has('bl_farm') && !has('bl_crop_plot'))
+      return { id:'farm', text: TXT.farm || '建一座农场' };
+    var need = winterFoodNeed(residents.length + 1);   // +1 = 指挥官
+    if((res.food || 0) < need)
+      return { id:'food', text: (TXT.food || '囤粮到 {n}').replace('{n}', need) };
+    if(!has('bl_wood_generator') && !has('bl_solar_panel') && !has('bl_ancient_generator'))
+      return { id:'power', text: TXT.power || '通电' };
+    if(!has('bl_turret') && !has('bl_wall'))
+      return { id:'defense', text: TXT.defense || '立起防线' };
+    if(!has('bl_clinic'))
+      return { id:'clinic', text: TXT.clinic || '建医疗舱' };
+    /* T5: 终局。分三步说清楚 —— 研发 → 建造 → 通电起飞 */
+    var tech = meta.tech || {};
+    if(!tech.te_deep_signal)
+      return { id:'endtech', text: TXT.endtech || '研发「深空信标阵列」，那是回家的路' };
+    if(!has('bl_transmitter'))
+      return { id:'endbuild', text: TXT.endbuild || '建造深空发射器（终局工程）' };
+    return { id:'endgame', text: TXT.endgame || '给发射器通电，走过去呼叫救援' };
+  }
+
   function boxSelectEntities(entities, x0, y0, x1, y1){
     if(!entities || !Array.isArray(entities)) return [];
     var minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
@@ -2627,6 +2703,7 @@ APH.Colony = (function(){
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     floraRespawnTick:floraRespawnTick,
     boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
+    colonyGoal:colonyGoal, winterFoodNeed:winterFoodNeed,
     makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
     serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,

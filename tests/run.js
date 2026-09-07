@@ -17,6 +17,19 @@ global.localStorage = {
 };
 global.document = { getElementById: () => null };   // 逻辑模块不应触 DOM
 
+/* ---- 确定性 RNG (ADR-5 可复现性): 每个用例前重播种, 用例与执行顺序无关 ---- */
+const SEED0 = 0x9E3779B9;
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function reseed(seed) { Math.random = mulberry32(seed == null ? SEED0 : seed); }
+reseed();
+
 /* ---- 微型用例注册器 ---- */
 const cases = [];
 function test(name, fn) { cases.push({ name, fn }); }
@@ -47,6 +60,7 @@ for (const c of cases) {
     // 每个用例前清空存档, 保证隔离
     localStorage.clear && localStorage.clear();
     for (const k of Object.keys(memStore)) delete memStore[k];
+    reseed();
     c.fn();
     pass++;
     console.log(`  ✓ ${c.name}`);

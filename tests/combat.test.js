@@ -81,11 +81,41 @@ test('rollLoot: 只产出物品表内的 id', () => {
     if (!(l.n >= 1)) throw new Error('数量非法');
   }
 });
-test('rollLoot: 大样本分布覆盖全部档位', () => {
+test('rollLoot: 大样本覆盖掉落表全部档位(表由 CFG 定义)', () => {
   const rng = U.makeRng(7);
+  const table = C.lootTable();
   const seen = new Set();
-  for (let i = 0; i < 500; i++) seen.add(C.rollLoot(rng).id);
-  if (seen.size < 3) throw new Error('稀有档从未掉出: ' + [...seen].join(','));
+  for (let i = 0; i < 2000; i++) seen.add(C.rollLoot(rng).id);
+  table.forEach(e => {
+    if (!seen.has(e.id)) throw new Error('档位从未掉出: ' + e.id);
+  });
+  seen.forEach(id => {
+    if (!table.some(e => e.id === id)) throw new Error('掉出了表外物品: ' + id);
+  });
+});
+
+/* ---------- 殖民地优先 T4: 远征只带回「种不出来的东西」 ---------- */
+test('T4 loot: 掉落表不得含散装资源(粮/木/石/铁/矿/皮/草药/药)', () => {
+  const table = C.lootTable();
+  const bulk = APH.CFG.expedition.bulkStores;
+  if (!table.length) throw new Error('掉落表不应为空');
+  table.forEach(e => {
+    const it = CFG.items[e.id];
+    if (!it) throw new Error('掉落表引用了不存在的物品: ' + e.id);
+    if (it.store && bulk.indexOf(it.store) >= 0)
+      throw new Error('散装资源不得进远征掉落表: ' + e.id + ' (store=' + it.store + ')');
+  });
+});
+
+test('T4 loot: 远征产出结算为研究点, 不再产出散装矿材', () => {
+  const table = C.lootTable();
+  const carry = {};
+  table.forEach(e => { carry[e.id] = 2; });
+  const goods = C.settleGoods(carry);
+  if (goods.mineral !== 0)
+    throw new Error('远征掉落不应结算出散装矿材, got ' + goods.mineral);
+  if (!(goods.research > 0))
+    throw new Error('远征掉落应结算为研究点, got ' + goods.research);
 });
 
 /* ---------- 背包负重 ---------- */

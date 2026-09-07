@@ -161,3 +161,38 @@ test('信标间距与禁区(离基地>220 / 离湖>200)', () => {
     if (U.dst(b.x, b.y, LAKE.x, LAKE.y) < 200) throw new Error('信标离湖过近');
   });
 });
+
+/* ---------- save.js: 迁移边界 (2026-09-07 复盘) ---------- */
+test('save: 合法 JSON 但不是存档对象 → 当损坏处理, 不抛错', () => {
+  const V = APH.CFG.save.VERSION;
+  ['123', '"hello"', 'null', '[1,2,3]'].forEach(bad => {
+    localStorage.setItem(APH.CFG.save.KEY_META, bad);
+    let m;
+    try { m = APH.Save.loadMeta(); }
+    catch (e) { throw new Error('损坏存档 ' + bad + ' 不应抛错: ' + e.message); }
+    if (!m || typeof m !== 'object') throw new Error('应回退成全新存档: ' + bad);
+    if (m.v !== V) throw new Error('全新存档应带当前版本号');
+  });
+  localStorage.removeItem(APH.CFG.save.KEY_META);
+});
+
+test('save: 未来版本存档抛错, 且绝不把版本号改回来', () => {
+  const V = APH.CFG.save.VERSION;
+  const future = { v: V + 5, research: 999, futureField: 'keepme' };
+  let threw = false;
+  try { APH.Save.migrate(future); }
+  catch (e) { threw = true; if (e.aphSaveVersion !== V + 5) throw new Error('错误应带原始版本号'); }
+  if (!threw) throw new Error('未来版本应抛错(宁可失败不可静默丢数据)');
+  if (future.v !== V + 5) throw new Error('未来存档的版本号不得被下调, got ' + future.v);
+  if (future.futureField !== 'keepme') throw new Error('未来存档的数据不得被改动');
+});
+
+test('save: 正常迁移链仍然推进版本号', () => {
+  const V = APH.CFG.save.VERSION;
+  const old = { research: 7 };            // v0: 无版本号
+  const out = APH.Save.migrate(old);
+  if (!out || out.v !== V) throw new Error('v0 应迁到当前版本, got ' + (out && out.v));
+  if (out.research !== 7) throw new Error('迁移不得丢数据');
+  if (!APH.Save.isFutureSave({ v: V + 1 })) throw new Error('isFutureSave 应识别未来版本');
+  if (APH.Save.isFutureSave({ v: V })) throw new Error('当前版本不是未来版本');
+});

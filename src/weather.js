@@ -179,10 +179,61 @@ APH.Weather = (function(){
   }
 
   /* ---------- ADR-25: 环境气温推导纯函数 ---------- */
-  function ambientTemperatureOf(weatherId, isDay){
+  /* ---------- 殖民地优先 T3: 季节 ----------
+     纯函数: 由世界时钟推导「今天是一年里的哪一天、什么季节」。
+     不存进存档 —— 从 clock 推导即可, 老档零迁移。 */
+  function seasonAt(clock, dayLen){
+    var S = CFG.seasons || {};
+    var order = S.order || ['spring', 'summer', 'autumn', 'winter'];
+    var per = (S.daysPerSeason != null) ? S.daysPerSeason : 6;
+    var dl = (dayLen != null) ? dayLen : (CFG.DAY_LEN || 3600);
+    if(!(per > 0) || !(dl > 0) || !order.length){
+      return { id:'spring', index:0, day:0, dayInSeason:0, daysLeft:0,
+               growMul:1, tempOffset:0, isWinter:false, name:'春', icon:'🌱' };
+    }
+    var day = Math.floor(Math.max(0, clock || 0) / dl);
+    var yearLen = per * order.length;
+    var dayOfYear = ((day % yearLen) + yearLen) % yearLen;
+    var index = Math.floor(dayOfYear / per);
+    var id = order[index] || order[0];
+    var dayInSeason = dayOfYear - index * per;
+    return {
+      id: id,
+      index: index,
+      day: day,
+      dayOfYear: dayOfYear,
+      dayInSeason: dayInSeason,
+      daysLeft: per - dayInSeason,          // 距离换季还有几天
+      growMul: (S.growMul && S.growMul[id] != null) ? S.growMul[id] : 1,
+      tempOffset: (S.tempOffset && S.tempOffset[id] != null) ? S.tempOffset[id] : 0,
+      isWinter: id === 'winter',
+      name: (S.names && S.names[id]) || id,
+      icon: (S.icons && S.icons[id]) || '',
+    };
+  }
+  /* 距离入冬还有几天 (已入冬 → 0) */
+  function daysUntilWinter(clock, dayLen){
+    var S = CFG.seasons || {};
+    var order = S.order || ['spring', 'summer', 'autumn', 'winter'];
+    var per = (S.daysPerSeason != null) ? S.daysPerSeason : 6;
+    var wi = order.indexOf('winter');
+    if(wi < 0 || !(per > 0)) return null;
+    var s = seasonAt(clock, dayLen);
+    if(s.isWinter) return 0;
+    var span = ((wi - s.index) + order.length) % order.length;
+    return (span - 1) * per + s.daysLeft;
+  }
+
+  /* 季节气温叠加在天气基础气温之上 (seasonId 可省, 老调用零改动) */
+  function ambientTemperatureOf(weatherId, isDay, seasonId){
     var C = (CFG.temperature && CFG.temperature.weatherBaseTemp) || {};
     var w = C[weatherId] || C.wx_clear || { day: 22, night: 10 };
-    return isDay !== false ? w.day : w.night;
+    var base = isDay !== false ? w.day : w.night;
+    if(seasonId){
+      var off = (CFG.seasons && CFG.seasons.tempOffset && CFG.seasons.tempOffset[seasonId]) || 0;
+      return base + off;
+    }
+    return base;
   }
 
   return {
@@ -195,6 +246,7 @@ APH.Weather = (function(){
     expectRemain: expectRemain,
     forecast: forecast,
     ambientTemperatureOf: ambientTemperatureOf,
+    seasonAt: seasonAt, daysUntilWinter: daysUntilWinter,
     /* W4 视觉 (程序化粒子/天色) */
     fxParams: fxParams,
     rgbaOf: rgbaOf,

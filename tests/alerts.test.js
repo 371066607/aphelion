@@ -120,3 +120,58 @@ test('#167 alerts: focus 把镜头移到警报坐标', () => {
   Alerts.focus(s, { x: 1500, y: 1600 });
   if (s.camX !== 1500 || s.camY !== 1600) throw new Error('镜头应跳到 1500,1600 实际: ' + s.camX + ',' + s.camY);
 });
+
+/* ---------- 殖民地优先 T3: 入冬预警 ---------- */
+function winterState(dayIndex, food, residents){
+  const DL = APH.CFG.DAY_LEN;
+  return {
+    scene: 'home', clock: dayIndex * DL,
+    px: 1100, py: 1100, entities: [],
+    war: { raidActive:false, raidWarn:0 },
+    colony: { buildings: [], buildQueue: [] },
+    meta: {
+      res: { food: food },
+      residents: residents || [],
+      playerNeeds: { food: 90, rest: 90, illness: 0, downed: false, isSleeping: false },
+    },
+  };
+}
+function hasWinter(list){ return list.some(a => a.kind === 'winter'); }
+
+test('T3 alert: 入冬前存粮不足 → 预警; 存粮充足 → 不吵', () => {
+  const per = APH.CFG.seasons.daysPerSeason;
+  const warn = APH.CFG.seasons.winterWarnDays;
+  const eve = per * 3 - warn;                  // 刚进入预警窗口
+  const pop = [{ id:'r1', name:'甲', food:90, rest:90 }];
+  const need = APH.Colony.winterFoodNeed(pop.length + 1);   // 由真实经济推导
+
+  const low = APH.Alerts.collect(winterState(eve, 0, pop));
+  if (!hasWinter(low)) throw new Error('入冬前缺粮应预警');
+
+  const ok = APH.Alerts.collect(winterState(eve, need + 10, pop));
+  if (hasWinter(ok)) throw new Error('存粮充足不应预警(否则是噪音)');
+});
+
+test('T3 alert: 距冬还早不预警, 入冬当季缺粮持续预警', () => {
+  const per = APH.CFG.seasons.daysPerSeason;
+  const pop = [{ id:'r1', name:'甲', food:90, rest:90 }];
+  const early = APH.Alerts.collect(winterState(0, 0, pop));
+  if (hasWinter(early)) throw new Error('开年距冬还远, 不应预警');
+
+  const inWinter = APH.Alerts.collect(winterState(per * 3 + 1, 0, pop));
+  if (!hasWinter(inWinter)) throw new Error('冬天缺粮应持续预警');
+});
+
+test('T3 alert: 冬季预警排在袭击/倒地之下, 缺料之上', () => {
+  const per = APH.CFG.seasons.daysPerSeason;
+  const st = winterState(per * 3, 0, [{ id:'r1', name:'甲', food:90, rest:90 }]);
+  st.war.raidActive = true;
+  const list = APH.Alerts.collect(st);
+  const iRaid = list.findIndex(a => a.kind === 'raid');
+  const iWinter = list.findIndex(a => a.kind === 'winter');
+  if (iRaid < 0 || iWinter < 0) throw new Error('两条警报都应在场');
+  if (!(iRaid < iWinter)) throw new Error('袭击应排在冬季预警之前');
+  const P = APH.CFG.alerts.prio;
+  if (!(P.winter > P.missing)) throw new Error('冬季预警应高于缺料');
+  if (!(P.winter < P.hungry)) throw new Error('冬季预警应低于已经在挨饿');
+});

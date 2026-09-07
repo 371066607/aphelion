@@ -34,7 +34,24 @@ APH.Save = (function(){
   var migrations = {
     // 1: function(s){ s.newField = 0; return s; },
   };
+  /* 未来版本存档: 旧构建读不懂, 但绝不能把版本号偷偷改回来 ——
+     那会让日后真正的新构建以为迁移已经做过, 跳过 v(n)→VERSION 全链。
+     宁可在这里明确失败, 也不要静默改坏玩家的档 (见文件头契约)。 */
+  function isFutureSave(save){
+    return !!(save && typeof save.v === 'number' && save.v > CFG.save.VERSION);
+  }
   function migrate(save){
+    if(save === null || typeof save !== 'object' || Array.isArray(save)){
+      /* 合法 JSON 但不是存档对象(数字/字符串/数组/null): 当损坏处理。
+         注意严格模式下给原始值赋属性会抛 TypeError, 不能放任它往下走。 */
+      return null;
+    }
+    if(isFutureSave(save)){
+      var err = new Error('存档版本 v' + save.v + ' 高于当前构建支持的 v' +
+        CFG.save.VERSION + ' —— 请用较新版本打开, 本次不会改写存档。');
+      err.aphSaveVersion = save.v;
+      throw err;
+    }
     var v = save.v || 0;
     while(v < CFG.save.VERSION){
       v++;
@@ -52,7 +69,7 @@ APH.Save = (function(){
     var obj;
     try{ obj = JSON.parse(txt); }
     catch(e){ return null; }           // 损坏存档视为不存在, 不抛错
-    return migrate(obj);
+    return migrate(obj);               // migrate 对非存档对象返回 null; 未来版本抛错
   }
   function write(key, obj){
     obj.v = CFG.save.VERSION;
@@ -186,7 +203,7 @@ APH.Save = (function(){
     loadMeta:loadMeta, saveMeta:saveMeta,
     loadPlanet:loadPlanet, savePlanet:savePlanet,
     loadRivals:loadRivals, saveRivals:saveRivals,
-    migrate:migrate, wipeAll:wipeAll,
+    migrate:migrate, wipeAll:wipeAll, isFutureSave:isFutureSave,
     isPersistent:function(){ return persistent; },
   };
 })();

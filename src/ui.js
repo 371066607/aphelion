@@ -156,11 +156,26 @@ APH.UI = (function(){
           }catch(e3){ /* 预报失败静默, 不影响主行 */ }
           /* ADR-25: 实时环境气温与室内温度展示 */
           var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
-          var outTemp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(wxIdNow, isDay) : 22;
+          /* T3 季节: 气温含季节偏移, 并在天气行前面挂出季节与入冬倒计时 */
+          var seasonHud = (window.APH.Weather && APH.Weather.seasonAt)
+            ? APH.Weather.seasonAt(s.clock, APH.CFG.DAY_LEN) : null;
+          var outTemp = (window.APH.Weather && APH.Weather.ambientTemperatureOf)
+            ? APH.Weather.ambientTemperatureOf(wxIdNow, isDay, seasonHud && seasonHud.id) : 22;
           var curRoomTemp = (s.currentRoom && s.currentRoom.temp != null) ? s.currentRoom.temp : null;
           var tempTxt = ' · ' + Math.round(outTemp) + '°C' + (curRoomTemp != null ? ' (室内 ' + Math.round(curRoomTemp) + '°C)' : '');
+          var seasonTxt = '';
+          if(seasonHud){
+            seasonTxt = seasonHud.icon + seasonHud.name;
+            var toW = (APH.Weather.daysUntilWinter)
+              ? APH.Weather.daysUntilWinter(s.clock, APH.CFG.DAY_LEN) : null;
+            var warnD = (APH.CFG.seasons && APH.CFG.seasons.winterWarnDays != null)
+              ? APH.CFG.seasons.winterWarnDays : 2;
+            if(seasonHud.isWinter) seasonTxt += '(田里不长)';
+            else if(toW != null && toW <= warnD) seasonTxt += '(' + toW + '天后入冬)';
+            seasonTxt += ' · ';
+          }
 
-          if(wxRow.textContent !== undefined) wxRow.textContent=wxIcon+' '+wxName+tempTxt+' · 预计 '+wxDurTxt+wxTomorrow;
+          if(wxRow.textContent !== undefined) wxRow.textContent=seasonTxt+wxIcon+' '+wxName+tempTxt+' · 预计 '+wxDurTxt+wxTomorrow;
           wxRow.style.color=wxIsExtrem ? '#ff9a9a' : '#8fd4ff';
         }catch(e){ /* HUD 只读展示, 失败静默 */ }
         /* P1b 玩家暴露条: 第六生存条 (>50 红色警示; 0 隐藏) */
@@ -402,6 +417,24 @@ APH.UI = (function(){
       var mm=Math.floor(stats.survived/60), ss=Math.round(stats.survived%60);
       surv=' · 着陆存活 '+mm+'分'+ss+'秒';
     }
+    /* 殖民地优先 T1: 殖民地覆灭是本作唯一「真的输了」的结局 ——
+       它不保留任何东西, 否则赌注不成立(见 docs/colony-first-redesign.md)。 */
+    if(stats.colonyFall){
+      s.querySelector('.tag').textContent='COLONY LOST';
+      s.querySelector('h1').textContent='殖 民 地 覆 灭';
+      var dTxt = stats.days!=null ? Math.max(1, Math.floor(stats.days)) : 1;
+      s.querySelector('p').innerHTML=reason+
+        '<br>殖民地存续 '+dTxt+' 天 · 失去 '+(stats.lost||0)+' 名同伴'+
+        '<br><span style="color:#ff9a9a">研究、科技与库存随殖民地一同失去。</span>'+
+        '<br><span style="color:#5d6f96">下一座殖民地要从头开始。</span>';
+      var bf=$('startBtn'); bf.textContent='重 建 殖 民 地';
+      bf.onclick=function(){
+        try{ if(APH.Save && APH.Save.wipeAll) APH.Save.wipeAll(); }catch(e){}
+        location.reload();
+      };
+      s.classList.remove('hide');
+      return;
+    }
     s.querySelector('p').innerHTML=reason+
       '<br>已建档异常 '+stats.found+'/'+stats.total+surv+
       ' · 研究点保留'+carryTxt+
@@ -411,11 +444,29 @@ APH.UI = (function(){
     s.classList.remove('hide');
   }
   function showWin(stats){
+    var end = $('end');
+    /* T5 终局: 呼叫救援通关 —— 讲这一局的故事(撑了多少天、几个人活着走、失去了谁),
+       而不是原来那句勘测流水账。 */
+    if(stats && stats.rescue){
+      var tag = end && end.querySelector('.tag');
+      var h1 = end && end.querySelector('h1');
+      if(tag) tag.textContent = 'RESCUE INBOUND';
+      if(h1) h1.textContent = '救 援 抵 达';
+      var days = Math.max(1, Math.floor(stats.days || 0));
+      $('endStats').innerHTML =
+        '新曙光殖民地存续 <b>' + days + '</b> 天' +
+        ' · <b>' + (stats.survivors || 0) + '</b> 人登船离开' +
+        (stats.lost ? ' · 失去 <b>' + stats.lost + '</b> 名同伴' : ' · 无人牺牲') +
+        '<br><br><span style="color:#8fd4ff">发射器烧掉了殖民地积攒的一切 —— 它值得。</span>' +
+        '<br><span style="color:#5d6f96">你们迫降在这里，也从这里走出去了。</span>';
+      if(end) end.classList.add('show');
+      return;
+    }
     $('endStats').innerHTML=
       '用时 '+Math.round(stats.clock/60)+' 分 · 采集晶体 '+stats.cry+' 枚'+
       ' · 历经 '+(stats.clock/APH.CFG.DAY_LEN>=1?'昼夜交替':'白昼')+
       '<br><br><span style="color:#5d6f96">正式版中，异常档案由 AI 依据你的行动轨迹即时撰写。</span>';
-    $('end').classList.add('show');
+    if(end) end.classList.add('show');
   }
 
   /* ---------- 致命错误 ---------- */
@@ -1654,10 +1705,14 @@ APH.UI = (function(){
   }
 
   /* ================= ADR-28 / Ticket #156: 通用检查器 (Inspector) ================= */
-  function thoughtsHtml(pawn, ctx){
+  /* ADR-31: 优先渲染模拟当跳算出的念头清单(pawn.thoughts) —— 面板上的理由
+     必须与驱动心情的那份清单是同一份, 否则检查器会对玩家撒谎。
+     没有(玩家/首跳前)才现算一份兜底。 */
+  function thoughtsHtml(pawn, ctx, precomputed){
     var Res = window.APH.Res;
     if(!Res || !Res.collectThoughts) return '';
-    var list = Res.collectThoughts(pawn, ctx || {});
+    var list = (precomputed && precomputed.length) ? precomputed
+             : Res.collectThoughts(pawn, ctx || {});
     if(!list.length) return '';
     var sum = Res.thoughtMoodSum(list);
     var sumCol = sum>=0 ? '#7dffab' : '#ff9a9a';
@@ -1673,19 +1728,13 @@ APH.UI = (function(){
     }
     return h;
   }
+  /* ADR-37: 检查器与模拟共用同一个念头上下文构造器。
+     此前 ui.js 自留一份 thoughtCtxOf, 少了美观/房间/同室三项 ——
+     指挥官面板显示的理由和真正驱动他心情的理由对不上。 */
   function thoughtCtxOf(s){
-    s = s || {};
-    var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? APH.Weather.ambientTemperatureOf(s.meta, s.clock||0) : null;
-    var night = !!(window.APH.World && APH.World.daylight && APH.World.daylight() < 0.5);
-    return {
-      raid: !!(s.war && s.war.raidActive),
-      night: night,
-      temp: temp,
-      exposed: !!(s.meta && s.meta.playerNeeds && (s.meta.playerNeeds.exposure||0) > 20),
-      filth: (window.APH.Colony && APH.Colony.filthAt) ? APH.Colony.filthAt((s.colony&&s.colony.filth)||{}, s.px||0, s.py||0) : 0,
-      corpseNearby: !!(s.entities||[]).some(function(en){ return en && en.type==='corpse' && !en.dead; }),
-      fireNearby: !!(s.colony && s.colony.fires && s.colony.fires.length)
-    };
+    s = s || (window.APH && window.APH.state) || {};
+    if(!(window.APH.Res && APH.Res.thoughtCtxAt)) return {};
+    return APH.Res.thoughtCtxAt(s.px || 0, s.py || 0, APH.Res.thoughtEnvOf(s));
   }
   function scheduleRowHtml(sch, s){
     var Res = window.APH.Res;
@@ -1781,7 +1830,7 @@ APH.UI = (function(){
       h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
       h += '<div class="insp-body">';
       if(tab==='thoughts'){
-        h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s));
+        h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s), r && r.thoughts);
       } else if(tab==='health'){
         if(r && r.parts){
           Object.keys(r.parts).forEach(function(p){
@@ -1877,7 +1926,16 @@ APH.UI = (function(){
     /* 6. 地形/地面 */
     var wx = Math.round(target.x || s.px || 0);
     var wy = Math.round(target.y || s.py || 0);
-    var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf) ? Math.round(APH.Weather.ambientTemperatureOf(s.meta, s.clock||0)) : 18;
+    /* 同 1705 处的老 bug: ambientTemperatureOf 是 (weatherId, isDay, seasonId),
+       此处曾误传 (meta, clock) —— 于是检查器的地面温度恒为晴天白昼值。 */
+    var inspNight = !!(window.APH.World && APH.World.daylight && APH.World.daylight() < 0.5);
+    var inspWx = (window.APH.Weather && APH.Weather.currentId)
+      ? APH.Weather.currentId(s.meta) : 'wx_clear';
+    var inspSeason = (window.APH.Weather && APH.Weather.seasonAt)
+      ? APH.Weather.seasonAt(s.clock, APH.CFG.DAY_LEN) : null;
+    var temp = (window.APH.Weather && APH.Weather.ambientTemperatureOf)
+      ? Math.round(APH.Weather.ambientTemperatureOf(inspWx, !inspNight, inspSeason && inspSeason.id))
+      : 18;
     var roomLine = '室外露天';
     if(window.APH.Nav && APH.Nav.roomsOf && APH.Nav.roomAt){
       var rooms = APH.Nav.roomsOf((s.colony && s.colony.buildings) || []);

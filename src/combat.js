@@ -72,24 +72,24 @@ APH.Combat = (function(){
   /* ============================================================
      2. 掉落表 —— 纯函数 (seeded rng 由调用方传入)
      ============================================================ */
-  var LOOT_TABLE = [
-    { id: 'it_crystal_ore', w: 40, n: [1,2] },
-    { id: 'it_mineral',     w: 34, n: [1,3] },
-    { id: 'it_alloy',       w: 20, n: [1,1] },
-    { id: 'it_relic',       w: 6,  n: [1,1] },
-  ];
+  /* T4: 掉落表进 CFG (ADR-10)。只出研究点与独有物, 不出散装资源 —— 见 CFG.expedition */
+  function lootTable(){
+    var t = (CFG.expedition && CFG.expedition.lootTable);
+    return (t && t.length) ? t : [{ id:'it_crystal_ore', w:1, n:[1,1] }];
+  }
   function rollLoot(rng){
-    var total = LOOT_TABLE.reduce(function(a,e){ return a+e.w; }, 0);
+    var T = lootTable();
+    var total = T.reduce(function(a,e){ return a+e.w; }, 0);
     var roll = rng() * total;
-    for(var i=0;i<LOOT_TABLE.length;i++){
-      roll -= LOOT_TABLE[i].w;
+    for(var i=0;i<T.length;i++){
+      roll -= T[i].w;
       if(roll <= 0){
-        var e = LOOT_TABLE[i];
+        var e = T[i];
         var n = e.n[0] + Math.floor(rng() * (e.n[1]-e.n[0]+1));
         return { id: e.id, n: n };
       }
     }
-    return { id: LOOT_TABLE[0].id, n: 1 };
+    return { id: T[0].id, n: 1 };
   }
 
   /* 击杀掉落实物标本 (Science #53): 酸吐者腺囊 / 硅壳甲壳 / Boss 古代芯片 / 机械哨兵核心 */
@@ -1230,9 +1230,9 @@ APH.Combat = (function(){
     s.war.waveAngle = Math.random() * U.TAU;
     s.war.siege = null;
 
-    if(s.war.tactic === 'siege' && window.APH.Main && APH.Main.setupSiegeCamp){
-      APH.Main.setupSiegeCamp();
-    }
+    /* ADR-38: 围攻扎营是世界侧实体操作, 归 main.js —— 这里只广播事件。
+       U.emit 是同步的, 顺序与原来的直接调用一致。 */
+    if(U.emit) U.emit('raidBegan', { tactic: s.war.tactic });
     if(window.APH.UI && APH.UI.setHint) APH.UI.setHint('');
     var vig = typeof document !== 'undefined' ? document.getElementById('vig') : null;
     if(vig){
@@ -1261,7 +1261,7 @@ APH.Combat = (function(){
       }
     });
 
-    if(window.APH.Main && APH.Main.clearSiegeCamp) APH.Main.clearSiegeCamp();
+    if(U.emit) U.emit('raidEnded', { routed: true });      /* ADR-38 */
     if(window.APH.UI && APH.UI.floatText) APH.UI.floatText(msg, escaped ? '#ffb35c' : '#ffd97a');
   }
 
@@ -1307,8 +1307,7 @@ APH.Combat = (function(){
 
     var RT = CFG.raidTactics || {};
 
-    // 围攻扎营处理
-    if(window.APH.Main && APH.Main.siegeTick) APH.Main.siegeTick(dt);
+    /* ADR-38: 围攻推进由 main.js 在自己的循环里调, 不再从 combat 反向调用。 */
 
     // 双波间歇
     if(s.war.betweenWaves){
@@ -1389,7 +1388,7 @@ APH.Combat = (function(){
           s.war.nextWaveT = RT.waveGap != null ? RT.waveGap : 45;
         } else {
           s.war.raidActive = false;
-          if(window.APH.Main && APH.Main.clearSiegeCamp) APH.Main.clearSiegeCamp();
+          if(U.emit) U.emit('raidEnded', { routed: false });   /* ADR-38 */
           if(s.war.escaped){
             if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('⚠ 盗掠者满载而归…下次早点拦截', '#ffb35c');
           } else {
@@ -1397,7 +1396,7 @@ APH.Combat = (function(){
             if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 袭击被击退! 战争态势提升', '#7dffab');
             if(U.emit) U.emit('raidDefended', {});
           }
-          if(window.APH.Main && APH.Main.saveWar) APH.Main.saveWar();
+          /* ADR-38: 战况存档由 main.js 的 raidEnded 订阅者负责 */
         }
       }
     }
@@ -1411,6 +1410,7 @@ APH.Combat = (function(){
     firePlasma:firePlasma, makeProj:makeProj,
     turretStep:turretStep, soldierCount:soldierCount, turretDamage:turretDamage,
     settleValue:settleValue, settleGoods:settleGoods,
+    rollLoot:rollLoot, lootTable:lootTable,
     raidPillage:raidPillage, pickRaidFocus:pickRaidFocus, hurtPlayer:hurtPlayer,
     homeRegen:homeRegen, strikeResident:strikeResident,
     spawnDrop:spawnDrop, stealNearbyDrop:stealNearbyDrop,

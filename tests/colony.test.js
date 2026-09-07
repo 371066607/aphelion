@@ -266,11 +266,27 @@ test('queueTick: 居民坐标数组可施工, 远离冻结', () => {
   r=Colony.queueTick(r.queue, 5, [{x:2000,y:2000}], 0);
   if(r.queue[0].progress!==progressed) throw new Error('无人应冻结');
 });
-test('shortageBrief: 缺矿/缺粮紧急', () => {
+test('shortageBrief: 缺矿/缺粮紧急, 且把出路指回殖民地 (T4)', () => {
   const a=Colony.shortageBrief({res:{mineral:0,food:0},residents:[{}]}, []);
-  if(!a.urgent || a.mission.indexOf('食物')<0) throw new Error('无粮应催补给: '+JSON.stringify(a));
+  if(!a.urgent) throw new Error('无粮应紧急: '+JSON.stringify(a));
+  if(a.text.indexOf('种田')<0) throw new Error('缺粮的出路应是种田, got: '+a.text);
   const b=Colony.shortageBrief({res:{mineral:5,food:99},residents:[]}, []);
-  if(!b.urgent || b.mission.indexOf('矿材')<0) throw new Error('缺矿应催矿: '+JSON.stringify(b));
+  if(!b.urgent) throw new Error('缺矿应紧急: '+JSON.stringify(b));
+  if(b.text.indexOf('采矿')<0) throw new Error('缺矿的出路应是采矿, got: '+b.text);
+});
+
+test('T4 brief: 任务简报不得再承诺远征能带回粮食/矿材', () => {
+  /* 远征掉落表只出研究点与独有物; 简报若还写「此行目标：补给食物」,
+     等于把玩家往一条已经不存在的解法上推。 */
+  const cases = [
+    Colony.shortageBrief({res:{mineral:0,food:0},residents:[{}]}, []),
+    Colony.shortageBrief({res:{mineral:5,food:99},residents:[]}, []),
+    Colony.shortageBrief({res:{mineral:99,food:99},residents:[]}, []),
+  ];
+  cases.forEach(c => {
+    if (/此行目标：补给食物|此行目标：矿材/.test(c.mission))
+      throw new Error('简报仍在承诺远征补给: ' + c.mission);
+  });
 });
 test('shortageBrief: 有病人无药时提示工坊', () => {
   const a=Colony.shortageBrief({
@@ -448,4 +464,99 @@ test('#83 canPlace: 陷阱/沙袋科技挂靠炮术+成本', () => {
   if(!t3.ok) throw new Error('沙袋应可建');
   const t4=Colony.canPlace([], {te_ballistics:true}, 'bl_sandbag', 500, 500, {stone:0});
   if(t4.ok) throw new Error('缺石不可建');
+});
+
+/* ---------- 殖民地优先 T2: 目标阶梯 (docs/colony-first-redesign.md) ---------- */
+test('T2 goal: 阶梯逐级推进, 且永不枯竭', () => {
+  const G = (meta, buildings) => APH.Colony.colonyGoal(meta, buildings);
+  const need = APH.Colony.winterFoodNeed(2);   // 1 居民 + 指挥官
+
+  let meta = { residents: [], res: { food: 0 } };
+  if (G(meta, []).id !== 'recruit') throw new Error('无人时应先要人, got ' + G(meta, []).id);
+
+  meta.residents = [{ id: 'r1' }];
+  if (G(meta, []).id !== 'farm') throw new Error('有人无田应要农场, got ' + G(meta, []).id);
+
+  const b = [{ id: 'bl_farm' }];
+  if (G(meta, b).id !== 'food') throw new Error('有田缺粮应要囤粮, got ' + G(meta, b).id);
+
+  meta.res.food = need;
+  if (G(meta, b).id !== 'power') throw new Error('粮够应要通电, got ' + G(meta, b).id);
+
+  b.push({ id: 'bl_wood_generator' });
+  if (G(meta, b).id !== 'defense') throw new Error('通电后应要防线, got ' + G(meta, b).id);
+
+  b.push({ id: 'bl_wall' });
+  if (G(meta, b).id !== 'clinic') throw new Error('有防线应要医疗舱, got ' + G(meta, b).id);
+
+  b.push({ id: 'bl_clinic' });
+  /* T5: 终局三级 —— 研发 → 建造 → 通电起飞 */
+  if (G(meta, b).id !== 'endtech') throw new Error('医疗舱后应指向终局科技, got ' + G(meta, b).id);
+  meta.tech = { te_deep_signal: 1 };
+  if (G(meta, b).id !== 'endbuild') throw new Error('研发后应指向建造发射器, got ' + G(meta, b).id);
+  b.push({ id: 'bl_transmitter' });
+  const last = G(meta, b);
+  if (last.id !== 'endgame') throw new Error('建成后应指向起飞, got ' + last.id);
+  if (!last.text) throw new Error('终局目标也必须有文案 —— 阶梯永不返回空');
+});
+
+test('T2 goal: 死亡建筑不算数, 太阳能也能满足通电', () => {
+  const meta = { residents: [{ id: 'r1' }], res: { food: 999 } };
+  const dead = [{ id: 'bl_farm' }, { id: 'bl_wood_generator', dead: true }];
+  if (APH.Colony.colonyGoal(meta, dead).id !== 'power')
+    throw new Error('已毁发电机不应算通电');
+  const solar = [{ id: 'bl_farm' }, { id: 'bl_solar_panel' }];
+  if (APH.Colony.colonyGoal(meta, solar).id !== 'defense')
+    throw new Error('太阳能应满足通电');
+  const byBid = [{ bid: 'bl_crop_plot' }];
+  if (APH.Colony.colonyGoal(meta, byBid).id === 'farm')
+    throw new Error('实体侧 bid 也应被识别为农田');
+});
+
+test('T3 economy: winterFoodNeed 由真实经济推导, 随人口线性、随数值自适应', () => {
+  const R = APH.CFG.residents, S = APH.CFG.seasons;
+  const perDay = R.foodDrain * (APH.CFG.DAY_LEN / APH.CFG.time.prodTick) / R.eatGain;
+  const expect1 = Math.ceil(perDay * S.daysPerSeason * S.winterFoodSafety * 1);
+  const got1 = APH.Colony.winterFoodNeed(1);
+  if (got1 !== expect1) throw new Error('1 人过冬存粮应为 ' + expect1 + ', got ' + got1);
+
+  /* 实测口径: 0.35 掉/跳 × 120 跳/天 ÷ 25 每单位 = 1.68 /人/天 */
+  if (Math.abs(perDay - 1.68) > 0.01) throw new Error('每人每天存粮口径漂移: ' + perDay);
+
+  const got4 = APH.Colony.winterFoodNeed(4);
+  if (got4 < got1 * 3) throw new Error('应随人口增长, got ' + got4 + ' vs ' + got1);
+  if (APH.Colony.winterFoodNeed(0) !== 0) throw new Error('0 人应为 0');
+
+  /* 别再退回写死的大数: 一个 5 人殖民地过冬远不该要上百存粮 */
+  if (APH.Colony.winterFoodNeed(5) > 100)
+    throw new Error('5 人过冬需求过高, 说明又被写死了: ' + APH.Colony.winterFoodNeed(5));
+});
+
+test('T5 power: 发射器的耗电必须是「造得起的电网」带得动的', () => {
+  /* 终局若要求的电力超过全图能造出的发电量, 发射器就是死路。
+     夜间只有木柴发电机(太阳能白天且受天气打折), 这是最紧的约束。 */
+  const P = APH.CFG.power;
+  const tx = P.consumers.bl_transmitter;
+  if (!tx) throw new Error('发射器应登记为耗电建筑');
+
+  const woodMax = APH.Colony.get('bl_wood_generator').max;
+  const solarMax = APH.Colony.get('bl_solar_panel').max;
+  const nightCap = P.wood.watts * woodMax;
+  const dayCap = nightCap + P.solar.watts * solarMax;
+
+  /* 与发射器同为保供/次级的固定负载 */
+  const reserve = (P.consumers.bl_turret.load || 0) + (P.consumers.bl_clinic.load || 0);
+
+  if (tx.load + reserve > nightCap)
+    throw new Error('发射器夜间带不动: ' + tx.load + '+' + reserve + ' > ' + nightCap + 'W');
+  if (tx.load + reserve > dayCap)
+    throw new Error('发射器白天也带不动: ' + tx.load + '+' + reserve + ' > ' + dayCap + 'W');
+  /* 但也不能太轻松 —— 终局该逼玩家把电网撑起来 */
+  if (tx.load < P.wood.watts)
+    throw new Error('发射器耗电过低, 终局失去「撑电网」的压力: ' + tx.load + 'W');
+  /* 供电不足时应先停发射器, 不能把炮塔/医疗舱挤停机 */
+  if (!(tx.prio > P.consumers.bl_turret.prio))
+    throw new Error('发射器优先级应低于炮塔(缺电先停发射器)');
+  if (!(tx.prio > P.consumers.bl_clinic.prio))
+    throw new Error('发射器优先级应低于医疗舱');
 });

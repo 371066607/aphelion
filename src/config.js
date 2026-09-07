@@ -26,7 +26,11 @@ APH.CFG = {
     commander: '指挥官',
     noFood: '仓库没有口粮',
     raid: '袭击进行中',
-    prio: { raid: 100, downed: 90, no_food: 80, hungry: 70, sleepy: 60, missing: 50 }
+    /* T3: 入冬预警 —— 冬天田里不长, 存粮不够就是慢性死亡。
+       排在缺料之上、饿之下: 它是「还来得及」的警报。 */
+    winterSoon: '{n} 天后入冬 · 存粮 {food}/{need}，冬天田里不长',
+    winterNow: '寒冬 · 田里不长，只能吃存粮（{food}）',
+    prio: { raid: 100, downed: 90, no_food: 80, hungry: 70, winter: 65, sleepy: 60, missing: 50 }
   },
 
   /* 作息表 (#170): 24 格; 本世界 clock0=白天, 12–23=夜 */
@@ -65,7 +69,39 @@ APH.CFG = {
     th_filthy:     { text:'这儿脏得要命', mood:-4 },
     th_saw_corpse: { text:'看见了尸体', mood:-10 },
     th_hurt:       { text:'身上在疼', mood:-6 },
-    th_fire:       { text:'着火了', mood:-12 }
+    th_fire:       { text:'着火了', mood:-12 },
+    /* 幅度由上下文给出(房间家具档次 / 关系恶劣程度), 目录值仅作缺省 */
+    th_room:       { text:'房间很舒适', mood:2 },
+    th_room_bad:   { text:'房间让人不适', mood:-2 },
+    th_roommate:   { text:'和讨厌的人同处一室', mood:-5 }
+  },
+
+  /* 殖民地优先 T1: 殖民地覆灭 —— 有过居民再归零 = 本局结束。
+     新档开局本来就是 0 居民, 所以必须先「立过殖民地」才可能覆灭。 */
+  colony: {
+    foundedAtResidents: 1,     // 名册达到几人算「殖民地已建立」
+    /* 殖民地优先 T2: 目标阶梯。过了第一夜之后, 游戏必须继续向玩家要东西 ——
+       每一级读真实殖民地状态, 不写死剧本, 因此永远不会枯竭。 */
+    goalTexts: {
+      recruit:  '招募第一位同伴 —— 等过客路过, [F] 请客提升印象',
+      farm:     '建一座农场 —— 远征带不回粮食，家里得自己种',
+      food:     '入冬前囤粮：把粮食堆到 {n}（够全员过冬）',
+      power:    '通电 —— 建一台发电机(烧木或太阳能)',
+      defense:  '立起防线 —— 袭击会随殖民地财富一起变强',
+      clinic:   '建医疗舱 —— 没有它，倒下就是死',
+      endtech:  '研发「深空信标阵列」——那是回家的路',
+      endbuild: '建造深空发射器（终局工程，造价高昂）',
+      endgame:  '给发射器通电，走过去按 [E] 呼叫救援',
+    },
+  },
+
+  /* ADR-31 念头上下文采样半径/阈值 (代码零魔数) */
+  thoughtCtx: {
+    fireR: 220,          // 视野内多近的火算「着火了」
+    corpseR: 220,        // 多近的尸体算「看见了尸体」
+    joyR: 50,            // 篝火暖意半径 (与 residentsTick 的取暖判定一致)
+    coldT: 5,            // 低于此温度 → th_cold
+    hotT: 32,            // 高于此温度 → th_hot
   },
 
   /* 土壤肥力体系 (RimWorld 农业) */
@@ -302,6 +338,14 @@ APH.CFG = {
     eatBelow: 60,
     eatGain: 25,
     foodDrain: 0.35,           // /生产跳；一天约掉 42，白天结束会饿
+    /* ADR-31 念头驱动心情: 心情不再是各处零散加减的累加器, 而是
+       「中性基线 + 念头偏移之和」这一目标值, 每生产跳按 moodLerp 缓动逼近。
+       collectThoughts 是唯一权威 —— 检查器里看到的那张念头清单, 就是驱动
+       这个数字的清单。下面 moodWellFood / moodStarve / moodHungry 等旧阈值
+       保留, 仅供老档与非念头路径(病情/宣泄)使用。 */
+    moodBase: 70,              // 无任何念头时的中性心情
+    moodLerp: 0.34,            // 每生产跳向目标靠拢的比例 (0~1)
+    moodFloor: 0,
     moodWellFood: 65,
     moodWellGain: 2,
     moodCap: 95,
@@ -358,6 +402,26 @@ APH.CFG = {
     roomMoodGain: 2,           // T9 卧室级房间(含居住舱)心情增益/生产跳
     /* P3 家具心情 (#97): 房间内逐件加成 [建筑id→心情值] */
     furnitureMood: { bl_tv: 1, bl_shelf: 1, bl_carpet: 1 },
+    /* P2 美观 (D2) —— 环世界 Beauty。
+       此前只有「有没有家具」的正向加分, 于是把发电机堆进卧室毫无代价。
+       真正的取舍来自负分: 工业设施难看、污秽拉低、尸体极难看。
+       美观分 = 家具/卧室正分 + 工业负分 − 污秽 − 尸体, 汇入 ADR-31 念头。 */
+    beauty: {
+      ugly: {                    // 工业设施的负美观
+        bl_wood_generator: -3, bl_mine: -3, bl_workshop: -2,
+        bl_battery: -1, bl_solar_panel: -1, bl_barracks: -1,
+        bl_transmitter: -2, bl_spike_trap: -1,
+      },
+      filthPer: 0.6,             // 房间内每单位污秽扣分
+      corpsePer: 5,              // 房间内每具尸体扣分 (环世界: 尸体极难看)
+      prettyAt: 5,               // 分数达此 → 「这屋子真漂亮」
+      uglyAt: -2,                // 分数低于此 → 「房间让人不适」
+      /* 1:1 —— 美观分直接就是念头心情幅度。
+         曾误设为 2, 结果把既有的房间加成(卧室2+电视1+书架1=+4)悄悄砍半成 +2,
+         改动了本不该动的平衡。正负分都按原尺度记, 不再二次缩放。 */
+      moodDiv: 1,
+      moodMin: -8, moodMax: 6,   // 心情幅度上下限
+    },
     diningChairR: 300,         // 居民分配空椅的最大距离 (椅须在桌旁 chairTableR 内; 300≈从居住舱走到食堂)
     chairTableR: 60,           // 椅子须在桌旁此距离内才算可用餐位
     diningArriveR: 6,          // 到椅坐下判定半径
@@ -508,6 +572,43 @@ APH.CFG = {
   },
 
   /* 微环境温度与冷热控制 (ADR-25 / Spec #143) */
+  /* 殖民地优先 T4: 远征降级 —— 只带回「种不出来的东西」。
+     以前掉落表里有 it_mineral / it_alloy(散装金属), 于是刷远征就能绕过
+     整条殖民地生产链: 种田/挖矿/烹饪沦为装饰, 冬天也可以靠刷装备度过。
+     现在远征只产出「研究点」与「独有物」——
+       晶体矿 / 信标遗件 → 研究点(settleGoods)
+       实物标本            → 化验解锁作物与种荚(specimenDropsOf, 另行掉落)
+     散装粮食/木材/金属一律回家自己种、自己挖。
+     (docs/colony-first-redesign.md T4) */
+  expedition: {
+    lootTable: [
+      { id: 'it_crystal_ore', w: 70, n: [1, 2] },   // → 研究点
+      { id: 'it_relic',       w: 30, n: [1, 1] },   // → 大量研究点
+    ],
+    /* 掉落表里禁止出现的「散装」store 类别 —— 由测试钉死, 防止日后手滑加回来 */
+    bulkStores: ['food', 'wood', 'stone', 'iron', 'mineral', 'leather', 'herb', 'med'],
+  },
+
+  /* 殖民地优先 T3: 季节 —— 压力发生器。
+     天气/温度/农业都已具备, 缺的是「年的形状」: 冬天种不出东西, 于是
+     「今天该干什么」有了永远成立的答案 —— 囤, 否则死。
+     (docs/colony-first-redesign.md T3) */
+  seasons: {
+    daysPerSeason: 6,                    // 一年 4×6 = 24 天
+    order: ['spring', 'summer', 'autumn', 'winter'],
+    names:  { spring:'春', summer:'夏', autumn:'秋', winter:'冬' },
+    icons:  { spring:'🌱', summer:'☀', autumn:'🍂', winter:'❄' },
+    /* 叠加在天气基础气温之上 */
+    tempOffset: { spring:0, summer:8, autumn:-2, winter:-18 },
+    /* 作物生长乘子: 冬天为 0 —— 这就是压力的来源 */
+    growMul:    { spring:1, summer:1.25, autumn:0.8, winter:0 },
+    winterWarnDays: 2,                   // 入冬前几天开始预警
+    /* 过冬存粮不写死: 由 foodDrain / eatGain / prodTick / DAY_LEN 推算,
+       这里只放安全余量。改了任何一个数值, 过冬线自动跟着走。
+       (实测: 1 人 1 天约吃 1.68 单位存粮 → 6 天冬天 ≈ 10 单位/人) */
+    winterFoodSafety: 1.25,
+  },
+
   temperature: {
     weatherBaseTemp: {
       wx_clear:       { day: 22, night: 10 },
@@ -863,6 +964,13 @@ APH.CFG = {
       bl_lamp:   { load: 3,  prio: 2 },   // T9 路灯: 预留(本票只入优先级表)
       bl_heater: { load: 40, prio: 3 },   // ADR-25 电暖器
       bl_cooler: { load: 50, prio: 2 },   // ADR-25 制冷空调
+      /* T5 终局: 发射器吃电极凶 —— 想起飞就得先把电网撑起来。
+         数值不是拍脑袋: 夜间只有木柴发电机供电(太阳能白天且看天气),
+         上限 14W×4 = 56W; 炮塔+医疗舱保供占 16W, 留给发射器 40W。
+         取 35W = 夜间余量的 87.5% —— 逼你几乎把发电机造满, 但确实带得动。
+         (最初写 80W, 夜间根本不可能满足, 等于把终局做成死路。)
+         prio 2: 供电不足时先停发射器, 不许它把炮塔和医疗舱挤停机。 */
+      bl_transmitter: { load: 35, prio: 2 },
     },
     wood:  { watts: 14, burnSec: 15 },    // 木柴发电机: 额定功率, 每 burnSec 秒烧 1 木材
     solar: { watts: 8 },                  // 太阳能板: 基础功率 × 天气 solarMul (仅白天)

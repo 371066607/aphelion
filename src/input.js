@@ -131,6 +131,58 @@ APH.Input = (function(){
     return false;
   }
 
+  /* ---------- 指针输入 (ADR-33) ----------
+     键盘早就走这套分发器了, 指针却还是 main.js 里裸绑的几百行监听。
+     这里补上对称的一半: 监听器与「当前工具 / 当前上下文」的判定收在
+     input.js, 具体做什么仍留在 main.js 的处理器里 —— 那是玩法, 不是输入。 */
+  var toolProvider = null;
+  function setToolProvider(fn){ toolProvider = (typeof fn === 'function') ? fn : null; }
+  /* 当前指针工具: 规划工具(砍/采/搬/拆) > 建造蓝图 > 默认选择 */
+  function currentTool(){
+    if(!toolProvider) return 'select';
+    try { return toolProvider() || 'select'; }
+    catch(err){ console.error('toolProvider error:', err); return 'select'; }
+  }
+
+  var POINTER_ACTIONS = {
+    pointerdown: 'POINTER_DOWN',
+    pointermove: 'POINTER_MOVE',
+    pointerup:   'POINTER_UP',
+    contextmenu: 'POINTER_CONTEXT'
+  };
+
+  /* 模态打开时指针不喂给世界 —— 与按键在 modal:* 上下文里的阻断规则一致。
+     但 pointerup/move 必须放行, 否则模态在拖拽中途弹出会让拖拽永远结束不了。 */
+  function pointerBlocked(type){
+    if(type === 'pointerup' || type === 'pointermove') return false;
+    return currentContext().indexOf('modal:') === 0;
+  }
+
+  function dispatchPointer(type, e){
+    var action = POINTER_ACTIONS[type];
+    if(!action) return false;
+    if(pointerBlocked(type)) return false;
+    return dispatchAction(action, {
+      type: type,
+      event: e,
+      button: e ? e.button : 0,
+      pointerId: e ? e.pointerId : 0,
+      clientX: e ? e.clientX : 0,
+      clientY: e ? e.clientY : 0,
+      tool: currentTool(),
+      context: currentContext()
+    });
+  }
+
+  var pointerBound = false;
+  function bindPointer(el){
+    if(pointerBound || !el || !el.addEventListener) return;
+    pointerBound = true;
+    Object.keys(POINTER_ACTIONS).forEach(function(type){
+      el.addEventListener(type, function(e){ dispatchPointer(type, e); });
+    });
+  }
+
   var bound = false;
   function bind(){
     if(bound || typeof addEventListener === 'undefined') return;
@@ -163,6 +215,10 @@ APH.Input = (function(){
     resolveAction: resolveAction,
     dispatchKey: dispatchKey,
     bind: bind,
+    bindPointer: bindPointer,
+    dispatchPointer: dispatchPointer,
+    setToolProvider: setToolProvider,
+    currentTool: currentTool,
     getKeyState: function(code){ return !!keyState[code]; }
   };
 })();

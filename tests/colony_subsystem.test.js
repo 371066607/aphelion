@@ -38,13 +38,15 @@ test('colony: tickConstruction 推进蓝图进度并在满进度时实体化建�
   }
 });
 
-test('colony: tickProduction 30s 周期触发电网结算与多岗产出', () => {
+test('colony: tickProduction 30s 周期触发电网结算与多岗产出, 并报告本跳是否发生 (ADR-38)', () => {
   const Colony = window.APH.Colony;
-  let rivalsTicked = false, storyTicked = false, residentsTicked = false;
+  /* ADR-38: colony 不再反向调用 APH.Main —— 它只做生产, 并返回「这一跳发生了」。
+     编排(rivals/story/residents)归 main.js。这里把桩留着, 用来断言「不许被调用」。 */
+  let calledUp = false;
   window.APH.Main = window.APH.Main || {};
-  window.APH.Main.tickRivals = () => { rivalsTicked = true; };
-  window.APH.Main.storyTick = () => { storyTicked = true; };
-  window.APH.Main.residentsTick = () => { residentsTicked = true; };
+  window.APH.Main.tickRivals = () => { calledUp = true; };
+  window.APH.Main.storyTick = () => { calledUp = true; };
+  window.APH.Main.residentsTick = () => { calledUp = true; };
 
   const s = {
     prodT: 29.5, // 还有 0.5s 触发
@@ -59,17 +61,40 @@ test('colony: tickProduction 30s 周期触发电网结算与多岗产出', () =>
   };
 
   // 推进 0.2s (未到 30s)
-  Colony.tickProduction(s, 0.2);
-  if (s.prodT < 29.6 || rivalsTicked) {
-    throw new Error('未满 30s 不应触发生产结算');
-  }
+  const early = Colony.tickProduction(s, 0.2);
+  if (s.prodT < 29.6) throw new Error('未满 30s 不应结算');
+  if (early !== false) throw new Error('未满 30s 应返回 false, got ' + early);
 
   // 再推进 0.5s (满 30s)
-  Colony.tickProduction(s, 0.5);
+  const fired = Colony.tickProduction(s, 0.5);
   if (s.prodT >= 30) {
     throw new Error('满 30s 后 prodT 应扣除 30s 周期, got ' + s.prodT);
   }
-  if (!rivalsTicked || !storyTicked || !residentsTicked) {
-    throw new Error('生产结算时应联动触发 rivals / story / residents 推进');
-  }
+  if (fired !== true) throw new Error('满 30s 应返回 true(供 main 决定是否编排), got ' + fired);
+
+  /* 层级铁律: 低层模块不得反向调用 main —— 那会让模拟循环没有唯一归属者 */
+  if (calledUp) throw new Error('colony 不得反向调用 APH.Main (ADR-38 层级倒置)');
+});
+
+test('colony: 建筑落成走事件总线, 不反向调用 main (ADR-38)', () => {
+  /* 落成后的存档/开场推进由 main.js 订阅 'built' 处理。 */
+  const Colony = window.APH.Colony, U = window.APH.U;
+  let builtId = null;
+  const h = ev => { builtId = ev && ev.id; };
+  U.on('built', h);
+  let calledUp = false;
+  window.APH.Main = window.APH.Main || {};
+  window.APH.Main.saveColony = () => { calledUp = true; };
+  window.APH.Main.applyFirstNightHint = () => { calledUp = true; };
+
+  const s = {
+    prodT: 0, clock: 100,
+    colony: { buildings: [], buildQueue: [{ bid:'bl_house', x:600, y:600, progress:1, total:1 }] },
+    meta: { res:{ mineral:99, food:0, wood:99, iron:99, stone:99 }, residents:[] },
+    entities: [], power: {},
+  };
+  Colony.tickConstruction(s, 1);
+  U.off && U.off('built', h);
+  if (builtId !== 'bl_house') throw new Error("落成应 emit 'built', got " + builtId);
+  if (calledUp) throw new Error('落成不得反向调用 APH.Main');
 });

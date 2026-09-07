@@ -106,6 +106,13 @@ APH.Res = (function(){
       if(!d) return;
       out.push({ id:id, text:d.text, mood:d.mood });
     }
+    /* 幅度可变的念头: 沿用目录里的文案, 但心情值由上下文算出
+       (房间家具档次、关系恶劣程度 —— 环世界的 opinion 类念头同理)。 */
+    function addVar(id, mood){
+      var d = cat[id];
+      if(!d || !mood) return;
+      out.push({ id:id, text:d.text, mood:mood });
+    }
     var food = pawn.food;
     if(food != null){
       if(food < 30) add('th_starving');
@@ -129,10 +136,13 @@ APH.Res = (function(){
       else if(rec > 70) add('th_joy');
     }
     if(ctx.atJoy) add('th_campfire');
-    if(ctx.roomPretty) add('th_pretty_room');
+    /* 房间美观念头统一在下面处理(见 roomPretty/roomMood), 此处不再单独挂,
+       否则「漂亮」档会用目录里的固定值, 反而比下一档的可变加成还低。 */
+    var TC = CFG.thoughtCtx || {};
     if(ctx.temp != null){
-      if(ctx.temp < 5) add('th_cold');
-      else if(ctx.temp > 32) add('th_hot');
+      var coldT = TC.coldT!=null?TC.coldT:5, hotT = TC.hotT!=null?TC.hotT:32;
+      if(ctx.temp < coldT) add('th_cold');
+      else if(ctx.temp > hotT) add('th_hot');
     }
     if((pawn.illness || 0) > 40) add('th_sick');
     if(pawn.downed) add('th_downed');
@@ -145,6 +155,20 @@ APH.Res = (function(){
     if((ctx.filth || 0) > 20) add('th_filthy');
     if(ctx.corpseNearby) add('th_saw_corpse');
     if(ctx.fireNearby) add('th_fire');
+    /* P2 美观: 一个房间只挂一条念头, 幅度一律取美观分算出的 roomMood。
+       「漂亮」档换专属文案但沿用同一幅度 —— 曾因用目录固定值(+3)
+       导致「装修得更好反而心情更差」(下一档可变加成已经 +4)。 */
+    if(ctx.roomPretty){
+      var prettyMood = ctx.roomMood;
+      if(!prettyMood){
+        var pd = cat.th_pretty_room;
+        prettyMood = pd ? pd.mood : 0;
+      }
+      addVar('th_pretty_room', prettyMood);
+    } else if(ctx.roomMood){
+      addVar(ctx.roomMood>0?'th_room':'th_room_bad', ctx.roomMood);
+    }
+    if(ctx.roomFriction) addVar('th_roommate', ctx.roomFriction);
     if(pawn.parts){
       var hurt=false;
       Object.keys(pawn.parts).forEach(function(p){ if(pawn.parts[p] < 0.7) hurt=true; });
@@ -156,6 +180,30 @@ APH.Res = (function(){
     var n=0, i;
     for(i=0;i<(list||[]).length;i++) n += (list[i].mood || 0);
     return n;
+  }
+
+  /* ADR-31 念头驱动心情。
+     心情 = 中性基线 + 当前念头偏移之和, 每跳缓动逼近, 不再各处零散加减。
+     顺带把这一跳的念头清单挂到 r.thoughts —— 检查器直接渲染它,
+     保证「面板上看到的理由」与「真正驱动模拟的数字」永远同源。 */
+  function moodFromThoughts(r, ctx){
+    if(!r) return 0;
+    var C=RS();
+    var base = C.moodBase!=null?C.moodBase:70;
+    var cap  = C.moodCap!=null?C.moodCap:95;
+    var floor= C.moodFloor!=null?C.moodFloor:0;
+    var lerp = C.moodLerp!=null?C.moodLerp:0.34;
+    var list = collectThoughts(r, ctx||{});
+    var target = base + thoughtMoodSum(list);
+    if(target>cap) target=cap;
+    if(target<floor) target=floor;
+    var cur = r.mood!=null ? r.mood : base;
+    r.mood = cur + (target-cur)*lerp;
+    if(r.mood>cap) r.mood=cap;
+    if(r.mood<floor) r.mood=floor;
+    r.thoughts = list;
+    r.moodTarget = target;
+    return r.mood;
   }
   function cycleScheduleSlot(kind){
     var i = SCHED_KINDS.indexOf(kind);
@@ -322,6 +370,12 @@ APH.Res = (function(){
     /* P1b 玩家暴露: 老档零迁移 (缺失=0 起步; 晴天恒 0 由 tick 消退维持) */
     if(meta.playerNeeds.exposure == null) meta.playerNeeds.exposure = 0;
     if(meta.playerNeeds.recreation == null) meta.playerNeeds.recreation = 80;
+    /* 殖民地优先 T1: 指挥官是居民之一, 所以他也有心情, 也由念头驱动(ADR-31)。
+       老档缺失 → 从中性基线起步, 零迁移。 */
+    if(meta.playerNeeds.mood == null){
+      var C0 = RS();
+      meta.playerNeeds.mood = (C0.moodBase != null) ? C0.moodBase : 70;
+    }
     meta.playerSchedule = ensureSchedule(meta.playerSchedule);
     return meta;
   }
@@ -399,9 +453,10 @@ APH.Res = (function(){
   /* ---------- U4: 饱食/心情/病情 tick(纯函数) ----------
      每30游戏秒一跳: 掉饱食; 真吃饭在走位里(仓/地上堆). 饿→心情掉且涨病; 不饿死.
      深度生存: 结算精力消耗与睡眠恢复。 */
-  function needsTick(r, hasFood){
+  function needsTick(r, hasFood, ctx){
     var C=RS();
     var out={ ate:false };
+    ctx = ctx || {};
     r.illness = r.illness||0;
     r.rest = r.rest!=null ? r.rest : 100;
     r.isSleeping = !!r.isSleeping;
@@ -418,19 +473,8 @@ APH.Res = (function(){
     var sickAt=C.hungerSickAt!=null?C.hungerSickAt:30;
     var sickAdd=C.hungerSick!=null?C.hungerSick:4;
     if(r.food<sickAt) addAilment(r, 'wound', sickAdd);        // 饿出的病=外伤
-    var wellF=C.moodWellFood!=null?C.moodWellFood:65;
-    var wellG=C.moodWellGain!=null?C.moodWellGain:2;
-    var cap=C.moodCap!=null?C.moodCap:95;
-    var stAt=C.moodStarveAt!=null?C.moodStarveAt:30;
-    var stN=C.moodStarve!=null?C.moodStarve:8;
-    var hgAt=C.moodHungryAt!=null?C.moodHungryAt:45;
-    var hgN=C.moodHungry!=null?C.moodHungry:3;
-    if(r.food>wellF && r.mood<cap) r.mood+=wellG;
-    else if(r.food<stAt) r.mood=Math.max(0,r.mood-stN);
-    else if(r.food<hgAt) r.mood=Math.max(0,r.mood-hgN);
-    var moodSickAt=C.moodSickAt!=null?C.moodSickAt:40;
-    var moodSick=C.moodSick!=null?C.moodSick:3;
-    if(r.illness>moodSickAt) r.mood=Math.max(0, r.mood-moodSick);
+    /* ADR-31: 饱食/病情/床铺/娱乐的心情影响全部改由念头表达, 见本函数末尾的
+       moodFromThoughts —— 此处只保留需求数值本身的结算。 */
 
     /* 深度生存: 精力自然衰减与睡眠恢复 (Survival #15) */
     var restDrain=C.restDrain!=null?C.restDrain:7;
@@ -465,14 +509,7 @@ APH.Res = (function(){
     var bedAt = C.sickBedAt!=null ? C.sickBedAt : 50;
     if(r.medLying && !r.downed && (r.illness||0) <= bedAt) r.medLying = false;
 
-    /* 床铺舒适度 vs 地铺惩罚 */
-    var bedMood = C.bedMood!=null?C.bedMood:3;
-    var floorMood = C.floorMood!=null?C.floorMood:-5;
-    if(r.bedId){
-      if(r.mood < cap) r.mood += bedMood;
-    }else if(r.isSleeping){
-      r.mood = Math.max(0, r.mood + floorMood);
-    }
+    /* ADR-31: 床铺/地铺心情 → th_slept_bed / th_floor_sleep */
 
     /* 深度生存: 娱乐需求自然衰减与身心愉悦/枯燥心情 (Survival #18) */
     var recDrain = C.recreationDrain!=null ? C.recreationDrain : 5;
@@ -483,13 +520,10 @@ APH.Res = (function(){
 
     r.recreation = r.recreation!=null ? r.recreation : 80;
     r.recreation = Math.max(0, r.recreation - recDrain);
-    if(r.recreation >= recBuffAt){
-      if(r.mood < cap) r.mood += recBuffMood;
-    }else if(r.recreation < recBoredAt){
-      r.mood = Math.max(0, r.mood + recBoredMood);
-    }
+    /* ADR-31: 娱乐心情 → th_joy / th_bored */
 
     if(r.sleepDisturbed > 0) r.sleepDisturbed--;
+    moodFromThoughts(r, ctx);
     return out;
   }
 
@@ -1911,6 +1945,164 @@ APH.Res = (function(){
     return total;
   }
 
+  /* ---------- 念头上下文 (ADR-37) ----------
+     把世界状态翻译成 collectThoughts 认识的字段。
+     曾经 main.js 与 ui.js 各有一份(thoughtCtxAt / thoughtCtxOf), 字段还不一样 ——
+     指挥官的检查器因此又开始对玩家撒谎(缺美观/房间/同室三项)。
+     现在收成一份, 挂在拥有「念头」这个概念的模块上。 */
+  function thoughtCtxAt(x, y, env){
+    var s = window.APH.state || {};
+    var TC = CFG.thoughtCtx || {};
+    var T = (CFG.entType) || {};
+    env = env || {};
+    var room = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:x,y:y}, env.rooms||[]) : null;
+    var sheltered = !!room;
+    var temp = (room && room.temp!=null) ? room.temp : env.ambT;
+    var fireR = TC.fireR!=null?TC.fireR:220;
+    var fireNearby = ((s.colony&&s.colony.fires)||[]).some(function(f){
+      return f && U.dst(f.x,f.y,x,y) <= fireR;
+    });
+    var corpseR = TC.corpseR!=null?TC.corpseR:220;
+    var corpseNearby = (s.entities||[]).some(function(e){
+      return e && !e.dead && e.type===(T.CORPSE||'corpse') && U.dst(e.x,e.y,x,y) <= corpseR;
+    });
+    var joyR = TC.joyR!=null?TC.joyR:50;
+    var atJoy = !!(env.campfire && U.dst(env.campfire.x, env.campfire.y, x, y) <= joyR);
+    var filth = (APH.Colony && APH.Colony.filthAt)
+      ? APH.Colony.filthAt((s.colony&&s.colony.filth)||{}, x, y) : 0;
+    /* T9 房间品质 + P2 美观 + ADR-22 同室死敌: 以前是 residentsTick 里对
+       r.mood 的两次事后加减, 现在统一成念头, 检查器能说出理由。
+       美观要按「这个房间里的」污秽与尸体算, 所以先按房间格子汇总。 */
+    var roomMood = 0, roomPretty = false;
+    if(room && APH.Res && APH.Res.roomBeauty){
+      var filthMap = (s.colony && s.colony.filth) || {};
+      var G = CFG.GRID || 48;
+      var filthSum = 0, ci;
+      if(APH.Colony && APH.Colony.filthAt){
+        for(ci=0; ci<room.cells.length; ci++){
+          var rc = room.cells[ci];
+          filthSum += APH.Colony.filthAt(filthMap, rc.gx*G + G/2, rc.gy*G + G/2) || 0;
+        }
+      }
+      var corpseN = 0;
+      (s.entities||[]).forEach(function(e){
+        if(!e || e.dead || e.type !== (T.CORPSE||'corpse')) return;
+        var egx = Math.floor((e.x||0)/G), egy = Math.floor((e.y||0)/G);
+        if(egx<room.minX||egx>room.maxX||egy<room.minY||egy>room.maxY) return;
+        corpseN++;
+      });
+      var bty = APH.Res.roomBeauty({x:x,y:y}, env.rooms||[], (s.colony&&s.colony.buildings)||[],
+                                   { filth: filthSum, corpses: corpseN });
+      if(bty){ roomMood = bty.mood; roomPretty = bty.pretty; }
+    }
+    var roomFriction = 0;
+    if(room && env.self && APH.Res && APH.Res.roomFrictionOf && APH.Nav && APH.Nav.roomAt){
+      var mates = (env.residents||[]).filter(function(o){
+        if(!o || o.id === env.self.id) return false;
+        var oEnt = (s.entities||[]).find(function(e){ return e.type===(T.RESIDENT||'resident') && e.id===o.id; });
+        return oEnt && APH.Nav.roomAt({x:oEnt.x, y:oEnt.y}, env.rooms||[]) === room;
+      });
+      roomFriction = APH.Res.roomFrictionOf(env.self, mates, env.bonds);
+    }
+    return {
+      roomMood: roomMood,
+      roomPretty: roomPretty,
+      roomFriction: roomFriction,
+      raid: !!(s.war && s.war.raidActive),
+      night: !!env.night,
+      sheltered: sheltered,
+      exposed: !!env.wxExtreme && !sheltered,
+      temp: temp,
+      filth: filth,
+      fireNearby: fireNearby,
+      corpseNearby: corpseNearby,
+      atJoy: atJoy
+    };
+  }
+
+  /* 每跳/每次渲染都要的环境量。main.js 每个生产跳算一次并复用;
+     ui.js 渲染检查器时按需算一次 —— 两边拿到的是同一套定义。 */
+  function thoughtEnvOf(s){
+    s = s || window.APH.state || {};
+    var W = window.APH.Weather, Nav = window.APH.Nav, World = window.APH.World;
+    var wxId = (W && W.currentId) ? W.currentId(s.meta) : 'wx_clear';
+    var wxFx = (W && W.weatherEffects) ? W.weatherEffects(wxId) : {};
+    var isDay = (World && World.daylight) ? World.daylight() >= 0.5 : true;
+    var season = (W && W.seasonAt) ? W.seasonAt(s.clock, CFG.DAY_LEN) : null;
+    var buildings = (s.colony && s.colony.buildings) || [];
+    return {
+      rooms: (Nav && Nav.roomsOf) ? Nav.roomsOf(buildings) : [],
+      ambT: (W && W.ambientTemperatureOf) ? W.ambientTemperatureOf(wxId, isDay, season && season.id) : 22,
+      night: !isDay,
+      wxExtreme: ((wxFx.exposureGain) || 0) > 0,
+      campfire: buildings.find(function(b){ return b && (b.id==='bl_campfire' || b.bid==='bl_campfire'); }),
+      self: null, residents: (s.meta && s.meta.residents) || [], bonds: (s.meta && s.meta.bonds) || {},
+    };
+  }
+
+  /* ---------- P2 美观 Beauty (D2) ----------
+     环世界的 Beauty: 好看的东西加分, 难看的东西减分, 脏与尸体拉低。
+     此前只有 roomMoodGain 的正向家具加分 —— 把发电机塞进卧室毫无代价,
+     于是「布置房间」从来不是一个取舍。这里补上负分那一半。
+
+     纯函数: opts.filth = 房间内污秽总量, opts.corpses = 房间内尸体数
+     (由调用方按房间格子汇总, 保持本函数无副作用、node 直测)。
+     返回 null = 不在任何房间(露天不谈美观)。 */
+  function roomBeauty(pos, rooms, buildings, opts){
+    if(!pos || !rooms || !rooms.length || !buildings) return null;
+    var C = RS();
+    var B = (C.beauty) || {};
+    var G = CFG.GRID || 48;
+    var gx = Math.floor((pos.x||0)/G), gy = Math.floor((pos.y||0)/G);
+    var room = null, i, j;
+    for(i=0;i<rooms.length;i++){
+      var r = rooms[i];
+      if(gx<r.minX||gx>r.maxX||gy<r.minY||gy>r.maxY) continue;
+      for(j=0;j<r.cells.length;j++){
+        if(r.cells[j].gx===gx && r.cells[j].gy===gy){ room = r; break; }
+      }
+      if(room) break;
+    }
+    if(!room) return null;
+
+    /* 正分复用既有家具/卧室聚合, 不另起一套 */
+    var score = roomMoodGain(pos, rooms, buildings) || 0;
+
+    /* 负分: 房间 bbox 内的工业设施 */
+    var ugly = B.ugly || {};
+    for(i=0;i<buildings.length;i++){
+      var b = buildings[i];
+      if(!b || b.dead) continue;
+      var bid = b.id || b.bid;
+      if(ugly[bid] == null) continue;
+      var bx = Math.floor((b.x||0)/G), by = Math.floor((b.y||0)/G);
+      if(bx<room.minX||bx>room.maxX||by<room.minY||by>room.maxY) continue;
+      score += ugly[bid];
+    }
+
+    opts = opts || {};
+    var filthPer = (B.filthPer != null) ? B.filthPer : 0.6;
+    var corpsePer = (B.corpsePer != null) ? B.corpsePer : 5;
+    score -= (opts.filth || 0) * filthPer;
+    score -= (opts.corpses || 0) * corpsePer;
+
+    var div = (B.moodDiv != null && B.moodDiv !== 0) ? B.moodDiv : 2;
+    var mood = Math.round(score / div);
+    var lo = (B.moodMin != null) ? B.moodMin : -8;
+    var hi = (B.moodMax != null) ? B.moodMax : 6;
+    if(mood < lo) mood = lo;
+    if(mood > hi) mood = hi;
+
+    var prettyAt = (B.prettyAt != null) ? B.prettyAt : 5;
+    var uglyAt = (B.uglyAt != null) ? B.uglyAt : -2;
+    return {
+      score: score,
+      mood: mood,
+      pretty: score >= prettyAt,
+      ugly: score <= uglyAt,
+    };
+  }
+
   /* T9: 组合避难判定 — 房间内(true) > 房间外回退 isSheltered(建筑半径) */
   /* ADR-30 / #168: 指挥官与居民共用决策。只出意图，不走路。 */
   function thinkPawn(pawn, world){
@@ -2009,6 +2201,8 @@ APH.Res = (function(){
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
     roomShelter:roomShelter, shelteredFor:shelteredFor, roomMoodGain:roomMoodGain,
+    thoughtCtxAt:thoughtCtxAt, thoughtEnvOf:thoughtEnvOf,
+    roomBeauty:roomBeauty,
     playerExposureTick:playerExposureTick,
     suitResistOf:suitResistOf, weatherMoveMul:weatherMoveMul,
     thermalStressTick:thermalStressTick,
@@ -2037,6 +2231,7 @@ APH.Res = (function(){
     defaultSchedule:defaultSchedule, ensureSchedule:ensureSchedule,
     hourOfDay:hourOfDay, cycleScheduleSlot:cycleScheduleSlot, scheduleAt:scheduleAt,
     collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum,
+    moodFromThoughts:moodFromThoughts,
     ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
     makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
     capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner,

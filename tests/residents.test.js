@@ -876,3 +876,112 @@ test('#97 roomMoodGain: 家具在房间外(墙外)不加成', () => {
   const g=Res.roomMoodGain({x:48*30+24, y:48*30+24}, rooms, b);
   if(g!==1) throw new Error('仅房内电视应 +1(书架在墙外不顾): '+g);
 });
+
+/* ---------- P2 美观 Beauty (D2) ---------- */
+function beautyRoom(){
+  /* 5×5 墙环, 内部格 21..23 */
+  const b = [];
+  for (let x = 20; x <= 24; x++) { b.push({id:'bl_wall', x:48*x, y:48*20}); b.push({id:'bl_wall', x:48*x, y:48*24}); }
+  for (let y = 20; y <= 24; y++) { b.push({id:'bl_wall', x:48*20, y:48*y}); b.push({id:'bl_wall', x:48*24, y:48*y}); }
+  return b;
+}
+const beautyPos = { x: 48*22+24, y: 48*22+24 };
+function beautyOf(extra, opts){
+  const b = beautyRoom().concat(extra || []);
+  const rooms = APH.Nav.roomsOf(b);
+  return Res.roomBeauty(beautyPos, rooms, b, opts || {});
+}
+
+test('P2 beauty: 露天不谈美观 → null', () => {
+  const b = beautyRoom();
+  const rooms = APH.Nav.roomsOf(b);
+  if (Res.roomBeauty({x:48*5+24, y:48*5+24}, rooms, b, {}) !== null)
+    throw new Error('房间外应返回 null');
+});
+
+test('P2 beauty: 家具加分, 工业设施减分 (别把发电机塞进卧室)', () => {
+  const pretty = beautyOf([{id:'bl_house', x:48*22, y:48*22}, {id:'bl_tv', x:48*21, y:48*21}]);
+  if (!(pretty.score > 0)) throw new Error('卧室+电视应为正分, got ' + pretty.score);
+
+  const withGen = beautyOf([
+    {id:'bl_house', x:48*22, y:48*22}, {id:'bl_tv', x:48*21, y:48*21},
+    {id:'bl_wood_generator', x:48*23, y:48*23},
+  ]);
+  if (!(withGen.score < pretty.score))
+    throw new Error('塞进发电机应拉低美观: ' + withGen.score + ' vs ' + pretty.score);
+  const ugly = APH.CFG.residents.beauty.ugly.bl_wood_generator;
+  if (withGen.score !== pretty.score + ugly)
+    throw new Error('负分应正好是配置值 ' + ugly + ', got ' + (withGen.score - pretty.score));
+});
+
+test('P2 beauty: 污秽与尸体拉低美观', () => {
+  const base = beautyOf([{id:'bl_house', x:48*22, y:48*22}]);
+  const B = APH.CFG.residents.beauty;
+
+  const dirty = beautyOf([{id:'bl_house', x:48*22, y:48*22}], { filth: 10 });
+  if (dirty.score !== base.score - 10 * B.filthPer)
+    throw new Error('污秽应按 filthPer 扣分, got ' + dirty.score);
+
+  const corpsed = beautyOf([{id:'bl_house', x:48*22, y:48*22}], { corpses: 1 });
+  if (corpsed.score !== base.score - B.corpsePer)
+    throw new Error('尸体应按 corpsePer 扣分, got ' + corpsed.score);
+  if (!corpsed.ugly) throw new Error('卧室里摆一具尸体应判「难看」, score ' + corpsed.score);
+});
+
+test('P2 beauty: 分档 —— 漂亮 / 难看 / 中性', () => {
+  const B = APH.CFG.residents.beauty;
+  const lots = beautyOf([
+    {id:'bl_house', x:48*22, y:48*22}, {id:'bl_tv', x:48*21, y:48*21},
+    {id:'bl_shelf', x:48*23, y:48*21}, {id:'bl_carpet', x:48*21, y:48*23},
+    {id:'bl_carpet', x:48*23, y:48*23},
+  ]);
+  if (!lots.pretty) throw new Error('堆满家具应达「漂亮」档, score ' + lots.score + ' 需 ≥ ' + B.prettyAt);
+  if (lots.ugly) throw new Error('漂亮不应同时判难看');
+
+  const bare = beautyOf([]);
+  if (bare.pretty || bare.ugly) throw new Error('空房间应是中性, score ' + bare.score);
+
+  const grim = beautyOf([{id:'bl_mine', x:48*22, y:48*22}, {id:'bl_wood_generator', x:48*21, y:48*21}]);
+  if (!grim.ugly) throw new Error('矿机+发电机的屋子应判难看, score ' + grim.score);
+});
+
+test('P2 beauty: 心情幅度 1:1 且受上下限约束', () => {
+  const B = APH.CFG.residents.beauty;
+  const base = beautyOf([{id:'bl_house', x:48*22, y:48*22}]);
+  if (base.mood !== Math.round(base.score / B.moodDiv))
+    throw new Error('心情应按 moodDiv 换算');
+  const hell = beautyOf([{id:'bl_mine', x:48*22, y:48*22}], { corpses: 20, filth: 500 });
+  if (hell.mood < B.moodMin) throw new Error('心情应有下限 ' + B.moodMin + ', got ' + hell.mood);
+});
+
+test('P2 beauty: 漂亮房间挂 th_pretty_room, 且不与通用房间念头重复', () => {
+  const pawn = { food: 80, rest: 80, recreation: 80 };
+  const pretty = Res.collectThoughts(pawn, { roomPretty: true, roomMood: 5 });
+  const ids = pretty.map(t => t.id);
+  if (ids.indexOf('th_pretty_room') < 0) throw new Error('应挂 th_pretty_room');
+  if (ids.indexOf('th_room') >= 0) throw new Error('漂亮档不应再叠一条通用房间念头');
+
+  const plain = Res.collectThoughts(pawn, { roomMood: 3 });
+  if (plain.map(t => t.id).indexOf('th_room') < 0) throw new Error('普通档应挂 th_room');
+});
+
+test('P2 beauty: 装修越好心情越好 —— 跨档不得反而变差', () => {
+  /* 「漂亮」档曾用目录固定值(+3), 比下一档的可变加成(+4)还低,
+     结果多铺两块地毯反而心情下降。这条锁住单调性。 */
+  const pawn = { food: 80, rest: 80, recreation: 80 };
+  const moodOf = ctx => {
+    const list = Res.collectThoughts(pawn, ctx);
+    const t = list.find(x => x.id === 'th_room' || x.id === 'th_room_bad' || x.id === 'th_pretty_room');
+    return t ? t.mood : 0;
+  };
+  const plain  = moodOf({ roomMood: 4 });
+  const pretty = moodOf({ roomMood: 6, roomPretty: true });
+  if (!(pretty > plain))
+    throw new Error('跨入漂亮档心情不得下降: ' + plain + ' → ' + pretty);
+
+  /* 一个房间只挂一条房间念头 */
+  const list = Res.collectThoughts(pawn, { roomMood: 6, roomPretty: true });
+  const roomish = list.filter(t => t.id.indexOf('th_room') === 0 || t.id === 'th_pretty_room');
+  if (roomish.length !== 1)
+    throw new Error('房间念头应只有一条, got ' + roomish.map(t => t.id).join(','));
+});

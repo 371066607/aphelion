@@ -173,22 +173,28 @@ test('recreation: needsTick 自然衰减 5/跳', function(){
   if (Math.abs(r.recreation - (60 - recDrain)) > 0.02) throw new Error('recreation 衰减后应为 '+(60-recDrain)+'，实际: ' + r.recreation);
 });
 
-test('recreation: 高娱乐提供 +8 身心愉悦，低娱乐惩罚 -5 极度枯燥', function(){
+test('recreation: 高娱乐拉高心情、低娱乐拉低, 且念头清单能解释差距 (ADR-31)', function(){
+  /* ADR-31: 心情是「基线 + 念头偏移之和」的缓动目标, 不再一跳到位。
+     固定娱乐值连续结算, 观察两人向各自目标收敛。 */
+  var base = APH.CFG.residents.moodBase;
   var rHigh = APH.Res.generate('rec3', 12345);
-  rHigh.food = 100;
-  rHigh.mood = 70;
-  rHigh.recreation = 85;
-  APH.Res.needsTick(rHigh, true);
-  // 70 + 2(food) + 3(bed) + 8(joy) = 83
-  if (rHigh.mood < 80) throw new Error('高娱乐应获得身心愉悦加成，实际 mood: ' + rHigh.mood);
+  rHigh.food = 100; rHigh.mood = base;
+  for (var i = 0; i < 8; i++) { rHigh.recreation = 85; APH.Res.needsTick(rHigh, true); }
 
   var rLow = APH.Res.generate('rec4', 12345);
-  rLow.food = 100;
-  rLow.mood = 70;
-  rLow.recreation = 15;
-  APH.Res.needsTick(rLow, true);
-  // low recreation penalty -5
-  if (rLow.mood > 72) throw new Error('低娱乐应受枯燥惩罚，实际 mood: ' + rLow.mood);
+  rLow.food = 100; rLow.mood = base;
+  for (var j = 0; j < 8; j++) { rLow.recreation = 15; APH.Res.needsTick(rLow, true); }
+
+  if (!(rHigh.mood > base)) throw new Error('高娱乐心情应高于基线，实际: ' + rHigh.mood);
+  if (!(rLow.mood < base)) throw new Error('低娱乐心情应低于基线，实际: ' + rLow.mood);
+  if (!(rHigh.mood - rLow.mood >= 8))
+    throw new Error('高低娱乐应拉开差距: ' + rHigh.mood + ' vs ' + rLow.mood);
+
+  /* 念头清单必须解释这个数字 —— 检查器与模拟同源 */
+  var hasJoy = (rHigh.thoughts || []).some(function(t){ return t.id === 'th_joy'; });
+  var hasBored = (rLow.thoughts || []).some(function(t){ return t.id === 'th_bored'; });
+  if (!hasJoy) throw new Error('高娱乐应挂 th_joy 念头');
+  if (!hasBored) throw new Error('低娱乐应挂 th_bored 念头');
 });
 
 test('recreation: enjoyRecreation 增加娱乐值', function(){
