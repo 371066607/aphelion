@@ -2034,6 +2034,9 @@ APH.UI = (function(){
   U.on('notice', function(p){ if(p && p.text) floatText(p.text, p.color); });
   U.on('hint',   function(p){ setHint((p && p.text) || ''); });
   U.on('death',  function(p){ if(p) showDeath(p.reason, p.stats || {}); });
+  /* ADR-42: 生产跳可能解锁科技/改变研究点, 科技树开着就重绘。
+     以前由 main 在生产跳末尾直接调 —— 界面刷新不该是模拟的一环。 */
+  U.on('productionTick', function(){ if(isOpen('techMap')) renderTechMap(); });
 
   /* ---------- 命令表 (ADR-39) ----------
      面板里的按钮原先直接写 onclick 调 main 的函数 —— 视图直接点名控制器,

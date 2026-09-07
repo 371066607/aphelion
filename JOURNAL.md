@@ -1822,3 +1822,105 @@ ADR-39 是 27 → 实际 37，这次是 38/5 → 实际 52/6。
 另一条：**重复的防御性代码是设计问题的读数**。
 那 58 个 `if(window.APH.UI && ...)` 不是谨慎，是同一句「这里方向不对」
 被抄了 58 遍。下次看见同一个守卫出现十次以上，先问它在防什么。
+
+---
+
+## 2026-09-07（续九）· ADR-41/42：开始拆 main.js
+
+依赖方向理顺之后（ADR-38/39/40），才看得出哪些代码天然属于哪里。
+BACKLOG 点名了两块：提示层、殖民地跳编排。这一班两块都做了。
+
+### 先把 main 代管的领域助手送回家
+
+搬提示层时发现它牵着 main 的一堆小函数。这些函数根本不属于 main：
+
+- `playerSleeping/Downed/Sick/Food/foodEatBelow` → `APH.Res`
+  （`playerNeeds` 是 Res 的概念，`setPlayerSleeping` 一直住在那儿）
+- `residentOf` / `makeRecruitCtx` → `APH.Res`
+- `buildingRecordOf` → `APH.Colony.recordOf`（查的是 colony.buildings）
+- `nearestMeal` → `APH.Colony.nearestMeal`（查的全是地上堆/货架/仓位）
+
+main 各留一行转发壳，30 多个调用点一个没动。
+
+### 提示层 → src/hints.js（217 行）
+
+`forHome` 的优先级表 + 四个分档。搬出来之后它是**纯读取**：
+不改 state、不碰 DOM、只返回字符串或 null，对 main 与 UI 的依赖都是 0。
+
+**三个只有搬出来才看得见的东西：**
+
+1. `hintObjective` 末尾那段「旧提示失效就清空」是**死代码**。
+   T2 让 `colonyGoal` 永不枯竭（兜底返回 endgame）之后就再也走不到了。
+   清空效果没丢——目标阶梯本身会覆盖掉残留。已删。
+2. 删掉死代码后，提示层读 DOM 的唯一理由也没了，模块彻底与 DOM 无关。
+   （中途我还为它加了个 `UI.getHint()`，发现没人用又撤掉了——不留没有使用者的 API。）
+3. 优先级第一档是「物资告急」，它**盖得住「击倒昏迷 · 生命垂危」**；
+   「没有口粮 · 请标记浆果丛采摘」这句具体指路也被「食物将尽」盖住。
+   两条都是既定行为，用例按现状钉死，是否合理进 BACKLOG 待拍板——不闷头改。
+
+写用例时连撞三次「实际行为和我以为的不一样」，每次都是我先假设了优先级。
+**这正是它埋在 main 里时没人测得了的部分。**
+
+### 生产跳 → src/colonytick.js（498 行）
+
+`residentsTick` 454 行，一跳串起约 20 个子系统。它不是领域逻辑
+（规则住在 Colony/Res/Weather/Nav），是**编排**——编排也该有自己的文件。
+
+挡在前面的三根线：`checkColonyFall`（一起搬）、`refreshTechMapIfOpen`
+（删掉，改由 ui 订阅）、`tryFirstNightVisitor`（留在 main，改由 main 订阅）。
+后两根用一个事件收掉：
+
+```js
+U.emit('productionTick', {});
+```
+
+另外它自己还藏着 **21 处 `APH.UI.floatText`** —— ADR-40 清 combat/colony 时
+漏掉的同一种债，只因为它当时住在 main（main 调 UI 不算倒置，护栏不报）。
+一并改成 `U.emit('notice')`。至此模拟层对 `APH.UI` 的引用全部为 0。
+
+### 又被同一个坑绊了一次
+
+加 `hints.js` 时漏改 scenario 的模块清单 → **当场 55 条红**，
+而红的原因跟 hints 毫无关系，只是模块没加载（`T is not defined` 也是同一类）。
+build.py 的 `MODULE_ORDER` 被 4 个测试入口各抄了一份。
+
+加了条护栏：凡是加载 main.js 的入口，不得漏掉 build.py 里的任何非 DOM 模块。
+**「漏了」和「故意不装」必须能分开** —— 故意不装要写进该入口的 `SKIP_MODULES`
+并说明理由（perf/boss 不装 opening.js，因为 `showOpening` 要真 `<video>`），
+否则这条护栏很快会被人用注释绕过去。
+
+### 实机验证：不是「没抛错」，是「真的算了」
+
+```
+模块就位:       {"ColonyTick":"object","Hints":"object"}
+真实生产跳:     {"productionTickFired":1}
+确实在结算需求: {"foodBefore":80,"foodAfter":79.65,"changed":true}
+覆灭判定:       {"fell":true,"mode":"dead"}    ← 死亡结算页确实弹出
+console 错误:   (无)
+```
+
+第三条是关键。搬 454 行编排代码，最容易出的错是**某个子系统被静默跳过** ——
+函数照样返回，测试照样绿，只是有件事不再发生了。所以要看数字真的变了。
+
+### 验证证据
+
+```
+python3 build.py             → ✓ game.html
+node tests/run.js            → 821 通过 / 0 失败   (818 → 821)
+node tests/scenario.js       → 162 通过 / 0 失败
+node tests/perf.test.js      → 4 通过 / 0 失败
+node tests/boss.test.js      → 7 通过 / 0 失败
+node tests/ui_modals.test.js → 89 通过 / 0 失败
+```
+
+**main.js 6048 → 5297 行。**
+
+### 记一笔
+
+**把代码搬出来，是让它可测的最短路径。** 提示层在 main 里时，
+「哪句话该盖过哪句话」只能靠人开着游戏站到东西旁边一个个试；
+搬成 217 行的纯函数模块之后，9 条用例就把优先级钉死了 ——
+顺带逼出一段死代码和两个存疑的设计。
+
+下一批（已进 BACKLOG）：输入绑定 ~600 行、`updateResidents` ~470 行、
+绘制层 ~340 行、访客系统 ~220 行。

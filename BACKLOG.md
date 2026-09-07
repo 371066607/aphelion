@@ -411,9 +411,20 @@
       那 58 处手写的 `if(window.APH.UI && ...)` 守卫本身就是「方向不对」的自白，
       现在由 `emit` 统一保证。顺带修掉 ui.js 11 处 `floatText` 实参错位
       （传了 `(txt,400,300,col)`，签名却是 `(txt,col)` → 一直沿用上一条飘字的颜色）
-- [ ] **main.js 仍 6100+ 行**：提示层与殖民地跳编排应各自独立成模块。
-      **依赖方向已理顺（ADR-38/39/40），这一项现在可以动了**
+- [x] **ADR-41/42 main.js 拆分第一批**：提示层 → `src/hints.js`（`APH.Hints`，217 行，
+      纯读取、不碰 DOM）；30 秒生产跳与覆灭判定 → `src/colonytick.js`
+      （`APH.ColonyTick`，498 行，对 UI/Main 引用为 0）。
+      顺带把 main 代管的领域助手送回归属地（`Res.playerFood` 等 5 个、
+      `Res.residentOf/recruitCtx`、`Colony.recordOf/nearestMeal`）。
+      **main.js 6048 → 5297 行**
+- [ ] **main.js 拆分第二批**（余下大头，可按同样方式继续切）：
+      输入绑定 `bindInput` ~600 行 · 居民世界侧接线 `updateResidents` ~470 行 ·
+      绘制层 `drawZones/drawDesignations/homeDrawers` 等 ~340 行 · 访客系统 ~220 行
 - [ ] **CFG 1110 行单层对象**：按域拆命名空间
+- [ ] **提示优先级存疑两处**（ADR-41 搬出提示层后才看清，用例已按现状钉死，
+      要改先拍板）：① 第一档「物资告急」盖得住「击倒昏迷 · 生命垂危」——
+      快死了却在提示种田；② 「没有口粮 · 请标记浆果丛采摘」这句具体指路
+      被「食物将尽」盖住，玩家看不到该怎么办
 - [ ] **飘字颜色 → 语义等级**：模拟层 emit 里仍写死 `#ff9a9a` 这类色值，
       应改成 `level:'danger'` 由 ui 决定调色板。ADR-40 刻意没做 ——
       现有 58 处用了 15 种色值，收敛必然改变画面，**需要先拍板调色板**

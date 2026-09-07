@@ -32,6 +32,7 @@ MODULE_ORDER = [
     "combat.js",
     "world.js",
     "entities.js",
+    "colonytick.js",
     "sfx.js",
     "sprite_data.js",
     "sprites.js",

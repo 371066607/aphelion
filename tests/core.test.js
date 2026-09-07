@@ -348,3 +348,74 @@ test('ADR-40: 单个订阅者抛错不拖垮模拟层', () => {
     APH.Combat.raidRetreat(s, '订阅者出错', false);      // U.emit 内部 try/catch 兜住
   } finally { APH.U.off('notice', bad); }
 });
+
+/* ---------- ADR-42: 生产跳独立成 APH.ColonyTick ---------- */
+
+test('ADR-42 colonyTick: 跳末发 productionTick, 让订阅者去做杂事', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 100, entities: [], parts: [],
+    colony: { buildings: [] },
+    meta: { residents: [], res: {}, tech: {}, bonds: {}, stats: {},
+            playerNeeds: { food: 80, rest: 100, illness: 0 } },
+  };
+  let fired = 0;
+  const h = APH.U.on('productionTick', () => fired++);
+  try {
+    APH.ColonyTick.run();
+    if (fired !== 1) throw new Error('生产跳应发且只发一次 productionTick, got ' + fired);
+  } finally { APH.U.off('productionTick', h); APH.state = prev; }
+});
+
+test('ADR-42 colonyTick: 覆灭判定 —— 立过殖民地再归零才算输', () => {
+  const prev = APH.state;
+  const base = () => ({
+    scene: 'home', mode: 'running', clock: 100, landedAt: 0, cry: 0, found: 0,
+    totalBeacons: 3, carry: {}, runLoot: {}, entities: [], parts: [],
+    colony: { buildings: [] },
+    meta: { residents: [], res: {}, tech: {}, bonds: {}, stats: {}, playerNeeds: {} },
+  });
+  try {
+    /* 从没立过殖民地 → 不算覆灭 */
+    APH.state = base();
+    if (APH.ColonyTick.checkFall() !== false) throw new Error('没立过就不算覆灭');
+    if (APH.state.mode !== 'running') throw new Error('不该改 mode');
+
+    /* 立过, 但人还在 → 不算 */
+    APH.state = base();
+    APH.state.meta.residents = [{ id: 'r1', name: '老张' }];
+    APH.ColonyTick.founded(APH.state.meta);
+    if (APH.ColonyTick.checkFall() !== false) throw new Error('还有人活着就不算覆灭');
+
+    /* 立过且归零 → 覆灭, 且发 death + gameOver */
+    APH.state.meta.residents = [];
+    const seen = [];
+    const h1 = APH.U.on('death', p => seen.push(['death', p]));
+    const h2 = APH.U.on('gameOver', () => seen.push(['gameOver']));
+    try {
+      if (APH.ColonyTick.checkFall() !== true) throw new Error('立过再归零应判覆灭');
+      if (APH.state.mode !== 'dead') throw new Error('覆灭后 mode 应为 dead');
+      const d = seen.find(x => x[0] === 'death');
+      if (!d) throw new Error('应发 death 事件');
+      if (!d[1].stats.colonyFall) throw new Error('结算页要知道这是覆灭结局, 不是战死');
+      if (!seen.find(x => x[0] === 'gameOver')) throw new Error('gameOver 不应被弄丢');
+      /* 不重复结算 */
+      seen.length = 0;
+      APH.state.mode = 'running';
+      if (APH.ColonyTick.checkFall() !== false) throw new Error('已结算过不应重复');
+      if (seen.length) throw new Error('重复调用不应再发事件');
+    } finally { APH.U.off('death', h1); APH.U.off('gameOver', h2); }
+  } finally { APH.state = prev; }
+});
+
+test('ADR-42 colonyTick: 无人订阅时生产跳照跑', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 100, entities: [], parts: [],
+    colony: { buildings: [] },
+    meta: { residents: [], res: {}, tech: {}, bonds: {}, stats: {},
+            playerNeeds: { food: 80, rest: 100, illness: 0 } },
+  };
+  try { APH.ColonyTick.run(); }             // 不抛错即通过
+  finally { APH.state = prev; }
+});

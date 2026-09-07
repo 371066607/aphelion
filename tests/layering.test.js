@@ -21,7 +21,7 @@ function codeOf(file) {
 const ORDER = [
   'config.js','utils.js','input.js','humanoid.js','save.js','opening.js',
   'planet.js','llm.js','colony.js','rivals.js','events.js','nav.js','weather.js',
-  'residents.js','alerts.js','combat.js','world.js','entities.js','sfx.js',
+  'residents.js','alerts.js','combat.js','world.js','entities.js','colonytick.js','sfx.js',
   'sprites.js','ui.js','hints.js','main.js',
 ];
 
@@ -46,8 +46,8 @@ test('layering: 反向调用 main 的次数只减不增 (棘轮)', () => {
     throw new Error('层级倒置增加了 —— 低层模块不得反向调用 main: ' + grew.join('; '));
 });
 
-test('layering: 模拟层(colony/combat)已彻底不再反向调用 main (ADR-38)', () => {
-  ['colony.js', 'combat.js'].forEach(f => {
+test('layering: 模拟层(colony/combat/colonytick)已彻底不再反向调用 main (ADR-38)', () => {
+  ['colony.js', 'combat.js', 'colonytick.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.Main\./g) || []).length;
     if (hits)
       throw new Error(f + ' 仍有 ' + hits + ' 处反向调用 main —— 模拟循环必须只有一个归属者');
@@ -69,8 +69,8 @@ test('layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)
 
 /* ADR-40: 模拟层不得直接驱动视图。combat 52 处 + colony 6 处 APH.UI.* 已清零,
    改为 U.emit('notice'|'hint'|'death') 由 ui.js 订阅。 */
-test('layering: 模拟层(colony/combat)不得直接调用 APH.UI (ADR-40)', () => {
-  ['colony.js', 'combat.js'].forEach(f => {
+test('layering: 模拟层(colony/combat/colonytick)不得直接调用 APH.UI (ADR-40)', () => {
+  ['colony.js', 'combat.js', 'colonytick.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.UI\./g) || []).length;
     if (hits)
       throw new Error(f + ' 有 ' + hits + ' 处直接调 APH.UI —— 模拟层应 emit 事件, 由 ui 订阅');
@@ -81,7 +81,8 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
   const NS = {
     'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
     'weather.js':'Weather','residents.js':'Res','alerts.js':'Alerts','combat.js':'Combat',
-    'world.js':'World','entities.js':'Ent','sfx.js':'SFX','sprites.js':'Sprites',
+    'world.js':'World','entities.js':'Ent','colonytick.js':'ColonyTick',
+    'sfx.js':'SFX','sprites.js':'Sprites',
     'ui.js':'UI','hints.js':'Hints','main.js':'Main','planet.js':'Planet',
     'llm.js':'LLM','save.js':'Save',
     'opening.js':'Opening','input.js':'Input','humanoid.js':'Humanoid',

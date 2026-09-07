@@ -105,7 +105,7 @@ ASSET_IDS.forEach(function(id){
 });
 for(const f of ['config.js','utils.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','alerts.js','combat.js',
-                'world.js','entities.js','sfx.js','sprites.js','ui.js','hints.js','main.js']){
+                'world.js','entities.js','colonytick.js','sfx.js','sprites.js','ui.js','hints.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 
