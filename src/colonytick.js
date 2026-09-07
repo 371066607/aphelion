@@ -20,6 +20,64 @@ APH.ColonyTick = (function(){
     if((m.residents || []).length >= need){ m.colonyFounded = true; return true; }
     return false;
   }
+  /* ---------- ADR-44: 指挥官倒下 ----------
+     全项目原先有三处「指挥官死 = 本局结束」: 远征战死、远征缺氧、家园失血过多。
+     可「殖民地优先」说的是「还有人活着, 殖民地就还在」—— 这三处直接和设计支柱打架。
+     现在它们统一走这里: 有人接班就接班, 名册空了才是真的结束。
+     本局结束的唯一出口, 剩下 checkFall(殖民地覆灭)。
+
+     reason: 死因文本 · at: 倒下的位置(家园留尸体; 远征在天外, 不留)
+     返回 true = 已继任(调用方继续跑), false = 本局结束(调用方已被本函数收尾)。 */
+  function commanderFell(reason, at){
+    var s = APH.state, m = s.meta;
+    if(!m || s.mode !== 'running') return false;
+    var r = APH.Res.succeedCommander(m);
+    if(!r.ok){
+      /* 没人接班 —— 这才是真的结束 */
+      s.mode = 'dead';
+      U.emit('gameOver', {});
+      m.stats = m.stats || {}; m.stats.deaths = (m.stats.deaths || 0) + 1;
+      APH.Save.saveMeta(m);
+      U.emit('death', { reason: reason, stats:{
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry,
+        runLoot:s.runLoot, survived:s.clock-(s.landedAt||0),
+        lastCommander:true, days:(s.clock||0)/(CFG.DAY_LEN||3600),
+      }});
+      return false;
+    }
+    /* 家园: 前任留下尸体, 让殖民地看得见代价(远征在天外, 尸体带不回来) */
+    if(at && s.scene === 'home' && APH.Res.makeCorpse){
+      s.entities.push(APH.Res.makeCorpse(
+        { id:'cmd_'+(r.successor.succeeded||1), name:r.fallen.name }, at.x, at.y));
+    }
+    var wasExpedition = (s.scene === 'expedition');
+    if(wasExpedition){
+      /* 继任者在家, 前任和他背上的东西都留在了荒原 —— 远征收益随人一起没了。
+         这是「指挥官不再是本局」之后, 远征风险仅剩的落点。 */
+      s.carry = {};
+      s.runLoot = 0;
+    }
+    /* 继任者是已经在场的人 —— 把指挥官的身体挪到他站的地方 */
+    var heirEnt = null;
+    (s.entities||[]).forEach(function(e){
+      if(e && !e.dead && e.type===T.RESIDENT && (e.rid||e.id)===r.heir.id) heirEnt = e;
+    });
+    if(heirEnt){ s.px = heirEnt.x; s.py = heirEnt.y; heirEnt.dead = true; }
+    s.hp = CFG.player.hpMax;
+    s.o2 = CFG.player.o2Max;
+    s.downed = false;
+    s.playerDrafted = false;
+    s.selectedRid = null;
+    s.target = null;
+    APH.Save.saveMeta(m);
+    /* 场景切换归 main(enterHome 要重建世界), 这里只报信。 */
+    if(wasExpedition) U.emit('forceReturnHome', { reason:reason });
+    U.emit('commanderSucceeded', { fallen:r.fallen, successor:r.successor, reason:reason });
+    U.emit('notice', {text:'⭐ ' + r.fallen.name + ' 倒下了 · ' + r.successor.name + ' 接过了指挥权',
+                      color:'#ffc857'});
+    return true;
+  }
+
   function checkFall(){
     var s = APH.state, m = s.meta;
     if(!m || s.mode !== 'running' || s.scene !== 'home') return false;
@@ -494,5 +552,12 @@ APH.ColonyTick = (function(){
     U.emit('productionTick', {});
   }
 
-  return { run:run, checkFall:checkFall, founded:founded };
+  /* ADR-44: combat 早于本模块加载, 够不着 commanderFell, 所以它发事件、这里接。
+     订阅点放在本模块而不是 main —— 不装 main 的测试入口也得能走完死亡链路,
+     否则那里的玩家会「死不掉」, 而用例还是绿的。 */
+  U.on('commanderFell', function(p){
+    commanderFell((p && p.reason) || '指挥官倒下了。', p && p.at);
+  });
+
+  return { run:run, checkFall:checkFall, founded:founded, commanderFell:commanderFell };
 })();

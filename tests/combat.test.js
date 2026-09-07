@@ -244,7 +244,7 @@ test('hurtPlayer: 家园击倒不消耗 clinicKit (远征急救仅在远征分�
     if(st.clinicKit!==1) throw new Error('家园击倒不得消耗远征急救, clinicKit='+st.clinicKit);
   }finally{ window.APH.state=prev; }
 });
-test('hurtPlayer: 远征生命归零仍是死亡 (现状不变, 不抬回殖民地)', () => {
+test('hurtPlayer: 远征生命归零且名册为空 → 本局结束 (ADR-44)', () => {
   const prev=window.APH.state;
   window.APH.state=combatState({scene:'expedition', hp:3, clinicKit:0, iFrameT:0});
   try{

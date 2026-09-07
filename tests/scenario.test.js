@@ -431,12 +431,14 @@ test('O2 死亡: showDeath 传入 runLoot 与 survived', () => {
   S.landedAt=10;
   S.clock=100;
   S.carry={ it_mineral:1 };
+  S.meta.residents=[];                 // ADR-44: 没人接班, 才是真的结束
   let seen=null;
-  const prev=APH.UI.showDeath;
-  APH.UI.showDeath=function(reason, stats){ seen=stats; if(prev) prev.apply(this,arguments); };
+  /* ADR-40 之后死亡结算走总线, 不再直调 APH.UI.showDeath ——
+     订总线才测得到真正的契约(旧写法打桩公开方法, 已经拦不住了)。 */
+  const off=APH.U.on('death', function(p){ seen=p&&p.stats; });
   M.updateSurvival(0.016);
-  APH.UI.showDeath=prev;
-  A(seen, '应调用 showDeath');
+  APH.U.off('death', off);
+  A(seen, '应发出 death 事件');
   A(seen.runLoot===7, 'runLoot 应传入, got '+seen.runLoot);
   A(typeof seen.survived==='number' && Math.abs(seen.survived-90)<0.01,
     'survived 应为 clock-landedAt, got '+seen.survived);

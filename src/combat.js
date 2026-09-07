@@ -1111,14 +1111,9 @@ APH.Combat = (function(){
     }
     if(s.hp <= 0){
       s.hp = 0;
-      s.mode = 'dead';
-      U.emit('gameOver',{});
-      s.meta.stats.deaths++;
-      APH.Save.saveMeta(s.meta);
-      U.emit('death', {reason:'你被 '+source+'终结了。', stats:{
-        cry:s.cry, found:s.found, total:s.totalBeacons,
-        carry:s.carry, runLoot:s.runLoot, survived:s.clock-(s.landedAt||0),
-      }});
+      /* ADR-44: 指挥官倒下不再等于本局结束 —— 有人接班就接班。
+         远征战死: 尸体在天外, 不留; 继任者在家, 由 commanderFell 把镜头交给他。 */
+      U.emit('commanderFell', { reason:'指挥官被 '+source+'终结在了荒原上。', at:null });
     }
   }
 
