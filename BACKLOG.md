@@ -417,9 +417,18 @@
       顺带把 main 代管的领域助手送回归属地（`Res.playerFood` 等 5 个、
       `Res.residentOf/recruitCtx`、`Colony.recordOf/nearestMeal`）。
       **main.js 6048 → 5297 行**
-- [ ] **main.js 拆分第二批**（余下大头，可按同样方式继续切）：
-      输入绑定 `bindInput` ~600 行 · 居民世界侧接线 `updateResidents` ~470 行 ·
-      绘制层 `drawZones/drawDesignations/homeDrawers` 等 ~340 行 · 访客系统 ~220 行
+- [x] **ADR-43 main.js 拆分第二批**：绘制层 → `src/draw.js`（`APH.Draw`，349 行，纯输出）；
+      访客拜访/请客/招募 → `src/visitors.js`（`APH.Visitors`，232 行）。
+      顺带 `Ent.selectedPawn` / `Colony.nibblePile` 归位。
+      **main.js 5297 → 4787 行**（ADR-41/42/43 累计 6048 → 4787，−1261）
+- [ ] **main.js 拆分第三批**：`updateResidents` ~470 行（居民世界侧接线，
+      依赖 10 个 main 本地函数，需先把 `pawnWorldAt`/`tryEatHere`/`doHaul` 理清）
+- [ ] **`selfCenter` 接不接**：T11 相机自愈保护（画面偏移超阈值就硬对齐），
+      ADR-43 发现**全项目从来没有调用过它** —— 写完没接上。代码已放回相机段并标注。
+      要么接进 `updateCamera`，要么删掉，别让它继续挂着
+- [ ] ~~输入绑定 `bindInput` ~600 行~~：ADR-43 复核后认为**未必该搬** ——
+      main 是组合根，把 DOM 事件接到各模块上本来就是它的活。
+      真要动，该拆的是处理器里顺手写的业务逻辑，不是绑定本身
 - [ ] **CFG 1110 行单层对象**：按域拆命名空间
 - [ ] **提示优先级存疑两处**（ADR-41 搬出提示层后才看清，用例已按现状钉死，
       要改先拍板）：① 第一档「物资告急」盖得住「击倒昏迷 · 生命垂危」——

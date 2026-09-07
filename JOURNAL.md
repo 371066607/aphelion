@@ -1924,3 +1924,90 @@ node tests/ui_modals.test.js → 89 通过 / 0 失败
 
 下一批（已进 BACKLOG）：输入绑定 ~600 行、`updateResidents` ~470 行、
 绘制层 ~340 行、访客系统 ~220 行。
+
+---
+
+## 2026-09-07（续十）· ADR-43：拆分第二批，先量再切
+
+四块候选先量耦合度，**按耦合度排序而不是按行数**：
+
+| 候选 | 行数 | 依赖的 main 本地函数 |
+|---|---|---|
+| 绘制层 | 328 | 4 |
+| 访客系统 | 206 | 6（其中 4 个已是转发壳） |
+| `updateResidents` | 473 | 10 |
+| `bindInput` | 597 | 16 |
+
+`bindInput` 最大，却最不该先动。**先量这一步，比直觉排序值钱。**
+
+### 绘制层 → src/draw.js（349 行）
+
+搬之前先修一处：`drawSelectedRing` 会在选中者离场时顺手
+`s.selectedRid=null` —— **绘制函数改 state**，一帧画两次就解除两次。
+挪进 `syncHomeChrome`（它本来就在做「实体没了，指向它的东西跟着清」）。
+
+### 访客系统 → src/visitors.js（232 行）
+
+13 处 `floatText` + 1 处 `setHint` → `U.emit`。招募成功后要同步世界侧实体，
+但实体池归 main 管，所以发 `rosterChanged` 让 main 去做。
+
+### 用例先炸出来的那个 bug
+
+`drawOrderDragBox`/`drawPawnDragBox` 读着 main 的 **6 个模块级 `var`**：
+
+```js
+var orderDrag=false, orderFrom=null, orderTo=null;
+var pawnDrag=false, pawnDragStart=null, pawnDragEnd=null;
+```
+
+搬进 draw.js 后全变未定义 —— **一开始拖框选就每帧抛 ReferenceError**。
+
+是新写的「绘制层画一遍不改 state」那条用例先报的 `orderDrag is not defined`，
+不是靠人去点。修法不是把 `var` 一起搬（那输入层又读不到了），
+而是**它本来就是输入与绘制共享的状态，归 `APH.state`**。
+
+搬模块最容易漏的就是这类闭包依赖：语法检查过、单测（不碰绘制）也过，
+只有真去拖一下才炸。所以实机探针里专门派了真实鼠标拖拽，截图确认框选矩形还在。
+
+### selfCenter 从来没被调用过
+
+T11 的相机自愈保护（DPR/iframe 缩放导致偏移就硬对齐），
+**全项目没有任何地方调用它** —— 写完就没接上。
+
+没删：它是有意写的异常保护。但它改的是相机不是绘制，所以放回相机段，
+注释写明「当前无调用者」，接不接进 BACKLOG 待拍板。
+
+### 关于 bindInput 的复核结论
+
+BACKLOG 原先把它列进待拆清单。这次仔细看下来**未必该搬**：
+main 是组合根，把 DOM 事件接到各模块上本来就是它的活。
+真要动，该拆的是处理器里顺手写的业务逻辑，不是绑定本身。
+已在 BACKLOG 划掉并写明理由 —— **清单上的条目也会过期，别照着做**。
+
+### 验证证据
+
+```
+python3 build.py             → ✓ game.html
+node tests/run.js            → 826 通过 / 0 失败   (821 → 826)
+node tests/scenario.js       → 162 通过 / 0 失败
+node tests/perf.test.js      → 4 通过 / 0 失败
+node tests/boss.test.js      → 7 通过 / 0 失败
+node tests/ui_modals.test.js → 89 通过 / 0 失败
+```
+
+实机（派真实鼠标拖拽）：
+```
+拖拽中: {"pawnDrag":true,"start":{...},"end":{...}}   ← 框选矩形正常(截图确认)
+松手后: {"pawnDrag":false}
+强刷过客: {"before":0,"after":1,"name":"格里·四号","hasBio":true}
+console 错误: (无)
+```
+
+**main.js 5297 → 4787 行**（ADR-41/42/43 累计 6048 → 4787，−1261）。
+
+### 记一笔
+
+这一班的两个发现是同一种：**代码搬家时，"它依赖什么" 比 "它有多大" 重要得多。**
+量耦合度让我把 `bindInput` 排到最后（并最终判定不该搬）；
+而没量出来的那 6 个闭包变量，是靠一条「不许改 state」的用例兜住的 ——
+护栏的价值不在于它测的那件事，而在于它顺手会撞见的那些事。

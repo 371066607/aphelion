@@ -1364,6 +1364,15 @@ APH.Colony = (function(){
     return room.temp;
   }
 
+  /* ADR-43: 从一堆地上物资里拿走 n 份, 拿空就标记 dead。原先住在 main.js。 */
+  function nibblePile(drop, n){
+    if(!drop) return 0;
+    var take=Math.min(drop.n||1, n||1);
+    drop.n=(drop.n||1)-take;
+    if((drop.n||0)<=0) drop.dead=true;
+    return take;
+  }
+
   /* ADR-41: 找离 e 最近的一口饭 —— 地上熟食优先, 其次任意粮堆,
      再其次 120px 内的食物货架, 最后是仓库。原先住在 main.js, 可它查的
      全是本模块的东西(地上堆 / 货架 / 仓位)。 */
@@ -2809,7 +2818,7 @@ APH.Colony = (function(){
     boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
     colonyGoal:colonyGoal, winterFoodNeed:winterFoodNeed,
     makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
-    persist:persist, recordOf:recordOf, nearestMeal:nearestMeal, serializeGround:serializeGround,
+    persist:persist, recordOf:recordOf, nearestMeal:nearestMeal, nibblePile:nibblePile, serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
     stockLabel:stockLabel, takeFromGround:takeFromGround,

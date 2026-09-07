@@ -419,3 +419,97 @@ test('ADR-42 colonyTick: 无人订阅时生产跳照跑', () => {
   try { APH.ColonyTick.run(); }             // 不抛错即通过
   finally { APH.state = prev; }
 });
+
+/* ---------- ADR-43: 访客系统与绘制层独立成模块 ---------- */
+
+test('ADR-43 visitors: 招募成功发 rosterChanged, 实体同步交给订阅者', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 500, px: 100, py: 100,
+    colony: { buildings: [{ id: 'bl_house', x: 50, y: 50, lv: 1 }] }, entities: [],
+    war: {}, meta: { residents: [], res: { food: 50 }, residentSeq: 0, bonds: {}, stats: {},
+                     opening: { nightDone: true }, playerNeeds: {} },
+  };
+  const s = APH.state;
+  /* 走真正的生成路径 —— 手搓 profile 会漏字段(enrichBio 要 id/origin) */
+  const vis = APH.Visitors.spawn({ x: 100, y: 100 }, { intent: 'refugee' });
+  vis.impression = 100;
+  let rosterEvents = 0;
+  const h = APH.U.on('rosterChanged', () => rosterEvents++);
+  try {
+    const before = s.meta.residents.length;
+    APH.Visitors.tryRecruit(vis, () => 0);       // 固定 rng 逼出成功分支
+    if (s.meta.residents.length <= before)
+      throw new Error('印象拉满 + 有空床 + 有粮, 应该招得进来');
+    if (rosterEvents !== 1)
+      throw new Error('招募成功应发一次 rosterChanged, got ' + rosterEvents);
+    if (!vis.dead) throw new Error('招进来之后过客实体应退场');
+  } finally { APH.U.off('rosterChanged', h); APH.state = prev; }
+});
+
+test('ADR-43 visitors: 粮食不足时请客失败并说明原因', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 500, colony: { buildings: [] }, entities: [],
+    war: {}, meta: { residents: [{ id: 'r1', name: '老李', mood: 50 }], res: { food: 0 },
+                     bonds: {}, stats: {}, playerNeeds: {} },
+  };
+  const notices = [];
+  const h = APH.U.on('notice', p => notices.push(p.text));
+  try {
+    const ent = { type: APH.CFG.entType.RESIDENT, rid: 'r1', x: 0, y: 0 };
+    APH.Visitors.offerMealToResident(ent);
+    if (!notices.some(t => t.indexOf('粮食不足') >= 0))
+      throw new Error('没粮请客应给出原因, 实得: ' + JSON.stringify(notices));
+  } finally { APH.U.off('notice', h); APH.state = prev; }
+});
+
+test('ADR-43 visitors: 对视图零依赖 —— 没有订阅者也不炸', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 500, colony: { buildings: [] }, entities: [],
+    war: {}, meta: { residents: [], res: {}, bonds: {}, stats: {},
+                     opening: { nightDone: true }, playerNeeds: {} },
+  };
+  try {
+    APH.Visitors.update(0.5);
+    APH.Visitors.count();
+    APH.Visitors.tryFirstNight();
+  } finally { APH.state = prev; }
+});
+
+test('ADR-43 draw: 绘制层是纯输出 —— 画一遍不改 state', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 10, px: 0, py: 0, camX: 0, camY: 0,
+    selectedRid: null, entities: [], parts: [], designations: {},
+    colony: { buildings: [] }, war: {}, meta: { residents: [], res: {}, playerNeeds: {} },
+  };
+  try {
+    const before = JSON.stringify(APH.state);
+    /* 无 canvas 时这些函数应安静返回, 且绝不改 state */
+    APH.Draw.selectedRing(10);
+    APH.Draw.zones();
+    APH.Draw.orderDragBox();
+    APH.Draw.pawnDragBox();
+    if (JSON.stringify(APH.state) !== before)
+      throw new Error('绘制层不得改动 state');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-43 ent: selectedPawn 只认活着的居民实体', () => {
+  const prev = APH.state;
+  const T = APH.CFG.entType;
+  APH.state = { selectedRid: 'r1', entities: [
+    { type: T.RESIDENT, rid: 'r1', dead: true },
+    { type: T.VISITOR,  rid: 'r1' },
+  ] };
+  try {
+    if (APH.Ent.selectedPawn() !== null) throw new Error('死了的/不是居民的都不算');
+    APH.state.entities.push({ type: T.RESIDENT, rid: 'r1', name: '活的' });
+    const got = APH.Ent.selectedPawn();
+    if (!got || got.name !== '活的') throw new Error('应找到活着的那个');
+    APH.state.selectedRid = null;
+    if (APH.Ent.selectedPawn() !== null) throw new Error('没选中时应为 null');
+  } finally { APH.state = prev; }
+});

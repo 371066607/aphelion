@@ -37,7 +37,7 @@ global.test = test;
 
 /* ---- 加载被测模块(顺序同 build.py, 不含 DOM 依赖模块) ---- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'input.js', 'humanoid.js', 'save.js', 'opening.js', 'planet.js', 'combat.js', 'entities.js', 'colony.js', 'rivals.js', 'events.js', 'nav.js', 'weather.js', 'residents.js', 'alerts.js', 'colonytick.js', 'sprites.js', 'llm.js', 'hints.js']) {
+for (const f of ['config.js', 'utils.js', 'input.js', 'humanoid.js', 'save.js', 'opening.js', 'planet.js', 'combat.js', 'entities.js', 'colony.js', 'rivals.js', 'events.js', 'nav.js', 'weather.js', 'residents.js', 'alerts.js', 'visitors.js', 'colonytick.js', 'draw.js', 'sprites.js', 'llm.js', 'hints.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 

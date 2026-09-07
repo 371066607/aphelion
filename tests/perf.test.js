@@ -35,7 +35,7 @@ const SRC=path.join(__dirname,'..','src');
 const SKIP_MODULES = ['opening.js', 'input.js'];
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','nav.js','weather.js','residents.js','alerts.js','combat.js',
-                'world.js','entities.js','colonytick.js','sfx.js','sprites.js','ui.js','hints.js','main.js']){
+                'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','hints.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 

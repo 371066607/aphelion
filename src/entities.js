@@ -1532,7 +1532,18 @@ APH.Ent = (function(){
   }
 
   /* 建筑绘制(殖民地/远征通用) */
+  /* ADR-43: 当前选中的小人实体。原先住在 main.js, 可它就是一次实体查找 ——
+     绘制层与输入层都要问这个问题, 谁都不该为此认识 main。 */
+  function selectedPawn(){
+    var s=(window.APH&&APH.state)||null;
+    if(!s || !s.selectedRid) return null;
+    return (s.entities||[]).find(function(en){
+      return en && en.type===T.RESIDENT && !en.dead && (en.rid||en.id)===s.selectedRid;
+    }) || null;
+  }
+
   return {
+    selectedPawn:selectedPawn,
     bindCtx:bindCtx,
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
