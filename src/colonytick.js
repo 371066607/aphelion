@@ -87,43 +87,9 @@ APH.ColonyTick = (function(){
       }
     });
 
-    if(m.playerNeeds && s.scene === 'home'){
-      var pRoom = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:s.px, y:s.py}, T9_rooms) : null;
-      var pTemp = (pRoom && pRoom.temp != null) ? pRoom.temp : ambT;
-      var pNearFire = (campfire && U.dst(s.px, s.py, campfire.x, campfire.y) <= 50);
-      var pSuit = (s.carry && s.carry.suit) ? (CFG.items && CFG.items[s.carry.suit]) : null;
-      APH.Res.thermalStressTick(m.playerNeeds, pTemp, pSuit, 30, pNearFire);
-    }
-    if(APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(m);
-    /* 殖民地优先 T1: 指挥官的心情与居民走同一条路(ADR-31 念头驱动)。
-       在此之前 playerNeeds 根本没有 mood —— 检查器给指挥官看的念头面板
-       是纯展示, 现在它同样在推动一个真数字。 */
-    if(m.playerNeeds && s.scene==='home' && APH.Res.moodFromThoughts){
-      thEnv.self = null; thEnv.residents = null; thEnv.bonds = null;
-      APH.Res.moodFromThoughts(m.playerNeeds, APH.Res.thoughtCtxAt(s.px, s.py, thEnv));
-    }
-    if(APH.Res.homeFoodTick && m.playerNeeds){
-      m.playerNeeds.food = APH.Res.homeFoodTick(m.playerNeeds.food, s.scene);
-    }
-    if(APH.Res.playerRestTick && m.playerNeeds){
-      /* #66 床边睡眠: 综合精力结算(睡眠恢复/清醒衰减, 委托 homeRestTick) */
-      /* #70 医疗舱躺下: hasBed 含医疗舱 — 舱内躺卧按床速恢复(≠#67 地铺 18) */
-      APH.Res.playerRestTick(m.playerNeeds, s.scene, !!s.nearBed || !!s.nearClinic);
-    }
-    if(m.playerNeeds && s.scene==='home'){
-      var recDrain=(CFG.residents&&CFG.residents.recreationDrain!=null)?CFG.residents.recreationDrain:5;
-      var rec0=m.playerNeeds.recreation!=null?m.playerNeeds.recreation:80;
-      m.playerNeeds.recreation=Math.max(0, rec0-recDrain);
-    }
-    if(APH.Res.homeIllnessTick && m.playerNeeds){
-      m.playerNeeds.illness = APH.Res.homeIllnessTick(m.playerNeeds.illness, s.scene);
-    }
-    /* P1b 玩家暴露(#93): 极端天气室外累积(装备减免)/室内+房间消退; 远征不结算 */
-    if(APH.Res.playerExposureTick && m.playerNeeds && s.scene==='home'){
-      APH.Res.playerExposureTick(m.playerNeeds,
-        APH.Res.shelteredFor({x:s.px, y:s.py}, s.colony.buildings, T9_rooms),
-        wxExtreme, wxId);
-    }
+    /* ADR-45: 「指挥官的体温/心情/饱食/精力/娱乐/病情/暴露」整段随化身一起删。
+       这些结算殖民者本来就各有一份(下面的 roster 循环), 玩家不再是其中一员。 */
+
     /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
     m.workPrio=m.workPrio||{};
     m.residents.forEach(function(r){

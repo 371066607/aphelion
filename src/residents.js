@@ -380,6 +380,26 @@ APH.Res = (function(){
     return meta;
   }
 
+  /* ---------- ADR-45: 开局班底 ----------
+     没有主角之后, 零居民 = 什么都不会发生(没人干活、没人接受命令、
+     连「殖民地覆灭」都无从判起)。所以开局必须有人 —— 环世界开局三个人。
+     只在**全新存档**上播种; 老档一个人也不加, 零迁移。 */
+  function seedStartingColonists(meta, seed, n){
+    if(!meta) return [];
+    meta.residents = meta.residents || [];
+    if(meta.residents.length) return meta.residents;      // 已有人, 不动
+    var count = n != null ? n : ((CFG.colony && CFG.colony.startingColonists) || 3);
+    var taken = [];
+    for(var i=0; i<count; i++){
+      meta.residentSeq = (meta.residentSeq || 0) + 1;
+      var r = generate('start'+meta.residentSeq, ((seed||7)*131 + meta.residentSeq*977)>>>0, taken);
+      taken.push(r.name);
+      meta.residents.push(r);
+    }
+    meta.colonyFounded = true;        // 开局就算立过殖民地: 从此归零 = 覆灭
+    return meta.residents;
+  }
+
   /* ---------- #66 玩家床边睡眠/唤醒 (纯函数, #67 累塌/#70 医疗舱可复用) ---------- */
   /* 入睡: 置 isSleeping; 有床时绑定床ID(无则打地铺); 返回 needs。 */
   function setPlayerSleeping(needs, flag, hasBed, bedIdParam){
@@ -2243,6 +2263,7 @@ APH.Res = (function(){
     homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
     setPlayerSleeping:setPlayerSleeping, playerWake:playerWake, playerRestTick:playerRestTick,
     playerDownedTick:playerDownedTick,
+    seedStartingColonists:seedStartingColonists,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     needsMedBed:needsMedBed, clinicBedSpot:clinicBedSpot,

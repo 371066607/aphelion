@@ -1,4 +1,8 @@
-/* hints.test.js — 家园提示层 (ADR-41)
+/* hints.test.js — 家园提示层 (ADR-41 · ADR-45 后)
+   ADR-45 拆掉主角之后, 「站在 X 旁边按 E」那一整档提示随之删除,
+   对应的四条用例也删了 —— 它们测的是不存在的交互。
+   现在提示层只回答两类问题: 场上有谁要你处置 · 下一个目标是什么。 */
+/* 原始说明 (ADR-41)
    提示层原先埋在 main.js 里, node 跑不到, 于是「哪句话该盖过哪句话」
    从来没有用例把关 —— 只能靠人开着游戏站到东西旁边一个个试。
    独立成 APH.Hints 之后, 优先级表可以直接断言。 */
@@ -34,43 +38,8 @@ test('hints: 优先级第一档是物资告急 —— 它连「击倒昏迷」�
   } finally { APH.state = prev; }
 });
 
-test('hints: 物资不告急时, 昏迷压过其余一切', () => {
-  const s = mkState({ nearBed: { x: 1, y: 1 } });
-  s.meta.playerNeeds.downed = true;
-  const prev = APH.state; APH.state = s;
-  try {
-    const h = APH.Hints.forHome(s, env({ needs: { downed: true } }), '');
-    if (!h || h.indexOf('击倒昏迷') !== 0)
-      throw new Error('昏迷应压过床边提示, got ' + h);
-    if (h.indexOf('无人救援') < 0)
-      throw new Error('没人来救时应说明, got ' + h);
-  } finally { APH.state = prev; }
-});
 
-test('hints: 站在发射器旁 —— 通电与否给不同的话', () => {
-  const s = mkState();
-  const prev = APH.state; APH.state = s;
-  try {
-    const tx = { bid: 'bl_transmitter', x: 50, y: 50 };
-    s.colony.buildings = [{ id: 'bl_transmitter', x: 50, y: 50, powered: false }];
-    s.nearTransmitter = tx;
-    let h = APH.Hints.forHome(s, env(), '');
-    if (h.indexOf('未通电') < 0) throw new Error('没电时应说未通电, got ' + h);
-    s.colony.buildings[0].powered = true;
-    h = APH.Hints.forHome(s, env(), '');
-    if (h.indexOf('[E] 呼叫救援') !== 0) throw new Error('通电后应给通关提示, got ' + h);
-  } finally { APH.state = prev; }
-});
 
-test('hints: 交互提示压过天气播报(否则站在东西旁边按不了键)', () => {
-  const s = mkState({ nearBed: { x: 1, y: 1 } });
-  const prev = APH.state; APH.state = s;
-  try {
-    const h = APH.Hints.forHome(s, env({ weatherHint: '☔ 酸雨' }), '');
-    if (h.indexOf('[E] 上床睡觉') !== 0)
-      throw new Error('可交互的东西应压过天气, got ' + h);
-  } finally { APH.state = prev; }
-});
 
 test('hints: 没有可说的就返回目标阶梯, 而不是 null', () => {
   const s = mkState();
@@ -139,27 +108,39 @@ test('hints: 是纯读取 —— 调用前后 state 不变', () => {
   } finally { APH.state = prev; }
 });
 
-test('hints: 饿了 —— 有粮说在路上, 没粮说没粮', () => {
+
+/* ---------- ADR-45: 没有主角之后的提示层 ---------- */
+
+test('hints: 过客在场时提示他值不值得招', () => {
   const s = mkState();
-  s.meta.playerNeeds.food = 10;          // 低于 foodEatBelow
+  s.nearVisitor = { profile: { name:'老张', mainSkill:'sk_build', skills:{sk_build:7}, intent:'refugee' },
+                    impression: 80 };
   const prev = APH.state; APH.state = s;
   try {
     const h = APH.Hints.forHome(s, env(), '');
-    if (h.indexOf('前往进食') < 0)
-      throw new Error('仓里有粮时应说正在前往, got ' + h);
+    if (h.indexOf('老张') < 0) throw new Error('应报出过客名字, got ' + h);
+    if (h.indexOf('印象') < 0) throw new Error('应给出印象值(玩家据此决定招不招)');
+    if (h.indexOf('[E]') >= 0) throw new Error('不该再出现按键提示 —— 没有化身可以走过去按 E');
+  } finally { APH.state = prev; }
+});
 
-    /* 全场无粮。注意 env.quiet 要关掉 —— 否则 shortageBrief 的「食物将尽」
-       会在第一档就把这句盖住, 玩家永远看不到「请标记浆果丛采摘」的具体指路。
-       这条 shadowing 已记进 BACKLOG。 */
-    s.meta.res.food = 0;
-    const h2 = APH.Hints.forHome(s, env({ quiet: false }), '');
-    if (h2.indexOf('没有口粮') < 0)
-      throw new Error('全场无粮时应明说没粮, got ' + h2);
+test('hints: 有人崩溃时提示「派人去安抚」而不是「你走过去安抚」', () => {
+  const s = mkState();
+  s.nearBrokenResident = { resident: { name:'小林', breakType:'break_daze' } };
+  const prev = APH.state; APH.state = s;
+  try {
+    const h = APH.Hints.forHome(s, env(), '');
+    if (h.indexOf('小林') < 0) throw new Error('应报出崩溃者是谁, got ' + h);
+    if (h.indexOf('派人') < 0) throw new Error('应是「派人去」—— 玩家自己没有身体');
+  } finally { APH.state = prev; }
+});
 
-    /* 地上放一堆粮, 话就该变回「正前往进食」 */
-    s.entities.push({ type: APH.CFG.entType.DROPPED, itemId: 'it_food', x: 300, y: 300, n: 5 });
-    const h3 = APH.Hints.forHome(s, env({ quiet: false }), '');
-    if (h3.indexOf('前往进食') < 0)
-      throw new Error('地上有粮时应说正在前往, got ' + h3);
+test('hints: 提示层不再读 playerNeeds(主角已不存在)', () => {
+  const s = mkState();
+  delete s.meta.playerNeeds;                  // 彻底没有这个字段
+  const prev = APH.state; APH.state = s;
+  try {
+    const h = APH.Hints.forHome(s, env(), '');   // 不抛错即通过
+    if (h == null) throw new Error('仍应给出目标提示');
   } finally { APH.state = prev; }
 });

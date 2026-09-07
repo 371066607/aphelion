@@ -513,3 +513,44 @@ test('ADR-43 ent: selectedPawn 只认活着的居民实体', () => {
     if (APH.Ent.selectedPawn() !== null) throw new Error('没选中时应为 null');
   } finally { APH.state = prev; }
 });
+
+/* ---------- ADR-45: 没有主角 ---------- */
+
+test('ADR-45: 开局播种班底 —— 零居民就什么都不会发生', () => {
+  const meta = { residents: [], residentSeq: 0 };
+  const out = APH.Res.seedStartingColonists(meta, 12345);
+  const n = (APH.CFG.colony && APH.CFG.colony.startingColonists) || 3;
+  if (out.length !== n) throw new Error('应播种 ' + n + ' 人, got ' + out.length);
+  const names = out.map(r => r.name);
+  if (new Set(names).size !== names.length) throw new Error('名字应各不相同: ' + names);
+  out.forEach(r => {
+    if (!r.id || !r.skills || !r.mainSkill) throw new Error('班底应是完整档案');
+  });
+  if (!meta.colonyFounded) throw new Error('开局就算立过殖民地 —— 从此归零 = 覆灭');
+});
+
+test('ADR-45: 已有人的存档不再播种(零迁移)', () => {
+  const meta = { residents: [{ id: 'r1', name: '老张' }], residentSeq: 1 };
+  const out = APH.Res.seedStartingColonists(meta, 12345);
+  if (out.length !== 1 || out[0].name !== '老张') throw new Error('老档不得被塞人');
+});
+
+test('ADR-45: 覆灭仍是唯一失败出口, 且开局即已立殖民地', () => {
+  const prev = APH.state;
+  APH.state = {
+    scene: 'home', mode: 'running', clock: 10, entities: [], parts: [],
+    colony: { buildings: [] }, war: {},
+    meta: { residents: [], res: {}, tech: {}, bonds: {}, stats: {} },
+  };
+  try {
+    APH.Res.seedStartingColonists(APH.state.meta, 7);
+    if (APH.ColonyTick.checkFall() !== false) throw new Error('有人活着就不算覆灭');
+    /* 只要还有一个人, 就继续 */
+    APH.state.meta.residents = [APH.state.meta.residents[0]];
+    if (APH.ColonyTick.checkFall() !== false) throw new Error('剩一个人也该继续');
+    APH.state.meta.residents = [];
+    if (APH.ColonyTick.checkFall() !== true) throw new Error('人全没了才是结束');
+    if (APH.state.mode !== 'dead') throw new Error('覆灭应结束本局');
+  } finally { APH.state = prev; }
+});
+

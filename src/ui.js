@@ -27,58 +27,14 @@ APH.UI = (function(){
     renderAlerts();
     var cvEl = $('cv');
     if(cvEl && cvEl.style) cvEl.style.cursor = (s.scene==='home' && s.buildMode) ? 'cell' : '';
-    $('bO2').style.width = U.clamp(s.o2/APH.CFG.player.o2Max*100,0,100)+'%';
-    $('vO2').textContent = Math.round(Math.max(0,s.o2));
-    $('bHP').style.width = U.clamp(s.hp/APH.CFG.player.hpMax*100,0,100)+'%';
-    $('vHP').textContent = Math.round(Math.max(0,s.hp));
+    /* ADR-45: 氧气/生命/饱食/精力/病情/击倒 六条都是「主角这个人」的状态。
+       没有主角之后, HUD 顶部改报殖民地本身: 人口 / 住房上限。 */
+    var pop=(s.meta&&s.meta.residents||[]).length;
+    var cap=(APH.Colony&&APH.Colony.housingCapacity)?APH.Colony.housingCapacity(s.colony&&s.colony.buildings):0;
+    var bPop=$('bPop'), vPop=$('vPop');
+    if(bPop) bPop.style.width = U.clamp(cap?pop/cap*100:0,0,100)+'%';
+    if(vPop) vPop.textContent = pop + (cap? '/'+cap : '');
     var atHome=s.scene==='home';
-    var needs=s.meta && s.meta.playerNeeds;
-    var rowFood=$('rowFood');
-    if(rowFood){
-      rowFood.style.display = atHome ? '' : 'none';
-      if(atHome){
-        var food=(needs && needs.food != null)
-          ? needs.food : ((APH.CFG.player && APH.CFG.player.homeFoodStart) || 80);
-        var bFood=$('bFood'), vFood=$('vFood');
-        if(bFood) bFood.style.width = U.clamp(food,0,100)+'%';
-        if(vFood) vFood.textContent = Math.round(Math.max(0,food));
-      }
-    }
-    var rowRest=$('rowRest');
-    if(rowRest){
-      rowRest.style.display = atHome ? '' : 'none';
-      if(atHome){
-        var rest=(needs && needs.rest != null)
-          ? needs.rest : ((APH.CFG.player && APH.CFG.player.homeRestStart) || 100);
-        var bRest=$('bRest'), vRest=$('vRest');
-        if(bRest) bRest.style.width = U.clamp(rest,0,100)+'%';
-        if(vRest) vRest.textContent = Math.round(Math.max(0,rest));
-      }
-    }
-    var rowIll=$('rowIll');
-    if(rowIll){
-      var ill=(needs && needs.illness != null) ? needs.illness : 0;
-      var showIll=atHome && ill>0;
-      rowIll.style.display = showIll ? '' : 'none';
-      if(showIll){
-        var bIll=$('bIll'), vIll=$('vIll');
-        if(bIll) bIll.style.width = U.clamp(ill,0,100)+'%';
-        if(vIll) vIll.textContent = Math.round(Math.max(0,ill));
-      }
-    }
-    /* #72 家园击倒: 家园才显示击倒倒计时条 */
-    var rowDowned=$('rowDowned');
-    if(rowDowned){
-      var showDowned = atHome && !!(needs && needs.downed);
-      rowDowned.style.display = showDowned ? '' : 'none';
-      if(showDowned){
-        var downedMax=(APH.CFG.player && APH.CFG.player.downedTime != null) ? APH.CFG.player.downedTime : 90;
-        var downedT=(needs.downT != null) ? needs.downT : downedMax;
-        var bDown=$('bDown'), vDown=$('vDown');
-        if(bDown) bDown.style.width = U.clamp(downedT/downedMax*100,0,100)+'%';
-        if(vDown) vDown.textContent = Math.ceil(Math.max(0,downedT));
-      }
-    }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);
@@ -123,7 +79,7 @@ APH.UI = (function(){
     /* P1b 暴露警示: >50 边缘红雾(与氧气低共用 vig, 取更强) */
     var expVig=0;
     try{
-      var exN2=(s.meta&&s.meta.playerNeeds&&s.meta.playerNeeds.exposure)||0;
+      var exN2=worstExposure(s);
       if(exN2>50) expVig=Math.min(.6, (exN2-50)/50*.6);
     }catch(eV){ /* 静默 */ }
     vig.style.opacity = Math.max(s.o2<25 ? (1-s.o2/25)*.85 : 0, expVig);
@@ -182,9 +138,9 @@ APH.UI = (function(){
         try{
           var exRow=exposureRow();
           if(exRow){
-            var exN=(s.meta&&s.meta.playerNeeds&&s.meta.playerNeeds.exposure)||0;
+            var exN=worstExposure(s);
             if(exN>0.5){
-              var exTxt='☣ 暴露 '+Math.round(exN)+
+              var exTxt='☣ 有人暴露 '+Math.round(exN)+
                 (exN>=80?' · 移动减速!':(exN>=50?' · 警惕!':''));
               if(exRow.textContent!==undefined) exRow.textContent=exTxt;
               exRow.style.display='';
@@ -256,7 +212,18 @@ APH.UI = (function(){
     return rowPw;
   }
 
-  /* P1b 玩家暴露行(懒建一次): 第六生存条 (值源 meta.playerNeeds.exposure) */
+  /* ADR-45: 暴露曾是主角一个人的读数。它对殖民地仍然有意义 ——
+     现在报「暴露最严重的那位殖民者」, 让玩家知道该把谁叫回屋里。 */
+  function worstExposure(s){
+    var worst=0;
+    ((s&&s.meta&&s.meta.residents)||[]).forEach(function(r){
+      var v=(r&&r.exposure)||0;
+      if(v>worst) worst=v;
+    });
+    return worst;
+  }
+
+  /* 暴露行(懒建一次) */
   var wxRowCache3=null;
   function exposureRow(){
     if(wxRowCache3) return wxRowCache3;
@@ -297,8 +264,8 @@ APH.UI = (function(){
 
   /* ---------- 发现卡片 ---------- */
   var cardT=null;
-  /* kind: 卡片头那行小字。缺省是发现卡的「异常已录入数据库」——
-     ADR-44 的指挥权交接复用这张卡, 但它不是一条异常记录。 */
+  /* kind: 卡片头那行小字。缺省是发现卡的「异常已录入数据库」;
+     别的场合(不是异常记录的)传自己的抬头。 */
   function showCard(name,lore,kind){
     var k=$('dcKind'); if(k) k.textContent = kind || '◈ 异常已录入数据库';
     $('dcName').textContent=name; $('dcLore').textContent=lore;
@@ -1492,26 +1459,8 @@ APH.UI = (function(){
         '<div>' + col.name + '</div></td>';
     });
     html += '</tr>';
-    /* ADR-28: 玩家自身作为命令表首行（环世界核心：玩家也是小人） */
-    var playerRow = '<tr><td style="padding:4px 10px;color:#59d9ff;font-weight:700;font-size:12px;white-space:nowrap">' +
-      '⭐ 指挥官(你)</td>';
-    var pPrio = m.playerPrio || (m.playerPrio = {});
-    cols.forEach(function(col){
-      var v = pPrio[col.key] != null ? pPrio[col.key] : 2;
-      var bg = v === 0 ? RW_PRIO_BG[0] : RW_PRIO_BG[v];
-      var tx = v === 0 ? RW_PRIO_TX[0] : RW_PRIO_TX[v];
-      var label = v === 0 ? '✕' : String(v);
-      playerRow += '<td data-prio-r="player" data-prio-c="' + col.key + '" style="padding:4px 0;text-align:center;cursor:pointer;' +
-        'min-width:52px;border-radius:8px;transition:all .15s;' +
-        'background:' + bg + ';color:' + tx + ';' +
-        'border:2px solid ' + (v===0 ? '#1a2334' : 'rgba(89,217,255,.3)') + ';' +
-        (v === 0 ? 'opacity:.45;' : '') + '" ' +
-        'onmouseover="this.style.borderColor=\'#ffc857\'" ' +
-        'onmouseout="this.style.borderColor=\'' + (v===0 ? '#1a2334' : 'rgba(89,217,255,.3)') + '\'"' +
-        ' title="指挥官 · ' + col.name + ' · 优先级 ' + v + ' · 点击切换">' +
-        '<div style="font-size:18px;font-weight:800;line-height:1">' + label + '</div></td>';
-    });
-    html += playerRow + '</tr>';
+    /* ADR-45: 优先级表原先有一行「⭐ 指挥官(你)」——
+       环世界的核心其实是「玩家不是小人」, 表里只该有殖民者。 */
     (m.residents || []).forEach(function(r, ri){
       html += '<tr><td style="padding:4px 10px;color:#f7f3df;font-weight:700;font-size:12px;white-space:nowrap">' +
         '<span style="color:#8fa3cc;font-size:10px">' + (ri+1) + '.</span> ' + esc(r.name) + '</td>';
@@ -1573,31 +1522,7 @@ APH.UI = (function(){
     var rp = document.getElementById('resPop'); if(rp) rp.textContent = popCount + '/' + housingCap();
     var html = prioGridHtml(m);
 
-    /* 1. 指挥官专属角色卡 (ADR-29: 玩家小人也是殖民地首位成员) */
-    var pNeeds = m.playerNeeds || {};
-    var pHp = Math.max(0, Math.min(100, Math.round(s.hp != null ? s.hp : 100)));
-    var pFood = Math.max(0, Math.min(100, Math.round(pNeeds.food != null ? pNeeds.food : 80)));
-    var pRest = Math.max(0, Math.min(100, Math.round(pNeeds.rest != null ? pNeeds.rest : 100)));
-    var pO2 = Math.max(0, Math.min(100, Math.round(s.o2 != null ? s.o2 : 100)));
-    var pIllness = Math.round(pNeeds.illness || 0);
-    var pStatusTxt = s.playerDrafted ? '<span style="color:#ff4d4d;font-weight:700">[战备征召]</span>' : (pNeeds.downed ? '<span style="color:#ff4757">[昏迷击倒]</span>' : (pNeeds.isSleeping ? '<span style="color:#b39dff">[睡眠中]</span>' : '<span style="color:#7dffab">[全能自治]</span>'));
-
-    var pSkHtml = (APH.Res.SKILLS || []).map(function(sk){
-      var v = (m.playerSkills && m.playerSkills[sk]) || (sk === 'sk_build' ? 6 : (sk === 'sk_farm' ? 6 : (sk === 'sk_lore' ? 6 : 5)));
-      return '<span style="color:#59d9ff">' + (APH.Res.SKILL_NAMES[sk] || sk) + v + '</span>';
-    }).join(' · ');
-
-    html += '<div style="border:1.5px solid rgba(89,217,255,.5);border-radius:10px;padding:12px 16px;margin-bottom:12px;background:rgba(18,34,55,.85);box-shadow:0 0 12px rgba(89,217,255,.15)">' +
-      '<b style="font-size:14px;color:#59d9ff">⭐ 指挥官 (你)</b> ' + pStatusTxt +
-      ' <span style="color:#8fa3cc;font-size:11px">全能拓荒者 · 基地领袖 · 探索队长 · <span style="color:#7dffab">工作效率 1.25</span></span><br>' +
-      '<span style="color:#8fa3cc;font-size:11px">' + pSkHtml + '</span><br>' +
-      '<div style="margin-top:6px;font-size:11px">' +
-      '生命 ' + foodBar(pHp) + '&nbsp;&nbsp;饱食 ' + foodBar(pFood) +
-      '&nbsp;&nbsp;精力 ' + foodBar(pRest) + (pNeeds.isSleeping ? ' <span style="color:#8fd4ff">[睡眠]</span>' : '') +
-      '&nbsp;&nbsp;氧气 ' + foodBar(pO2) +
-      (pIllness > 0 ? ('&nbsp;&nbsp;<span style="color:#ff6d7a">病情 ' + sickBar(pIllness) + '</span>') : '') +
-      '</div>' +
-    '</div>';
+    /* ADR-45: 指挥官卡已删 —— 没有主角, 面板里只有殖民者。 */
 
     if(!m.residents || !m.residents.length){
       html += '<div style="color:#5d6f96;margin:16px 0 24px;text-align:center;font-size:12px">' +
@@ -1762,44 +1687,23 @@ APH.UI = (function(){
   function inspectorHtml(target, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var CFG = (window.APH && window.APH.CFG) || {};
+    /* ADR-45: 没有主角 —— 没选中任何东西时, 检查器给殖民地概览而不是「你」。 */
     if(!target || target.type === 'player'){
-      /* 1. 指挥官(玩家) */
-      var m = s.meta || {};
-      var needs = m.playerNeeds || {};
-      var hp = Math.round(s.hp != null ? s.hp : 100);
-      var food = Math.round(needs.food != null ? needs.food : 80);
-      var rest = Math.round(needs.rest != null ? needs.rest : 100);
-      var o2 = Math.round(s.o2 != null ? s.o2 : 100);
-      var statusTxt = needs.downed ? '昏迷击倒' : (needs.isSleeping ? '睡眠休息中' : (s.moving ? '行进中' : '清醒 · 待命'));
-      var statusCol = needs.downed ? '#ff4d4d' : (needs.isSleeping ? '#b39dff' : '#7dffab');
-
-      var rec = Math.round(needs.recreation != null ? needs.recreation : 80);
-      var tab = s.inspTab || 'needs';
-      var cmds = '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'togglePlayerDraft\')">'+(s.playerDrafted?'解除征召':'征召')+'</button>';
-      var h = inspHead('🧑‍🚀', '⭐ 指挥官(你)', statusTxt + ' · 生命 '+hp+' · 氧 '+o2, statusCol, cmds);
-      h += needBarsHtml(food, rest, rec);
-      h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
-      h += '<div class="insp-body">';
-      if(tab==='thoughts'){
-        h += thoughtsHtml({ food:needs.food, rest:needs.rest, recreation:needs.recreation, isSleeping:needs.isSleeping, bedId:needs.bedId, downed:needs.downed, illness:needs.illness }, thoughtCtxOf(s));
-      } else if(tab==='health'){
-        h += '<div>生命 '+hp+' / 氧 '+o2+(needs.illness?' · 病情 '+Math.round(needs.illness):'')+'</div>';
-      } else if(tab==='sched'){
-        h += scheduleRowHtml(m.playerSchedule, s);
-      } else {
-        h += '<div style="color:#9a8c70">未征召自己过日子。征召后点地面走路（不用右键）</div>';
-      }
-      if((m.prisoners||[]).length){
-        h += '<div style="margin-top:6px;color:#9a8c70">囚犯（非奴隶）</div>';
-        (m.prisoners||[]).forEach(function(p){
-          h += '<div>'+ (p.name||'俘虏') +
-            ' <button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'releasePrisoner\',\''+p.id+'\')">释放</button></div>';
-        });
-      }
-      h += '</div>';
-      return h;
+      var m0 = s.meta || {};
+      var pop = (m0.residents || []).length;
+      var capH = (APH.Colony && APH.Colony.housingCapacity)
+        ? APH.Colony.housingCapacity(s.colony && s.colony.buildings) : 0;
+      var goal = (APH.Colony && APH.Colony.colonyGoal)
+        ? APH.Colony.colonyGoal(m0, (s.colony && s.colony.buildings) || []) : null;
+      var hh = inspHead('🏠', '新曙光殖民地',
+        '殖民者 ' + pop + (capH ? ' / 床位 ' + capH : '') + ' · 研究 ' + (m0.research || 0),
+        '#7dffab', '');
+      hh += '<div class="insp-body">';
+      hh += '<div style="color:#c5e3f6">' + (goal && goal.text ? '◈ ' + goal.text : '殖民地运转正常') + '</div>';
+      hh += '<div style="color:#8fa3cc;font-size:11px;margin-top:6px">点选一个殖民者下达命令</div>';
+      hh += '</div>';
+      return hh;
     }
-
     if(target.type === 'resident'){
       /* 2. 居民(Pawn) */
       var ent = target.entity || target;
@@ -1871,6 +1775,21 @@ APH.UI = (function(){
       h += '<div style="padding:6px 10px"><div class="insp-need"><span class="insp-need-lab">耐久</span><div class="insp-need-track"><div class="insp-need-fill" style="width:'+pct+'%;background:#6bcf8e"></div></div><span class="insp-need-val">'+Math.round(hp)+'</span></div></div>';
       if(bid==='bl_kitchen'||bid==='bl_campfire'||bid==='bl_workshop'){
         h += '<div class="insp-body">' + billsHtml(rec || be, bid) + '</div>';
+      }
+      /* ADR-45: 终局出口。原先是「走到发射器旁按 E」—— 没有化身之后那条路断了,
+         整个游戏会失去唯一的胜利出口。现在它是发射器自己的一个命令。 */
+      if(bid==='bl_transmitter'){
+        var powered = !(rec && rec.powered === false);
+        h += '<div class="insp-body">';
+        if(powered){
+          h += '<button type="button" onclick="APH.UI.cmd(\'callRescue\')" ' +
+               'style="font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid rgba(125,255,171,.6);' +
+               'background:rgba(125,255,171,.15);color:#c8ffd8;cursor:pointer;font-weight:700">' +
+               '📡 呼叫救援 · 离开这颗星球</button>';
+        }else{
+          h += '<div style="color:#ff9a9a;font-size:11px">未通电 —— 接入导线并保证发电充足</div>';
+        }
+        h += '</div>';
       }
       return h;
     }
@@ -1953,21 +1872,7 @@ APH.UI = (function(){
     var curRid = s.selectedRid;
     var h = '';
 
-    /* 1. 指挥官卡片 */
-    var isPlayerSel = curSel.type === 'player' && !curRid;
-    var pDrafted = !!s.playerDrafted;
-    var pHp = Math.max(0, Math.min(100, Math.round(s.hp != null ? s.hp : 100)));
-    var pHpCol = pHp > 50 ? '#7dffab' : (pHp > 25 ? '#ffc857' : '#ff4d4d');
-    var pCls = 'aph-colonist-card' + (isPlayerSel ? ' selected' : '') + (pDrafted ? ' drafted' : '');
-    var pBadge = pDrafted ? '<div class="aph-card-badge" title="已征召战备">⚔</div>' : '';
-
-    h += '<div class="' + pCls + '" data-pawn-id="player" title="指挥官 · 单击选中, 双击镜头聚焦">' +
-      pBadge +
-      '<div style="font-size:16px;line-height:1">🧑‍🚀</div>' +
-      '<div style="font-size:10px;font-weight:700;color:#59d9ff;margin-top:2px">你</div>' +
-      '<div class="aph-card-bar"><div class="aph-card-fill" style="width:' + pHp + '%;background:' + pHpCol + '"></div></div>' +
-    '</div>';
-
+    /* ADR-45: 头像条只列殖民者 —— 玩家没有化身。 */
     /* 2. 居民卡片列表 */
     list.forEach(function(r){
       var ent = (s.entities || []).find(function(e){ return e && (e.rid === r.id || e.id === r.id); });
@@ -2048,17 +1953,6 @@ APH.UI = (function(){
   U.on('hint',   function(p){ setHint((p && p.text) || ''); });
   U.on('death',  function(p){ if(p) showDeath(p.reason, p.stats || {}); });
 
-  /* ADR-44: 指挥权交接是这局里最重的一刻之一 —— 一行飘字撑不住。
-     复用发现卡: 上面写谁倒下了, 下面写谁接过来。 */
-  U.on('commanderSucceeded', function(p){
-    if(!p || !p.fallen || !p.successor) return;
-    var ord = ['初代','第二任','第三任','第四任','第五任'][p.successor.succeeded] || ('第'+p.successor.succeeded+'任');
-    floatText('⭐ ' + p.successor.name + ' 接过了指挥权', '#ffc857');
-    showCard(p.fallen.name + ' 倒下了',
-      (p.reason || '') + '\n' +
-      p.successor.name + '（' + (p.successor.origin || '殖民地') + '）成为' + ord + '指挥官。\n' +
-      '殖民地还在。', '◈ 指挥权交接');
-  });
   /* ADR-42: 生产跳可能解锁科技/改变研究点, 科技树开着就重绘。
      以前由 main 在生产跳末尾直接调 —— 界面刷新不该是模拟的一环。 */
   U.on('productionTick', function(){ if(isOpen('techMap')) renderTechMap(); });

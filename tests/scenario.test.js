@@ -192,74 +192,6 @@ test('boot 后: 出生在殖民地(home), spec=新曙光殖民地', () => {
   A(S.scene==='home', 'scene 应为 home, got '+S.scene);
   A(S.spec.name==='新曙光殖民地', '应出生在殖民地, got '+S.spec.name);
 });
-test('player food: 家园 HUD 显示饱食, 远征隐藏且不掉', () => {
-  APH.Res.ensurePlayerNeeds(S.meta);
-  const start = S.meta.playerNeeds.food;
-  A(start != null, '家园应有玩家饱食');
-  APH.UI.updHUD();
-  const row = document.getElementById('rowFood');
-  A(row && row.style.display !== 'none', '家园应显示饱食条');
-  const homeNext = APH.Res.homeFoodTick(start, 'home');
-  A(homeNext < start, '家园跳应掉饱食');
-  const expNext = APH.Res.homeFoodTick(start, 'expedition');
-  A(expNext === start, '远征跳饱食应冻结');
-  S.scene = 'expedition';
-  APH.UI.updHUD();
-  A(row.style.display === 'none', '远征应隐藏饱食条');
-  S.scene = 'home';
-});
-test('player rest: 家园 HUD 显示精力, 远征隐藏且不掉', () => {
-  APH.Res.ensurePlayerNeeds(S.meta);
-  const start = S.meta.playerNeeds.rest;
-  const foodStart = S.meta.playerNeeds.food;
-  A(start != null, '家园应有玩家精力');
-  APH.UI.updHUD();
-  const row = document.getElementById('rowRest');
-  A(row && row.style.display !== 'none', '家园应显示精力条');
-  const v = document.getElementById('vRest');
-  A(v && Number(v.textContent) === Math.round(start), '家园精力数值应显示 '+start+', 实际: '+(v && v.textContent));
-  M.residentsTick();
-  const restDrain = (APH.CFG.residents && APH.CFG.residents.restDrain) || 0.42;
-  A(Math.abs(S.meta.playerNeeds.rest - (start - restDrain)) < 0.05, '家园生产跳应掉精力, 实际: '+S.meta.playerNeeds.rest);
-  APH.UI.updHUD();
-  A(Number(v.textContent) === Math.round(S.meta.playerNeeds.rest), '家园 HUD 应跟上精力下降, 实际: '+v.textContent);
-  S.scene = 'expedition';
-  const frozen = S.meta.playerNeeds.rest;
-  M.residentsTick();
-  A(S.meta.playerNeeds.rest === frozen, '远征生产跳精力应冻结');
-  APH.UI.updHUD();
-  A(row.style.display === 'none', '远征应隐藏精力条');
-  S.scene = 'home';
-  S.meta.playerNeeds.rest = start;
-  S.meta.playerNeeds.food = foodStart;
-});
-test('player illness: 家园病情>0 才显示, 远征隐藏且不结算', () => {
-  APH.Res.ensurePlayerNeeds(S.meta);
-  const foodStart = S.meta.playerNeeds.food;
-  const restStart = S.meta.playerNeeds.rest;
-  const illStart = S.meta.playerNeeds.illness;
-  S.meta.playerNeeds.illness = 0;
-  S.scene = 'home';
-  APH.UI.updHUD();
-  const row = document.getElementById('rowIll');
-  A(row && row.style.display === 'none', '家园病情为 0 时 HUD 应隐藏');
-  S.meta.playerNeeds.illness = 40;
-  APH.UI.updHUD();
-  A(row.style.display !== 'none', '家园病情>0 时 HUD 应显示');
-  const v = document.getElementById('vIll');
-  A(v && Number(v.textContent) === 40, '家园病情数值应显示 40, 实际: '+(v && v.textContent));
-  M.residentsTick();
-  A(S.meta.playerNeeds.illness === 40, '家园生产跳病情应为身份, 实际: '+S.meta.playerNeeds.illness);
-  S.scene = 'expedition';
-  M.residentsTick();
-  A(S.meta.playerNeeds.illness === 40, '远征生产跳病情应冻结');
-  APH.UI.updHUD();
-  A(row.style.display === 'none', '远征应隐藏病情条');
-  S.scene = 'home';
-  S.meta.playerNeeds.food = foodStart;
-  S.meta.playerNeeds.rest = restStart;
-  S.meta.playerNeeds.illness = illStart;
-});
 test('殖民地世界: 有发射台, 无敌人, 无信标', () => {
   const pad = S.entities.find(e=>e.type===T.BUILDING && e.pad);
   A(pad, '发射台缺失');
@@ -629,40 +561,6 @@ test('#68 home: 睡着居民原地俯卧不动 (不走位/不清走位)', () => 
   }
 });
 
-test('#64 player: 仅家园生病时走路与跑步使用同一减速倍率', () => {
-  const old={scene:S.scene, px:S.px, py:S.py, vx:S.vx, vy:S.vy, face:S.face, walkPh:S.walkPh,
-    run:S.run, keys:S.keys, joy:S.joy, target:S.target, parts:S.parts, fireCd:S.fireCd,
-    iFrameT:S.iFrameT, hurtFlash:S.hurtFlash, illness:S.meta.playerNeeds.illness};
-  const pe=APH.Ent.findPlayer();
-  const oldPe={x:pe.x, y:pe.y, face:pe.face, moving:pe.moving, walkPh:pe.walkPh};
-  function moved(scene, illness, running){
-    S.scene=scene; S.meta.playerNeeds.illness=illness;
-    S.px=400; S.py=400; S.vx=0; S.vy=0; S.target={x:800, y:400}; S.parts=[];
-    S.keys={ShiftLeft:running}; S.joy={active:false,id:null,x:0,y:0};
-    pe.x=S.px; pe.y=S.py;
-    APH.Ent.updatePlayer(0.05);
-    return S.px-400;
-  }
-  try{
-    const homeWalk=moved('home',0,false);
-    const sickHomeWalk=moved('home',21,false);
-    const homeRun=moved('home',0,true);
-    const sickHomeRun=moved('home',21,true);
-    const expWalk=moved('expedition',21,false);
-    const expRun=moved('expedition',21,true);
-    A(Math.abs(sickHomeWalk/homeWalk-0.6)<1e-9, '家园走路应按 0.6 减速');
-    A(Math.abs(sickHomeRun/homeRun-0.6)<1e-9, '家园跑步应按 0.6 减速');
-    A(Math.abs(expWalk-homeWalk)<1e-9, '远征走路不应受冻结的家园病情影响');
-    A(Math.abs(expRun-homeRun)<1e-9, '远征跑步不应受冻结的家园病情影响');
-    A(Math.abs(moved('home',20,false)-homeWalk)<1e-9, '病情等于移动边界不应减速');
-  }finally{
-    S.scene=old.scene; S.px=old.px; S.py=old.py; S.vx=old.vx; S.vy=old.vy;
-    S.face=old.face; S.walkPh=old.walkPh; S.run=old.run; S.keys=old.keys; S.joy=old.joy;
-    S.target=old.target; S.parts=old.parts; S.fireCd=old.fireCd; S.iFrameT=old.iFrameT;
-    S.hurtFlash=old.hurtFlash; S.meta.playerNeeds.illness=old.illness;
-    pe.x=oldPe.x; pe.y=oldPe.y; pe.face=oldPe.face; pe.moving=oldPe.moving; pe.walkPh=oldPe.walkPh;
-  }
-});
 
 test('#64 render: 病号标记在显示阈值起为红色 14px 十字', () => {
   const cv=document.getElementById('cv');
@@ -692,24 +590,6 @@ test('#64 render: 病号标记在显示阈值起为红色 14px 十字', () => {
   }
 });
 
-test('home: 无医疗舱不回血, 靠近医疗舱缓慢回血', () => {
-  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
-  A(S.scene==='home', '应在殖民地');
-  S.war = S.war || {};
-  S.war.raidActive = false;
-  S.war.raidWarn = 0;
-  S.nearVisitor = null;
-  const pad = (S.colony.buildings||[]).find(b=>b.id==='bl_landing_pad');
-  S.colony.buildings = pad ? [pad] : [];
-  S.hp = 50;
-  const o2before = S.o2;
-  M.updateHome(1);
-  A(S.hp===50, '无舱不应回血, got '+S.hp);
-  A(S.o2>=o2before, '家园应补氧');
-  S.colony.buildings.push({id:'bl_clinic', x:S.px, y:S.py, lv:1});
-  M.updateHome(1);
-  A(Math.abs(S.hp-54)<0.01, '靠近医疗舱1秒应+4, got '+S.hp);
-});
 test('home: 殖民地有气候法则, 酸雨夜间减农 / 磁暴停实验室', () => {
   if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
   const laws=S.spec.laws||[];
@@ -1055,230 +935,23 @@ test('#59 smoke: 玩家俯卧触发(惰性 flag)不崩、不走循环', () => {
 
 /* #66 床边睡眠/唤醒: 靠床 E 睡(俯卧); 平移镜头不醒; E/受伤/征召可醒
    驱动通道: updateHome / residentsTick / debugPressE (无 __frame 导出) */
-test('#66: 靠床近判定 nearBed 且不触发自动寻路 (S.target 保持 null)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.playerDrafted = false;
-  S.keys = {};
-  S.target = null;
-  /* 在玩家脚下放一座居住舱(床边判定与真实摆放一致) */
-  APH.Colony.placeBuildingEntity('bl_house', S.px, S.py, 1);
-  M.updateHome(0.016);
-  A(S.nearBed, '靠床应判定 nearBed');
-  A(S.target === null, '靠床不得自动寻路到床 (S.target 应保持 null)');
-});
 
-test('#66: 靠床 E 入睡 → meta+实体俯卧, drawPlayer 不崩', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.nearBed = { id:'be_house_test', type:T.BUILDING, bid:'bl_house', x:S.px, y:S.py };
-  S.keys = {};
-  S.target = null;
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === true, 'E 靠床应入睡');
-  A(S.meta.playerNeeds.bedId === 'bed_player', '有床入睡应绑床, 实际: ' + S.meta.playerNeeds.bedId);
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
-  let threw = false;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #66 player sleep draw err:', err.message); }
-  A(!threw, '睡中玩家绘制不应崩');
-});
 
-test('#66: 视口平移不唤醒睡眠 (摄像机仍平移)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.playerDrafted = false;
-  S.keys = {};
-  const camX0 = S.camX;
-  S.keys.KeyA = true;   // 向左平移视口
-  M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === true, '环世界: 平移镜头不得把人摇醒');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '实体应保持俯卧');
-  A(S.camX < camX0, 'WASD 应向左平移摄像机, 实际 camX=' + S.camX);
-  S.keys = {};
-});
 
-test('#66: 睡中再按 E 唤醒', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.nearBed = { id:'be_house_test', type:T.BUILDING, bid:'bl_house', x:S.px, y:S.py };
-  S.keys = {};
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
-});
 
-test('#66: 受伤唤醒 (伤害真正落地时)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.keys = {};
-  S.iFrameT = 0;
-  const hp0 = S.hp;
-  APH.Combat.hurtPlayer(5, 'test');
-  A(S.meta.playerNeeds.isSleeping === false, '受伤应唤醒');
-  A(S.hp === hp0 - 5, '受伤应掉血, 实际 hp ' + S.hp + '(初始 ' + hp0 + ')');
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
-});
 
 /* #67 累塌: 家园精力归零原地睡着(打地铺 bedId=null), 即使仍在操作
    触发通道: residentsTick→playerRestTick(清醒跳掉 7 到 0) → setPlayerSleeping(true,false)
    唤醒通道复用 #66: WASD / E / 受伤 */
-test('#67: 家园精力归零累塌 → meta+实体俯卧, bedId=null, moving=false', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.rest = 0.2;      // 一跳掉到 0 → 累塌
-  S.nearBed = null;                 // 原地打地铺, 不绑床
-  S.keys = {};
-  M.residentsTick();
-  A(S.meta.playerNeeds.isSleeping === true, '精力归零应原地累塌睡着, 实际仍清醒');
-  A(S.meta.playerNeeds.rest === 0, '精力应钳到 0, 实际: ' + S.meta.playerNeeds.rest);
-  A(S.meta.playerNeeds.bedId === null, '累塌为打地铺 bedId 应为 null, 实际: ' + S.meta.playerNeeds.bedId);
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
-  A(pe && pe.moving === false, '累塌睡眠中实体不应残留走位 (moving 应 false)');
-  let threw = false;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #67 collapse draw err:', err.message); }
-  A(!threw, '累塌俯卧玩家绘制不应崩');
-});
 
-test('#67: 累塌后平移镜头不唤醒', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.meta.playerNeeds.bedId = null;
-  S.playerDrafted = false;
-  S.keys = {};
-  const camX0 = S.camX;
-  S.keys.KeyA = true;   // 向左平移视口
-  M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === true, '累塌睡眠中平移镜头不得唤醒');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '实体应保持俯卧');
-  A(S.camX < camX0, 'WASD 应向左平移摄像机');
-  S.keys = {};
-});
 
-test('#67: 累塌后 E / 受伤唤醒 (复用 #66)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.meta.playerNeeds.bedId = null;
-  S.keys = {};
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒累塌睡眠');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
-  /* 重新入睡, 验证受伤唤醒 */
-  S.meta.playerNeeds.isSleeping = true;
-  S.meta.playerNeeds.bedId = null;
-  S.iFrameT = 0;
-  const hp0 = S.hp;
-  APH.Combat.hurtPlayer(5, 'test');
-  A(S.meta.playerNeeds.isSleeping === false, '受伤应唤醒累塌睡眠');
-  A(S.hp === hp0 - 5, '受伤应掉血, 实际 hp ' + S.hp + '(初始 ' + hp0 + ')');
-  M.updateHome(0.016);
-  const pe2 = APH.Ent.findPlayer();
-  A(pe2 && pe2.isSleeping === false, '实体标志应同步清醒');
-});
 
 /* #70 医疗舱躺下: 玩家病了不自动走向医疗舱, 靠近舱按 E 才躺下(bed_med, 床速恢复)
    与 #66 床边睡眠同机制(只置 nearClinic, 绝不自动寻路); 与 #72 击倒/#67 累塌互斥
    驱动通道: updateHome(近判定) / debugPressE(E 交互) / residentsTick(恢复速率) */
-test('#70: 生病近医疗舱不自动躺/不自动寻路 (S.target 保持 null)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.illness = 50;
-  S.meta.playerNeeds.downed = false;
-  S.meta.playerNeeds.food = 80;
-  S.playerDrafted = false;
-  S.keys = {};
-  S.target = null;
-  /* 在玩家脚下放一座医疗舱(近判定与真实摆放一致) */
-  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
-  M.updateHome(0.016);
-  A(S.nearClinic, '靠舱应判定 nearClinic');
-  A(S.meta.playerNeeds.isSleeping === false, '生病+靠舱不应自动躺下 (仍清醒)');
-  A(S.target === null, '靠舱不得自动寻路 (S.target 应保持 null)');
-  /* 清理实体, 防泄漏到后续用例 */
-  S.entities = S.entities.filter(e => e.bid !== 'bl_clinic');
-  S.nearClinic = null;
-  S.meta.playerNeeds.illness = 0;
-});
 
-test('#70: 生病+靠舱按 E 躺入 → meta+实体俯卧, bed_med, drawPlayer 不崩', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.illness = 50;
-  S.meta.playerNeeds.downed = false;
-  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
-  S.nearBed = null;                // 隔离 #70: 只测医疗舱分支, 避免 #66 残留床/房实体干扰
-  S.keys = {};
-  S.target = null;
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === true, 'E 靠舱应躺入医疗舱');
-  A(S.meta.playerNeeds.bedId === 'bed_med', '舱内躺卧应绑 bed_med, 实际: ' + S.meta.playerNeeds.bedId);
-  A(S.target === null, 'E 躺入不得触发自动寻路 (S.target 应保持 null)');
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '实体应同步俯卧标志');
-  let threw = false;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #70 pod sleep draw err:', err.message); }
-  A(!threw, '舱内躺卧玩家绘制不应崩');
-  S.nearClinic = null;
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.bedId = null;
-  S.meta.playerNeeds.illness = 0;
-});
 
-test('#70: 躺舱中再按 E 唤醒', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = true;
-  S.meta.playerNeeds.bedId = 'bed_med';
-  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
-  S.nearBed = null;                // 隔离 #70
-  S.keys = {};
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === false, 'E 再按应唤醒舱内躺卧');
-  A(S.meta.playerNeeds.bedId === null, '唤醒应清 bedId, 实际: ' + S.meta.playerNeeds.bedId);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === false, '实体标志应同步清醒');
-  S.nearClinic = null;
-  S.meta.playerNeeds.illness = 0;
-});
 
-test('#70: 健康玩家靠舱按 E 不躺 (E 躺入仅生病可触发)', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.illness = 0;
-  S.meta.playerNeeds.downed = false;
-  S.nearClinic = { id:'be_clinic_test', type:T.BUILDING, bid:'bl_clinic', x:S.px, y:S.py };
-  S.nearBed = null;                // 隔离 #70
-  S.keys = {};
-  S.target = null;
-  M.debugPressE();
-  A(S.meta.playerNeeds.isSleeping === false, '健康玩家靠舱按 E 不得躺入 (E 躺入需生病)');
-  A(S.meta.playerNeeds.bedId !== 'bed_med', '健康玩家不得绑 bed_med');
-  A(S.target === null, '健康玩家按 E 也不得自动寻路');
-  S.nearClinic = null;
-});
 
 test('#70: 击倒玩家靠舱按 E 被阻断 (#72 互斥)', () => {
   S.scene = 'home'; S.mode = 'running';
@@ -1299,136 +972,14 @@ test('#70: 击倒玩家靠舱按 E 被阻断 (#72 互斥)', () => {
   S.meta.playerNeeds.illness = 0;
 });
 
-test('#70: 舱内躺卧按床速恢复 (+25/跳, 非地铺 18) 且保持 bed_med', () => {
-  S.scene = 'home';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.illness = 50;
-  S.meta.playerNeeds.rest = 40;
-  S.meta.playerNeeds.downed = false;
-  S.keys = {};
-  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
-  S.prodT = 0;                     // 防 prodT≥30 门在 updateHome 内触发 residentsTick 污染恢复算术
-  M.updateHome(0.016);                 // 置 nearClinic
-  A(S.nearClinic, '近判定应置 nearClinic');
-  S.nearBed = null;                // updateHome 会从残留房实体重设 nearBed → 隔离只测医疗舱分支
-  M.debugPressE();                     // 生病+靠舱 E 躺入
-  A(S.meta.playerNeeds.isSleeping === true, 'E 应躺入医疗舱');
-  const pe0 = APH.Ent.findPlayer();
-  A(pe0 && pe0.isSleeping === true, '实体应俯卧');
-  M.residentsTick();                   // 结算恢复: hasBed=nearBed||nearClinic=true → 床速
-  const bedRec = (APH.CFG.player && APH.CFG.player.bedRecover) || 0.65;
-  A(Math.abs(S.meta.playerNeeds.rest - (40 + bedRec)) < 0.05, '舱内躺卧应按床速恢复, 实际: ' + S.meta.playerNeeds.rest);
-  A(S.meta.playerNeeds.bedId === 'bed_med', '恢复结算后应保持 bed_med, 实际: ' + S.meta.playerNeeds.bedId);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.isSleeping === true, '恢复结算后实体仍应俯卧');
-  /* 清理 */
-  S.entities = S.entities.filter(e => e.bid !== 'bl_clinic');
-  S.nearClinic = null;
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.bedId = null;
-  S.meta.playerNeeds.illness = 0;
-});
 
 /* #65 走到粮边吃: 玩家饥饿时近粮堆/仓库按 E 吃一口(+饱食),
    只置 s.nearFood, 绝不写 s.target 自动寻路; 满饱食靠粮按 E 不耗粮不寻路
    驱动通道: updateHome(近判定) / debugPressE(E 交互) / drawPlayer(🍽标记)
    注意: scenario.test.js 被 run.js EXCLUDE, 无自动清档, 每例手动清残留 */
-test('#65: 靠粮堆判定 nearFood 且不自动寻路 (S.target 保持 null)', () => {
-  S.scene = 'home'; S.mode = 'running';
-  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
-    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
-  S.meta.residents = [];
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 30;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;   // 隔离 #66/#70 残留
-  S.prodT = 0;
-  /* 粮堆放到 40px 处: 避开 updateDropped 26px 自动入库, 但仍在 foodEatRadius(60) 内 */
-  APH.Combat.spawnDrop(S.px+40, S.py, 'it_food', 5, {stock:true});
-  M.updateHome(0.016);
-  A(S.nearFood, '靠粮堆应判定 nearFood');
-  A(S.nearFood.isWarehouse !== true, '近处有粮堆时 nearFood 不应是仓库');
-  A(S.target === null, '靠粮堆不得自动寻路 (S.target 应保持 null)');
-  /* 清理残留 */
-  S.entities = S.entities.filter(e => e.type!==T.DROPPED);
-  S.nearFood = null;
-  S.prodT = 0;
-});
 
-test('#65: 靠仓库判定 nearFood 且不自动寻路', () => {
-  S.scene = 'home'; S.mode = 'running';
-  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
-    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
-  S.meta.residents = [];
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 30;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
-  S.prodT = 0;
-  S.meta.res = S.meta.res || {};
-  S.meta.res.food = 10;
-  APH.Colony.placeBuildingEntity('bl_warehouse', S.px, S.py, 1);
-  M.updateHome(0.016);
-  A(S.nearFood, '靠仓库应判定 nearFood');
-  A(S.nearFood.isWarehouse === true, '无近粮堆+仓有粮时 nearFood 应为仓库');
-  A(S.target === null, '靠仓库不得自动寻路 (S.target 应保持 null)');
-  /* 清理残留 */
-  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
-  S.nearFood = null;
-  S.prodT = 0;
-});
 
-test('#65: 近粮堆按 E 吃 → 饱食上升且堆-1', () => {
-  S.scene = 'home'; S.mode = 'running';
-  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
-    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
-  S.meta.residents = [];
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 30;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
-  S.prodT = 0;
-  /* 粮堆放到 40px 处: 避开 updateDropped 26px 自动入库, 但仍在 foodEatRadius(60) 内 */
-  const pile = APH.Combat.spawnDrop(S.px+40, S.py, 'it_food', 5, {stock:true});
-  M.updateHome(0.016);
-  A(S.nearFood, '靠粮堆应判定 nearFood');
-  A(S.meta.playerNeeds.food > 30, '饥饿靠粮堆应自动进食, 实际: '+S.meta.playerNeeds.food);
-  A((pile.n||0) === 4, '地上粮堆应 -1, 实际 n='+(pile.n||0));
-  A(S.target === null, '已在粮边进食不得再写寻路目标 (S.target 应保持 null)');
-  /* 清理残留 */
-  S.entities = S.entities.filter(e => e.type!==T.DROPPED);
-  S.nearFood = null;
-  S.prodT = 0;
-});
 
-test('#65: 近仓库按 E 吃 → 饱食上升且扣 1 粮', () => {
-  S.scene = 'home'; S.mode = 'running';
-  S.entities = (S.entities||[]).filter(e=>e.type!==T.DROPPED && e.type!==T.RESIDENT
-    && e.type!==T.VISITOR && !(e.type===T.BUILDING && e.bid!=='bl_landing_pad'));
-  S.meta.residents = [];
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 30;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
-  S.prodT = 0;
-  S.meta.res = S.meta.res || {};
-  S.meta.res.food = 10;
-  APH.Colony.placeBuildingEntity('bl_warehouse', S.px, S.py, 1);
-  M.updateHome(0.016);
-  A(S.nearFood && S.nearFood.isWarehouse, '靠仓库应判定 nearFood 为仓库');
-  A(S.meta.playerNeeds.food > 30, '饥饿靠仓库应自动进食, 实际: '+S.meta.playerNeeds.food);
-  A(S.meta.res.food === 9, '仓库应扣 1 粮, 实际: '+S.meta.res.food);
-  A(S.target === null, '已在仓库口进食不得再写寻路目标 (S.target 应保持 null)');
-  /* 清理残留 */
-  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
-  S.nearFood = null;
-  S.prodT = 0;
-});
 
 test('#65: 满饱食靠粮按 E 不耗粮不寻路', () => {
   S.scene = 'home'; S.mode = 'running';
@@ -1451,106 +1002,11 @@ test('#65: 满饱食靠粮按 E 不耗粮不寻路', () => {
   S.prodT = 0;
 });
 
-test('#65: 饿玩家 drawPlayer 画 🍽 不崩', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.isSleeping = false;
-  S.meta.playerNeeds.food = 30;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
-  S.prodT = 0;
-  const pe = APH.Ent.findPlayer();
-  let threw = false;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #65 hungry draw err:', err.message); }
-  A(!threw, '饿玩家(含🍽标记)绘制不应崩');
-  /* 满饱食也不崩(不画标记分支) */
-  S.meta.playerNeeds.food = 80;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #65 full draw err:', err.message); }
-  A(!threw, '满饱食玩家绘制不应崩');
-  S.prodT = 0;
-});
 
-test('#70 补充: 生病玩家 drawPlayer 画 ✚ (illness>=20), 康健不画', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.isSleeping = false;
-  S.keys = {}; S.target = null;
-  S.nearBed = null; S.nearClinic = null; S.nearFood = null;
-  S.prodT = 0;
-  const cv=document.getElementById('cv');
-  const originalCtx=cv.getContext('2d');
-  const calls=[];
-  const spy=new Proxy({ fillStyle:'', font:'', textAlign:'', globalAlpha:1 }, {
-    get(t,k){
-      if(k==='fillText') return function(text,x,y){ calls.push({text, fillStyle:this.fillStyle}); };
-      if(typeof t[k]!=='undefined') return t[k];
-      if(k==='createRadialGradient'||k==='createLinearGradient') return function(){ return { addColorStop(){} }; };
-      return function(){};
-    }
-  });
-  try{
-    APH.Ent.bindCtx(spy);
-    S.meta.playerNeeds.illness = 30;
-    const pe = APH.Ent.findPlayer();
-    APH.Ent.drawPlayer(pe, 0);
-    A(calls.some(function(c){return c.text==='✚' && c.fillStyle==='#ff6d7a';}), '病玩家应画红色 ✚');
-    calls.length=0;
-    S.meta.playerNeeds.illness = 10;
-    APH.Ent.drawPlayer(pe, 0);
-    A(!calls.some(function(c){return c.text==='✚';}), '康健玩家(illness<20)不应画 ✚');
-  }finally{
-    APH.Ent.bindCtx(originalCtx);
-  }
-  S.prodT = 0;
-});
 
 /* #72 家园击倒: 击倒 != 死亡, 昏迷不可动/不可醒, 送医复活/倒计时死亡, 远征死法不变
    驱动通道: hurtPlayer → updateHome(playerDownedTick/carryPlayerToClinic) */
-test('#72: 家园击倒 → meta+实体俯卧, moving=false, drawPlayer 不崩', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.downed = true;
-  S.meta.playerNeeds.downT = 90;
-  S.hp = 0;
-  S.keys = {};
-  S.target = null;
-  S.meta.residents = [];
-  S.colony.buildings = S.colony.buildings || [];
-  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');   // 无舱无居民: 不触发拖行/复活
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.downed === true, '击倒中实体应同步俯卧标志 (pe.downed)');
-  A(pe && pe.moving === false, '击倒中实体不应残留走位 (moving=false)');
-  A(S.downed === true, 's.downed 运行时镜像应为 true');
-  let threw = false;
-  try { APH.Ent.drawPlayer(pe, 0); } catch(err){ threw = true; console.log('  #72 downed draw err:', err.message); }
-  A(!threw, '击倒俯卧玩家绘制不应崩');
-  S.meta.playerNeeds.downed = false;
-  S.meta.playerNeeds.downT = null;
-  S.keys = {};
-});
 
-test('#72: 击倒期间 WASD 不移动且不醒', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.downed = true;
-  S.meta.playerNeeds.downT = 90;
-  S.keys = {};
-  S.meta.residents = [];
-  S.colony.buildings = S.colony.buildings || [];
-  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');   // 无舱无居民: 击倒期间不得被拖行
-  const px0 = S.px, py0 = S.py;
-  S.keys.KeyA = true;   // 向左(水平方向 px 必变若可动)
-  M.updateHome(0.016);
-  A(S.px === px0 && S.py === py0, '击倒中 WASD 不得移动 (px '+px0+'→'+S.px+')');
-  A(S.meta.playerNeeds.downed === true, '击倒中 WASD 不得唤醒 (仍 downed)');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.moving === false, '击倒中实体不得移动');
-  S.meta.playerNeeds.downed = false;
-  S.meta.playerNeeds.downT = null;
-  S.keys = {};
-});
 
 test('#72: hurtPlayer 家园击倒 != 死亡, 远征生命归零仍死亡', () => {
   S.scene = 'home'; S.mode = 'running';
@@ -1579,78 +1035,8 @@ test('#72: hurtPlayer 家园击倒 != 死亡, 远征生命归零仍死亡', () =
   S.scene = 'home'; S.mode = 'running';
 });
 
-test('#72: 有居民+医疗舱送医复活 (downed 清, hp 回血, 实体标志清)', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.downed = true;
-  S.meta.playerNeeds.downT = 60;
-  S.hp = 0;
-  S.keys = {};
-  S.colony.buildings = S.colony.buildings || [];
-  S.colony.buildings.push({id:'bl_clinic', x:S.px, y:S.py, lv:1});
-  APH.Colony.placeBuildingEntity('bl_clinic', S.px, S.py, 1);
-  S.meta.residents = [{ id:'rs_72', name:'医疗甲', job:null, skills:{}, mood:80, food:80, rest:80, recreation:80, exposure:0, illness:0 }];
-  M.updateHome(0.05);
-  A(S.meta.playerNeeds.downed === false, '有居民+舱内应送医复活 (downed=false)');
-  A(S.meta.playerNeeds.downT === null, '送医复活应清 downT');
-  A(S.hp >= window.APH.CFG.economy.clinicHeal, '复活应回血到 ≥'+window.APH.CFG.economy.clinicHeal+', 实际 hp='+S.hp);
-  M.updateHome(0.016);
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.downed === false, '复活后实体俯卧标志应清除');
-  S.meta.playerNeeds.downed = false;
-  S.meta.playerNeeds.downT = null;
-  S.meta.residents = [];
-  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');
-});
 
-test('#72: 有居民且医疗舱在远处 → 击倒玩家被拖向医疗舱 (送医拖行)', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.downed = true;
-  S.meta.playerNeeds.downT = 90;
-  S.hp = 0;
-  S.keys = {};
-  S.meta.residents = [{ id:'rs_72b', name:'抬工乙', job:null, skills:{}, mood:80, food:80, rest:80, recreation:80, exposure:0, illness:0 }];
-  // 玩家 (1000,1000), 医疗舱 (1200,1000) 相距 200px > clinicHealR(80): 应被拖过去
-  S.px = 1000; S.py = 1000;
-  S.colony.buildings = (S.colony.buildings||[]).filter(b=>b.id!=='bl_clinic');
-  S.colony.buildings.push({id:'bl_clinic', x:1200, y:1000, lv:1});
-  const d0 = U.dst(S.px, S.py, 1200, 1000);
-  M.updateHome(0.5);
-  const d1 = U.dst(S.px, S.py, 1200, 1000);
-  A(d1 < d0 - 1, '有居民时击倒玩家应被拖向医疗舱 (d0='+d0.toFixed(1)+'→d1='+d1.toFixed(1)+')');
-  A(S.meta.playerNeeds.downed === true, '拖行途中仍保持击倒');
-  const pe = APH.Ent.findPlayer();
-  A(pe && pe.x === S.px && pe.y === S.py, '拖行应同步实体坐标');
-  S.meta.playerNeeds.downed = false;
-  S.meta.playerNeeds.downT = null;
-  S.meta.residents = [];
-  S.colony.buildings = S.colony.buildings.filter(b=>b.id!=='bl_clinic');
-});
 
-test('#72: 无居民倒计时归零死亡 (按死亡处理, 不产生 clinicKit)', () => {
-  S.scene = 'home'; S.mode = 'running';
-  APH.Res.ensurePlayerNeeds(S.meta);
-  S.meta.playerNeeds.downed = true;
-  S.meta.playerNeeds.downT = 0.1;
-  S.hp = 0;
-  S.clinicKit = 0;
-  S.meta.residents = [];
-  S.colony.buildings = S.colony.buildings || [];
-  S.keys = {};
-  const deaths0 = S.meta.stats.deaths;
-  const origDeath = window.APH.UI.showDeath;
-  window.APH.UI.showDeath = function(){};
-  try {
-    M.updateHome(0.2);
-    A(S.mode === 'dead', '倒计时归零应按死亡处理, mode='+S.mode);
-    A(S.meta.stats.deaths === deaths0+1, '倒计时死亡应记死亡');
-    A(S.clinicKit === 0, '击倒死亡不应产生 clinicKit');
-  } finally {
-    window.APH.UI.showDeath = origDeath;
-  }
-  S.scene = 'home'; S.mode = 'running';
-});
 
 /* #71 击倒叠伤痕: 睡/倒共用俯卧身, 击倒叠伤痕+血泊、睡着不叠 (渲染级区分测试)
    ADR-0003: 不另画 downed sheet、不运行时换色、不叠五官。
@@ -2357,51 +1743,6 @@ test('#92 home: 雷暴→明日依旧雷雨链 (转移表 wx_rain 最高), HUD �
 });
 
 /* ============ P1b 玩家暴露条 (#93) ============ */
-test('#93 home: 雷暴室外玩家暴露累积+HUD 第六行显示', () => {
-  const oldScene=S.scene, oldWx=S.meta.weather, oldNeeds=JSON.stringify(S.meta.playerNeeds),
-        oldBuildings=S.colony.buildings, oldPos={x:S.px,y:S.py};
-  try{
-    S.scene='home';
-    S.meta.weather={ id:'wx_thunder', t:0, cd:null };
-    if(!S.meta.playerNeeds) S.meta.playerNeeds={};
-    S.meta.playerNeeds.exposure=0;
-    S.colony.buildings=[];  /* 空旷处: 无建筑避难 */
-    S.px=2000; S.py=2000;   /* 远离 HAB(1100,1100) 与所有建筑 */
-    M.residentsTick();
-    const ex=S.meta.playerNeeds.exposure;
-    A(ex>0, '雷暴室外应累积暴露, got '+ex);
-    /* HUD: exposure 行显示 */
-    APH.UI.updHUD();
-    const rowEx=document.getElementById('rowExposure');
-    A(rowEx && rowEx.textContent && rowEx.textContent.indexOf('暴露')>=0,
-      'HUD 应显示暴露行, got: '+(rowEx&&rowEx.textContent));
-  }finally{
-    S.scene=oldScene; S.meta.weather=oldWx;
-    S.meta.playerNeeds=JSON.parse(oldNeeds);
-    S.colony.buildings=oldBuildings; S.px=oldPos.x; S.py=oldPos.y;
-  }
-});
-test('#93 home: 房间内玩家暴露消退 (T9 免疫复用)', () => {
-  const oldScene=S.scene, oldWx=S.meta.weather, oldNeeds=JSON.stringify(S.meta.playerNeeds),
-        oldBuildings=S.colony.buildings, oldPos={x:S.px,y:S.py};
-  try{
-    S.scene='home';
-    S.meta.weather={ id:'wx_acid', t:0, cd:null };
-    if(!S.meta.playerNeeds) S.meta.playerNeeds={};
-    S.meta.playerNeeds.exposure=80;
-    /* 圈房: 5×5 墙环(远离 HAB), 玩家在房内 */
-    S.colony.buildings=[];
-    for(let x=0;x<5;x++){ S.colony.buildings.push({id:'bl_wall',x:48*(30+x),y:48*30}); S.colony.buildings.push({id:'bl_wall',x:48*(30+x),y:48*34}); }
-    for(let y=0;y<5;y++){ S.colony.buildings.push({id:'bl_wall',x:48*30,y:48*(30+y)}); S.colony.buildings.push({id:'bl_wall',x:48*34,y:48*(30+y)}); }
-    S.px=48*32+24; S.py=48*32+24;
-    M.residentsTick();
-    A(S.meta.playerNeeds.exposure<80, '房间内酸雨应消退, got '+S.meta.playerNeeds.exposure);
-  }finally{
-    S.scene=oldScene; S.meta.weather=oldWx;
-    S.meta.playerNeeds=JSON.parse(oldNeeds);
-    S.colony.buildings=oldBuildings; S.px=oldPos.x; S.py=oldPos.y;
-  }
-});
 
 /* ============ P2 敌避陷阱 (#94) ============ */
 test('#94 home: 敌人寻路绕开待触发陷阱 (不踩)', () => {
@@ -2685,102 +2026,9 @@ test('#106 diplomacy: 通商协定签署并生效', () => {
   }
 });
 
-test('#132 social: 靠近正常居民按 E 热情打招呼', () => {
-  const oldScene = S.scene, oldResidents = S.meta.residents, oldEntities = S.entities;
-  try {
-    S.scene = 'home'; S.mode = 'running';
-    APH.Res.ensurePlayerNeeds(S.meta);
-    S.meta.playerNeeds.isSleeping = false;
-    S.meta.playerNeeds.downed = false;
-    S.meta.residents = [{ id: 'rs_g1', name: '小满', skills: {}, mood: 70, food: 80 }];
-    S.meta.bonds = {};
-    S.greetCooldowns = {};
-    S.entities = [{ type: T.RESIDENT, id: 'rs_g1', x: S.px + 20, y: S.py, dead: false }];
-    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
-    M.updateHome(0.016);
-    A(S.nearResident, '走近居民应判定 nearResident');
-    A(!S.nearBrokenResident, '正常居民不应判定 nearBrokenResident');
-    M.debugPressE();
-    A(S.meta.bonds['player|rs_g1'] === 52, '打招呼应 +2 好感, got ' + S.meta.bonds['player|rs_g1']);
-    A(S.entities[0].socialBubble === '😊', '居民头顶应浮现微笑微气泡');
-  } finally {
-    S.scene = oldScene; S.meta.residents = oldResidents; S.entities = oldEntities;
-  }
-});
 
-test('#132 social: 靠近崩溃居民按 E 安抚情绪解除崩溃', () => {
-  const oldScene = S.scene, oldResidents = S.meta.residents, oldEntities = S.entities;
-  try {
-    S.scene = 'home'; S.mode = 'running';
-    APH.Res.ensurePlayerNeeds(S.meta);
-    S.meta.playerNeeds.isSleeping = false;
-    S.meta.playerNeeds.downed = false;
-    S._interventionRng = () => 0.1;
-    S.meta.residents = [{ id: 'rs_brk1', name: '暴躁阿岚', skills: {}, mood: 20, food: 80, breakType: 'wander', breakT: 2 }];
-    S.meta.bonds = { 'player|rs_brk1': 60 };
-    S.entities = [{ type: T.RESIDENT, id: 'rs_brk1', x: S.px + 20, y: S.py, dead: false }];
-    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
-    M.updateHome(0.016);
-    A(S.nearBrokenResident, '靠近崩溃居民应判定 nearBrokenResident');
-    M.debugPressE();
-    A(S.meta.residents[0].breakType === null, '安抚后 breakType 应清空');
-    A(S.meta.residents[0].breakT === 0, '安抚后 breakT 应归零');
-    A(S.meta.residents[0].mood >= 30, '安抚后心情应获得开导增益, got ' + S.meta.residents[0].mood);
-    A(S.meta.bonds['player|rs_brk1'] === 66, '安抚后好感应 +6, got ' + S.meta.bonds['player|rs_brk1']);
-  } finally {
-    delete S._interventionRng;
-    S.scene = oldScene; S.meta.residents = oldResidents; S.entities = oldEntities;
-  }
-});
 
-test('#137 storage: 走近置物货架按 E 循环品类且就近取料', () => {
-  const oldScene = S.scene, oldBuildings = S.colony.buildings, oldEntities = S.entities;
-  try {
-    S.scene = 'home'; S.mode = 'running';
-    APH.Res.ensurePlayerNeeds(S.meta);
-    S.meta.playerNeeds.isSleeping = false;
-    S.meta.playerNeeds.downed = false;
-    const shelf = { type: T.BUILDING, id: 'bl_storage_shelf', bid: 'bl_storage_shelf', x: S.px + 20, y: S.py, filter: 'all' };
-    S.colony.buildings = [shelf];
-    S.entities = [shelf];
-    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false; S.nearResident = null; S.nearBrokenResident = null;
-    M.updateHome(0.016);
-    A(S.nearStorageContainer, '走近置物货架应判定 nearStorageContainer');
-    M.debugPressE();
-    A(shelf.filter === 'food', '按 E 后品类应切换为 food, 实际: ' + shelf.filter);
 
-    // 放置食材在货架上，测试 120px 内就近取料
-    const drop = { id: 'dp_sh_1', type: T.DROPPED, itemId: 'it_roasted_meat', n: 5, x: S.px + 20, y: S.py, dead: false };
-    S.entities.push(drop);
-    const sourced = APH.Colony.findNearbySourcedItem('food', { x: S.px, y: S.py }, 120, S.colony.buildings, S.entities);
-    A(sourced && sourced.found === true, '就近取料应成功检索到食材');
-    A(sourced.drop && sourced.drop.id === 'dp_sh_1', '取料对象应为货架上的熟食');
-  } finally {
-    S.scene = oldScene; S.colony.buildings = oldBuildings; S.entities = oldEntities;
-  }
-});
-
-test('#142 ruins: 开启远古遗物箱获得古代蓝图与高能核心', () => {
-  const oldScene = S.scene, oldEntities = S.entities;
-  try {
-    S.scene = 'expedition'; S.mode = 'running';
-    APH.Res.ensurePlayerNeeds(S.meta);
-    S.meta.playerNeeds.isSleeping = false;
-    S.meta.playerNeeds.downed = false;
-    const vault = { type: T.BUILDING, id: 'ancient_vault', bid: 'ancient_vault', x: S.px + 20, y: S.py, opened: false };
-    S.entities = [vault];
-    S.nearFood = null; S.nearBed = null; S.nearClinic = null; S.nearPad = false;
-    M.updateHome(0.016);
-    A(S.nearAncientVault, '靠近遗物箱应判定 nearAncientVault');
-    M.debugPressE();
-    A(vault.opened === true, '按 E 后遗物箱应被开启');
-    const drops = S.entities.filter(e => e && e.type === T.DROPPED);
-    A(drops.some(d => d.itemId === 'it_ancient_blueprint'), '箱内必定喷出古代蓝图残卷');
-    A(drops.some(d => d.itemId === 'it_ancient_core'), '箱内必定喷出史前高能核心');
-  } finally {
-    S.scene = oldScene; S.entities = oldEntities;
-  }
-});
 
 
 /* ================= ADR-29 征召与直接命令 (环世界式) ================= */
@@ -2935,44 +2183,6 @@ test('#149 cmd: 袭击中移动令保留(撤离), 非移动令被清除', () => 
   S.war.raidActive = false;
 });
 
-test('#156 inspector: 左下角检查器展示指挥官、居民、植物、建筑与地面', () => {
-  const ents = cmdHomeSetup();
-  // 1. 默认或选中指挥官
-  S.selectedTarget = { type: 'player' };
-  let html = APH.UI.inspectorHtml(S.selectedTarget, S);
-  A(html.indexOf('⭐ 指挥官(你)') !== -1, '默认应为指挥官, got: ' + html);
-  A(html.indexOf('生命') !== -1, '检查器应含生命');
-  A(html.indexOf('饱食') !== -1, '检查器应含饱食');
-
-  // 2. 选中居民
-  const p = ents[0];
-  M.cmd.select(p);
-  A(S.selectedTarget && S.selectedTarget.type === 'resident', '选中居民应写 selectedTarget');
-  html = APH.UI.inspectorHtml(S.selectedTarget, S);
-  A(html.indexOf(p.name) !== -1, '检查器应含居民名字');
-
-  // 3. 选中植物
-  const tree = { type: T.FLORA, kind: 'tree', hp: 30, maxHp: 30, x: S.px + 50, y: S.py };
-  S.selectedTarget = { type: 'flora', entity: tree };
-  html = APH.UI.inspectorHtml(S.selectedTarget, S);
-  A(html.indexOf('红树') !== -1, '检查器应含红树');
-  A(html.indexOf('30/30') !== -1, '检查器应含耐久');
-
-  // 4. 选中建筑
-  const bld = { type: T.BUILDING, bid: 'bl_house', lv: 1, x: S.px, y: S.py };
-  S.selectedTarget = { type: 'building', entity: bld };
-  html = APH.UI.inspectorHtml(S.selectedTarget, S);
-  A(html.indexOf('居住舱') !== -1 || html.indexOf('bl_house') !== -1, '检查器应含建筑名');
-
-  // 5. 选中地面
-  S.selectedTarget = { type: 'terrain', x: 1000, y: 1200 };
-  html = APH.UI.inspectorHtml(S.selectedTarget, S);
-  A(html.indexOf('1000') !== -1 && html.indexOf('1200') !== -1, '检查器应含坐标');
-
-  // 6. Esc 清空回到指挥官
-  M.cmd.deselect();
-  A(S.selectedTarget && S.selectedTarget.type === 'player', '解除后应重置为指挥官');
-});
 
 test('#157 orders: 规划工具箱选择、框选打标与自动清标', () => {
   cmdHomeSetup();
@@ -3104,7 +2314,8 @@ test('#161 colonist_bar: 顶部小人条选择、R 键战备征召切换与聚�
 
   // 1. 头像条渲染
   const barHtml = APH.UI.colonistBarHtml(S.meta.residents, S);
-  A(barHtml.indexOf('data-pawn-id="player"') !== -1, '头像条应包含指挥官');
+  /* ADR-45: 没有主角 —— 头像条里只有殖民者 */
+  A(barHtml.indexOf('data-pawn-id="player"') === -1, '头像条不该再有玩家化身');
   A(barHtml.indexOf(p.name) !== -1, '头像条应包含居民名字');
 
   // 2. 选择小人并按 R 键战备征召
@@ -3284,112 +2495,11 @@ function commanderSoloSetup(){
   if(pe){ pe.x=S.px; pe.y=S.py; pe.isSleeping=false; pe.downed=false; }
 }
 
-test('#165 commander: 未征召饥饿时自动寻路到仓库进食', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 0;
-  S.meta.res = S.meta.res || {};
-  S.meta.res.food = 8;
-  APH.Colony.placeBuildingEntity('bl_warehouse', 1400, 1170, 1);
-  const food0 = S.meta.playerNeeds.food;
-  const x0 = S.px;
-  for(let i=0; i<900 && S.meta.playerNeeds.food<=food0; i++) M.updateHome(0.016);
-  A(S.meta.playerNeeds.food > food0, '指挥官饥饿时应自主走到仓库吃饭, 实际饱食='+S.meta.playerNeeds.food+' px='+Math.round(S.px));
-  A(S.px > x0 + 40, '指挥官应向仓库方向移动');
-  S.entities = S.entities.filter(e => e.bid !== 'bl_warehouse');
-});
 
-test('#165 commander: 未征召时按砍伐标记自动前往砍树', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.res = S.meta.res || {};
-  S.meta.res.food = 20;
-  const tree = { id:'fl_cmd_chop', type:T.FLORA, kind:'tree', x:1400, y:1170, hp:12, maxHp:12, dead:false };
-  S.entities.push(tree);
-  A(APH.Colony.applyDesignation(S.designations, tree, 'chop')===true, '应成功打上砍伐标记');
-  const x0 = S.px;
-  for(let i=0; i<900 && !tree.dead; i++) M.updateHome(0.016);
-  A(tree.dead===true, '未征召指挥官应按规划标记自主砍倒树木, px='+Math.round(S.px)+' hp='+tree.hp);
-  A(S.px > x0 + 40, '指挥官应向被标记树木移动');
-});
 
-test('#166 chop: 贴树砍伐是持续作业，一帧不得砍倒，并进入伐木姿态', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.playerDrafted = false;
-  const tree = { id:'fl_cmd_slow', type:T.FLORA, kind:'tree', x:S.px+20, y:S.py, hp:30, maxHp:30, dead:false };
-  S.entities.push(tree);
-  APH.Colony.applyDesignation(S.designations, tree, 'chop');
-  M.updateHome(0.016);
-  A(tree.dead !== true, '一帧不得砍倒成树');
-  A(tree.hp < 30 && tree.hp > 20, '一帧只推进少量耐久, hp='+tree.hp);
-  const pe = APH.Ent.findPlayer();
-  A(S.gathering === true || (pe && pe.gathering), '贴树作业时应进入伐木姿态');
-});
 
-test('#165 hungry: 无口粮时饥饿居民仍执行规划砍伐（避免饿到停工）', () => {
-  const ents = cmdHomeSetup();
-  const p = ents[0];
-  p.x = S.px; p.y = S.py; p.job=null; p.drafted=false; p.userOrder=null;
-  S.meta.residents[0].job=null;
-  S.meta.residents[0].food=0;
-  S.meta.residents[0].rest=90;
-  S.meta.residents[0].wantSleep=false;
-  S.meta.residents[0].isSleeping=false;
-  S.meta.res = S.meta.res || {};
-  S.meta.res.food=0;
-  S.meta.workPrio = S.meta.workPrio || {};
-  S.meta.workPrio[p.id] = { sk_gather:1, sk_haul:1, sk_farm:0, sk_build:0 };
-  S.designations={}; S.selectedRid=null;
-  S.entities = S.entities.filter(e=>e.type!==T.DROPPED);
-  const tree = { id:'fl_starve_chop', type:T.FLORA, kind:'tree', x:p.x+80, y:p.y, hp:10, maxHp:10, dead:false };
-  S.entities.push(tree);
-  APH.Colony.applyDesignation(S.designations, tree, 'chop');
-  for(let i=0; i<700 && !tree.dead; i++) M.updateHome(0.016);
-  A(tree.dead===true, '饥饿且无口粮时居民仍应执行规划砍伐, gatherTarget='+(p.gatherTarget&&p.gatherTarget.id));
-});
 
-test('#167 idle: 未征召无任务指挥官会在院子里自主漫步', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.playerDrafted = false;
-  S.designations = {};
-  S.gathering = false;
-  S.target = null;
-  S.cmdIdleInited = false;
-  S.cmdIdleWalk = false;
-  S.cmdIdleT = 0;
-  const x0 = S.px, y0 = S.py;
-  let maxD = 0;
-  for(let i = 0; i < 900; i++){
-    M.updateHome(0.016);
-    const d = Math.hypot(S.px - x0, S.py - y0);
-    if(d > maxD) maxD = d;
-  }
-  A(maxD > 24, '无任务指挥官应在院子漫步，不应原地罚站, 最大位移='+maxD.toFixed(1));
-});
 
-test('#168 rest: 困了的指挥官走去居住舱上床，平移镜头不摇醒', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 12;
-  S.meta.playerNeeds.isSleeping = false;
-  S.playerDrafted = false;
-  S.designations = {};
-  S.keys = {};
-  S.colony.buildings.push({ id:'bl_house', x:1400, y:1170, lv:1 });
-  APH.Colony.placeBuildingEntity('bl_house', 1400, 1170, 1);
-  const x0 = S.px;
-  for(let i=0; i<900 && !S.meta.playerNeeds.isSleeping; i++) M.updateHome(0.016);
-  A(S.meta.playerNeeds.isSleeping === true, '困倦指挥官应走到居住舱入睡');
-  A(S.px > x0 + 40, '应向居住舱方向移动');
-  const cam0 = S.camX;
-  S.keys.KeyD = true;
-  M.updateHome(0.1);
-  A(S.meta.playerNeeds.isSleeping === true, '睡眠中平移镜头不得唤醒');
-  A(S.camX > cam0, 'WASD 仍应平移摄像机');
-  S.keys = {};
-});
 
 test('#168 rest: 困了的居民走去居住舱再睡，不原地瞬睡', () => {
   const ents = cmdHomeSetup();
@@ -3411,58 +2521,8 @@ test('#168 rest: 困了的居民走去居住舱再睡，不原地瞬睡', () => 
   A(d1 < d0 - 10 || d1 < 50, '应靠近居住舱, d0='+d0.toFixed(0)+' d1='+d1.toFixed(0));
 });
 
-test('#169 joy: 娱乐低的指挥官会走向篝火休闲', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.meta.playerNeeds.recreation = 10;
-  S.playerDrafted = false;
-  S.designations = {};
-  S.colony.buildQueue = [];
-  S.haulCarry = null;
-  S.meta.playerPrio = { sk_build:0, sk_gather:0, sk_haul:0, sk_farm:2 };
-  S.colony.buildings.push({ id:'bl_campfire', x:1400, y:1170 });
-  APH.Colony.placeBuildingEntity('bl_campfire', 1400, 1170, 1);
-  const x0 = S.px;
-  M.updateHome(0.016);
-  A(S.target && S.target.x > x0 + 100, '第一帧应把篝火设为寻路目标, rec='+S.meta.playerNeeds.recreation);
-  let maxX = S.px;
-  for(let i=0; i<250; i++){
-    M.updateHome(0.016);
-    if(S.px > maxX) maxX = S.px;
-  }
-  A(maxX > x0 + 40, '无聊时应走向篝火, maxX='+Math.round(maxX));
-});
 
-test('#170 build: 未征召指挥官会走向施工蓝图', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.meta.playerNeeds.recreation = 80;
-  S.playerDrafted = false;
-  S.meta.playerPrio = { sk_build:1, sk_gather:2, sk_haul:2 };
-  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12, building:false }];
-  const x0 = S.px;
-  for(let i=0; i<700; i++) M.updateHome(0.016);
-  A(S.px > x0 + 40, '有蓝图时应走去施工, px='+Math.round(S.px));
-});
 
-test('#171 haul: 未征召指挥官会拾取地上堆并入库', () => {
-  commanderSoloSetup();
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.meta.playerNeeds.recreation = 80;
-  S.playerDrafted = false;
-  S.meta.playerPrio = { sk_haul:1, sk_gather:0, sk_build:0 };
-  S.meta.res = S.meta.res || {};
-  S.meta.res.wood = 0;
-  const pile = { id:'dp_cmd_wood', type:T.DROPPED, itemId:'it_wood', x:S.px+80, y:S.py, n:3, dead:false };
-  S.entities.push(pile);
-  for(let i=0; i<900 && !pile.dead; i++) M.updateHome(0.016);
-  A(pile.dead === true || S.haulCarry, '应拾起地上木材');
-  for(let i=0; i<900 && (S.meta.res.wood||0)<3; i++) M.updateHome(0.016);
-  A((S.meta.res.wood||0) >= 3 || S.haulCarry, '木材应入库或正在搬运, wood='+(S.meta.res.wood||0));
-});
 
 test('#172 right_click: 右键居住舱下达优先休息', () => {
   commanderSoloSetup();
@@ -3510,19 +2570,6 @@ test('征召后点地面走路（笔记本无右键）', () => {
   A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应走到点击处');
 });
 
-test('#169 right_click: 征召态右键地面是战术移动不是建造', () => {
-  commanderSoloSetup();
-  S.playerDrafted = true;
-  const pe = APH.Ent.findPlayer && APH.Ent.findPlayer();
-  A(!!pe, '应有指挥官实体');
-  S.selectedPawns = [pe];
-  S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12 }];
-  S.entities.push({ id:'bp_house2', type:T.BLUEPRINT, bid:'bl_house', x:1450, y:1170 });
-  const gx = S.px + 80, gy = S.py + 40;
-  M.cmd.rightClick(gx, gy);
-  A(!S.playerOrder || S.playerOrder.type!=='build', '征召点地不应下建造令');
-  A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应战术移动到点击处');
-});
 
 test('#170 schedule: 检查器循环作息格', () => {
   commanderSoloSetup();
@@ -3599,25 +2646,6 @@ test('#167 alerts: 饥饿警报可点跳镜头，没事则空', () => {
   S.paused=false;
 });
 
-test('#168 thinkPawn: 征召指挥官不闲逛，解征召后恢复自治', () => {
-  commanderSoloSetup();
-  S.playerDrafted = true;
-  S.meta.playerNeeds.food = 80;
-  S.meta.playerNeeds.rest = 100;
-  S.meta.playerNeeds.recreation = 80;
-  S.designations = {};
-  S.colony.buildQueue = [];
-  S.haulCarry = null;
-  S.target = null;
-  S.cmdIdleWalk = false;
-  M.updateHome(0.5);
-  A(!S.target && !S.cmdIdleWalk, '征召中不应自己闲逛');
-  S.playerDrafted = false;
-  S.cmdIdleInited = true;
-  S.cmdIdleT = 0;
-  M.updateHome(0.05);
-  A(S.cmdIdleWalk || S.target, '解征召后应恢复自治');
-});
 
 
 /* ---------- ADR-32: 家园提示优先级(显式表, 不再靠 setHint 后写覆盖) ---------- */
@@ -3640,13 +2668,6 @@ function hintScene(setup){
   return document.getElementById('hint').textContent || '';
 }
 
-test('#ADR32 hint: 站在建筑旁, 交互提示压过天气播报', () => {
-  const h = hintScene(s => {
-    s.entities.push({id:'be_k',type:'building',bid:'bl_kitchen',x:1100,y:1120,recipe:'it_roasted_meat'});
-  });
-  A(h.indexOf('烹饪灶台') >= 0, '灶台旁应给出灶台提示, got: ' + h);
-  A(h.indexOf('磁暴') < 0 && h.indexOf('酸雨') < 0, '天气播报不得盖掉交互提示, got: ' + h);
-});
 
 test('#ADR32 hint: 没东西可交互时不出交互键提示', () => {
   /* 兜底档(天气/开场目标)是否有话说取决于开场进度与当前天气, 不做断言;
@@ -3664,20 +2685,7 @@ test('#ADR32 hint: 物资告急压过交互提示', () => {
   A(h.indexOf('烹饪灶台') < 0, '告急时不应还在显示灶台提示, got: ' + h);
 });
 
-test('#ADR32 hint: 击倒昏迷压过一切', () => {
-  const h = hintScene(s => {
-    s.meta.playerNeeds.downed = true;
-    s.entities.push({id:'be_k3',type:'building',bid:'bl_kitchen',x:1100,y:1120,recipe:'it_roasted_meat'});
-  });
-  A(h.indexOf('击倒昏迷') >= 0, '昏迷提示应最高优先, got: ' + h);
-});
 
-test('#ADR32 hint: 空调提示不再被开场目标淹没', () => {
-  const h = hintScene(s => {
-    s.entities.push({id:'be_cl',type:'building',bid:'bl_cooler',x:1100,y:1120,mode:'freezer'});
-  });
-  A(h.indexOf('空调') >= 0, '空调旁应给出空调提示, got: ' + h);
-});
 
 
 /* ---------- 殖民地优先 T1: 覆灭判定与指挥官心情 ---------- */

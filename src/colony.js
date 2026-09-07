@@ -217,7 +217,9 @@ APH.Colony = (function(){
     /* 实体重建: 玩家出生在居住舱旁 */
     s.entities = [];
     var spawnX = CFG.HAB.x, spawnY = CFG.HAB.y + 110;
-    s.entities.push({ id:'player', type:T.PLAYER, x:spawnX, y:spawnY });
+    /* ADR-45: 不再生成玩家化身 —— 玩家是没有身体的指挥者。
+       spawnX/spawnY 现在只用来把镜头落在殖民地上。 */
+    s.camX = spawnX; s.camY = spawnY;
     s.px = spawnX; s.py = spawnY;
     s.camX = spawnX; s.camY = spawnY;
 

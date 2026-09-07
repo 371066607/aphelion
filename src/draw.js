@@ -36,7 +36,9 @@ APH.Draw = (function(){
   }
   function expeditionDrawers(){
     return {
-      player:function(e,t){ APH.Ent.drawPlayer(e,t); },
+      /* ADR-45: 远征地表上跑的是殖民者, 不是化身 —— 这张表原先根本没有
+         resident 项, 所以队员一个都画不出来。 */
+      resident:function(e,t){ APH.Ent.drawResident(e,t); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
@@ -298,7 +300,6 @@ APH.Draw = (function(){
 
   function homeDrawers(){
     var d = {
-      player:function(e,t){ APH.Ent.drawPlayer(e,t); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){},

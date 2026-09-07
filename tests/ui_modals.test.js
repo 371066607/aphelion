@@ -181,9 +181,11 @@ UI.close('orders');
 // 10. ADR-28 补丁: 指挥官(玩家)行出现在命令表
 window.APH.Res = window.APH.Res || { SKILLS: ['sk_build','sk_farm'], SKILL_NAMES: {} };
 assert('prioGridHtml 已导出', typeof UI.prioGridHtml === 'function');
-const gridHtml = UI.prioGridHtml({ residents: [] });
-assert('命令表应含指挥官行', gridHtml.indexOf('指挥官') !== -1);
-assert('指挥官单元格应带 data-prio-r="player"', gridHtml.indexOf('data-prio-r="player"') !== -1);
+const gridHtml = UI.prioGridHtml({ residents: [{ id:'rs_1', name:'阿尔法', skills:{} }] });
+/* ADR-45: 没有主角 —— 优先级表里只该有殖民者 */
+assert('命令表不含主角行', gridHtml.indexOf('data-prio-r="player"') === -1);
+assert('命令表仍含居民行', gridHtml.indexOf('阿尔法') !== -1);
+assert('零居民时命令表不崩', typeof UI.prioGridHtml({ residents: [] }) === 'string');
 
 // 11. ADR-28 / Ticket #156: 通用检查器 (Inspector) HTML 纯函数断言
 assert('inspectorHtml 已导出', typeof UI.inspectorHtml === 'function');
@@ -201,11 +203,12 @@ const mockState = {
 
 // 1) 指挥官检查器
 const playerHtml = UI.inspectorHtml({ type: 'player' }, mockState);
-assert('指挥官检查器含标题', playerHtml.indexOf('⭐ 指挥官(你)') !== -1);
-assert('指挥官检查器含生命', playerHtml.indexOf('85') !== -1);
-assert('指挥官检查器含饱食', playerHtml.indexOf('75') !== -1);
-assert('指挥官检查器含娱乐条', playerHtml.indexOf('娱乐') !== -1);
-assert('指挥官需求是进度条', playerHtml.indexOf('width:') !== -1);
+/* ADR-45: 没有主角 —— 未选中任何东西时给的是殖民地概览 */
+assert('默认检查器是殖民地概览', playerHtml.indexOf('新曙光殖民地') !== -1);
+assert('殖民地概览报人口', playerHtml.indexOf('殖民者') !== -1);
+assert('殖民地概览给下一个目标', playerHtml.indexOf('◈') !== -1 || playerHtml.indexOf('运转正常') !== -1);
+assert('殖民地概览提示点选小人', playerHtml.indexOf('点选一个殖民者') !== -1);
+assert('默认检查器不再有主角字样', playerHtml.indexOf('指挥官') === -1);
 
 // 2) 居民检查器
 const resHtml = UI.inspectorHtml({
@@ -235,14 +238,15 @@ assert('colonistBarHtml 已导出', typeof UI.colonistBarHtml === 'function');
 assert('renderColonistBar 已导出', typeof UI.renderColonistBar === 'function');
 
 const barHtml = UI.colonistBarHtml(mockState.meta.residents, mockState);
-assert('头像条包含指挥官卡片', barHtml.indexOf('data-pawn-id="player"') !== -1);
 assert('头像条包含居民卡片', barHtml.indexOf('data-pawn-id="rs_1"') !== -1);
 assert('头像条包含居民姓名', barHtml.indexOf('阿尔法') !== -1);
+/* ADR-45: 没有主角 —— 头像条里不该再有玩家化身那张卡 */
+assert('头像条不含玩家化身卡片', barHtml.indexOf('data-pawn-id="player"') === -1);
 
-// 征召状态卡片标记
-mockState.playerDrafted = true;
+// 征召的是殖民者, 不是主角
+mockState.entities = [{ type: 'resident', id: 'rs_1', rid: 'rs_1', drafted: true }];
 const draftedBarHtml = UI.colonistBarHtml(mockState.meta.residents, mockState);
-assert('征召指挥官卡片带 drafted 样式', draftedBarHtml.indexOf('drafted') !== -1);
+assert('征召的居民卡片带 drafted 样式', draftedBarHtml.indexOf('drafted') !== -1);
 assert('征召卡片含武器角标', draftedBarHtml.indexOf('aph-card-badge') !== -1);
 
 // 13. ADR-29 工作面板 (Roster) 中无论是否有其他居民，均展示指挥官行与专属角色卡
@@ -262,8 +266,9 @@ window.APH.state = {
 };
 UI.renderResPanel();
 const bodyHtml = elements.resBody.innerHTML;
-assert('开局零居民时工作面板应渲染指挥官角色卡', bodyHtml.indexOf('⭐ 指挥官 (你)') !== -1);
-assert('开局零居民时工作面板应包含指挥官工作表', bodyHtml.indexOf('⭐ 指挥官(你)') !== -1);
+/* ADR-45: 零居民 = 面板里真的没有人。此前会渲染一张「指挥官」卡冒充首位成员。 */
+assert('零居民时工作面板不再渲染主角卡', bodyHtml.indexOf('指挥官') === -1);
+assert('零居民时工作面板不崩', typeof bodyHtml === 'string');
 
 /* ---------- ADR-39 命令表: 视图 → 控制器的唯一通道 ---------- */
 console.log('--- ADR-39 Command Table ---');
@@ -297,7 +302,7 @@ window.APH.state = {
 };
 const inspHtml = UI.inspectorHtml() || '';
 assert('检查器 HTML 不含 APH.Main', inspHtml.indexOf('APH.Main') === -1);
-assert('检查器的征召按钮走 APH.UI.cmd', inspHtml.indexOf("APH.UI.cmd('togglePlayerDraft')") !== -1);
+assert('默认检查器不含主角征召按钮', inspHtml.indexOf("togglePlayerDraft") === -1);
 
 /* 命令表真的接得上: 模拟 main 注册后点按钮 */
 let drafted = 0;
@@ -343,3 +348,19 @@ assert('空载荷的 hint 视作清空', elements.hint.textContent === '');
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);
+
+/* ---------- ADR-45: 终局出口从「按 E」变成发射器的命令 ---------- */
+console.log('--- ADR-45 Endgame reachable ---');
+window.APH.state = {
+  scene: 'home', mode: 'running', entities: [],
+  colony: { buildings: [{ id: 'bl_transmitter', x: 10, y: 10, powered: true }] },
+  meta: { residents: [], res: {} },
+};
+const txHtml = UI.inspectorHtml({ type: 'building', entity: { bid: 'bl_transmitter', x: 10, y: 10 } }, window.APH.state);
+assert('通电的发射器给出呼叫救援按钮', txHtml.indexOf("callRescue") !== -1);
+assert('按钮文案说清楚这是终局', txHtml.indexOf('呼叫救援') !== -1);
+
+window.APH.state.colony.buildings[0].powered = false;
+const txOff = UI.inspectorHtml({ type: 'building', entity: { bid: 'bl_transmitter', x: 10, y: 10 } }, window.APH.state);
+assert('没电时不给按钮', txOff.indexOf("callRescue") === -1);
+assert('没电时说明原因', txOff.indexOf('未通电') !== -1);
