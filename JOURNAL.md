@@ -1633,3 +1633,98 @@ node tests/boss.test.js → 7 通过 / 0 失败
 两次「我自己造的重复」都是同一个模式：**给新功能找了个就近的落点，
 而不是找它概念上的归属地**。`thoughtCtxAt` 该从第一天就在 `APH.Res`。
 下次加跨模块概念，先问「这个概念属于谁」，再问「谁调用它方便」。
+
+---
+
+## 2026-09-07（续七）· ADR-39：ui.js 不再认识 main
+
+先把上一批（殖民地优先五票 + 美观 + ADR-37/38）落进两笔提交 ——
+之前 27 个文件、+3692/−634、7 个 ADR 全压在工作区没进 git。
+顺带把 `assets/_raw`（各建筑单帧原图 + `pack_sheets.py`）归档进库：
+此前只有切好的 sheet 在版本库里，原图丢了就没法重切。
+
+### 上一班留下的那行数字
+
+ADR-38 的护栏里登记着 `MAIN_DEBT = { 'ui.js': 27 }` —— 视图反向调控制器，
+当时选择「登记而不硬修」。这一班就是来删那行的。
+
+### 27 是错的，真实是 37
+
+`layering.test.js` 的 `codeOf` 会剥掉字符串字面量再判定。而命令派发那一类长这样：
+
+```js
+h += '<button onclick="window.APH.Main&&APH.Main.togglePlayerDraft()">征召</button>';
+```
+
+**调用正好住在字符串里**，护栏对它完全没有视野。27 处代码 + 10 处藏在 HTML 属性里。
+最脏的一类恰恰是数不到的那一类。
+
+### 三类，三个归宿
+
+**存档（9 处）**：`saveColony` / `saveRivals` 不但住在 main，还绕开 `APH.Save`
+**直接写裸 localStorage** —— Save 那层为隐私模式/测试环境做的内存兜底对它们无效，
+存档会静默丢。现在：`Save.metaQuiet/loadColony/saveColony/loadRivalStates/saveRivalStates`、
+`Colony.persist()`（落盘前先 `serializeGround`）、`Rivals.hydrateStates/persistStates`。
+**键名一个没动**，老存档照常读得到。
+
+势力关系存的是数组，走不了 `Save.read/write` —— `migrate` 只认存档对象，
+会把数组判成损坏返回 null。这一对走 `rawGet/rawSet`，仍有内存兜底。
+
+**领域查询（5 处）**：`haveStock` / `playerDefPower` / `applyTech` 下沉 `APH.Colony`
+（`TECHS` 表本来就住那儿）。
+
+**命令派发（1 + 10 处）**：ui.js 持一张命令表，main 在**加载期**注册
+（不是 boot 期 —— 面板可能在 boot 前就渲染）。按钮变成
+`onclick="APH.UI.cmd('togglePlayerDraft')"`，未注册的命令静默 no-op。
+
+### 顺手捞出来的两个真 bug
+
+```js
+function getStock(key){
+  if(window.APH.Main && APH.Main.haveStock) return APH.Main.haveStock(key);
+  return (s.meta.res && s.meta.res[key]) || 0;   // ← 这份不认识地上堆
+}
+```
+
+main 那份算「仓 + 地上堆」，ui 的 fallback 只算仓 ——
+外交面板的「我有多少矿可以纳贡」在两条路径下答案不同。
+**这是 ADR-37「念头上下文两份」的同一个病换了张脸。**
+另一个就是上面那条：殖民地/势力存档绕开 Save 的降级兜底。
+
+### 护栏这次连自己的盲区一起补
+
+- `MAIN_DEBT` → `{}`，`ALLOWED` 里 `'ui.js': ['Main']` 删除；
+- **新增一条只剥注释、保留字符串的用例**，专堵 `onclick="…APH.Main…"`；
+- 命令表 9 条（含「点击链路真的接得上」）、存档与查询 8 条。
+
+### 实机验证：内联 onclick 是测试跑不到的地方
+
+无头 Chrome + CDP 驱动 `game.html?autostart=1`，**派真实鼠标事件**点那颗按钮：
+
+```
+检查器 HTML: {"hasMain":false,"hasCmd":true}
+找到按钮:    {"found":true,"label":"解除征召"}
+点击后:      playerDrafted 翻转
+console 错误: (无)
+```
+
+### 验证证据
+
+```
+python3 build.py             → ✓ game.html
+node tests/run.js            → 803 通过 / 0 失败   (795 → 803)
+node tests/scenario.js       → 162 通过 / 0 失败
+node tests/perf.test.js      → 4 通过 / 0 失败
+node tests/boss.test.js      → 7 通过 / 0 失败
+node tests/ui_modals.test.js → 77 通过 / 0 失败   (68 → 77)
+```
+
+`src/ui.js` 里 `APH.Main` 出现次数：**37 → 0**。
+
+### 记一笔
+
+上一班的教训是「给新功能找就近的落点，而不是概念上的归属地」。
+这一班是它的下一层：**护栏只挡得住它看得见的东西。**
+我数出 27 并且相信了这个数字，因为剥字符串这一步看起来是在降噪 ——
+它同时把最脏的一类调用一起剥掉了。
+下次写度量，先问：*这次测量漏掉了哪一类写法？*

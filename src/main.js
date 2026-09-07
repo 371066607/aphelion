@@ -1564,11 +1564,8 @@ window.APH = window.APH || {};
     U.emit('storyEvent', { id:id });
   }
 
-  function playerDefPower(){
-    var s=APH.state;
-    var turrets=s.colony.buildings.filter(function(b){return b.id==='bl_turret';}).length;
-    return 10 + turrets*12 + APH.Colony.plasmaTechLevel(s.meta.tech)*5;
-  }
+  /* ADR-39: 已下沉到 APH.Colony —— 此前 ui 另有一份 fallback 且已分叉。 */
+  function playerDefPower(){ return APH.Colony.playerDefPower(); }
   /* ---- 阶段E: 袭击战术辅助 ---- */
   function setupSiegeCamp(){
     var s=APH.state;
@@ -1688,35 +1685,9 @@ window.APH = window.APH || {};
     setTimeout(function(){document.getElementById('vig').style.opacity=0;},900);
     U.emit('raidStarted',s.war.wave);
   }
-  function loadRivals(){
-    var s=APH.state;
-    try{
-      var v=JSON.parse(localStorage.getItem('aphelion_rivals_v1')||'null');
-      if(v&&Array.isArray(v)) {
-        s.rivalStates=v.map(function(r){
-          if(r.relation == null && r.rival && r.rival.trait && APH.Rivals && APH.Rivals.defaultRelationOf)
-            r.relation = APH.Rivals.defaultRelationOf(r.rival.trait);
-          if(r.cowedTime == null) r.cowedTime = 0;
-          if(r.pact == null) r.pact = false;
-          return r;
-        });
-        return;
-      }
-    }catch(e){}
-    /* 从当前星球spec初始化(首次) */
-    var specRivals = window.APH.Planet.fallbackPlanet(s.seed||12345).rivals;
-    s.rivalStates = specRivals.map(function(r){
-      var defRel = (APH.Rivals && APH.Rivals.defaultRelationOf) ? APH.Rivals.defaultRelationOf(r.trait) : -20;
-      return {
-        rival:r,
-        anger:0,
-        relation: defRel,
-        cowedTime: 0,
-        pact: false
-      };
-    });
-    saveRivals();
-  }
+  /* ADR-39: 势力关系的存取已归 APH.Rivals, 殖民地存档已归 APH.Colony,
+     meta 静默保存已归 APH.Save。以下四个只是保留旧名的转发壳。 */
+  function loadRivals(){ APH.Rivals.hydrateStates(); }
   /* #72 家园击倒: 送医拖行(世界侧 lerp, 无新实体类型)。玩家击倒昏迷且有居民在场时,
      把玩家朝医疗舱拖; 已到治疗半径内则停下(交由 playerDownedTick 判复活)。 */
   function carryPlayerToClinic(dt){
@@ -1743,10 +1714,7 @@ window.APH = window.APH || {};
     if(pe){ pe.x=s.px; pe.y=s.py; pe.face=s.face; }
   }
 
-  function saveRivals(){
-    try{ localStorage.setItem('aphelion_rivals_v1',
-      JSON.stringify(APH.state.rivalStates)); }catch(e){}
-  }
+  function saveRivals(){ APH.Rivals.persistStates(); }
   function saveWar(){
     var s=APH.state;
     s.meta.war = s.meta.war || {wins:0, raids:0};
@@ -2286,25 +2254,9 @@ window.APH = window.APH || {};
   }
 
   /* ================= 科技效果应用 ================= */
-  function applyTech(meta,techId){
-    var t=APH.Colony.TECHS[techId]; if(!t || !t.effect) return;
-    var lv=meta.tech[techId]||0;
-    var P=CFG.player;
-    /* 从基准值重算, 避免叠加误差 */
-    if(t.effect.o2Max){ P.o2Max = 100 + t.effect.o2Max*lv; S_o2Clamp(); }
-    if(t.effect.dmgMul){
-      var plv = APH.Colony.plasmaTechLevel(meta.tech);
-      CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*plv));
-    }
-    if(t.effect.spdMul){ P.walkSpeed=Math.round(150*(1+t.effect.spdMul*lv));
-                         P.runSpeed=Math.round(235*(1+t.effect.spdMul*lv)); }
-    /* te_radar: 罗盘/农产倍率在绘制与 farmTick 读取 meta.tech, 无需改全局 */
-  }
-  function applyAllTech(meta){
-    Object.keys(APH.Colony.TECHS).forEach(function(id){ applyTech(meta,id); });
-    if(S_o2Clamp) S_o2Clamp();
-  }
-  function S_o2Clamp(){ if(APH.state) APH.state.o2=Math.min(APH.state.o2,CFG.player.o2Max); }
+  /* ADR-39: 科技效果的应用已下沉到 APH.Colony(TECHS 表的归属地)。此处仅转发, 保留旧名。 */
+  function applyTech(meta,techId){ return APH.Colony.applyTech(meta, techId); }
+  function applyAllTech(meta){ return APH.Colony.applyAllTech(meta); }
 
   /* ================= 建造放置 ================= */
   function tryPlace(bid,wx,wy){
@@ -2380,25 +2332,8 @@ window.APH = window.APH || {};
     var rec=buildingRecordOf(ent);
     if(rec) rec[key]=val;
   }
-  function saveColony(){
-    var s=APH.state;
-    if(s.colony && window.APH.Colony && APH.Colony.serializeGround)
-      s.colony.ground=APH.Colony.serializeGround(s.entities);
-    try{ localStorage.setItem('aphelion_colony_v1',
-      JSON.stringify(APH.state.colony)); }catch(e){}
-  }
-  function loadColony(){
-    try{
-      var v=JSON.parse(localStorage.getItem('aphelion_colony_v1')||'null');
-      if(v && Array.isArray(v.buildings)){
-        v.buildQueue=v.buildQueue||[];
-        v.ground=v.ground||[];
-        v.buildings.forEach(function(b){ b.lv=b.lv||1; });
-        return v;
-      }
-    }catch(e){}
-    return { buildings:[], builtAt:Date.now(), ground:[] };
-  }
+  function saveColony(){ APH.Colony.persist(); }
+  function loadColony(){ return APH.Save.loadColony(); }
 
   /* ================= 输入动作处理器 (委托 APH.Input 深模块, ADR-19) ================= */
   function onPlayerInteract(ignoreMode){
@@ -5280,10 +5215,8 @@ window.APH = window.APH || {};
   function extraRes(){
     return (APH.Colony.groundTally && APH.Colony.groundTally(APH.state.entities)) || {};
   }
-  function haveStock(key){
-    if(APH.Colony.stockOf) return APH.Colony.stockOf(APH.state.meta.res, APH.state.entities, key);
-    return (APH.state.meta.res&&APH.state.meta.res[key])||0;
-  }
+  /* ADR-39: 已下沉到 APH.Colony(仓 + 地上堆)。 */
+  function haveStock(key){ return APH.Colony.haveStock(key); }
   function panelStock(key){
     var s=APH.state, w=(s.meta.res&&s.meta.res[key])||0;
     var g=APH.Colony.groundCount ? APH.Colony.groundCount(s.entities, key) : 0;
@@ -5780,7 +5713,7 @@ window.APH = window.APH || {};
     tryFirstNightVisitor();
     refreshTechMapIfOpen();
   }
-  function saveMetaQuiet(){ try{ APH.Save.saveMeta(APH.state.meta); }catch(e){} }
+  function saveMetaQuiet(){ APH.Save.metaQuiet(); }
   function bindBuildUI(){
     /* ADR-28 底部主标签栏事件绑定 */
     var to = document.getElementById('tabOrders');
@@ -5876,7 +5809,7 @@ window.APH = window.APH || {};
           var curP = m.playerPrio[colKey] != null ? m.playerPrio[colKey] : 2;
           var nextP = (curP + 1) % 4;
           m.playerPrio[colKey] = nextP;
-          if(APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+          saveMetaQuiet();
           var colNameP = colKey === 'sk_gather' ? '采集' : (colKey === 'sk_haul' ? '搬运' : (APH.Res.SKILL_NAMES[colKey]||colKey));
           var labelP = nextP === 0 ? '✕ 禁止' : nextP;
           APH.UI.floatText('指挥官 · ' + colNameP + ' → ' + labelP, '#59d9ff');
@@ -5891,7 +5824,7 @@ window.APH = window.APH || {};
         var next = (cur + 1) % 4;  /* 0→1→2→3→0 */
         m.workPrio[rid][colKey] = next;
         r.jobLocked = false;
-        if(APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+        saveMetaQuiet();
         var colName = colKey === 'sk_gather' ? '采集' : (colKey === 'sk_haul' ? '搬运' : (APH.Res.SKILL_NAMES[colKey]||colKey));
         var label = next === 0 ? '✕ 禁止' : next;
         APH.UI.floatText(r.name + ' · ' + colName + ' → ' + label, '#8fd4ff');
@@ -5902,6 +5835,22 @@ window.APH = window.APH || {};
   /* (D) 旧 autoAssign 已被 Colony.assignByPriority 取代 */
   
   
+  /* ADR-39: 把面板按钮要用的命令交给 APH.UI 的命令表。
+     视图从此只知道命令名, 不知道 main 存在。加载期注册, 不放进 boot() ——
+     面板在 boot 之前也可能被渲染。 */
+  APH.UI.registerCommands({
+    setInspTab:setInspTab,
+    cycleSchedule:cycleSchedule,
+    addBuildingBill:addBuildingBill,
+    togglePlayerDraft:togglePlayerDraft,
+    toggleSelectedDraft:toggleSelectedDraft,
+    releasePrisoner:releasePrisoner,
+    assignRestrict:assignRestrict,
+    cycleGrowCrop:cycleGrowCrop,
+    cycleZoneFilter:cycleZoneFilter,
+    toggleZoneForbid:toggleZoneForbid,
+  });
+
   /* 调试接口(标题探针之外的程序化验证通道) */
   APH.Main={
     start:startGame,

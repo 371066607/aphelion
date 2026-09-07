@@ -26,12 +26,12 @@ const ORDER = [
 ];
 
 /* 反向调用 main 的历史债: 棘轮式登记 —— 只许减少, 不许增加。
-   修掉一处就把数字调小; 想新增会直接让用例变红。
-   ui.js 的 27 处分三类, 待 ADR-38 后续拆解:
-     存档类(saveMetaQuiet/saveRivals/saveColony) → 应直接走 APH.Save
-     领域查询(haveStock/playerDefPower/applyTech) → 应下沉到 Colony/Res
-     命令派发(toggle / cycle 系列)               → 视图→控制器, 应走事件或命令表 */
-const MAIN_DEBT = { 'ui.js': 27 };
+   ADR-39 已把 ui.js 的 27 处清零, 三类各有归宿:
+     存档类(saveMetaQuiet/saveRivals/saveColony) → APH.Save / APH.Colony.persist / APH.Rivals.persistStates
+     领域查询(haveStock/playerDefPower/applyTech) → 下沉到 APH.Colony
+     命令派发(toggle / cycle 系列)               → APH.UI 命令表, main 启动时 registerCommands
+   现在这张表是空的。想再往里加一行, 先说明为什么这个模块必须认识 main。 */
+const MAIN_DEBT = {};
 
 test('layering: 反向调用 main 的次数只减不增 (棘轮)', () => {
   const grew = [];
@@ -54,6 +54,19 @@ test('layering: 模拟层(colony/combat)已彻底不再反向调用 main (ADR-38
   });
 });
 
+/* codeOf 会把字符串字面量剥掉, 而 onclick="...APH.Main.xxx()" 正好藏在字符串里 ——
+   ADR-39 之前 ui.js 有 10 处这种从 HTML 里发起的反向调用, 棘轮根本数不到。
+   这条用例读原文, 专门堵这个洞。 */
+test('layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)', () => {
+  /* 只剥注释, 保留字符串 —— 要找的东西就住在字符串里 */
+  const raw = fs.readFileSync(path.join(SRC, 'ui.js'), 'utf-8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  const bad = (raw.match(/onclick="[^"]*APH\.Main/g) || []).length;
+  if (bad)
+    throw new Error(`ui.js 有 ${bad} 处 onclick 直接调 APH.Main —— 应改走 APH.UI.cmd('<命令名>')`);
+});
+
 test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
   const NS = {
     'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
@@ -74,7 +87,6 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
     'alerts.js':  ['Colony','Weather'],
     'save.js':    ['Res'],
     'sfx.js':     ['Save'],
-    'ui.js':      ['Main'],
     'llm.js':     ['Planet','Save'],
     'opening.js': ['OpeningData','OpeningVideo'],
   };

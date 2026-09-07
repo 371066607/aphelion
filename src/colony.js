@@ -1364,6 +1364,15 @@ APH.Colony = (function(){
     return room.temp;
   }
 
+  /* ADR-39: 殖民地存档归殖民地自己管 —— 落盘前先把地上堆序列化进 colony.ground。
+     原先住在 main.js, 于是 ui 每次改动殖民地都要反向调 APH.Main.saveColony。 */
+  function persist(){
+    var s = (window.APH && APH.state) || null;
+    if(!s || !s.colony) return;
+    s.colony.ground = serializeGround(s.entities);
+    APH.Save.saveColony(s.colony);
+  }
+
   function serializeGround(entities){
     var g=[];
     (entities||[]).forEach(function(e){
@@ -1404,6 +1413,14 @@ APH.Colony = (function(){
   }
   function stockOf(res, entities, key){
     return ((res&&res[key])||0)+groundCount(entities, key);
+  }
+
+  /* ADR-39: 「当前局面下我有多少 key」—— 仓 + 地上堆, 从 APH.state 自取。
+     此前 main 与 ui 各有一份(ui 那份漏了地上堆), 现在只有这一份。 */
+  function haveStock(key){
+    var s=(window.APH&&APH.state)||null;
+    if(!s||!s.meta) return 0;
+    return stockOf(s.meta.res, s.entities, key);
   }
 
   /* 从地上堆扣 store 单位. 先扣 storeN=1 的堆; 合金整件扣.
@@ -1708,6 +1725,40 @@ APH.Colony = (function(){
   function plasmaTechLevel(tech){
     tech=tech||{};
     return Math.max(tech.te_ballistics||0, tech.te_weaponry||0);
+  }
+
+  /* ADR-39: 殖民地防御力(炮塔 + 等离子科技) —— 外交威慑与袭击评估共用。
+     ui 那份 fallback 曾与 main 分叉, 现统一在此。 */
+  function playerDefPower(){
+    var s=(window.APH&&APH.state)||null;
+    if(!s||!s.colony||!s.colony.buildings) return 10;
+    var turrets=s.colony.buildings.filter(function(b){ return b.id==='bl_turret'; }).length;
+    return 10 + turrets*12 + plasmaTechLevel(s.meta&&s.meta.tech)*5;
+  }
+
+  /* ADR-39: 科技效果落到 CFG(玩家属性/武器伤害)。TECHS 表本来就住在这里,
+     效果的应用也该在这里, 而不是在 main 里由 ui 反向调过去。 */
+  function applyTech(meta, techId){
+    var t=TECHS[techId]; if(!t||!t.effect||!meta) return;
+    var lv=(meta.tech&&meta.tech[techId])||0;
+    var P=CFG.player;
+    /* 从基准值重算, 避免叠加误差 */
+    if(t.effect.o2Max){ P.o2Max = 100 + t.effect.o2Max*lv; clampO2(); }
+    if(t.effect.dmgMul){
+      var plv=plasmaTechLevel(meta.tech);
+      CFG.combat.plasmaDmg = Math.round(13*(1+t.effect.dmgMul*plv));
+    }
+    if(t.effect.spdMul){ P.walkSpeed=Math.round(150*(1+t.effect.spdMul*lv));
+                         P.runSpeed =Math.round(235*(1+t.effect.spdMul*lv)); }
+    /* te_radar: 罗盘/农产倍率在绘制与 farmTick 读 meta.tech, 无需改全局 */
+  }
+  function applyAllTech(meta){
+    Object.keys(TECHS).forEach(function(id){ applyTech(meta, id); });
+    clampO2();
+  }
+  function clampO2(){
+    var s=(window.APH&&APH.state)||null;
+    if(s) s.o2=Math.min(s.o2, CFG.player.o2Max);
   }
 
   function missingRequire(t, owned){
@@ -2662,6 +2713,8 @@ APH.Colony = (function(){
     TECHS:TECHS, TECH_COLUMNS:TECH_COLUMNS, canBuy:canBuy, buyTech:buyTech,
     techDepth:techDepth, techNodeStatus:techNodeStatus,
     grantAssayKeyedTechs:grantAssayKeyedTechs, plasmaTechLevel:plasmaTechLevel,
+    applyTech:applyTech, applyAllTech:applyAllTech,
+    haveStock:haveStock, playerDefPower:playerDefPower,
     farmTick:farmTick, harvestYield:harvestYield, jobOutput:jobOutput,
     ranchTick:ranchTick, climateLaws:climateLaws, harvestMods:harvestMods,
     workshopTick:workshopTick,
@@ -2705,7 +2758,7 @@ APH.Colony = (function(){
     boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
     colonyGoal:colonyGoal, winterFoodNeed:winterFoodNeed,
     makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
-    serializeGround:serializeGround,
+    persist:persist, serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
     stockLabel:stockLabel, takeFromGround:takeFromGround,

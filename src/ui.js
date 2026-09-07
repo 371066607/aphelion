@@ -810,9 +810,9 @@ APH.UI = (function(){
     if(r2.ok){
       s.meta.tech=r2.owned;
       if(APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
-      if(window.APH.Main && APH.Main.applyTech){
-        APH.Main.applyTech(s.meta, s.techSel);
-        (r2.granted||[]).forEach(function(id){ APH.Main.applyTech(s.meta, id); });
+      if(APH.Colony.applyTech){
+        APH.Colony.applyTech(s.meta, s.techSel);
+        (r2.granted||[]).forEach(function(id){ APH.Colony.applyTech(s.meta, id); });
       }
       var okMsg='✔ 研发成功: '+tdef.name;
       if(r2.granted && r2.granted.length){
@@ -899,29 +899,17 @@ APH.UI = (function(){
   registerModal('techMap', { elId: 'techMap', isOverlay: true, render: renderTechMap, onOpen: ensureTechSel });
 
   /* ---------- 外星势力外交面板 (Diplomacy, ADR-17, ADR-18) ---------- */
-  function getPlayerDefPower(){
-    if(window.APH.Main && APH.Main.playerDefPower) return APH.Main.playerDefPower();
-    var s = window.APH && window.APH.state;
-    if(!s || !s.colony || !s.colony.buildings) return 10;
-    var turrets = s.colony.buildings.filter(function(b){ return b.id === 'bl_turret'; }).length;
-    var plasmaLv = (APH.Colony && APH.Colony.plasmaTechLevel) ? APH.Colony.plasmaTechLevel(s.meta && s.meta.tech) : 0;
-    return 10 + turrets * 12 + plasmaLv * 5;
-  }
-
-  function getStock(key){
-    if(window.APH.Main && APH.Main.haveStock) return APH.Main.haveStock(key);
-    var s = window.APH && window.APH.state;
-    if(!s || !s.meta) return 0;
-    if(APH.Colony && APH.Colony.stockOf) return APH.Colony.stockOf(s.meta.res, s.entities, key);
-    return (s.meta.res && s.meta.res[key]) || 0;
-  }
+  /* ADR-39: 这两个查询原本 ui 各留了一份 fallback, 且 getStock 那份漏了地上堆 ——
+     和念头上下文(ADR-37)是同一种分叉。现在只转发 APH.Colony 的唯一实现。 */
+  function getPlayerDefPower(){ return APH.Colony.playerDefPower(); }
+  function getStock(key){ return APH.Colony.haveStock(key); }
 
   function renderDiplomacy(){
     var s = window.APH && window.APH.state;
     if(!s) return;
     var body = document.getElementById('diplomacyBody');
     if(!body) return;
-    if(!s.rivalStates && window.APH.Main && APH.Main.loadRivals) APH.Main.loadRivals();
+    if(!s.rivalStates) APH.Rivals.hydrateStates();
 
     var def = getPlayerDefPower();
     var defEl = document.getElementById('dipDefPower');
@@ -1079,8 +1067,8 @@ APH.UI = (function(){
     }
     if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, resType, res.cost);
     s.rivalStates[rIdx] = res.newState;
-    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
-    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    APH.Rivals.persistStates();
+    APH.Save.metaQuiet();
     if(s.war && s.war.pendingWave && s.war.raidFrom === rs.rival.name){
       s.war.pendingWave = null;
       s.war.raidWarn = 0;
@@ -1101,8 +1089,8 @@ APH.UI = (function(){
     }
     if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, 'mineral', res.cost);
     s.rivalStates[rIdx] = res.newState;
-    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
-    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    APH.Rivals.persistStates();
+    APH.Save.metaQuiet();
     floatText(' 与 ' + rs.rival.name + ' 签署通商协定！', 400, 300, '#59d9ff');
     renderDiplomacy();
   }
@@ -1118,7 +1106,7 @@ APH.UI = (function(){
       return;
     }
     s.rivalStates[rIdx] = res.newState;
-    if(window.APH.Main && APH.Main.saveRivals) APH.Main.saveRivals();
+    APH.Rivals.persistStates();
     floatText('⚡ 成功威慑 ' + rs.rival.name + '！敌方陷入畏缩。', 400, 300, '#ffc857');
     renderDiplomacy();
   }
@@ -1232,8 +1220,8 @@ APH.UI = (function(){
       floatText(' 买入 ' + (RES_LABEL[r.key] || r.key) + ' -' + r.cost + '矿', 400, 300, '#9fe8c8');
     else
       floatText(' 卖出 ' + (RES_LABEL[r.key] || r.key) + ' +' + r.gain + '矿', 400, 300, '#ffe28a');
-    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
-    if(window.APH.Main && APH.Main.saveColony) APH.Main.saveColony();
+    APH.Save.metaQuiet();
+    APH.Colony.persist();
     renderTradePanel();
     if(APH.U && APH.U.emit) APH.U.emit('traded', r);
   }
@@ -1399,7 +1387,7 @@ APH.UI = (function(){
     tab = tab || 'needs';
     var h = '<div class="insp-tabs">';
     keys.forEach(function(k){
-      h += '<div class="insp-tab' + (tab===k.id ? ' on' : '') + '" onclick="window.APH.Main&&APH.Main.setInspTab(\'' + k.id + '\')">' + k.name + '</div>';
+      h += '<div class="insp-tab' + (tab===k.id ? ' on' : '') + '" onclick="APH.UI.cmd(\'setInspTab\',\'' + k.id + '\')">' + k.name + '</div>';
     });
     return h + '</div>';
   }
@@ -1460,7 +1448,7 @@ APH.UI = (function(){
     var sk = col ? col.key : 'sk_farm';
     m.workPrio[r.id][sk] = (APH.U && APH.U.clamp) ? APH.U.clamp(v, 0, 3) : Math.max(0, Math.min(3, v));
     r.jobLocked = false;
-    if(window.APH.Main && APH.Main.saveMetaQuiet) APH.Main.saveMetaQuiet();
+    APH.Save.metaQuiet();
     renderResPanel();
     floatText(r.name + ' · ' + (col ? col.name : sk) + ' 优先级 → ' + v, 400, 300, '#8fd4ff');
   }
@@ -1701,7 +1689,6 @@ APH.UI = (function(){
       }
       return toggle('diplomacy');
     }
-    if(window.APH.Main && APH.Main.toggleDiplomacy) APH.Main.toggleDiplomacy(show);
   }
 
   /* ================= ADR-28 / Ticket #156: 通用检查器 (Inspector) ================= */
@@ -1748,7 +1735,7 @@ APH.UI = (function(){
     for(i=0;i<24;i++){
       k = sch[i] || 'any';
       ring = (i===hourNow) ? 'outline:1px solid #fff;' : '';
-      h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleSchedule('+i+')" title="'+i+'时 '+k+'" style="width:16px;height:16px;padding:0;font-size:8px;line-height:16px;border:none;border-radius:3px;cursor:pointer;background:'+(col[k]||'#6a7a94')+';color:#0b0f14;'+ring+'">'+ (lab[k]||'·') +'</button>';
+      h += '<button type="button" onclick="APH.UI.cmd(\'cycleSchedule\','+i+')" title="'+i+'时 '+k+'" style="width:16px;height:16px;padding:0;font-size:8px;line-height:16px;border:none;border-radius:3px;cursor:pointer;background:'+(col[k]||'#6a7a94')+';color:#0b0f14;'+ring+'">'+ (lab[k]||'·') +'</button>';
     }
     h += '</div>';
     return h;
@@ -1766,7 +1753,7 @@ APH.UI = (function(){
     });
     var addRecipe = bid==='bl_workshop' ? 'it_pickaxe' : 'it_roasted_meat';
     var addName = bid==='bl_workshop' ? '采矿斧×4' : '烤肉×4';
-    h += '<button type="button" onclick="window.APH.Main&&APH.Main.addBuildingBill(\''+addRecipe+'\',4)" style="margin-top:4px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">+ '+addName+'</button>';
+    h += '<button type="button" onclick="APH.UI.cmd(\'addBuildingBill\',\''+addRecipe+'\',4)" style="margin-top:4px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">+ '+addName+'</button>';
     return h;
   }
   function inspectorHtml(target, s){
@@ -1785,7 +1772,7 @@ APH.UI = (function(){
 
       var rec = Math.round(needs.recreation != null ? needs.recreation : 80);
       var tab = s.inspTab || 'needs';
-      var cmds = '<button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.togglePlayerDraft()">'+(s.playerDrafted?'解除征召':'征召')+'</button>';
+      var cmds = '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'togglePlayerDraft\')">'+(s.playerDrafted?'解除征召':'征召')+'</button>';
       var h = inspHead('🧑‍🚀', '⭐ 指挥官(你)', statusTxt + ' · 生命 '+hp+' · 氧 '+o2, statusCol, cmds);
       h += needBarsHtml(food, rest, rec);
       h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
@@ -1803,7 +1790,7 @@ APH.UI = (function(){
         h += '<div style="margin-top:6px;color:#9a8c70">囚犯（非奴隶）</div>';
         (m.prisoners||[]).forEach(function(p){
           h += '<div>'+ (p.name||'俘虏') +
-            ' <button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.releasePrisoner(\''+p.id+'\')">释放</button></div>';
+            ' <button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'releasePrisoner\',\''+p.id+'\')">释放</button></div>';
         });
       }
       h += '</div>';
@@ -1824,7 +1811,7 @@ APH.UI = (function(){
       var rec = Math.round((r && r.recreation != null) ? r.recreation : (ent.recreation != null ? ent.recreation : 80));
       var action = ent.userOrder ? (ent.userOrder.type === 'move' ? '战术行军中' : (ent.userOrder.type === 'gather' ? '执行开采指令' : '执行搬运指令')) : (ent.drafted ? '战备戒备中' : (ent.gathering ? '正在采集中' : (ent.walking ? (ent.job ? '工位巡视劳作' : '基地漫步闲逛') : (ent.job ? '工位作业中' : '休闲散步中'))));
       var tab = s.inspTab || 'needs';
-      var cmds = '<button class="insp-cmd" type="button" onclick="window.APH.Main&&APH.Main.toggleSelectedDraft()">'+(ent.drafted?'解除征召':'征召')+'</button>';
+      var cmds = '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'toggleSelectedDraft\')">'+(ent.drafted?'解除征召':'征召')+'</button>';
       var h = inspHead('👤', name, trait + ' · ' + action + ' · ' + job, ent.drafted ? '#ff6d6d' : '#b8a888', cmds);
       h += needBarsHtml(food, rest, rec, mood);
       h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
@@ -1890,14 +1877,14 @@ APH.UI = (function(){
       var n = (z.cells||[]).length;
       if(z.type==='restrict'){
         var h = '<div style="color:#8fd4ff;font-weight:700;font-size:12px">🚧 活动区 · '+n+' 格</div>';
-        h += '<button type="button" onclick="window.APH.Main&&APH.Main.assignRestrict()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">限制选中小人</button>';
+        h += '<button type="button" onclick="APH.UI.cmd(\'assignRestrict\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">限制选中小人</button>';
         return h;
       }
       if(z.type==='grow'){
         var crop = (window.APH.Colony && APH.Colony.ALIEN_CROPS && APH.Colony.ALIEN_CROPS[z.cropType]) || {};
         var h = '<div style="color:#7dffab;font-weight:700;font-size:12px">🌱 种植区 · '+n+' 格</div>';
         h += '<div style="font-size:10px;color:#8fa3cc;margin-top:4px">作物: '+(crop.name||z.cropType||'未选')+'</div>';
-        h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleGrowCrop()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(125,255,171,.45);background:rgba(125,255,171,.12);color:#c8e89a;cursor:pointer">换作物</button>';
+        h += '<button type="button" onclick="APH.UI.cmd(\'cycleGrowCrop\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(125,255,171,.45);background:rgba(125,255,171,.12);color:#c8e89a;cursor:pointer">换作物</button>';
         return h;
       }
       var filt = z.filter || 'all';
@@ -1906,8 +1893,8 @@ APH.UI = (function(){
       var h = '<div style="color:#ffc857;font-weight:700;font-size:12px">📦 仓储区 · '+n+' 格</div>';
       h += '<div style="font-size:10px;color:#8fa3cc;margin-top:4px">过滤: '+filtName+'</div>';
       h += '<div style="font-size:10px;color:#ff9a9a;margin-top:2px">禁止: '+(forbids.length?forbids.join(','):'无')+'</div>';
-      h += '<button type="button" onclick="window.APH.Main&&APH.Main.cycleZoneFilter()" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">循环过滤</button> ';
-      h += '<button type="button" onclick="window.APH.Main&&APH.Main.toggleZoneForbid(\'food\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(255,154,154,.45);background:rgba(255,80,80,.12);color:#ffd0d0;cursor:pointer">禁止口粮</button>';
+      h += '<button type="button" onclick="APH.UI.cmd(\'cycleZoneFilter\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(89,217,255,.45);background:rgba(89,217,255,.12);color:#bfe8ff;cursor:pointer">循环过滤</button> ';
+      h += '<button type="button" onclick="APH.UI.cmd(\'toggleZoneForbid\',\'food\')" style="margin-top:6px;font-size:10px;padding:3px 8px;border-radius:8px;border:1px solid rgba(255,154,154,.45);background:rgba(255,80,80,.12);color:#ffd0d0;cursor:pointer">禁止口粮</button>';
       return h;
     }
     if(target.type === 'dropped'){
@@ -2039,7 +2026,23 @@ APH.UI = (function(){
     }
   }
 
+  /* ---------- 命令表 (ADR-39) ----------
+     面板里的按钮原先直接写 onclick 调 main 的函数 —— 视图直接点名控制器,
+     是 ui → main 反向依赖里最难看的一类(还绕过模块边界, 从 HTML 字符串里调)。
+     现在视图只发命令名: onclick="APH.UI.cmd('xxx')"; main 启动时 registerCommands 挂上实现。
+     未注册的命令静默 no-op —— 面板可能在 main 就绪前就渲染, 不该炸。 */
+  var commands = {};
+  function registerCommands(map){
+    Object.keys(map || {}).forEach(function(k){ commands[k] = map[k]; });
+  }
+  function cmd(name){
+    var f = commands[name];
+    if(typeof f !== 'function') return undefined;
+    return f.apply(null, [].slice.call(arguments, 1));
+  }
+
   return {
+    registerCommands:registerCommands, cmd:cmd,
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
     setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,

@@ -259,5 +259,45 @@ const bodyHtml = elements.resBody.innerHTML;
 assert('开局零居民时工作面板应渲染指挥官角色卡', bodyHtml.indexOf('⭐ 指挥官 (你)') !== -1);
 assert('开局零居民时工作面板应包含指挥官工作表', bodyHtml.indexOf('⭐ 指挥官(你)') !== -1);
 
+/* ---------- ADR-39 命令表: 视图 → 控制器的唯一通道 ---------- */
+console.log('--- ADR-39 Command Table ---');
+
+/* 未注册的命令必须静默 no-op: 面板可能在 main 就绪前渲染 */
+let threw = false;
+try { UI.cmd('nope_not_registered', 1, 2); } catch(e){ threw = true; }
+assert('未注册命令不抛错(静默 no-op)', threw === false);
+assert('未注册命令返回 undefined', UI.cmd('nope_not_registered') === undefined);
+
+/* 注册后按名派发, 参数原样透传, 返回值回传 */
+let seen = null;
+UI.registerCommands({ probe: function(a, b){ seen = [a, b]; return 'ok:' + a; } });
+const ret = UI.cmd('probe', 'x', 7);
+assert('已注册命令被调用且参数透传', JSON.stringify(seen) === JSON.stringify(['x', 7]));
+assert('已注册命令的返回值原样回传', ret === 'ok:x');
+
+/* registerCommands 可多次调用, 后注册的覆盖同名命令 */
+UI.registerCommands({ probe: function(){ return 'second'; } });
+assert('同名命令可被后注册的覆盖', UI.cmd('probe') === 'second');
+assert('registerCommands 接受空参数不抛错', (function(){
+  try { UI.registerCommands(); UI.registerCommands(null); return true; }
+  catch(e){ return false; }
+})());
+
+/* 检查器面板发出的按钮必须走命令表, 不得直呼 APH.Main */
+window.APH.state = {
+  hp: 100, o2: 100, scene: 'home', selectedRid: null, playerDrafted: false,
+  colony: { buildings: [] }, entities: [],
+  meta: { residents: [], playerNeeds: { food: 80, rest: 100 } }
+};
+const inspHtml = UI.inspectorHtml() || '';
+assert('检查器 HTML 不含 APH.Main', inspHtml.indexOf('APH.Main') === -1);
+assert('检查器的征召按钮走 APH.UI.cmd', inspHtml.indexOf("APH.UI.cmd('togglePlayerDraft')") !== -1);
+
+/* 命令表真的接得上: 模拟 main 注册后点按钮 */
+let drafted = 0;
+UI.registerCommands({ togglePlayerDraft: function(){ drafted++; } });
+UI.cmd('togglePlayerDraft');
+assert('检查器命令经命令表抵达实现', drafted === 1);
+
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);

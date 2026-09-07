@@ -401,12 +401,15 @@
       指挥官检查器又开始撒谎。统一挂 `APH.Res`
 - [x] **ADR-38 模拟循环单一归属**：colony/combat 的 12 处 `APH.Main` 反向调用清零；
       `tickProduction` 改为返回「本跳是否发生」，编排归还 main；落成/围攻改走事件总线
-- [ ] **ui.js → APH.Main 27 处**（棘轮已锁死不许增长）：
-      存档类 → 直接走 `APH.Save`；领域查询 → 下沉 Colony/Res；命令派发 → 事件或命令表
+- [x] **ADR-39 ui.js → APH.Main 清零**（27 处代码 + 10 处藏在 onclick 字符串里，棘轮数不到）：
+      存档 → `APH.Save` / `Colony.persist` / `Rivals.persistStates`（且不再绕开 Save 的降级兜底）；
+      领域查询 → 下沉 `APH.Colony`（ui 的 `getStock` fallback 曾漏算地上堆）；
+      命令派发 → `APH.UI` 命令表，main 加载期 `registerCommands`。
+      棘轮表清空 + 新增一条只剥注释的用例专堵内联 onclick
 - [ ] **模拟层直接驱动 UI**：`combat.js` 38 处、`colony.js` 5 处 `APH.UI.*`，
       应改为 emit 事件由 ui 订阅（ADR-8 总线已具备）
 - [ ] **main.js 仍 6100+ 行**：提示层与殖民地跳编排应各自独立成模块。
-      **注意排序**：这一项要放在上面两项之后 —— 先把依赖方向理顺，
+      **注意排序**：这一项要放在上面一项之后 —— 先把依赖方向理顺，
       才知道哪些代码天然属于哪里
 - [ ] **CFG 1110 行单层对象**：按域拆命名空间
 

@@ -196,3 +196,102 @@ test('save: 正常迁移链仍然推进版本号', () => {
   if (!APH.Save.isFutureSave({ v: V + 1 })) throw new Error('isFutureSave 应识别未来版本');
   if (APH.Save.isFutureSave({ v: V })) throw new Error('当前版本不是未来版本');
 });
+
+/* ---------- ADR-39: 局内存档从 main 搬进 Save/Colony/Rivals ---------- */
+
+test('ADR-39 save: 殖民地存档往返, 且带上当前版本号', () => {
+  const colony = { buildings: [{ id: 'bl_house', x: 10, y: 20 }], builtAt: 123, ground: [] };
+  APH.Save.saveColony(colony);
+  const back = APH.Save.loadColony();
+  if (!back || !Array.isArray(back.buildings)) throw new Error('应读回殖民地');
+  if (back.buildings.length !== 1 || back.buildings[0].id !== 'bl_house')
+    throw new Error('建筑清单不得丢失');
+  if (back.v !== APH.CFG.save.VERSION) throw new Error('应带当前版本号, got ' + back.v);
+  if (back.buildings[0].lv !== 1) throw new Error('缺省等级应补成 1');
+});
+
+test('ADR-39 save: 无存档时给出空殖民地而不是 null', () => {
+  const fresh = APH.Save.loadColony();
+  if (!fresh || !Array.isArray(fresh.buildings) || fresh.buildings.length)
+    throw new Error('无存档应回退成空殖民地');
+});
+
+test('ADR-39 save: 势力关系是数组, 往返不被 migrate 判成损坏', () => {
+  const list = [{ rival: { name: '灰隼', trait: 'raider' }, anger: 5, relation: -20, cowedTime: 0, pact: false }];
+  APH.Save.saveRivalStates(list);
+  const back = APH.Save.loadRivalStates();
+  if (!Array.isArray(back)) throw new Error('数组存档应原样读回, got ' + JSON.stringify(back));
+  if (back.length !== 1 || back[0].anger !== 5) throw new Error('关系数据不得丢失');
+  APH.Save.saveRivalStates('not an array');
+  if (JSON.stringify(APH.Save.loadRivalStates()) !== JSON.stringify(back))
+    throw new Error('非数组入参应被拒绝, 不得覆盖已有存档');
+});
+
+test('ADR-39 colony: persist 落盘前把地上堆序列化进 colony.ground', () => {
+  const prev = APH.state;
+  APH.state = {
+    colony: { buildings: [], builtAt: 1, ground: [] },
+    entities: [{ type: APH.CFG.entType.DROPPED, itemId: 'it_food', x: 5, y: 6, n: 3 }],
+  };
+  try {
+    APH.Colony.persist();
+    const back = APH.Save.loadColony();
+    const expect = APH.Colony.serializeGround(APH.state.entities);
+    if (!expect.length) throw new Error('用例前提失效: 地上堆应被序列化出至少一条');
+    if (JSON.stringify(back.ground) !== JSON.stringify(expect))
+      throw new Error('落盘的 ground 应等于 serializeGround 的结果');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-39 rivals: 首次 hydrate 从星球 spec 建表并立刻落盘', () => {
+  const prev = APH.state;
+  APH.state = { seed: 12345, rivalStates: null };
+  try {
+    const list = APH.Rivals.hydrateStates();
+    if (!Array.isArray(list) || !list.length) throw new Error('应从 spec 初始化出势力');
+    list.forEach(r => {
+      if (typeof r.relation !== 'number') throw new Error('每个势力都要有初始关系值');
+      if (r.cowedTime !== 0 || r.pact !== false) throw new Error('新势力的畏缩/通商应归零');
+    });
+    if (!APH.Save.loadRivalStates()) throw new Error('首次初始化后应立刻落盘');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-39 rivals: 老存档缺字段时 hydrate 补齐, 不丢已有关系', () => {
+  const prev = APH.state;
+  APH.Save.saveRivalStates([{ rival: { name: '灰隼', trait: 'raider' }, anger: 9 }]);
+  APH.state = { seed: 12345, rivalStates: null };
+  try {
+    const list = APH.Rivals.hydrateStates();
+    if (list.length !== 1 || list[0].anger !== 9) throw new Error('已有数据不得被 spec 覆盖');
+    if (typeof list[0].relation !== 'number') throw new Error('缺失的 relation 应按性格补齐');
+    if (list[0].cowedTime !== 0 || list[0].pact !== false) throw new Error('缺失字段应补默认值');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-39 colony: haveStock 算上地上堆(ui 那份 fallback 曾漏掉)', () => {
+  const prev = APH.state;
+  APH.state = {
+    meta: { res: { food: 4 } },
+    entities: [{ type: APH.CFG.entType.DROPPED, itemId: 'it_food', x: 1, y: 1, n: 3 }],
+  };
+  try {
+    const ground = APH.Colony.groundCount(APH.state.entities, 'food');
+    if (ground !== 3) throw new Error('地上应有 3 份口粮, got ' + ground);
+    if (APH.Colony.haveStock('food') !== 4 + ground)
+      throw new Error('haveStock 应为 仓 + 地上堆, got ' + APH.Colony.haveStock('food'));
+    if (APH.Colony.haveStock('nonexistent') !== 0) throw new Error('未知资源应为 0');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-39 colony: playerDefPower 随炮塔与等离子科技增长', () => {
+  const prev = APH.state;
+  APH.state = { colony: { buildings: [] }, meta: { tech: {} } };
+  try {
+    if (APH.Colony.playerDefPower() !== 10) throw new Error('无炮塔无科技时应为基准 10');
+    APH.state.colony.buildings = [{ id: 'bl_turret' }, { id: 'bl_turret' }, { id: 'bl_house' }];
+    if (APH.Colony.playerDefPower() !== 10 + 24) throw new Error('每座炮塔 +12');
+    APH.state.meta.tech = { te_weaponry: 2 };
+    if (APH.Colony.playerDefPower() !== 10 + 24 + 10) throw new Error('等离子每级 +5');
+  } finally { APH.state = prev; }
+});

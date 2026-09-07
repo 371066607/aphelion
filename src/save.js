@@ -185,6 +185,45 @@ APH.Save = (function(){
   function loadRivals(id){ return read(CFG.save.KEY_RIVALS + id); }
   function saveRivals(id, state){ write(CFG.save.KEY_RIVALS + id, state); }
 
+  /* ---------- 局内状态: 殖民地 / 势力关系 (ADR-39) ----------
+     此前住在 main.js 里、直接 localStorage.setItem, 于是 ui 想存档就得反向调 main,
+     且 localStorage 不可用时(隐私模式/测试环境)静默丢档。现在与 meta 走同一条路。 */
+
+  /* meta 的静默保存: 存档失败不该打断正在进行的交互 */
+  function metaQuiet(){
+    try{ saveMeta(APH.state.meta); }catch(e){}
+  }
+
+  function loadColony(){
+    var v = read(CFG.save.KEY_COLONY);
+    if(v && Array.isArray(v.buildings)){
+      v.buildQueue = v.buildQueue || [];
+      v.ground = v.ground || [];
+      v.buildings.forEach(function(b){ b.lv = b.lv || 1; });
+      return v;
+    }
+    return { buildings:[], builtAt:Date.now(), ground:[] };
+  }
+  function saveColony(colony){
+    if(!colony) return;
+    try{ write(CFG.save.KEY_COLONY, colony); }catch(e){}
+  }
+
+  /* 势力关系存的是数组, 走不了 read/write —— migrate 只认存档对象, 会把数组判为损坏。
+     所以这一对直接用 rawGet/rawSet, 仍然享有内存兜底。 */
+  function loadRivalStates(){
+    var txt = rawGet(CFG.save.KEY_RIVAL_STATES);
+    if(!txt) return null;
+    try{
+      var v = JSON.parse(txt);
+      return Array.isArray(v) ? v : null;
+    }catch(e){ return null; }
+  }
+  function saveRivalStates(list){
+    if(!Array.isArray(list)) return;
+    try{ rawSet(CFG.save.KEY_RIVAL_STATES, JSON.stringify(list)); }catch(e){}
+  }
+
   /* ---------- 调试/重置 ---------- */
   function wipeAll(){
     // 只清本游戏前缀的 key
@@ -203,6 +242,9 @@ APH.Save = (function(){
     loadMeta:loadMeta, saveMeta:saveMeta,
     loadPlanet:loadPlanet, savePlanet:savePlanet,
     loadRivals:loadRivals, saveRivals:saveRivals,
+    metaQuiet:metaQuiet,
+    loadColony:loadColony, saveColony:saveColony,
+    loadRivalStates:loadRivalStates, saveRivalStates:saveRivalStates,
     migrate:migrate, wipeAll:wipeAll, isFutureSave:isFutureSave,
     isPersistent:function(){ return persistent; },
   };

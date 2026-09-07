@@ -197,7 +197,36 @@ APH.Rivals = (function(){
     return base;
   }
 
+  /* ---------- 局内势力关系的存取 (ADR-39) ----------
+     原先住在 main.js: ui 面板改了关系就得反向调 APH.Main.saveRivals。
+     关系表是本模块的概念, 它的读写也归本模块; 存储层走 APH.Save。 */
+  function hydrateStates(){
+    var s = APH.state;
+    var saved = APH.Save.loadRivalStates();
+    if(saved){
+      s.rivalStates = saved.map(function(r){
+        if(r.relation == null && r.rival && r.rival.trait)
+          r.relation = defaultRelationOf(r.rival.trait);
+        if(r.cowedTime == null) r.cowedTime = 0;
+        if(r.pact == null) r.pact = false;
+        return r;
+      });
+      return s.rivalStates;
+    }
+    /* 首次: 从当前星球 spec 初始化 */
+    var specRivals = APH.Planet.fallbackPlanet(s.seed || 12345).rivals;
+    s.rivalStates = specRivals.map(function(r){
+      return { rival:r, anger:0, relation:defaultRelationOf(r.trait), cowedTime:0, pact:false };
+    });
+    persistStates();
+    return s.rivalStates;
+  }
+  function persistStates(){
+    APH.Save.saveRivalStates(APH.state.rivalStates);
+  }
+
   return {
+    hydrateStates:hydrateStates, persistStates:persistStates,
     TRAITS:TRAITS,
     growthTick:growthTick,
     shouldRaid:shouldRaid,

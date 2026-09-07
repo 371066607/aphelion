@@ -1014,6 +1014,10 @@ APH.CFG = {
     KEY_META: 'aphelion_meta',
     KEY_PLANET: 'aphelion_planet_',
     KEY_RIVALS: 'aphelion_rivals_',
+    /* ADR-39: 殖民地与势力关系此前由 main.js 直接写裸 localStorage,
+       绕开了 Save 的降级兜底; key 保持原样, 老存档照常读得到。 */
+    KEY_COLONY: 'aphelion_colony_v1',
+    KEY_RIVAL_STATES: 'aphelion_rivals_v1',
     VERSION: 1,
   },
 
