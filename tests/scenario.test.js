@@ -431,7 +431,6 @@ test('O2 死亡: showDeath 传入 runLoot 与 survived', () => {
   S.landedAt=10;
   S.clock=100;
   S.carry={ it_mineral:1 };
-  S.meta.residents=[];                 // ADR-44: 没人接班, 才是真的结束
   let seen=null;
   /* ADR-40 之后死亡结算走总线, 不再直调 APH.UI.showDeath ——
      订总线才测得到真正的契约(旧写法打桩公开方法, 已经拦不住了)。 */

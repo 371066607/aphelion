@@ -377,72 +377,7 @@ APH.Res = (function(){
       meta.playerNeeds.mood = (C0.moodBase != null) ? C0.moodBase : 70;
     }
     meta.playerSchedule = ensureSchedule(meta.playerSchedule);
-    ensureCommander(meta);
     return meta;
-  }
-
-  /* ---------- ADR-44: 指挥官是一个人, 不是一个插槽 ----------
-     此前指挥官没有名字, 全项目写死 { id:'player', name:'指挥官' } ——
-     因为他不可能被替换, 所以不需要身份。继任落地后他需要。
-     老档缺失 → 补一位无名的初代指挥官, 零迁移。 */
-  function ensureCommander(meta){
-    if(!meta) return null;
-    if(!meta.commander){
-      meta.commander = {
-        name: '指挥官', origin: '登陆舱',
-        skills: null,              // null = 沿用旧的写死技能值(初代指挥官)
-        mainSkill: null, bio: null,
-        succeeded: 0,              // 第几任: 0 = 初代
-      };
-    }
-    return meta.commander;
-  }
-  function commanderName(meta){
-    var c = meta && meta.commander;
-    return (c && c.name) || '指挥官';
-  }
-  /* 指挥官在某项技能上的水平。初代没有技能表, 沿用各调用点原先写死的值,
-     所以要传 fallback —— 这样继任者用自己的真实技能, 初代行为一字不变。 */
-  function commanderSkill(meta, key, fallback){
-    var c = meta && meta.commander;
-    if(c && c.skills && c.skills[key] != null) return c.skills[key];
-    return fallback;
-  }
-
-  /* ---------- ADR-44: 继任 ----------
-     指挥官倒下时, 只要还有殖民者活着, 就有人顶上 —— 殖民地优先的直接推论:
-     「还有人活着, 殖民地就还在」。挑最资深的那位(名册顺序 = 加入顺序):
-     跟得最久的人接手, 是这个故事里最自然的选择。
-     返回 { ok, successor, fallen } ; 名册空 → { ok:false } 由调用方判本局结束。 */
-  function succeedCommander(meta){
-    if(!meta) return { ok:false };
-    var roster = meta.residents || [];
-    if(!roster.length) return { ok:false };
-    ensureCommander(meta);
-    var fallen = {
-      name: commanderName(meta),
-      succeeded: meta.commander.succeeded || 0,
-    };
-    var heir = roster.shift();                 // 名册首位 = 最资深
-    meta.commander = {
-      name: heir.name, origin: heir.origin,
-      skills: heir.skills || null, mainSkill: heir.mainSkill || null,
-      bio: heir.bio || null,
-      succeeded: (fallen.succeeded || 0) + 1,
-    };
-    /* 继任者带着自己的身体状况上任 —— 不是满血复活, 他刚经历了同一场灾难 */
-    var n = meta.playerNeeds || {};
-    n.food = heir.food != null ? heir.food : n.food;
-    n.rest = heir.rest != null ? heir.rest : n.rest;
-    n.illness = heir.illness != null ? heir.illness : 0;
-    n.mood = heir.mood != null ? heir.mood : n.mood;
-    n.recreation = heir.recreation != null ? heir.recreation : n.recreation;
-    n.downed = false; n.downT = null; n.isSleeping = false; n.bedId = null;
-    n.exposure = 0;
-    meta.playerNeeds = n;
-    meta.stats = meta.stats || {};
-    meta.stats.commandersLost = (meta.stats.commandersLost || 0) + 1;
-    return { ok:true, successor: meta.commander, fallen: fallen, heir: heir };
   }
 
   /* ---------- #66 玩家床边睡眠/唤醒 (纯函数, #67 累塌/#70 医疗舱可复用) ---------- */
@@ -2308,8 +2243,6 @@ APH.Res = (function(){
     homeFoodTick:homeFoodTick, homeRestTick:homeRestTick, homeIllnessTick:homeIllnessTick, ensurePlayerNeeds:ensurePlayerNeeds,
     setPlayerSleeping:setPlayerSleeping, playerWake:playerWake, playerRestTick:playerRestTick,
     playerDownedTick:playerDownedTick,
-    ensureCommander:ensureCommander, commanderName:commanderName,
-    commanderSkill:commanderSkill, succeedCommander:succeedCommander,
     hurtResident:hurtResident, applyMed:applyMed,
     disturbSleep:disturbSleep, assignBeds:assignBeds, capacitiesOf:capacitiesOf,
     needsMedBed:needsMedBed, clinicBedSpot:clinicBedSpot,

@@ -1494,7 +1494,7 @@ APH.UI = (function(){
     html += '</tr>';
     /* ADR-28: 玩家自身作为命令表首行（环世界核心：玩家也是小人） */
     var playerRow = '<tr><td style="padding:4px 10px;color:#59d9ff;font-weight:700;font-size:12px;white-space:nowrap">' +
-      '⭐ '+cmdName()+'(你)</td>';
+      '⭐ 指挥官(你)</td>';
     var pPrio = m.playerPrio || (m.playerPrio = {});
     cols.forEach(function(col){
       var v = pPrio[col.key] != null ? pPrio[col.key] : 2;
@@ -1776,7 +1776,7 @@ APH.UI = (function(){
       var rec = Math.round(needs.recreation != null ? needs.recreation : 80);
       var tab = s.inspTab || 'needs';
       var cmds = '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'togglePlayerDraft\')">'+(s.playerDrafted?'解除征召':'征召')+'</button>';
-      var h = inspHead('🧑‍🚀', '⭐ '+cmdName()+'(你)', statusTxt + ' · 生命 '+hp+' · 氧 '+o2, statusCol, cmds);
+      var h = inspHead('🧑‍🚀', '⭐ 指挥官(你)', statusTxt + ' · 生命 '+hp+' · 氧 '+o2, statusCol, cmds);
       h += needBarsHtml(food, rest, rec);
       h += inspTabsHtml(tab, [{id:'needs',name:'概况'},{id:'thoughts',name:'念头'},{id:'health',name:'健康'},{id:'sched',name:'作息'}]);
       h += '<div class="insp-body">';
@@ -2034,12 +2034,16 @@ APH.UI = (function(){
      模拟层认识视图, 方向是反的。现在它们只 emit, 由这里订阅并落到 DOM。
      U.emit 是同步派发, 顺序与直调时完全一致; 没有监听者时是 no-op,
      和原先 `if(APH.UI && APH.UI.floatText)` 的守卫等价(无头/测试环境照跑)。 */
-  /* ADR-44: 指挥官会更替, 所以面板上得叫他的名字, 不能再写死「指挥官」。 */
-  function cmdName(){
-    var s = window.APH && APH.state;
-    return (APH.Res && APH.Res.commanderName) ? APH.Res.commanderName(s && s.meta) : '指挥官';
-  }
+  U.on('notice', function(p){ if(p && p.text) floatText(p.text, p.color); });
+  U.on('hint',   function(p){ setHint((p && p.text) || ''); });
+  U.on('death',  function(p){ if(p) showDeath(p.reason, p.stats || {}); });
 
+
+  /* ---------- 模拟层通知的落地点 (ADR-40) ----------
+     combat/colony 原先直接调 APH.UI.floatText / setHint / showDeath ——
+     模拟层认识视图, 方向是反的。现在它们只 emit, 由这里订阅并落到 DOM。
+     U.emit 是同步派发, 顺序与直调时完全一致; 没有监听者时是 no-op,
+     和原先 `if(APH.UI && APH.UI.floatText)` 的守卫等价(无头/测试环境照跑)。 */
   U.on('notice', function(p){ if(p && p.text) floatText(p.text, p.color); });
   U.on('hint',   function(p){ setHint((p && p.text) || ''); });
   U.on('death',  function(p){ if(p) showDeath(p.reason, p.stats || {}); });

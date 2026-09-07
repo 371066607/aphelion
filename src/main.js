@@ -470,8 +470,11 @@ window.APH = window.APH || {};
       }else s.acidT=0;
     }
     if(s.o2<=0){
-      /* ADR-44: 缺氧倒下同样走继任判定, 不再直接结束本局 */
-      APH.ColonyTick.commanderFell('生命维持系统在荒原上停转了。', null);
+      s.mode='dead'; U.emit('gameOver',{});
+      s.meta.stats.deaths++; APH.Save.saveMeta(s.meta);
+      U.emit('death', {reason:'生命维持系统在荒原上停转了。', stats:{
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry,
+        runLoot:s.runLoot, survived:s.clock-(s.landedAt||0)}});
     }
   }
 
@@ -576,7 +579,6 @@ window.APH = window.APH || {};
     var s=APH.state;
     if(!s.nearFood) return false;
     if(!s.meta.playerNeeds && APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(s.meta);
-      if(APH.Res && APH.Res.ensureCommander) APH.Res.ensureCommander(s.meta);   /* ADR-44 老档补身份 */
     if(playerFood()>=foodEatBelow()){
       APH.UI.floatText('🍽 不饿，先不吃','#8fd4ff');
       return false;
@@ -1011,7 +1013,6 @@ window.APH = window.APH || {};
     var s=APH.state;
     /* #72 家园击倒: 首帧保证 playerNeeds 存在(否则击倒/送医无挂载点) */
     if(!s.meta.playerNeeds && APH.Res && APH.Res.ensurePlayerNeeds) APH.Res.ensurePlayerNeeds(s.meta);
-      if(APH.Res && APH.Res.ensureCommander) APH.Res.ensureCommander(s.meta);   /* ADR-44 老档补身份 */
 
     /* 发射台 / 过客接近检测 (委托 APH.Ent 空间检索接缝, ADR-20) */
     var pad = APH.Ent.findNearestBuilding(s.entities, 'bl_landing_pad', s.px, s.py, 90) ||
@@ -1120,9 +1121,11 @@ window.APH = window.APH || {};
       hasResidents: hasRes72,
     });
     if(res72.dead && s.mode==='running'){
-      /* ADR-44: 没人及时救 → 指挥官死在自己的殖民地里。留尸体; 有人接班就接班。 */
-      APH.ColonyTick.commanderFell(
-        APH.Res.commanderName(s.meta)+'在殖民地里倒下，失血过多。', { x:s.px, y:s.py });
+      s.mode='dead'; U.emit('gameOver',{});
+      s.meta.stats.deaths++; APH.Save.saveMeta(s.meta);
+      U.emit('death', {reason:'你在殖民地倒下，失血过多。', stats:{
+        cry:s.cry, found:s.found, total:s.totalBeacons, carry:s.carry,
+        runLoot:s.runLoot, survived:s.clock-(s.landedAt||0)}});
     }else if(res72.revived){
       s.hp = Math.min(CFG.player.hpMax, (CFG.economy&&CFG.economy.clinicHeal)||40);
       s.downed=false;
@@ -1877,8 +1880,7 @@ window.APH = window.APH || {};
     }
     if(s.scene==='home' && s.nearBrokenResident){
       var targetRes = s.nearBrokenResident.resident;
-      var counselor = { id:'player', name:APH.Res.commanderName(s.meta),
-                        skills:{ sk_social: APH.Res.commanderSkill(s.meta,'sk_social',4) } };
+      var counselor = { id:'player', name:'指挥官', skills:{ sk_social: 4 } };
       var rngFn = (s._interventionRng) || Math.random;
       var bRes = APH.Res.attemptIntervention(targetRes, counselor, rngFn, s.meta.bonds);
       if(bRes.success){
@@ -1962,8 +1964,7 @@ window.APH = window.APH || {};
       var termObj = s.nearAncientTerminal.terminal || s.nearAncientTerminal;
       if(!termObj.hacked){
         var loreSkill = (s.meta && s.meta.loreSkill) || 3;
-        var hacker = { id:'player', name:APH.Res.commanderName(s.meta),
-                       skills:{ sk_lore: APH.Res.commanderSkill(s.meta,'sk_lore', loreSkill) } };
+        var hacker = { id:'player', name:'指挥官', skills:{ sk_lore: loreSkill } };
         var hRes = APH.Res.hackTerminal(termObj, hacker, s._hackRng || Math.random);
         if(hRes.success){
           if(s.ruins && s.ruins.gate){
@@ -2298,7 +2299,7 @@ window.APH = window.APH || {};
         if(s.playerDrafted){
           APH.UI.floatText('⭐ 已征召 · 点地面走路', '#ff4d4d');
         } else {
-          APH.UI.floatText('⭐ '+APH.Res.commanderName(s.meta)+' 解除征召 (归队作息)', '#7dffab');
+          APH.UI.floatText('⭐ 指挥官解除征召 (归队作息)', '#7dffab');
         }
         updateInspectorNow();
         if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
@@ -2558,8 +2559,7 @@ window.APH = window.APH || {};
         if(hitTerm){
           var tObj = hitTerm.terminal || hitTerm;
           if(!tObj.hacked && APH.Res && APH.Res.hackTerminal){
-            var hackScholar = { id: 'player', name: APH.Res.commanderName(s0.meta),
-              skills: { sk_lore: APH.Res.commanderSkill(s0.meta, 'sk_lore', (s0.meta && s0.meta.loreSkill) || 6) } };
+            var hackScholar = { id: 'player', name: '指挥官', skills: { sk_lore: (s0.meta && s0.meta.loreSkill) || 6 } };
             var rngFn = s0._hackRng || Math.random;
             var hRes = APH.Res.hackTerminal(tObj, hackScholar, rngFn);
             if(hRes && hRes.success){
@@ -2806,7 +2806,7 @@ window.APH = window.APH || {};
           var minX = Math.min(APH.state.pawnDragStart.x, APH.state.pawnDragEnd.x), maxX = Math.max(APH.state.pawnDragStart.x, APH.state.pawnDragEnd.x);
           var minY = Math.min(APH.state.pawnDragStart.y, APH.state.pawnDragEnd.y), maxY = Math.max(APH.state.pawnDragStart.y, APH.state.pawnDragEnd.y);
           if(s0.px >= minX && s0.px <= maxX && s0.py >= minY && s0.py <= maxY){
-            pawns.unshift(APH.Ent.findPlayer() || { type:'player', id:'player', name:APH.Res.commanderName(APH.state.meta) });
+            pawns.unshift(APH.Ent.findPlayer() || { type: 'player', id: 'player', name: '指挥官' });
           }
           if(pawns.length > 0){
             s0.selectedPawns = pawns;
@@ -3064,11 +3064,6 @@ window.APH = window.APH || {};
      实体池归 main 管, 所以订阅方是这里。 */
   U.on('rosterChanged', function(){ syncResidentEntities(); });
 
-  /* ADR-44: 指挥官死在远征途中 —— 继任者在家, 所以镜头得回家。
-     不走 returnHome(那会把战利品入库), 战利品已随前任留在荒原。 */
-  U.on('forceReturnHome', function(){
-    if(APH.state.scene === 'expedition') enterHome();
-  });
 
   /* ================= 事件订阅 (ADR-8 示范) ================= */
   U.on('built', onBuilt);          /* ADR-38: 建筑落成副作用 */
