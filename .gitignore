@@ -9,3 +9,6 @@ node_modules/
 .freebuff/
 # build_sprites.py 改写原图前的一次性备份
 *.bak
+
+# build_sprites/pack_sheets 的一次性备份目录
+assets/_bak_cottage/
