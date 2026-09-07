@@ -43,7 +43,8 @@ for (const f of ['config.js', 'utils.js', 'input.js', 'humanoid.js', 'save.js', 
 
 /* ---- 加载测试文件 ---- */
 const argFiles = process.argv.slice(2);
-const EXCLUDE = ['scenario.test.js', 'perf.test.js', 'boss.test.js', 'ui_modals.test.js'];   // 独立入口(DOM桩/require)
+const EXCLUDE = ['scenario.test.js', 'perf.test.js', 'boss.test.js', 'ui_modals.test.js',
+  'building_proto.test.js', 'building_proto_boot.test.js', 'building_proto_ui.test.js'];   // 独立入口(DOM桩/require)
 let files = argFiles.length ? argFiles
   : fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js') && !EXCLUDE.includes(f));
 

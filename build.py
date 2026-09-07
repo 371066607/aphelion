@@ -40,6 +40,9 @@ MODULE_ORDER = [
     "sprites.js",
     "ui.js",
     "hints.js",
+    "building_proto_model.js",
+    "building_proto_draw.js",
+    "building_proto.js",
     "main.js",
 ]
 

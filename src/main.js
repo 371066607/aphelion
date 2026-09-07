@@ -8,6 +8,11 @@ window.APH = window.APH || {};
 
 (function(){
   'use strict';
+  /* #186: isolated, memory-only prototype. This gate precedes every game side effect. */
+  if (typeof location !== 'undefined' && /(?:^|[?&])prototype=building-v4(?:&|$)/.test(location.search || '')) {
+    APH.BuildPrototype.boot();
+    return;
+  }
   var U=APH.U, CFG=APH.CFG, T=CFG.entType;
   var handleContextMenu = function(){ return false; };
   /* 真实可视区域(canvas实际显示尺寸), 预览面板缩放/分栏安全 */
