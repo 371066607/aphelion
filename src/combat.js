@@ -664,8 +664,7 @@ APH.Combat = (function(){
         if(focus.kind==='building' && focus.b){
           var pl=raidPillage(s.meta, null);
           if(pl.food||pl.mineral||pl.med){
-            if(window.APH.UI && APH.UI.floatText)
-              APH.UI.floatText('⚠ 仓库被盗掠','#ff9a9a');
+            U.emit('notice', {text:'⚠ 仓库被盗掠', color:'#ff9a9a'});
             U.emit('raidStole', en);
           }
         }
@@ -687,12 +686,12 @@ APH.Combat = (function(){
           /* 打伤殖民者, 不致死 */
         }else if(focus.kind==='building' && focus.b){
           var loot=raidPillage(s.meta, focus.b);
-          if((loot.food||loot.mineral||loot.med) && window.APH.UI && APH.UI.floatText){
+          if(loot.food||loot.mineral||loot.med){
             var bits=[];
             if(loot.food) bits.push('粮-'+loot.food);
             if(loot.mineral) bits.push('矿-'+loot.mineral);
             if(loot.med) bits.push('药-'+loot.med);
-            APH.UI.floatText('⚠ 被抢 '+bits.join(' '),'#ff9a9a');
+            U.emit('notice', {text:'⚠ 被抢 '+bits.join(' '), color:'#ff9a9a'});
           }
         }
         U.emit('enemyMelee', en);
@@ -734,8 +733,7 @@ APH.Combat = (function(){
           hitTrap.cd=2;                              /* 触发展示计时(已触发态) */
           s.parts= s.parts||[];
           s.parts.push({t:'spark', x:en.x, y:en.y-14, life:.4, max:.4});
-          if(window.APH.UI && APH.UI.floatText)
-            APH.UI.floatText('⚠ 尖刺 '+Math.round(strike.dmg)+' 出血!','#ff6d7a');
+          U.emit('notice', {text:'⚠ 尖刺 '+Math.round(strike.dmg)+' 出血!', color:'#ff6d7a'});
         }
       }
 
@@ -789,8 +787,8 @@ APH.Combat = (function(){
         U.emit('wallHit', { x: wb.x, y: wb.y, hp: Math.max(0, wb.hp) });
         if(wb.hp <= 0) destroyWall(wb, s);
         s.shake = Math.min(1, (s.shake || 0) + 0.12);
-        if(p.side === 'siege' && window.APH.UI && APH.UI.floatText)
-          APH.UI.floatText('💥 围攻炮击! 墙体受损', '#ff9a9a');
+        if(p.side === 'siege')
+          U.emit('notice', {text:'💥 围攻炮击! 墙体受损', color:'#ff9a9a'});
         break;
       }
       if(p.dead) return;      // 弹丸被墙消耗: 不再参与后续命中判定
@@ -816,7 +814,7 @@ APH.Combat = (function(){
               var gRes = APH.Planet.damageAncientGate(en.gate || en, p.dmg);
               s.shake = Math.min(1, s.shake + 0.15);
               if(gRes.breached){
-                if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 远古能量闸门已被摧毁！', '#00e5ff');
+                U.emit('notice', {text:'💥 远古能量闸门已被摧毁！', color:'#00e5ff'});
               }
               break;
             }
@@ -846,8 +844,7 @@ APH.Combat = (function(){
             p.dead=true;
             tb.offlineT=(tb.offlineT||0)+(p.offlineSec!=null?p.offlineSec:20);
             s.shake=Math.min(1,(s.shake||0)+.3);
-            if(window.APH.UI && APH.UI.floatText)
-              APH.UI.floatText('💥 围攻炮击! 建筑停机','#ff9a9a');
+            U.emit('notice', {text:'💥 围攻炮击! 建筑停机', color:'#ff9a9a'});
             break;
           }
         }
@@ -922,8 +919,7 @@ APH.Combat = (function(){
     if(!best) return false;
     best.dead=true;
     var it=(CFG.items&&CFG.items[best.itemId])||{};
-    if(window.APH.UI && APH.UI.floatText)
-      APH.UI.floatText('⚠ 地上被抢走 '+(it.name||best.itemId)+'×'+(best.n||1),'#ff9a9a');
+    U.emit('notice', {text:'⚠ 地上被抢走 '+(it.name||best.itemId)+'×'+(best.n||1), color:'#ff9a9a'});
     U.emit('raidStole', en);
     return true;
   }
@@ -960,7 +956,7 @@ APH.Combat = (function(){
       en.hp = 0;
       en.downed = true;
       en.walking = false;
-      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('击倒 · 右键俘虏或补刀', '#c5e3f6');
+      U.emit('notice', {text:'击倒 · 右键俘虏或补刀', color:'#c5e3f6'});
       return;
     }
     en.dead = true;
@@ -1017,7 +1013,7 @@ APH.Combat = (function(){
       }
       try{ localStorage.setItem('aphelion_rivals_v1', JSON.stringify(s.rivalStates)); }catch(e){}
     }
-    if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 '+base.rivalName+' 基地被掠夺!','#ff9ad0');
+    U.emit('notice', {text:'💥 '+base.rivalName+' 基地被掠夺!', color:'#ff9ad0'});
     U.emit('raidSuccess',{ rivalId:base.rivalId });
   }
 
@@ -1057,8 +1053,7 @@ APH.Combat = (function(){
     R.hurtResident(rec, wound);
     best.illness=rec.illness; best.mood=rec.mood;
     best.hurtCd=iframe; best.hitFlash=0.12;
-    if(window.APH.UI && APH.UI.floatText)
-      APH.UI.floatText((rec.name||'居民')+' 受伤','#ff9a9a');
+    U.emit('notice', {text:(rec.name||'居民')+' 受伤', color:'#ff9a9a'});
     U.emit('residentHurt', { id:rec.id, illness:rec.illness });
     return true;
   }
@@ -1085,7 +1080,7 @@ APH.Combat = (function(){
     /* ADR-29 掩体减免 (沙袋/墙角 55% 伤害减免) */
     if(s.scene === 'home' && hasCover({ x: s.px, y: s.py }, s.colony && s.colony.buildings)){
       dmg = Math.max(1, Math.round(dmg * 0.45));
-      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('🛡️ 掩体抵挡伤害 (55%)', '#59d9ff');
+      U.emit('notice', {text:'🛡️ 掩体抵挡伤害 (55%)', color:'#59d9ff'});
     }
     s.iFrameT = 0.5;
     s.hp -= dmg;
@@ -1103,7 +1098,7 @@ APH.Combat = (function(){
         needs.downT = (CFG.player.downedTime != null ? CFG.player.downedTime : 90);
         s.downed = true;
         U.emit('playerDowned', { source:source });
-        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('💥 你被击倒了!','#ff4757');
+        U.emit('notice', {text:'💥 你被击倒了!', color:'#ff4757'});
       }
       return;
     }
@@ -1111,7 +1106,7 @@ APH.Combat = (function(){
       s.clinicKit--;
       s.hp = Math.min(CFG.player.hpMax, (CFG.economy&&CFG.economy.clinicHeal)||40);
       s.iFrameT = 0.8;
-      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✚ 医疗舱急救 +'+s.hp,'#7dffab');
+      U.emit('notice', {text:'✚ 医疗舱急救 +'+s.hp, color:'#7dffab'});
       return;
     }
     if(s.hp <= 0){
@@ -1120,10 +1115,10 @@ APH.Combat = (function(){
       U.emit('gameOver',{});
       s.meta.stats.deaths++;
       APH.Save.saveMeta(s.meta);
-      if(window.APH.UI && APH.UI.showDeath) APH.UI.showDeath('你被 '+source+'终结了。', {
+      U.emit('death', {reason:'你被 '+source+'终结了。', stats:{
         cry:s.cry, found:s.found, total:s.totalBeacons,
         carry:s.carry, runLoot:s.runLoot, survived:s.clock-(s.landedAt||0),
-      });
+      }});
     }
   }
 
@@ -1157,12 +1152,10 @@ APH.Combat = (function(){
         e.dead=true;
         if(got.kind==='stock'){
           U.emit('lootPicked', { id:e.itemId, n:e.n, home:true });
-          if(window.APH.UI && APH.UI.floatText)
-            APH.UI.floatText('入库 +'+(got.n||e.n)+' '+(got.label||it.name),'#9fe8c8');
+          U.emit('notice', {text:'入库 +'+(got.n||e.n)+' '+(got.label||it.name), color:'#9fe8c8'});
         }else if(got.kind==='research'){
           U.emit('lootPicked', { id:e.itemId, n:e.n, home:true });
-          if(window.APH.UI && APH.UI.floatText)
-            APH.UI.floatText('研究 +'+got.research+' ('+(got.label||it.name)+')','#ffe28a');
+          U.emit('notice', {text:'研究 +'+got.research+' ('+(got.label||it.name)+')', color:'#ffe28a'});
         }
         return;
       }
@@ -1174,9 +1167,9 @@ APH.Combat = (function(){
         s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
         U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
         var nm = it.name;
-        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), '#9fe8c8');
+        U.emit('notice', {text:'+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), color:'#9fe8c8'});
       }else{
-        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('负重已满！回舱卸货', '#ff9a9a');
+        U.emit('notice', {text:'负重已满！回舱卸货', color:'#ff9a9a'});
       }
     });
     s.entities = (APH.Ent && APH.Ent.sweepDead) ? APH.Ent.sweepDead(s.entities) : s.entities.filter(function(e){ return e.type!==T.DROPPED || !e.dead; });
@@ -1210,9 +1203,7 @@ APH.Combat = (function(){
       var eat = (window.APH.Colony && APH.Colony.takeStock)
         ? (APH.Colony.takeStock(s.meta && s.meta.res, s.entities, 'food', n).taken || 0)
         : 0;
-      if(window.APH.UI && APH.UI.floatText){
-        APH.UI.floatText('🛡 ' + n + ' 名士兵出动' + (eat ? ' · 口粮 -' + eat : ''), '#ffc857');
-      }
+      U.emit('notice', {text:'🛡 ' + n + ' 名士兵出动' + (eat ? ' · 口粮 -' + eat : ''), color:'#ffc857'});
       if(window.APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
     }
 
@@ -1233,7 +1224,7 @@ APH.Combat = (function(){
     /* ADR-38: 围攻扎营是世界侧实体操作, 归 main.js —— 这里只广播事件。
        U.emit 是同步的, 顺序与原来的直接调用一致。 */
     if(U.emit) U.emit('raidBegan', { tactic: s.war.tactic });
-    if(window.APH.UI && APH.UI.setHint) APH.UI.setHint('');
+    U.emit('hint', {text:''});
     var vig = typeof document !== 'undefined' ? document.getElementById('vig') : null;
     if(vig){
       vig.style.opacity = .5;
@@ -1262,7 +1253,7 @@ APH.Combat = (function(){
     });
 
     if(U.emit) U.emit('raidEnded', { routed: true });      /* ADR-38 */
-    if(window.APH.UI && APH.UI.floatText) APH.UI.floatText(msg, escaped ? '#ffb35c' : '#ffd97a');
+    U.emit('notice', {text:msg, color:escaped ? '#ffb35c' : '#ffd97a'});
   }
 
   function tickRaid(s, dt){
@@ -1271,9 +1262,7 @@ APH.Combat = (function(){
     // 1. 预警阶段
     if(s.war.raidWarn > 0){
       s.war.raidWarn -= dt;
-      if(window.APH.UI && APH.UI.setHint){
-        APH.UI.setHint('⚠ ' + (s.war.raidFrom || '敌军') + '来袭! ' + Math.ceil(s.war.raidWarn) + 's — 保卫殖民地!');
-      }
+      U.emit('hint', {text:'⚠ ' + (s.war.raidFrom || '敌军') + '来袭! ' + Math.ceil(s.war.raidWarn) + 's — 保卫殖民地!'});
       if(s.war.raidWarn <= 0){
         startRaid(s);
       }
@@ -1312,14 +1301,12 @@ APH.Combat = (function(){
     // 双波间歇
     if(s.war.betweenWaves){
       s.war.nextWaveT -= dt;
-      if(window.APH.UI && APH.UI.setHint){
-        APH.UI.setHint('⚠ 第二波正在集结 ' + Math.ceil(Math.max(0, s.war.nextWaveT)) + 's — 方向会变!');
-      }
+      U.emit('hint', {text:'⚠ 第二波正在集结 ' + Math.ceil(Math.max(0, s.war.nextWaveT)) + 's — 方向会变!'});
       if(s.war.nextWaveT <= 0){
         s.war.betweenWaves = false;
         s.war.spawned = 0;
         s.war.waveAngle = (s.war.waveAngle || 0) + (RT.wave2Angle != null ? RT.wave2Angle : 2.4);
-        if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('⚠ 第二波袭击!', '#ff9a9a');
+        U.emit('notice', {text:'⚠ 第二波袭击!', color:'#ff9a9a'});
       }
     }
 
@@ -1390,10 +1377,10 @@ APH.Combat = (function(){
           s.war.raidActive = false;
           if(U.emit) U.emit('raidEnded', { routed: false });   /* ADR-38 */
           if(s.war.escaped){
-            if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('⚠ 盗掠者满载而归…下次早点拦截', '#ffb35c');
+            U.emit('notice', {text:'⚠ 盗掠者满载而归…下次早点拦截', color:'#ffb35c'});
           } else {
             s.war.wins = (s.war.wins || 0) + 1;
-            if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ 袭击被击退! 战争态势提升', '#7dffab');
+            U.emit('notice', {text:'✔ 袭击被击退! 战争态势提升', color:'#7dffab'});
             if(U.emit) U.emit('raidDefended', {});
           }
           /* ADR-38: 战况存档由 main.js 的 raidEnded 订阅者负责 */

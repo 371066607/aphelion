@@ -1728,3 +1728,97 @@ node tests/ui_modals.test.js → 77 通过 / 0 失败   (68 → 77)
 我数出 27 并且相信了这个数字，因为剥字符串这一步看起来是在降噪 ——
 它同时把最脏的一类调用一起剥掉了。
 下次写度量，先问：*这次测量漏掉了哪一类写法？*
+
+---
+
+## 2026-09-07（续八）· ADR-40：最后一条反向箭头
+
+ADR-38 修 `模拟层 → main`，ADR-39 修 `ui → main`，
+剩下的这条方向正好相反：**模拟层直接调视图**。
+
+### 58 处守卫，是 58 次自白
+
+```js
+if(window.APH.UI && APH.UI.floatText)
+  APH.UI.floatText('⚠ 仓库被盗掠','#ff9a9a');
+```
+
+`combat.js` 52 处、`colony.js` 6 处（比 BACKLOG 登记的 38/5 都多 ——
+上次也是估的）。那个守卫本身就是供词：**作者知道 UI 可能不在**
+（无头、测试、加载顺序靠前），于是每处手写一遍兜底。
+
+ADR-8 的事件总线从第一天就在，只是没人用它走这条路。
+现在三个事件覆盖全部 58 处：
+
+```js
+U.emit('notice', {text, color});   →   U.on('notice', p => floatText(p.text, p.color));
+U.emit('hint',   {text});          →   U.on('hint',   p => setHint((p&&p.text)||''));
+U.emit('death',  {reason, stats}); →   U.on('death',  p => showDeath(p.reason, p.stats||{}));
+```
+
+无监听者时 `emit` 是 no-op，与原先手写守卫等价；单个订阅者抛错也不拖垮
+模拟层（`emit` 内部 try/catch）。**这两件事现在有用例钉死，不再靠 58 处自觉。**
+
+### 刻意没做的那件事
+
+载荷里还带着 `color:'#ff9a9a'` —— 模拟层仍在描述表现，不够干净。
+更好的是 `level:'danger'` 由 ui 决定调色板。
+
+**这一版故意不做**：现有 58 处用了 15 种色值，收敛必然改画面。
+层级重构应当是零视觉变化的，调色板是另一件需要拍板的事。已进 BACKLOG。
+
+### 改到一半掉出来一个真 bug
+
+ui.js 内部 11 处：
+
+```js
+floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');   // 签名其实是 (txt, col)
+```
+
+`col` 收到 `400`。实机复核：
+
+```js
+d.style.color = '#123456';
+d.style.color = 400;        // → 仍然是 rgb(18, 52, 86)
+```
+
+非法值被 CSS-OM 静默忽略，元素**沿用上一条飘字的颜色**。
+外交/交易/工作面板那 11 条消息一直用「上一条消息的颜色」显示 ——
+纳贡失败可能是绿的，成功可能是红的，取决于你上一步做了什么。
+不崩溃，所以没人报；只在特定顺序下才看得出不对，所以一直没被发现。
+
+### 实机验证：走真实模拟路径，不是直接 emit
+
+```
+style.color=400 的后果:  {"after":"rgb(18, 52, 86)"}          ← 实参错位确认
+notice 落地:             {"found":true,"color":"rgb(255, 154, 154)"}
+hint 落地:               {"opacity":"1"} / 清空后 {"opacity":"0"}
+经 Combat.raidRetreat:   {"found":true,"color":"rgb(255, 217, 122)"}
+console 错误:            (无)
+```
+
+第三条是关键 —— 调真正的 `Combat.raidRetreat`，看它一路走到 DOM，
+而不是自己 `emit` 一下自己接住。
+
+### 验证证据
+
+```
+python3 build.py             → ✓ game.html
+node tests/run.js            → 808 通过 / 0 失败   (803 → 808)
+node tests/scenario.js       → 162 通过 / 0 失败
+node tests/perf.test.js      → 4 通过 / 0 失败
+node tests/boss.test.js      → 7 通过 / 0 失败
+node tests/ui_modals.test.js → 89 通过 / 0 失败   (77 → 89)
+```
+
+`MODULE_ORDER` 里的反向箭头至此全部清零。
+
+### 记一笔
+
+连着三班都是同一件事的不同侧面，而每一次真实数字都比登记的大：
+ADR-39 是 27 → 实际 37，这次是 38/5 → 实际 52/6。
+**估出来的债一律偏小。** 下次往 BACKLOG 写数字前，先跑一遍 grep。
+
+另一条：**重复的防御性代码是设计问题的读数**。
+那 58 个 `if(window.APH.UI && ...)` 不是谨慎，是同一句「这里方向不对」
+被抄了 58 遍。下次看见同一个守卫出现十次以上，先问它在防什么。

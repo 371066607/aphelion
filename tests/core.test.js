@@ -295,3 +295,56 @@ test('ADR-39 colony: playerDefPower 随炮塔与等离子科技增长', () => {
     if (APH.Colony.playerDefPower() !== 10 + 24 + 10) throw new Error('等离子每级 +5');
   } finally { APH.state = prev; }
 });
+
+/* ---------- ADR-40: 模拟层只发事件, 不直接驱动视图 ---------- */
+
+function captureBus(events, fn){
+  const seen = [];
+  const subs = events.map(evt => [evt, APH.U.on(evt, p => seen.push({ evt, p }))]);
+  try { fn(); } finally { subs.forEach(([evt, h]) => APH.U.off(evt, h)); }
+  return seen;
+}
+
+test('ADR-40 combat: 袭击溃退发 notice, 载荷是 {text,color}', () => {
+  const s = { war: { routed: false, wave: null, siege: null }, entities: [], parts: [] };
+  const seen = captureBus(['notice', 'raidEnded'], () => {
+    APH.Combat.raidRetreat(s, '✔ 袭击被击退!', false);
+  });
+  const notice = seen.find(x => x.evt === 'notice');
+  if (!notice) throw new Error('溃退应发 notice');
+  if (notice.p.text !== '✔ 袭击被击退!') throw new Error('文案应原样带出, got ' + notice.p.text);
+  if (typeof notice.p.color !== 'string' || notice.p.color[0] !== '#')
+    throw new Error('颜色应是色值, got ' + notice.p.color);
+  if (!seen.find(x => x.evt === 'raidEnded')) throw new Error('ADR-38 的 raidEnded 不应被弄丢');
+});
+
+test('ADR-40 combat: 玩家死亡发 death, 载荷是 {reason,stats}', () => {
+  const prev = APH.state;
+  APH.state = {
+    hp: 1, mode: 'running', clock: 100, landedAt: 10, cry: 0, found: 0, totalBeacons: 3,
+    carry: {}, runLoot: {}, entities: [], parts: [],
+    meta: { stats: { deaths: 0 }, playerNeeds: {} },
+  };
+  try {
+    const seen = captureBus(['death', 'gameOver'], () => APH.Combat.hurtPlayer(99, '酸雨'));
+    const death = seen.find(x => x.evt === 'death');
+    if (!death) throw new Error('玩家死亡应发 death');
+    if (String(death.p.reason).indexOf('酸雨') < 0) throw new Error('死因应带来源, got ' + death.p.reason);
+    if (!death.p.stats || typeof death.p.stats.survived !== 'number')
+      throw new Error('结算数据应挂在 stats 上');
+    if (!seen.find(x => x.evt === 'gameOver')) throw new Error('gameOver 不应被弄丢');
+  } finally { APH.state = prev; }
+});
+
+test('ADR-40: 无人订阅时模拟层照跑(无头/测试环境)', () => {
+  const s = { war: { routed: false, wave: null, siege: null }, entities: [], parts: [] };
+  APH.Combat.raidRetreat(s, '没人听也不该炸', false);   // 不抛错即通过
+});
+
+test('ADR-40: 单个订阅者抛错不拖垮模拟层', () => {
+  const bad = APH.U.on('notice', () => { throw new Error('订阅者炸了'); });
+  try {
+    const s = { war: { routed: false, wave: null, siege: null }, entities: [], parts: [] };
+    APH.Combat.raidRetreat(s, '订阅者出错', false);      // U.emit 内部 try/catch 兜住
+  } finally { APH.U.off('notice', bad); }
+});

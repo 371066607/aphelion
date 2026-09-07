@@ -793,7 +793,7 @@ APH.UI = (function(){
   function setTechMapMsg(txt, col){
     var el=document.getElementById('techMapMsg');
     if(el){ el.textContent=txt||''; el.style.color=col||'#ffc857'; }
-    if(txt) floatText(txt, 400, 300, col||'#ffc857');
+    if(txt) floatText(txt, col||'#ffc857');
   }
 
   function tryBuySelectedTech(){
@@ -1062,7 +1062,7 @@ APH.UI = (function(){
     var stock = getStock(resType);
     var res = APH.Rivals.sendTribute(rs, resType, stock);
     if(!res.success){
-      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      floatText('✕ ' + res.reason, '#ff9a9a');
       return;
     }
     if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, resType, res.cost);
@@ -1073,7 +1073,7 @@ APH.UI = (function(){
       s.war.pendingWave = null;
       s.war.raidWarn = 0;
     }
-    floatText(' 向 ' + rs.rival.name + ' 纳贡成功，怒气平息！', 400, 300, '#7dffab');
+    floatText(' 向 ' + rs.rival.name + ' 纳贡成功，怒气平息！', '#7dffab');
     renderDiplomacy();
   }
 
@@ -1084,14 +1084,14 @@ APH.UI = (function(){
     var stock = getStock('mineral');
     var res = APH.Rivals.signTradePact(rs, stock);
     if(!res.success){
-      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      floatText('✕ ' + res.reason, '#ff9a9a');
       return;
     }
     if(APH.Colony && APH.Colony.takeStock) APH.Colony.takeStock(s.meta.res, s.entities, 'mineral', res.cost);
     s.rivalStates[rIdx] = res.newState;
     APH.Rivals.persistStates();
     APH.Save.metaQuiet();
-    floatText(' 与 ' + rs.rival.name + ' 签署通商协定！', 400, 300, '#59d9ff');
+    floatText(' 与 ' + rs.rival.name + ' 签署通商协定！', '#59d9ff');
     renderDiplomacy();
   }
 
@@ -1102,12 +1102,12 @@ APH.UI = (function(){
     var def = getPlayerDefPower();
     var res = APH.Rivals.deterRival(rs, def);
     if(!res.success){
-      floatText('✕ ' + res.reason, 400, 300, '#ff9a9a');
+      floatText('✕ ' + res.reason, '#ff9a9a');
       return;
     }
     s.rivalStates[rIdx] = res.newState;
     APH.Rivals.persistStates();
-    floatText('⚡ 成功威慑 ' + rs.rival.name + '！敌方陷入畏缩。', 400, 300, '#ffc857');
+    floatText('⚡ 成功威慑 ' + rs.rival.name + '！敌方陷入畏缩。', '#ffc857');
     renderDiplomacy();
   }
 
@@ -1215,11 +1215,11 @@ APH.UI = (function(){
     if(i < (stock.sells || []).length){ kind = 'buy'; idx = i; }
     else { kind = 'sell'; idx = i - (stock.sells || []).length; }
     var r = (APH.Res && APH.Res.tradeOnce) ? APH.Res.tradeOnce(s.meta, s.entities, stock, kind, idx, tradeMulNow()) : { ok: false, why: '未实现' };
-    if(!r.ok){ floatText('✕ ' + r.why, 400, 300, '#ff9a9a'); renderTradePanel(); return; }
+    if(!r.ok){ floatText('✕ ' + r.why, '#ff9a9a'); renderTradePanel(); return; }
     if(r.kind === 'buy')
-      floatText(' 买入 ' + (RES_LABEL[r.key] || r.key) + ' -' + r.cost + '矿', 400, 300, '#9fe8c8');
+      floatText(' 买入 ' + (RES_LABEL[r.key] || r.key) + ' -' + r.cost + '矿', '#9fe8c8');
     else
-      floatText(' 卖出 ' + (RES_LABEL[r.key] || r.key) + ' +' + r.gain + '矿', 400, 300, '#ffe28a');
+      floatText(' 卖出 ' + (RES_LABEL[r.key] || r.key) + ' +' + r.gain + '矿', '#ffe28a');
     APH.Save.metaQuiet();
     APH.Colony.persist();
     renderTradePanel();
@@ -1450,7 +1450,7 @@ APH.UI = (function(){
     r.jobLocked = false;
     APH.Save.metaQuiet();
     renderResPanel();
-    floatText(r.name + ' · ' + (col ? col.name : sk) + ' 优先级 → ' + v, 400, 300, '#8fd4ff');
+    floatText(r.name + ' · ' + (col ? col.name : sk) + ' 优先级 → ' + v, '#8fd4ff');
   }
 
   var PRIO_COLOR = ['#39435c','#ffc857','#cdd9f5','#5d6f96'];
@@ -2025,6 +2025,15 @@ APH.UI = (function(){
       }
     }
   }
+
+  /* ---------- 模拟层通知的落地点 (ADR-40) ----------
+     combat/colony 原先直接调 APH.UI.floatText / setHint / showDeath ——
+     模拟层认识视图, 方向是反的。现在它们只 emit, 由这里订阅并落到 DOM。
+     U.emit 是同步派发, 顺序与直调时完全一致; 没有监听者时是 no-op,
+     和原先 `if(APH.UI && APH.UI.floatText)` 的守卫等价(无头/测试环境照跑)。 */
+  U.on('notice', function(p){ if(p && p.text) floatText(p.text, p.color); });
+  U.on('hint',   function(p){ setHint((p && p.text) || ''); });
+  U.on('death',  function(p){ if(p) showDeath(p.reason, p.stats || {}); });
 
   /* ---------- 命令表 (ADR-39) ----------
      面板里的按钮原先直接写 onclick 调 main 的函数 —— 视图直接点名控制器,

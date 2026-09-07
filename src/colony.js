@@ -2422,7 +2422,7 @@ APH.Colony = (function(){
          colony 不再反向调用 APH.Main。 */
       if(U.emit) U.emit('built', { id: d.bid });
       var bdef = get(d.bid);
-      if(window.APH.UI && APH.UI.floatText) APH.UI.floatText('✔ ' + (bdef ? bdef.name : d.bid) + ' 建造完成', '#9fe8c8');
+      U.emit('notice', {text:'✔ ' + (bdef ? bdef.name : d.bid) + ' 建造完成', color:'#9fe8c8'});
       if(s.parts) s.parts.push({ t: 'ping', x: d.x, y: d.y, life: .9, max: .9 });
     });
   }
@@ -2470,9 +2470,7 @@ APH.Colony = (function(){
     });
 
     if(out.mineral || out.research){
-      if(window.APH.UI && APH.UI.floatText){
-        APH.UI.floatText('生产: ' + (out.mineral ? '矿材×' + out.mineral + '堆在地上 ' : '') + (out.research ? '+' + out.research + ' 研究点' : ''), '#9fe8c8');
-      }
+      U.emit('notice', {text:'生产: ' + (out.mineral ? '矿材×' + out.mineral + '堆在地上 ' : '') + (out.research ? '+' + out.research + ' 研究点' : ''), color:'#9fe8c8'});
     }
 
     /* ADR-25: 推进封闭房间室内气温与温控电器结算 */
@@ -2520,9 +2518,7 @@ APH.Colony = (function(){
           }
         }
         var itDef = (CFG.items && CFG.items[e.itemId]) || {};
-        if(window.APH.UI && APH.UI.floatText){
-          APH.UI.floatText('⚠️ ' + (itDef.name || '物资') + ' 在室外腐烂损毁了', '#ff6d7a');
-        }
+        U.emit('notice', {text:'⚠️ ' + (itDef.name || '物资') + ' 在室外腐烂损毁了', color:'#ff6d7a'});
       }
     });
 

@@ -67,6 +67,16 @@ test('layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)
     throw new Error(`ui.js 有 ${bad} 处 onclick 直接调 APH.Main —— 应改走 APH.UI.cmd('<命令名>')`);
 });
 
+/* ADR-40: 模拟层不得直接驱动视图。combat 52 处 + colony 6 处 APH.UI.* 已清零,
+   改为 U.emit('notice'|'hint'|'death') 由 ui.js 订阅。 */
+test('layering: 模拟层(colony/combat)不得直接调用 APH.UI (ADR-40)', () => {
+  ['colony.js', 'combat.js'].forEach(f => {
+    const hits = (codeOf(f).match(/APH\.UI\./g) || []).length;
+    if (hits)
+      throw new Error(f + ' 有 ' + hits + ' 处直接调 APH.UI —— 模拟层应 emit 事件, 由 ui 订阅');
+  });
+});
+
 test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
   const NS = {
     'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
@@ -78,8 +88,8 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
   /* 已知的、暂时容忍的向后引用: 这些是本轮之后仍待处理的债, 列在此处使其可见。
      新增违规会让本用例变红; 修好一处就从这里删掉一行。 */
   const ALLOWED = {
-    'colony.js':  ['Ent','Res','Combat','UI','Weather','World','Save','Nav','Opening'],
-    'combat.js':  ['Ent','Res','UI','Weather','World','Save','Nav','Rivals','Colony'],
+    'colony.js':  ['Ent','Res','Combat','Weather','World','Save','Nav','Opening'],
+    'combat.js':  ['Ent','Res','Weather','World','Save','Nav','Rivals','Colony'],
     'residents.js':['Combat','World','Nav','Colony'],
     'entities.js':['Res','Sprites','World','Weather','Colony'],
     'events.js':  ['Weather','Colony'],

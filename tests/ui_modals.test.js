@@ -27,9 +27,15 @@ function createStubElement(id){
 }
 
 global.window = global;
+/* ADR-40 的通知落地要真的写进 DOM, 所以桩里得有 body 和可赋值的 style/textContent */
+const appended = [];
 global.document = {
   getElementById: (id) => elements[id] || null,
-  createElement: (tag) => ({ style: {}, classList: { add(){}, remove(){} }, appendChild(){} })
+  createElement: (tag) => ({
+    tag, style: {}, textContent: '', innerHTML: '',
+    classList: { add(){}, remove(){} }, appendChild(){}, querySelector(){ return null; }
+  }),
+  body: { appendChild: (el) => { appended.push(el); } }
 };
 
 /* ---------- 加载被测模块 ---------- */
@@ -298,6 +304,42 @@ let drafted = 0;
 UI.registerCommands({ togglePlayerDraft: function(){ drafted++; } });
 UI.cmd('togglePlayerDraft');
 assert('检查器命令经命令表抵达实现', drafted === 1);
+
+/* ---------- ADR-40 模拟层通知的落地点 ---------- */
+console.log('--- ADR-40 Sim → UI via bus ---');
+
+const U = window.APH.U;
+
+/* notice: 文案与颜色都要落到飘字元素上 */
+appended.length = 0;
+U.emit('notice', { text: '⚠ 仓库被盗掠', color: '#ff9a9a' });
+const ft = appended[appended.length - 1];
+assert('notice 事件创建了飘字元素', !!ft);
+assert('notice 的文案落到 DOM', ft && ft.textContent === '⚠ 仓库被盗掠');
+assert('notice 的颜色落到 DOM', ft && ft.style.color === '#ff9a9a');
+
+/* 飘字元素是复用的, 第二条只改内容不再新建 */
+const beforeN = appended.length;
+U.emit('notice', { text: '✔ 袭击被击退!', color: '#7dffab' });
+assert('第二条 notice 复用同一个元素', appended.length === beforeN);
+assert('第二条 notice 更新了文案', ft.textContent === '✔ 袭击被击退!');
+assert('第二条 notice 更新了颜色', ft.style.color === '#7dffab');
+
+/* hint: 空字符串要把提示条隐藏 */
+createStubElement('hint');
+U.emit('hint', { text: '⚠ 敌军来袭! 12s' });
+assert('hint 事件落到提示条', elements.hint.textContent === '⚠ 敌军来袭! 12s');
+assert('有内容时提示条可见', elements.hint.style.opacity === 1);
+U.emit('hint', { text: '' });
+assert('空 hint 清空提示条', elements.hint.textContent === '');
+assert('空 hint 隐藏提示条', elements.hint.style.opacity === 0);
+
+/* 畸形/缺失载荷不得让订阅者炸 —— U.emit 会吞异常, 所以直接查订阅函数本身 */
+let noticeThrew = false;
+try { U.emit('notice', null); U.emit('notice', {}); U.emit('hint', null); }
+catch (e) { noticeThrew = true; }
+assert('缺失载荷不抛错', noticeThrew === false);
+assert('空载荷的 hint 视作清空', elements.hint.textContent === '');
 
 console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
 if (fail > 0) process.exit(1);
