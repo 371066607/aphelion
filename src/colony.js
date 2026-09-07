@@ -1364,6 +1364,61 @@ APH.Colony = (function(){
     return room.temp;
   }
 
+  /* ADR-41: 找离 e 最近的一口饭 —— 地上熟食优先, 其次任意粮堆,
+     再其次 120px 内的食物货架, 最后是仓库。原先住在 main.js, 可它查的
+     全是本模块的东西(地上堆 / 货架 / 仓位)。 */
+  function nearestMeal(e, rMax){
+    var s=(window.APH&&APH.state)||null;
+    if(!s) return null;
+    var best=null, bd=rMax;
+    var bestCooked=null, bestCookedDist=rMax;
+    (s.entities||[]).forEach(function(p){
+      if(!p || p.dead || p.type!==T.DROPPED) return;
+      var it = CFG.items && CFG.items[p.itemId];
+      if(!it || it.store!=='food') return;
+      var dist=U.dst(e.x,e.y,p.x,p.y);
+      if(it.isCooked && dist<bestCookedDist){
+        bestCookedDist=dist;
+        bestCooked={ kind:'pile', drop:p, x:p.x, y:p.y, itemId:p.itemId, isCooked:true };
+      }
+      if(dist<bd){
+        bd=dist;
+        best={ kind:'pile', drop:p, x:p.x, y:p.y, itemId:p.itemId, isCooked:!!it.isCooked };
+      }
+    });
+    if(bestCooked) return bestCooked;
+    /* ADR-23 就近货架取料: 优先检测 120px 范围内的食物货架 */
+    var nearFoodShelf = findNearbySourcedItem('food', e, (CFG.storage&&CFG.storage.sourcingRadius)||120, s.colony && s.colony.buildings, s.entities);
+    if(nearFoodShelf && nearFoodShelf.found && nearFoodShelf.drop){
+      var dropIt = CFG.items && CFG.items[nearFoodShelf.drop.itemId];
+      return { kind:'pile', drop:nearFoodShelf.drop, x:nearFoodShelf.drop.x, y:nearFoodShelf.drop.y, itemId:nearFoodShelf.drop.itemId, isCooked:!!(dropIt&&dropIt.isCooked) };
+    }
+    if((s.meta.res&&s.meta.res.food||0)>0){
+      var st=stockpileSpot(s.colony&&s.colony.buildings);
+      (s.entities||[]).forEach(function(b){
+        if(b && !b.dead && b.type===T.BUILDING && b.bid==='bl_warehouse'){
+          st = { x:b.x, y:(b.y||0)+18 };
+        }
+      });
+      var d=U.dst(e.x,e.y,st.x,st.y);
+      if(d<bd){ bd=d; best={ kind:'stock', x:st.x, y:st.y }; }
+    }
+    return best;
+  }
+
+  /* ADR-41: 世界实体 → 殖民地建筑档案。原先叫 buildingRecordOf, 住在 main.js ——
+     可它查的是 colony.buildings, 是本模块的表。 */
+  function recordOf(ent){
+    if(!ent) return null;
+    var s=(window.APH&&APH.state)||null;
+    var list=(s && s.colony && s.colony.buildings) || [];
+    for(var i=0;i<list.length;i++){
+      var b=list[i];
+      if(b && b.id===ent.bid && Math.abs((b.x||0)-(ent.x||0))<2 && Math.abs((b.y||0)-(ent.y||0))<2) return b;
+    }
+    return null;
+  }
+
   /* ADR-39: 殖民地存档归殖民地自己管 —— 落盘前先把地上堆序列化进 colony.ground。
      原先住在 main.js, 于是 ui 每次改动殖民地都要反向调 APH.Main.saveColony。 */
   function persist(){
@@ -2754,7 +2809,7 @@ APH.Colony = (function(){
     boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
     colonyGoal:colonyGoal, winterFoodNeed:winterFoodNeed,
     makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
-    persist:persist, serializeGround:serializeGround,
+    persist:persist, recordOf:recordOf, nearestMeal:nearestMeal, serializeGround:serializeGround,
     groundCount:groundCount, groundTally:groundTally, stockOf:stockOf,
     itemCount:itemCount, takeDropped:takeDropped,
     stockLabel:stockLabel, takeFromGround:takeFromGround,

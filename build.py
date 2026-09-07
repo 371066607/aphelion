@@ -36,6 +36,7 @@ MODULE_ORDER = [
     "sprite_data.js",
     "sprites.js",
     "ui.js",
+    "hints.js",
     "main.js",
 ]
 

@@ -29,9 +29,13 @@ function test(name,fn){ try{fn();pass++;console.log('  ✓ '+name);}
 const A=(c,m)=>{ if(!c) throw new Error(m||'断言失败'); };
 
 const SRC=path.join(__dirname,'..','src');
+/* 故意不装(被 layering 的清单一致性用例读取):
+   opening.js —— showOpening 要真实 <video>, 装了 boot 就炸;
+   input.js   —— 性能跑分不派输入事件。 */
+const SKIP_MODULES = ['opening.js', 'input.js'];
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','alerts.js','combat.js',
-                'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
+                'colony.js','rivals.js','events.js','nav.js','weather.js','residents.js','alerts.js','combat.js',
+                'world.js','entities.js','sfx.js','sprites.js','ui.js','hints.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 

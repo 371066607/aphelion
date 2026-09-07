@@ -2188,7 +2188,55 @@ APH.Res = (function(){
     return isSheltered(pos, buildings);
   }
 
+  /* ---------- 指挥官自身状态 (ADR-41) ----------
+     playerNeeds 是本模块的概念(setPlayerSleeping 一直住这儿), 这几个读取器
+     却留在 main.js, 于是提示层想问「指挥官饿不饿」就得先认识 main。 */
+  function playerNeedsOf(){
+    var s=(window.APH&&APH.state)||null;
+    return (s && s.meta && s.meta.playerNeeds) || null;
+  }
+  function playerSleeping(){ var n=playerNeedsOf(); return !!(n && n.isSleeping); }
+  function playerDowned(){   var n=playerNeedsOf(); return !!(n && n.downed); }
+  function playerSick(){     var n=playerNeedsOf(); return !!(n && n.illness > 0); }
+  function playerFood(){
+    var start=(CFG.player&&CFG.player.homeFoodStart!=null)?CFG.player.homeFoodStart:80;
+    var n=playerNeedsOf();
+    if(!n) return start;
+    return (n.food==null) ? start : n.food;
+  }
+  /* 饥饿阈值(防老档/降级 CFG 缺字段) */
+  function foodEatBelow(){
+    return (CFG.player&&CFG.player.foodEatBelow!=null)?CFG.player.foodEatBelow:60;
+  }
+
+  /* 实体 → 名册里的居民档案 */
+  function residentOf(e){
+    var id=e&&(e.rid||e.id);
+    var s=(window.APH&&APH.state)||null;
+    var list=(s && s.meta && s.meta.residents)||[];
+    for(var i=0;i<list.length;i++) if(list[i].id===id) return list[i];
+    return null;
+  }
+
+  /* 招募判定的上下文(joinChance 的入参) —— 概念属于招募, 不属于 main */
+  function recruitCtx(vis){
+    var s=(window.APH&&APH.state)||null;
+    if(!s) return {};
+    var start=(CFG.recruit&&CFG.recruit.impressStart)||50;
+    return {
+      residentCount:(s.meta.residents||[]).length,
+      housingCap:APH.Colony.housingCapacity(s.colony.buildings),
+      food:APH.Colony.haveStock('food'),
+      buildings:(s.colony&&s.colony.buildings)||[],
+      raidActive:!!(s.war&&s.war.raidActive),
+      impression: vis && vis.impression!=null ? vis.impression : start
+    };
+  }
+
   return {
+    playerSleeping:playerSleeping, playerDowned:playerDowned, playerSick:playerSick,
+    playerFood:playerFood, foodEatBelow:foodEatBelow,
+    residentOf:residentOf, recruitCtx:recruitCtx,
     SKILLS:SKILLS, SKILL_NAMES:SKILL_NAMES,
     generate:generate, needsTick:needsTick, eatOnce:eatOnce, eatMeal:eatMeal, efficiency:efficiency, clinicTick:clinicTick,
     playerEatOnce:playerEatOnce,
