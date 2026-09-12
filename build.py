@@ -15,6 +15,8 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 MODULE_ORDER = [
     "config.js",
     "utils.js",
+    "building_art_data.js",
+    "building_art.js",
     "input.js",
     "humanoid.js",
     "save.js",
@@ -53,6 +55,7 @@ def node_check(path):
         sys.exit(1)
 
 def main():
+    subprocess.run([sys.executable, os.path.join(ROOT, "assets", "build_building_art.py")], check=True)
     tpl_path = os.path.join(ROOT, "template.html")
     tpl = open(tpl_path, encoding="utf-8").read()
     if "<!--SCRIPTS-->" not in tpl:

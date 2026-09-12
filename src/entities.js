@@ -1343,7 +1343,7 @@ APH.Ent = (function(){
   }
 
   /* T2 墙/闸门格层渲染 (ADR-13: 格上静态物不上 entities[])
-     贴地矮块: 地形后/实体前; 四邻拼接偏移, 转角靠 sheet 单块砖。 */
+     墙/门共用一张格网轮廓: 相邻格不描内边, 一次填底避免非整数缩放白缝。 */
   function drawWalls(time){
     var s=APH.state;
     var bs=(s.colony && s.colony.buildings)||[];
@@ -1355,22 +1355,123 @@ APH.Ent = (function(){
       else if(b.id==='bl_sandbag') bags.push(b);
     });
     var sc=0.92;
-    walls.forEach(function(w){
-      APH.Sprites.draw(ctx, 'bl_wall', w.x, w.y+20, 0, sc);
-      /* T4 破墙: 受损墙块叠耐久条(满血不画) */
-      var wMax=(CFG.wall&&CFG.wall.hp!=null)?CFG.wall.hp:60;
-      var wHp=(w.hp!=null)?w.hp:wMax;
-      if(wHp < wMax){
-        var wp=Math.max(0, wHp/wMax);
-        ctx.fillStyle='#1a2334';
-        ctx.fillRect(w.x-12, w.y-6, 24, 3);
-        ctx.fillStyle = wp>0.5 ? '#ffd97a' : '#ff9a9a';
-        ctx.fillRect(w.x-12, w.y-6, 24*wp, 3);
+    var grid=CFG.GRID||48, half=grid/2, wallMap={}, wallTiles=[];
+    function wallKey(x,y){ return x+','+y; }
+    function addWallTile(b, gate){
+      var k=wallKey(b.x,b.y);
+      var tile={ b:b, gate:!!gate, x:b.x, y:b.y };
+      /* 正常建造不会同格；脏档若墙门重叠，门作为可通行构件优先显示。 */
+      if(wallMap[k]){
+        if(gate && !wallMap[k].gate){
+          wallMap[k]=tile;
+          for(var ri=0;ri<wallTiles.length;ri++){
+            if(wallTiles[ri].x===b.x && wallTiles[ri].y===b.y){ wallTiles[ri]=tile; break; }
+          }
+        }
+        return;
       }
-    });
-    gates.forEach(function(g){
-      APH.Sprites.draw(ctx, 'bl_gate', g.x, g.y+20, 0, sc);
-    });
+      wallMap[k]=tile;
+      wallTiles.push(tile);
+    }
+    walls.forEach(function(w){ addWallTile(w,false); });
+    gates.forEach(function(g){ addWallTile(g,true); });
+    /* 只认真实中心恰好相差一格；渲染层绝不替旧存档吸格或迁坐标。 */
+    function hasWall(x,y){ return !!wallMap[wallKey(x,y)]; }
+
+    if(wallTiles.length){
+      ctx.save();
+      /* 暖奶油回收舱板底色必须自给自足；BuildArt 只是可选材质覆盖。 */
+      ctx.beginPath();
+      wallTiles.forEach(function(t){ ctx.rect(t.x-half,t.y-half,grid,grid); });
+      ctx.fillStyle='#d8c7a3';
+      ctx.fill();
+
+      wallTiles.forEach(function(t){
+        var x=t.x-half, y=t.y-half, material=false;
+        if(window.APH.BuildArt && typeof APH.BuildArt.fillMaterial==='function'){
+          try{ material=APH.BuildArt.fillMaterial(ctx,'wall',x,y,grid,grid)===true; }catch(ignore){}
+        }
+        /* fallback 已由上方统一底色完整覆盖；禁止逐格 inset/内框制造假接缝。 */
+        var scratchSeed=Math.floor(Math.abs(t.x/grid))*17+Math.floor(Math.abs(t.y/grid))*31;
+        if(!material && !t.gate && scratchSeed%4===0){
+          ctx.strokeStyle='#bca57e'; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(t.x-5,t.y+4); ctx.lineTo(t.x+2,t.y+1); ctx.stroke();
+        }
+      });
+
+      /* 暗金属只包外轮廓。墙与门互为邻格，接缝处绝不重复描边。 */
+      ctx.strokeStyle='#4a4138';
+      ctx.lineWidth=5;
+      ctx.lineCap='butt';
+      wallTiles.forEach(function(t){
+        var x=t.x-half, y=t.y-half;
+        if(!hasWall(t.x,t.y-grid)){ ctx.beginPath(); ctx.moveTo(x,y+2.5); ctx.lineTo(x+grid,y+2.5); ctx.stroke(); }
+        if(!hasWall(t.x+grid,t.y)){ ctx.beginPath(); ctx.moveTo(x+grid-2.5,y); ctx.lineTo(x+grid-2.5,y+grid); ctx.stroke(); }
+        if(!hasWall(t.x,t.y+grid)){ ctx.beginPath(); ctx.moveTo(x,y+grid-2.5); ctx.lineTo(x+grid,y+grid-2.5); ctx.stroke(); }
+        if(!hasWall(t.x-grid,t.y)){ ctx.beginPath(); ctx.moveTo(x+2.5,y); ctx.lineTo(x+2.5,y+grid); ctx.stroke(); }
+      });
+
+      /* 奶油板只在外露边吃一线高光，内部相邻边完全不落笔。 */
+      ctx.strokeStyle='#f5e8c8';
+      ctx.lineWidth=1;
+      wallTiles.forEach(function(t){
+        var x=t.x-half, y=t.y-half;
+        if(!hasWall(t.x,t.y-grid)){ ctx.beginPath(); ctx.moveTo(x+5,y+6); ctx.lineTo(x+grid-5,y+6); ctx.stroke(); }
+        if(!hasWall(t.x+grid,t.y)){ ctx.beginPath(); ctx.moveTo(x+grid-6,y+5); ctx.lineTo(x+grid-6,y+grid-5); ctx.stroke(); }
+        if(!hasWall(t.x,t.y+grid)){ ctx.beginPath(); ctx.moveTo(x+5,y+grid-6); ctx.lineTo(x+grid-5,y+grid-6); ctx.stroke(); }
+        if(!hasWall(t.x-grid,t.y)){ ctx.beginPath(); ctx.moveTo(x+6,y+5); ctx.lineTo(x+6,y+grid-5); ctx.stroke(); }
+      });
+
+      /* 克制铆钉: 只落在暴露边中点，不把每格接缝重新画回来。 */
+      ctx.fillStyle='#756653';
+      wallTiles.forEach(function(t){
+        var x=t.x-half, y=t.y-half, rivets=[];
+        if(!hasWall(t.x,t.y-grid)) rivets.push([t.x,y+7]);
+        if(!hasWall(t.x+grid,t.y)) rivets.push([x+grid-7,t.y]);
+        if(!hasWall(t.x,t.y+grid)) rivets.push([t.x,y+grid-7]);
+        if(!hasWall(t.x-grid,t.y)) rivets.push([x+7,t.y]);
+        rivets.forEach(function(r){ ctx.beginPath(); ctx.arc(r[0],r[1],1.7,0,U.TAU); ctx.fill(); });
+      });
+
+      /* 普通游戏没有开门状态字段；维持旧关闭表现，方向由相邻墙线自动推断。 */
+      wallTiles.forEach(function(t){
+        if(!t.gate) return;
+        var x=t.x-half, y=t.y-half;
+        var ns=hasWall(t.x,t.y-grid)||hasWall(t.x,t.y+grid);
+        var ew=hasWall(t.x-grid,t.y)||hasWall(t.x+grid,t.y);
+        var vertical=ns&&!ew;
+        ctx.fillStyle='#665a4b';
+        if(vertical){
+          ctx.fillRect(x+5,y+3,8,grid-6); ctx.fillRect(x+grid-13,y+3,8,grid-6);
+        }else{
+          ctx.fillRect(x+3,y+5,grid-6,8); ctx.fillRect(x+3,y+grid-13,grid-6,8);
+        }
+        ctx.fillStyle='#9a6f3f';
+        if(vertical){
+          ctx.fillRect(x+13,y+6,grid-26,grid-12);
+        }else{
+          ctx.fillRect(x+6,y+13,grid-12,grid-26);
+        }
+      });
+
+      /* T4 破墙: 裂纹随损伤加深；原耐久条语义与颜色保留。 */
+      walls.forEach(function(w){
+        var wx=w.x, wy=w.y;
+        var wMax=(CFG.wall&&CFG.wall.hp!=null)?CFG.wall.hp:60;
+        var wHp=(w.hp!=null)?w.hp:wMax;
+        if(wHp < wMax){
+          var wp=Math.max(0,wHp/wMax);
+          ctx.strokeStyle='#765348'; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(wx-7,wy-13); ctx.lineTo(wx-2,wy-5); ctx.lineTo(wx-6,wy+2); ctx.stroke();
+          if(wp<0.34){ ctx.beginPath(); ctx.moveTo(wx+9,wy-9); ctx.lineTo(wx+3,wy); ctx.lineTo(wx+8,wy+9); ctx.stroke(); }
+          ctx.fillStyle='#1a2334';
+          ctx.fillRect(wx-12,wy-6,24,3);
+          ctx.fillStyle = wp>0.5 ? '#ffd97a' : '#ff9a9a';
+          ctx.fillRect(wx-12,wy-6,24*wp,3);
+        }
+      });
+      ctx.restore();
+    }
     /* T10 尖刺陷阱: 待触发正常画; 已触发(armed=false)叠「已触发」标记(扁平+红点) */
     traps.forEach(function(t){
       if(t.armed===false){

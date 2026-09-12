@@ -144,7 +144,7 @@ key('r'); key('Enter');
 assert.equal(controller.getState().blueprints.length, countAfterEscape, 'R and Enter outside build context must not mutate state');
 
 /* fit(empty) maps this point to ground cell (8,14), one cell from pawn_1. */
-pointer(2, 291, 334);
+pointer(2, 306, 335);
 state = controller.getState();
 assert.equal(state.pawns[0].order.action, 'move', 'right-clicking ground must issue a move order');
 assert.deepEqual(state.pawns[0].order.target, { gx: 8, gy: 14 });

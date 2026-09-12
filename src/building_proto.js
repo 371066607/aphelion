@@ -20,32 +20,32 @@ APH.BuildPrototype = (function(){
     var frameId=0,last=0,lastUI=0,stopped=false;
     var root=document.createElement('div');root.id='building-prototype-root';
     root.innerHTML='<style>'+[
-      'body.bp-active{margin:0;overflow:hidden;background:#394737}',
+      'body.bp-active{margin:0;overflow:hidden;background:#343832}',
       'body.bp-active> :not(#building-prototype-root):not(script){display:none!important}',
-      '#building-prototype-root{position:fixed;inset:0;color:#eee7d6;font:14px/1.5 system-ui,sans-serif;z-index:10000}',
+      '#building-prototype-root{position:fixed;inset:0;color:#f4ead4;font:14px/1.5 system-ui,sans-serif;z-index:10000}',
       '#building-prototype-root *{box-sizing:border-box}',
       '#bp-canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;outline:none}',
-      '#building-prototype-root button,#building-prototype-root select{font:inherit;color:inherit;background:#303e35;border:1px solid #73806a;border-radius:5px;padding:7px 10px;cursor:pointer}',
-      '#building-prototype-root button:hover{background:#455649} #building-prototype-root button:focus-visible,#bp-canvas:focus-visible{outline:2px solid #f4d77d;outline-offset:2px}',
-      '#building-prototype-root button[aria-pressed=true]{background:#655d3d;border-color:#e0c46e;color:#fff1b0}',
+      '#building-prototype-root button,#building-prototype-root select{font:inherit;color:inherit;background:#292b27eF;border:1px solid #8f7745;border-radius:3px;padding:7px 10px;cursor:pointer;box-shadow:inset 0 1px #fff3d11a}',
+      '#building-prototype-root button:hover{background:#3b3930;border-color:#cfad61} #building-prototype-root button:focus-visible,#bp-canvas:focus-visible{outline:2px solid #e6c570;outline-offset:2px}',
+      '#building-prototype-root button[aria-pressed=true]{background:#4b4430;border-color:#d5b35e;color:#fff2c4;box-shadow:inset 0 0 0 1px #ead48733}',
       '.bp-top{position:absolute;left:16px;right:16px;top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;pointer-events:none}',
-      '.bp-top>*{pointer-events:auto}.bp-brand{background:#202e27ed;padding:9px 15px;border:1px solid #65735b;border-radius:7px}.bp-brand strong{font-size:19px;letter-spacing:2px}.bp-brand small{display:block;color:#c4c9b6}',
-      '.bp-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.bp-panel{position:absolute;background:#202e27f2;border:1px solid #65735b;border-radius:7px;padding:12px;overflow:auto}',
-      '#bp-palette{left:16px;top:104px;bottom:98px;width:196px}.bp-panel h2{font-size:14px;color:#d8c991;margin:9px 0 7px}.bp-tools{display:grid;grid-template-columns:1fr 1fr;gap:6px}',
-      '#building-prototype-root .bp-tool{padding:5px 3px;font-size:12px;text-align:center;min-width:0}.bp-tool canvas{display:block;margin:auto;width:64px;height:48px}.bp-tool small{display:block;color:#b9c3ad}',
-      '#bp-inspector{right:16px;top:104px;width:210px;max-height:calc(100% - 202px)}.bp-muted{font-size:12px;color:#bfc7b5}.bp-value{white-space:pre-line;margin:7px 0 12px}.bp-action{width:100%;margin:3px 0}',
-      '.bp-bottom{position:absolute;left:228px;right:242px;bottom:16px;background:#202e27f2;border:1px solid #65735b;border-radius:7px;padding:10px 14px}#bp-status{min-height:21px;margin-top:7px;color:#efe0a7}',
-      '#bp-pawns button{min-width:86px;background:#24392feF}#bp-pawns small{display:block;font-size:11px;color:#c7d2bf}',
-      '@media(max-width:900px){#bp-palette{width:154px}.bp-bottom{left:182px;right:204px}#bp-inspector{width:176px}.bp-top{gap:5px}.bp-brand strong{font-size:15px}.bp-tool canvas{width:52px}}',
-      '@media(max-height:680px){#bp-palette,#bp-inspector{top:85px}.bp-tool canvas{height:34px}.bp-panel{padding:8px}}'
+      '.bp-top>*{pointer-events:auto}.bp-brand{background:#1e211fdf;padding:8px 13px;border:1px solid #a8894e;border-radius:4px;box-shadow:0 5px 18px #10120e55,inset 0 1px #fff0c51a}.bp-brand strong{font-size:18px;letter-spacing:1.5px}.bp-brand small{display:block;color:#d7c9ab;font-size:11px;letter-spacing:.05em}',
+      '.bp-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.bp-panel{position:absolute;background:#1d201edf;border:1px solid #9f854d;border-radius:4px;padding:10px;overflow:auto;box-shadow:0 6px 20px #10120e55,inset 0 1px #fff0c514}',
+      '#bp-palette{left:16px;top:98px;bottom:92px;width:216px}.bp-panel h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d9ba72;margin:10px 0 6px}.bp-tools{display:grid;grid-template-columns:1fr 1fr;gap:5px}',
+      '#building-prototype-root .bp-tool{padding:5px 2px 4px;font-size:12px;text-align:center;min-width:0;background:#252824c9}.bp-tool canvas{display:block;margin:auto;width:74px;height:54px}.bp-tool small{display:block;color:#bdbba8;font-size:10px}',
+      '#bp-inspector{right:16px;top:98px;width:208px;max-height:calc(100% - 190px)}.bp-muted{font-size:12px;color:#c6c0ad}.bp-value{white-space:pre-line;margin:7px 0 12px}.bp-action{width:100%;margin:3px 0}.bp-value,#bp-status{font-variant-numeric:tabular-nums}',
+      '.bp-bottom{position:absolute;left:244px;right:238px;bottom:16px;background:#1d201edf;border:1px solid #9f854d;border-radius:4px;padding:8px 12px;box-shadow:0 6px 20px #10120e55,inset 0 1px #fff0c514}#bp-status{min-height:21px;margin-top:6px;color:#72d4bd}',
+      '#bp-pawns button{min-width:86px;background:#222723eF}#bp-pawns button[aria-pressed=true]{color:#b8f0dc;border-color:#55aa90;background:#263c35}#bp-pawns small{display:block;font-size:11px;color:#c7d2bf}',
+      '@media(max-width:900px){#bp-palette{width:164px}.bp-bottom{left:192px;right:198px}#bp-inspector{width:170px}.bp-top{gap:5px}.bp-brand strong{font-size:15px}.bp-tool canvas{width:58px;height:43px}}',
+      '@media(max-height:680px){#bp-palette,#bp-inspector{top:78px}.bp-tool canvas{height:34px}.bp-panel{padding:8px}}'
     ].join('')+'</style>'+
       '<canvas id="bp-canvas" tabindex="0" aria-label="建造地图；方向键选格，回车选择或放置，WASD移动镜头"></canvas>'+
-      '<header class="bp-top"><div class="bp-brand"><strong>远日点 · 房间试建</strong><small>两间房，从每一格开始</small></div><div id="bp-pawns" class="bp-row"></div><div class="bp-row"><button id="bp-demo">双房间示范</button><button id="bp-empty">空地重建</button></div></header>'+
+      '<header class="bp-top"><div class="bp-brand"><strong>远日点 · 重建家园</strong><small>房间试建 · 新曙光迫降后的第一盏灯</small></div><div id="bp-pawns" class="bp-row"></div><div class="bp-row"><button id="bp-demo">双房间示范</button><button id="bp-empty">空地重建</button></div></header>'+
       '<aside id="bp-palette" class="bp-panel" aria-label="建筑目录"></aside>'+
       '<aside id="bp-inspector" class="bp-panel"><h2>殖民地</h2><div id="bp-probe" class="bp-value"></div><select id="bp-weather" aria-label="环境场景"><option value="clear">晴天 · 14°C</option><option value="rain">下雨 · 8°C</option><option value="cold">寒潮 · −12°C</option><option value="hot">热浪 · 38°C</option></select><h2>当前选择</h2><div id="bp-detail" class="bp-value"></div><div id="bp-actions"></div><h2>建造操作</h2><div class="bp-muted">墙 / 导线：拖出直线<br>地板：拖出矩形<br>R 旋转 · Esc 取消<br>方向键选格 · Enter 放置<br>右键下令 · 中键拖动镜头<br>滚轮缩放 · Home 适配视野</div><p class="bp-muted">此处进度只保留到关闭页面。</p></aside>'+
       '<footer class="bp-bottom"><div class="bp-row"><button id="bp-pause" aria-pressed="false">暂停</button><button id="bp-speed">速度 ×1</button><button id="bp-grid" aria-pressed="false">网格 V</button><button id="bp-roof" aria-pressed="false">屋顶 H</button><button id="bp-power" aria-pressed="false">电力 P</button><button id="bp-demolish" aria-pressed="false">拆除</button><select id="bp-layer" aria-label="拆除图层"><option value="structure">建筑层</option><option value="floor">地板层</option><option value="conduit">导线层</option></select><button id="bp-rotate">旋转 R</button></div><div id="bp-status" role="status" aria-live="polite"></div></footer>';
     document.body.classList.add('bp-active');document.body.appendChild(root);
-    var $=function(id){return root.querySelector('#'+id);},canvas=$('bp-canvas'),ctx=canvas.getContext('2d');
+    var $=function(id){return root.querySelector('#'+id);},canvas=$('bp-canvas'),ctx=canvas.getContext('2d'),paletteIcons=[];
     function message(value){$('bp-status').textContent=value;}
     function resultMessage(r,success){message(r.ok?success:(reasons[r.why]||('无法执行：'+r.why)));return r.ok;}
     function focusMap(){canvas.focus({preventScroll:true});}
@@ -56,6 +56,12 @@ APH.BuildPrototype = (function(){
       $('bp-demolish').setAttribute('aria-pressed',String(demolition));
     }
     var groups=[['结构',['bl_wall','bl_gate','bl_floor']],['生活',['bl_bed','bl_clinic','bl_dining_table','bl_dining_chair']],['工作',['bl_lab','bl_kitchen','bl_workshop','bl_storage_shelf']],['电力',['bl_wood_generator','bl_conduit']]];
+    function drawPaletteIcon(icon,bid){
+      var g=icon.getContext('2d');
+      g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,icon.width,icon.height);
+      g.translate(icon.width/2,icon.height/2);D.drawIcon(g,bid,0,Math.min(72/M.DEFS[bid].w,76/M.DEFS[bid].h));
+    }
+    function redrawPaletteIcons(){paletteIcons.forEach(function(entry){drawPaletteIcon(entry.icon,entry.bid);});}
     groups.forEach(function(group){
       var heading=document.createElement('h2');heading.textContent=group[0];$('bp-palette').appendChild(heading);
       var list=document.createElement('div');list.className='bp-tools';$('bp-palette').appendChild(list);
@@ -65,7 +71,7 @@ APH.BuildPrototype = (function(){
         var name=document.createElement('span');name.textContent=d.label;button.appendChild(name);
         var size=document.createElement('small');size.textContent=d.w+' × '+d.h+' 格';button.appendChild(size);
         button.addEventListener('click',function(){choose(bid);});list.appendChild(button);
-        var g=icon.getContext('2d');g.translate(64,48);D.drawIcon(g,bid,0,Math.min(72/d.w,76/d.h));
+        paletteIcons.push({icon:icon,bid:bid});drawPaletteIcon(icon,bid);
       });
     });
     var statuses={idle:'空闲',moving:'赶路',sleeping:'睡眠',sitting:'休息',working:'工作',building:'建造'};
@@ -103,7 +109,7 @@ APH.BuildPrototype = (function(){
       if(!cells.length)cells=[{gx:8,gy:8},{gx:25,gy:23}];
       var xs=cells.map(function(c){return c.gx;}),ys=cells.map(function(c){return c.gy;});
       var minX=Math.min.apply(null,xs)*G-2*G,maxX=(Math.max.apply(null,xs)+1)*G+2*G,minY=Math.min.apply(null,ys)*G-2*G,maxY=(Math.max.apply(null,ys)+1)*G+2*G;
-      var left=width<900?182:228,right=width<900?204:242,top=96,bottom=120;
+      var left=width<900?192:244,right=width<900?198:238,top=96,bottom=120;
       camera.z=Math.max(.25,Math.min(1.35,(width-left-right)/(maxX-minX),(height-top-bottom)/(maxY-minY)));
       camera.x=left+(width-left-right)/2-(minX+maxX)/2*camera.z;camera.y=top+(height-top-bottom)/2-(minY+maxY)/2*camera.z;
     }
@@ -148,12 +154,16 @@ APH.BuildPrototype = (function(){
     window.addEventListener('keydown',keydown);window.addEventListener('resize',resize);
     function loadPeople(){if(!APH.Sprites||!APH.Humanoid||!APH.SPRITE_DATA)return;for(var face=0;face<4;face++)['walk','idle','prone'].forEach(function(cycle){var name='hum_'+face+'_nopack_'+cycle,src=APH.SPRITE_DATA[name];if(!src)return;var layout=APH.Humanoid.sheetLayout(name);APH.Sprites.define(name,{src:src,cols:layout.cols,count:layout.count,fps:layout.fps,baseline:cycle==='prone'?[248,248,249,198][face]:248,contentH:cycle==='prone'?[122,138,102,124][face]:(cycle==='idle'?236:240)});});APH.Sprites.loadAll();}
     function frame(now){if(stopped)return;var dt=last?Math.min(.05,(now-last)/1000):0;last=now;if(!paused)M.tick(state,dt*speed);
-      var dpr=width?canvas.width/width:1;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#394737';ctx.fillRect(0,0,width,height);ctx.setTransform(dpr*camera.z,0,0,dpr*camera.z,dpr*camera.x,dpr*camera.y);
+      var dpr=width?canvas.width/width:1;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle='#343832';ctx.fillRect(0,0,width,height);ctx.setTransform(dpr*camera.z,0,0,dpr*camera.z,dpr*camera.x,dpr*camera.y);
       var placement=tool?Object.assign({bid:tool,gx:hover.gx,gy:hover.gy,rotation:rotation},M.canPlace(state,tool,hover.gx,hover.gy,rotation)):null;
       D.drawWorld(ctx,state,{grid:grid,roof:roof,power:power,selectedUid:selectedUid,selectedPawnId:selectedPawn,hover:hover,placement:placement,dragCells:drag&&!drag.pan?dragCells(drag.start,drag.end):null,demolishLayer:demolition?layer:null,time:state.clock});
       if(now-lastUI>200){refresh();lastUI=now;}frameId=requestAnimationFrame(frame);
     }
-    resize();refresh();loadPeople();message('先选居民，再右键床、椅子或工作台。选“空地重建”从头造一遍。');frameId=requestAnimationFrame(frame);
+    resize();refresh();loadPeople();
+    if(APH.BuildArt&&typeof APH.BuildArt.load==='function'){
+      try{APH.BuildArt.load(function(){if(!stopped&&APH.BuildArt&&typeof APH.BuildArt.isReady==='function'&&APH.BuildArt.isReady())redrawPaletteIcons();});}catch(ignore){}
+    }
+    message('先选居民，再右键床、椅子或工作台。选“空地重建”从头造一遍。');frameId=requestAnimationFrame(frame);
     active={getState:function(){return state;},snapshot:function(){return M.snapshot(state);},reset:reset,command:send,stop:function(){stopped=true;cancelAnimationFrame(frameId);window.removeEventListener('keydown',keydown);window.removeEventListener('resize',resize);document.body.removeChild(root);document.body.classList.remove('bp-active');document.title=previousTitle;active=null;}};
     return active;
   }

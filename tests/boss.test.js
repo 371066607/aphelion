@@ -31,7 +31,7 @@ const SRC=path.join(__dirname,'..','src');
    opening.js —— showOpening 要真实 <video>, 装了 boot 就炸;
    input.js   —— Boss 用例直调战斗接口, 不派输入事件。 */
 const SKIP_MODULES = ['opening.js', 'input.js'];
-for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','building_art_data.js','building_art.js','humanoid.js','save.js','planet.js','llm.js',
                 'colony.js','rivals.js','events.js','nav.js','weather.js','residents.js','alerts.js','combat.js',
                 'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();

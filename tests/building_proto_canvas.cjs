@@ -3,10 +3,10 @@
 'use strict';
 const assert = require('assert');
 const fs = require('fs');
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { createCanvas, loadImage, Image } = require('@napi-rs/canvas');
 global.window = global;
 global.APH = {};
-for (const file of ['config', 'humanoid', 'sprites', 'sprite_data', 'building_proto_model', 'building_proto_draw']) {
+for (const file of ['config', 'building_art_data', 'building_art', 'humanoid', 'sprites', 'sprite_data', 'building_proto_model', 'building_proto_draw']) {
   require('../src/' + file + '.js');
 }
 const M = APH.BuildProtoModel, D = APH.BuildProtoDraw;
@@ -15,6 +15,7 @@ function raster(objects, blueprints) {
   D.drawWorld(canvas.getContext('2d'), { objects, blueprints, pawns: [] }, {});
   return canvas.getContext('2d').getImageData(0, 0, 240, 240).data;
 }
+function verifyFootprints(label) {
 const ground = raster([], []);
 for (const bid of Object.keys(M.DEFS)) for (let rotation = 0; rotation < 4; rotation++) {
   const obj = { uid: 'probe', bid, gx: 1, gy: 1, rotation }, r = M.rectOf(obj);
@@ -45,10 +46,26 @@ const seam = createCanvas(600, 200), seamCtx = seam.getContext('2d');
 seamCtx.scale(1.3, 1.3);
 D.drawWorld(seamCtx, { objects: [1, 2, 3, 4].map(gx => ({ bid: 'bl_wall', gx, gy: 1 })), pawns: [] }, {});
 const row = seamCtx.getImageData(80, 94, 210, 1).data;
-for (let i = 0; i < row.length; i += 4) assert.deepEqual(Array.from(row.slice(i, i + 4)), [215, 208, 193, 255]);
-console.log('canvas: 52 world/icon footprint checks, floor/conduit ghosts and fractional wall joins passed');
+for (let i = 0; i < row.length; i += 4) {
+  assert.equal(row[i+3], 255);
+  assert(row[i] > 150 && row[i+1] > 135 && row[i+2] > 90, 'wall joins must retain cream material instead of revealing soil or dark seams');
+}
+console.log(label + ': 52 world/icon footprint checks, floor/conduit ghosts and fractional wall joins passed');
+}
+verifyFootprints('fallback');
 
 (async function capture() {
+  global.Image = Image;
+  global.OffscreenCanvas = class { constructor(w,h) { return createCanvas(w,h); } };
+  await new Promise(resolve => APH.BuildArt.load(resolve));
+  assert(APH.BuildArt.isReady(), 'actual embedded atlas must decode');
+  const atlas = await loadImage(APH.BUILD_ART_DATA), probe = createCanvas(atlas.width, atlas.height);
+  probe.getContext('2d').drawImage(atlas,0,0);
+  const atlasPixels=probe.getContext('2d').getImageData(0,0,atlas.width,atlas.height).data;
+  let transparent=0;
+  for(let i=3;i<atlasPixels.length;i+=4) if(atlasPixels[i]===0) transparent++;
+  assert(transparent>atlas.width*atlas.height*.1, 'atlas needs real alpha, never a baked checkerboard');
+  verifyFootprints('warm atlas');
   if (!process.argv[2]) return;
   for (let face = 0; face < 4; face++) for (const cycle of ['walk', 'idle', 'prone']) {
     const name = `hum_${face}_nopack_${cycle}`, src = APH.SPRITE_DATA[name];

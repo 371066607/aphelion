@@ -19,7 +19,7 @@ function codeOf(file) {
 
 /* build.py 的 MODULE_ORDER (含 DOM 层); main.js 是入口, 排最后 */
 const ORDER = [
-  'config.js','utils.js','input.js','humanoid.js','save.js','opening.js',
+  'config.js','utils.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js',
   'planet.js','llm.js','colony.js','rivals.js','events.js','nav.js','weather.js',
   'residents.js','alerts.js','combat.js','world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js',
   'sprites.js','ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js',
@@ -82,7 +82,7 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
     'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
     'weather.js':'Weather','residents.js':'Res','alerts.js':'Alerts','combat.js':'Combat',
     'world.js':'World','entities.js':'Ent','visitors.js':'Visitors','colonytick.js':'ColonyTick','draw.js':'Draw',
-    'sfx.js':'SFX','sprites.js':'Sprites',
+    'building_art.js':'BuildArt','sfx.js':'SFX','sprites.js':'Sprites',
     'building_proto_model.js':'BuildProtoModel','building_proto_draw.js':'BuildProtoDraw','building_proto.js':'BuildPrototype',
     'ui.js':'UI','hints.js':'Hints','main.js':'Main','planet.js':'Planet',
     'llm.js':'LLM','save.js':'Save',

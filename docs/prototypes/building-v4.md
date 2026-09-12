@@ -50,7 +50,7 @@ file:///Users/mac/aphelion/game.html?prototype=building-v4
 
 ## 实现边界
 
-`building_proto_model.js` 负责纯模型，`building_proto_draw.js` 负责绘制，`building_proto.js` 负责本模式的输入与 DOM。它们在普通入口加载时无启动副作用。正常入口、殖民地存档和正式建造接口维持原有行为。
+`building_proto_model.js` 负责纯模型，`building_proto_draw.js` 负责绘制，`building_proto.js` 负责本模式的输入与 DOM。它们在普通入口加载时无启动副作用。暖色图集由 `building_art.js` 按需解码，资源随 `game.html` 内联。普通入口同步修复墙层连续绘制；殖民地存档和正式建造接口维持原有行为。
 
 这是交互验证场，不接正式资源扣款、任务经济、战斗、医疗效果、完整天气导演或存档迁移。室内效率仅用于比较环境保护，不构成生产平衡结论。
 
@@ -77,7 +77,7 @@ npm install --prefix /tmp/aphelion-building-qa @napi-rs/canvas@1.0.8 --no-audit 
 NODE_PATH=/tmp/aphelion-building-qa/node_modules node tests/building_proto_canvas.cjs docs/prototypes/evidence/building-v4-canvas.png
 ```
 
-该脚本对 13 类建筑 × 4 方向的实际世界绘制与图标检查边界，检查地板/导线蓝图可见、非整数缩放墙缝，再复用实际人物贴图与 `drawWorld` 导出 [离线画面](evidence/building-v4-canvas.png)。不新增项目运行依赖。
+该脚本分别对代码回退、暖色图集的 13 类建筑 × 4 方向实际世界绘制与图标检查边界，检查真实透明通道、地板/导线蓝图可见、非整数缩放墙缝，再复用实际人物贴图与 `drawWorld` 导出画面。[早期代码画面](evidence/building-v4-canvas.png) / [已接入暖色图集的离线画面](evidence/building-v4-warm-runtime.png)。不新增项目运行依赖。
 
 浏览器本地 URL 自动访问被安全策略拒绝，未使用其他浏览器、代理 URL 或服务器绕过。因此浏览器实机视觉和操作手感仍由玩家在上述入口验收，Node / 离线绘图结果不等同于浏览器验收。
 
