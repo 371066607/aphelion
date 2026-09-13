@@ -259,5 +259,52 @@ APH.Observe = (function(){
     };
   }
 
-  return { observe: observe };
+  function gridOf(holder){
+    if(!holder || !holder.observation || !holder.observation.grid) return null;
+    return holder.observation.grid;
+  }
+  function stamp(holder, result){
+    holder.observation = {
+      grid: result.grid,
+      degraded: !!result.degraded,
+      biomeId: result.biomeId
+    };
+    return holder;
+  }
+  function sizeOf(opts){
+    var cells = Math.floor((CFG.WORLD || 2200) / (CFG.GRID || 48));
+    return {
+      widthCells: (opts && opts.widthCells) || cells,
+      heightCells: (opts && opts.heightCells) || cells
+    };
+  }
+  function ensureHome(colony, opts){
+    colony = colony || {};
+    if(gridOf(colony)) return colony;
+    opts = opts || {};
+    var sz = sizeOf(opts);
+    return stamp(colony, observe({
+      seed: opts.seed,
+      biomeId: (CFG.observe && CFG.observe.homeBiome) || 'biome_landing',
+      widthCells: sz.widthCells,
+      heightCells: sz.heightCells,
+      pins: opts.pins
+    }));
+  }
+  function ensurePlanet(spec, opts){
+    if(!spec) return spec;
+    if(gridOf(spec)) return spec;
+    opts = opts || {};
+    var sz = sizeOf(opts);
+    var biomeId = (spec.biome && spec.biome.id) || opts.biomeId;
+    return stamp(spec, observe({
+      seed: spec.seed,
+      biomeId: biomeId,
+      widthCells: sz.widthCells,
+      heightCells: sz.heightCells,
+      pins: opts.pins
+    }));
+  }
+
+  return { observe: observe, ensureHome: ensureHome, ensurePlanet: ensurePlanet, gridOf: gridOf };
 })();

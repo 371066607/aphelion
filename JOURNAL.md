@@ -2146,3 +2146,7 @@ console:  (无)
 ### 2026-09-13 · feat/adr-48-observe · #192
 
 - 观测接缝 `APH.Observe.observe`：五张群系砖表、钉子、失败降级。单元 847 绿；构建成功。未上场、未落盘。未 push。
+
+### 2026-09-13 · feat/adr-48-observe · #193
+
+- `ensureHome` / `ensurePlanet` / `gridOf`：格网随殖民地与星球存档往返；已有格网不重测；旧档加载不观测。Save 不自动观测。单元 850 绿。未接地面查询。
