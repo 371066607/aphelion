@@ -2329,3 +2329,8 @@ console:  (无)
 
 - 复核进一步确认 JSON 中显式 `"uid": null` 会被旧条件误当成字段缺省。资源校验现按 own-property 区分：只有真正没有 `uid` 键的早期 v1 最小记录允许补齐；显式 null、空串或非规范身份都返回 `invalid-resource-uid`。新增 JSON stringify/parse 往返回归，同时覆盖 PlanetSpec 与绕过校验的实体化入口。
 - 重新构建 `game.html` 41977231 字节，SHA-256 `6d89a1b8cdfcd444e48780481b9d1c4d5a50c518ef545607c3348ab03a9e8a04`。1060 单元、144 scenario、5 perf、7 boss 全绿，`git diff --check` 通过；本轮 DOM 性能桩 P50=2ms/P95=3ms、20 次寻路79ms、存档1610564字节。该条是 #203 最新冻结证据。
+
+### 2026-09-14 05:39 +08 · #203 上游 main 重放与冲突消解
+
+- 推送前按协作规范把七张地图修复提交重放到 `origin/main`。上游已经合入旧 PR #196；冲突按 #197 的整合边界保留当前双世界 WIP 与七票实现，同时保留上游 24 行追加日志。自动混入但未发生文本冲突的旧单世界 Observe 出航 UI、重复配置和三组旧 API 测试已逐项移除，避免恢复第二套目的地与观测生命周期。
+- 消解后的源码与 rebase 前双轴 PASS 树逐文件一致，只有 `JOURNAL.md` 多出上游历史；`game.html` 仍为 41977231 字节与 SHA-256 `6d89a1b8cdfcd444e48780481b9d1c4d5a50c518ef545607c3348ab03a9e8a04`。重新执行 1060 单元、144 scenario、5 perf、7 boss 全绿，`git diff --check` 通过；本轮 DOM 性能桩 P50=1ms/P95=3ms、20 次寻路68ms、存档1610772字节。
