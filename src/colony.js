@@ -249,7 +249,10 @@ APH.Colony = (function(){
       });
     });
     /* 程序化生成自然资源生态实体(树木/矿脉/灌木) */
-    var flora = generateFlora(seed);
+    if(window.APH.Observe && s.colony && !APH.Observe.gridOf(s.colony) && !(s.colony.buildings||[]).length){
+      APH.Observe.ensureHome(s.colony, { seed: seed });
+    }
+    var flora = generateFlora(seed, s.colony);
     flora.forEach(function(f){ s.entities.push(f); });
     ensurePad();
   }
@@ -771,12 +774,13 @@ APH.Colony = (function(){
   }
 
   /* 法则→收成修正(纯函数): 夜间酸雨减农; 磁暴窗停实验室 */
-  function harvestMods(laws, clock, night){
+  function harvestMods(laws, clock, night, env){
     var C=CFG.laws||{};
     var has={};
     (laws||[]).forEach(function(l){ if(l&&l.id) has[l.id]=true; });
     var farmMul=1, labMul=1, acid=false, storm=false;
-    if(has.lw_night_acid && night){
+    var dry = env && window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(env) && APH.Observe.hasWater && !APH.Observe.hasWater(env);
+    if(has.lw_night_acid && night && !dry){
       farmMul=C.acidFarmMul!=null?C.acidFarmMul:0.5;
       acid=true;
     }
@@ -2320,7 +2324,10 @@ APH.Colony = (function(){
   }
 
   /* ---------- 自然生态生成(纯函数) ---------- */
-  function generateFlora(seed){
+  function generateFlora(seed, holder){
+    if(holder && window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(holder) && APH.Observe.floraFrom){
+      return APH.Observe.floraFrom(holder);
+    }
     var rng = U.makeRng((seed ^ 0xF108A) >>> 0 || 17);
     var out = [];
     var H = CFG.HAB || { x:1100, y:1100 };
@@ -2388,10 +2395,16 @@ APH.Colony = (function(){
       queue[i].ticksLeft--;
       if(queue[i].ticksLeft <= 0){
         var rng = U.makeRng(((s.seed || 7) * 31 + i * 917 + Math.floor((s.clock || 0))) >>> 0);
-        var nx = queue[i].x + Math.floor((rng() - 0.5) * zoneR * 2);
-        var ny = queue[i].y + Math.floor((rng() - 0.5) * zoneR * 2);
-        nx = U.clamp(nx, 100, CFG.WORLD - 100);
-        ny = U.clamp(ny, 100, CFG.WORLD - 100);
+        var observed = window.APH.Observe && ((s.colony && APH.Observe.gridOf(s.colony)) || (s.spec && APH.Observe.gridOf(s.spec)));
+        var nx, ny;
+        if(observed){
+          nx = queue[i].x; ny = queue[i].y;
+        } else {
+          nx = queue[i].x + Math.floor((rng() - 0.5) * zoneR * 2);
+          ny = queue[i].y + Math.floor((rng() - 0.5) * zoneR * 2);
+          nx = U.clamp(nx, 100, CFG.WORLD - 100);
+          ny = U.clamp(ny, 100, CFG.WORLD - 100);
+        }
         var kind = queue[i].kind;
         var hp = kind === 'tree' ? 30 : (kind === 'rock_iron' ? 40 : (kind === 'rock_stone' ? 35 : (kind === 'bush_berry' ? 15 : 20)));
         spawned.push({
@@ -2524,7 +2537,7 @@ APH.Colony = (function(){
     s.powerStatus = powRes;
 
     var nightP = !isDay;
-    var hmods = harvestMods(s.spec && s.spec.laws, s.clock, nightP);
+    var hmods = harvestMods(s.spec && s.spec.laws, s.clock, nightP, s.colony);
     var prodWorkers = ((s.meta && s.meta.residents) || []).filter(function(r){
       return !(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r));
     });

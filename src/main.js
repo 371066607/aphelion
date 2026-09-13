@@ -169,7 +169,9 @@ window.APH = window.APH || {};
         x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
       });
       /* 远征野生异星植物生成 (Flora #36) */
-      if(APH.Planet && APH.Planet.generateExpeditionFlora){
+      if(window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(p) && APH.Observe.floraFrom){
+        APH.Observe.floraFrom(p).forEach(function(f){ s.entities.push(f); });
+      } else if(APH.Planet && APH.Planet.generateExpeditionFlora){
         var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
         expFlora.forEach(function(f){ s.entities.push(f); });
       }
@@ -195,9 +197,12 @@ window.APH = window.APH || {};
       /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
       if(p.rivals && p.rivals.length){
         var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
-        var ba=Math.random()*U.TAU;
-        var bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
-        var by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
+        var ba=Math.random()*U.TAU, btry=0, bx, by;
+        do{
+          ba=Math.random()*U.TAU;
+          bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
+          by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
+        }while(btry++<24 && window.APH.Observe && APH.Observe.walkableWorld && !APH.Observe.walkableWorld(p, bx, by));
         s.entities.push({
           id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
           x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
@@ -870,7 +875,7 @@ window.APH = window.APH || {};
     var quiet = !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0);
     if(quiet){
       var nightW=APH.World.daylight()<.5;
-      var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW);
+      var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW, s.colony);
       if(wx.storm && !s._stormOn) APH.UI.floatText('⚡ 磁暴来袭 · 实验室停摆','#c39bff');
       if(wx.acid && !s._acidOn) APH.UI.floatText('🌧 酸雨 · 农田减半','#7dffab');
       s._stormOn=!!wx.storm; s._acidOn=!!wx.acid;

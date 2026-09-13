@@ -14,7 +14,13 @@ APH.CFG = {
   GRID: 48,                    // ADR-4 逻辑格网
   observe: {
     retries: 8,                // 观测失败换子种子次数，用尽则降级
-    homeBiome: 'biome_landing'
+    homeBiome: 'biome_landing',
+    waterTiles: ['water','spore_water','crystal_water','acid_pool'],
+    floraTiles: ['tree','rock_stone','rock_iron','bush_berry','bush_herb','bush_alien','rock_wreckage','glow_cap','shard','reed','frost_shrub'],
+    fertility: {
+      landing: .45, woodland: .64, lakeshore: .72, ridge: .16,
+      alien: .58, wreckage: .28, water: 0
+    }
   },
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },

@@ -306,5 +306,75 @@ APH.Observe = (function(){
     }));
   }
 
-  return { observe: observe, ensureHome: ensureHome, ensurePlanet: ensurePlanet, gridOf: gridOf };
+  function inList(list, id){
+    var i;
+    list = list || [];
+    for(i = 0; i < list.length; i++) if(list[i] === id) return true;
+    return false;
+  }
+  function hasWater(holder){
+    var grid = gridOf(holder), y, x, waters;
+    if(!grid) return false;
+    waters = (CFG.observe && CFG.observe.waterTiles) || ['water'];
+    for(y = 0; y < grid.length; y++){
+      for(x = 0; x < grid[y].length; x++){
+        if(inList(waters, grid[y][x])) return true;
+      }
+    }
+    return false;
+  }
+  function cellAt(holder, gx, gy){
+    var grid = gridOf(holder), tile, water, fertTbl, fertility;
+    if(!grid || gy < 0 || gy >= grid.length || gx < 0 || gx >= grid[gy].length) return null;
+    tile = grid[gy][gx];
+    water = inList((CFG.observe && CFG.observe.waterTiles) || ['water'], tile);
+    fertTbl = (CFG.observe && CFG.observe.fertility) || {};
+    fertility = fertTbl[tile];
+    if(fertility == null) fertility = water ? 0 : 0.5;
+    return {
+      tile: tile,
+      walkable: !water,
+      fertility: fertility,
+      water: water,
+      shore: tile === 'lakeshore' && hasWater(holder),
+      floraKind: inList((CFG.observe && CFG.observe.floraTiles) || [], tile) ? tile : null
+    };
+  }
+  function walkableWorld(holder, x, y){
+    var G = CFG.GRID || 48, c;
+    if(!gridOf(holder)) return true;
+    c = cellAt(holder, Math.floor(x / G), Math.floor(y / G));
+    return !!(c && c.walkable);
+  }
+  function floraHp(kind){
+    if(kind === 'tree') return 30;
+    if(kind === 'rock_iron') return 40;
+    if(kind === 'rock_stone' || kind === 'rock_wreckage') return 35;
+    if(kind === 'bush_berry') return 15;
+    return 20;
+  }
+  function floraFrom(holder){
+    var grid = gridOf(holder), out = [], y, x, c, G, hp;
+    if(!grid) return out;
+    G = CFG.GRID || 48;
+    for(y = 0; y < grid.length; y++){
+      for(x = 0; x < grid[y].length; x++){
+        c = cellAt(holder, x, y);
+        if(!c || !c.floraKind) continue;
+        hp = floraHp(c.floraKind);
+        out.push({
+          id: 'flora_' + c.floraKind + '_' + x + '_' + y,
+          type: 'flora', kind: c.floraKind,
+          x: (x + 0.5) * G, y: (y + 0.5) * G,
+          hp: hp, maxHp: hp
+        });
+      }
+    }
+    return out;
+  }
+
+  return {
+    observe: observe, ensureHome: ensureHome, ensurePlanet: ensurePlanet, gridOf: gridOf,
+    cellAt: cellAt, hasWater: hasWater, walkableWorld: walkableWorld, floraFrom: floraFrom
+  };
 })();
