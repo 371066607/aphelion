@@ -97,3 +97,15 @@ Observation 在运行时按不可变快照使用。世界块、总览和导航�
 Active Run 的 `destination` 必须是已解析 `{kind:'planet', planetId, seed}`，会随 snapshot、restore 和返航回执保存。WorldRuntime 只恢复同时满足以下条件的远征容器：scene 为 expedition、实体数组存在、spec 的 ID/seed 与 destination 一致、descriptor 明确为 generation 1 expedition，且两份 Observation 都与持久 PlanetSpec 相同。恢复层会完整校验持久 PlanetSpec 的地形、调色板和敌人运行结构，再以持久 spec 和由它派生的 descriptor 覆盖 runtime 镜像；runtime 镜像缺字段不会制造半颗星，持久档自身损坏则不安装。无目的地、身份或 Observation 不一致的旧/损坏 run 会沿幂等返航路径回收队员与已有货物。
 
 `main.js` 只编排发现保存、状态机提交、WorldRuntime 切换和异步文案富化。旧结算页直接创建 generation 0 星球的 `buildWorld/newPlanet` 路径已删除。AI 返回时沿用原 ID、seed 和 Observation，并在重写展示文案前先 checkpoint 当前 runtime，避免晚到的响应覆盖远征进度。远征地面、边界、敌人落点和酸性水域均查询 `TerrainModel`；岩石、水晶、植物、矿点和遗迹目前仍由既有生成器补入实体列表，#203 将把这些覆盖物收口到 Observation。
+
+## 2026-09-14 修订：已知星球重访与故障恢复（#202）
+
+Atlas 的一次“发现”就是首次实际着陆，因此新条目写入 `visits:1`、`lastVisitedAt=discoveredAt`；`Atlas.visit` 在副本上递增次数、更新时间，并保留 `discoveredAt` 与当前构建不认识的条目字段。规划器每次重建时先选择一个禁用提示项，再列“未知星球”和 Atlas 已知星；已知条目按是否持有 Observation 标成“已观测”或“旧版地图”。打开、浏览和重新打开面板都不生成星球，且不会沿用上一次选择。原生 select 的上下键、Home、End 有显式导航接缝，Enter 仍只在焦点离开 select 后提交。
+
+已知目的地必须解析为 `{kind:'planet', planetId, seed}`。`main.js` 先按 ID 读取 PlanetSpec，校验完整运行结构及 ID/seed 相等，再调用 `Save.savePlanetVisit`。这个前序事务只准备并写入下一份 meta/Atlas 与存在时的殖民地 `metaSnapshot`，不重写 `planet_<id>`，并返回可撤销到提交前原始字节的回执。随后 `ExpeditionState.begin` 扣补给、转移居民并建立 Active Run，构造远征容器；只有首个 runtime checkpoint 把这三项一起保存成功，UI 才显示已经着陆。若 begin、构造或最终 colony 保存失败，对象图快照会恢复家园、名册、实体、物流及 active/home slot 的共享引用，再用前序回执恢复 meta/colony/PlanetSpec 字节。已知星不会再次观测，也不会触发异步 LLM 富化。
+
+旧档可能已经有 `aphelion_planet_P…` 而没有 Atlas。`Save.loadMeta` 启动时只扫描该前缀，逐份读取并完整校验；仅当存储 key 后缀与 PlanetSpec 内部 ID 精确相等时，才按原 ID 回填内存 Atlas。历史短 ID 永不改名，PlanetSpec 原始字节不因索引回填而变化。旧低 12 位算法已经发生的 key 碰撞无法推断丢失内容，因此不合成第二颗星；新发现继续用完整 32 位 ID 保证后续不碰撞。
+
+#201 阶段已经着陆但写成 `visits:0`、缺少 `lastVisitedAt` 的条目，在第一次加载/回填时按一次首访归一，后续第一次重访正确变成 2。PlanetSpec 回填和重访会拒绝显式越界 tier、负数或越界地形密度、缺失/非法 `nightBoost` 以及空或未归一的阵营权重，避免刷怪间隔或移动速度进入 `NaN`；早期完全缺少 tier 的 v1 legacy PlanetSpec 仍按既有 tier 1 默认值兼容。colony 中的 `metaSnapshot` 是权威 meta，若其版本高于当前构建，Save 会在任何 colony 迁移写回、Atlas 扫描、运行态 `metaWillSave` checkpoint 或统一 colony 写入口前同时检查 localStorage 与会话兜底，不能用当前 v1 meta 降级它。字符串、数组等合法 JSON 损坏快照不参与默认值修补，加载回退独立 meta 且不写回原 colony 字节。
+
+#201 对“远征重载均要求 generation 1”的约束在这里收窄：新发现和带 Observation 的已知星仍必须是 generation 1，并要求 runtime 的 spec/descriptor Observation 与持久 PlanetSpec 完全一致；已有但没有 Observation 的 PlanetSpec 则是只读 legacy 兼容分支，描述固定为 generation 0。legacy runtime 只有在 scene、实体数组、ID、seed、尺寸和无 Observation 状态都与持久档相符时才能恢复。刷新后两条路径都用持久 PlanetSpec 覆盖 runtime 镜像；错误身份或损坏结构安全返航。返航消费 Active Run 一次并清空 active，重复调用不重复结算；下一次出发仍需显式重选目的地。

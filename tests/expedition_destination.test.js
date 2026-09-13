@@ -110,6 +110,86 @@ test('#201 atlas: loadMeta 与普通 saveMeta 原样保留未来 Atlas 顶层字
   assert(JSON.stringify(persisted.atlas)===JSON.stringify(futureAtlas),'普通 saveMeta 不得丢未来 Atlas 字段');
 });
 
+test('#202 loadMeta: future authoritative meta 在任何迁移或 Atlas 回填前拒绝且磁盘零变化',()=>{
+  const spec=Planet.newObservedPlanet(0x20220),metaRaw=JSON.stringify(fixture().meta);
+  const futureMeta={v:APH.CFG.save.VERSION+1,res:{food:99},residents:[],futureField:{keep:true}};
+  const oldColony={v:APH.CFG.save.COLONY_VERSION-1,rulesVersion:1,buildings:[],buildQueue:[],pendingGround:[],
+    scene:{v:1,kind:'home',generation:0,seed:22,width:APH.CFG.WORLD,height:APH.CFG.WORLD,grid:APH.CFG.GRID},
+    metaSnapshot:futureMeta,stock:futureMeta.res};
+  const colonyRaw=JSON.stringify(oldColony),planetRaw=JSON.stringify(spec);
+  localStorage.setItem(APH.CFG.save.KEY_META,metaRaw);
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,colonyRaw);
+  localStorage.setItem(APH.CFG.save.KEY_PLANET+spec.id,planetRaw);
+  let threw=false;
+  try{Save.loadMeta();}catch(e){threw=true;assert(e.aphSaveVersion===futureMeta.v,'错误应带 future meta 版本');}
+  assert(threw,'家园快照中的 future authoritative meta 必须拒绝读取');
+  assert(localStorage.getItem(APH.CFG.save.KEY_META)===metaRaw,'拒绝前不得写回 meta');
+  assert(localStorage.getItem(APH.CFG.save.KEY_COLONY)===colonyRaw,'拒绝前不得升级或改写 colony envelope');
+  assert(localStorage.getItem(APH.CFG.save.KEY_PLANET+spec.id)===planetRaw,'拒绝前不得因 Atlas 扫描改写 PlanetSpec');
+  assert(Save.saveMeta(fixture().meta)===false,'普通 saveMeta 也不得覆盖 future authoritative meta');
+  assert(localStorage.getItem(APH.CFG.save.KEY_META)===metaRaw&&localStorage.getItem(APH.CFG.save.KEY_COLONY)===colonyRaw,
+    'saveMeta 拒绝 future authoritative meta 时必须保持原始字节');
+});
+
+test('#202 loadMeta: 任意非对象 authoritative metaSnapshot 回退 standalone 且不迁移 colony',()=>{
+  ['corrupt',[], '',0,null].forEach((bad,index)=>{
+    Save.wipeAll();
+    const standalone=fixture().meta;standalone.marker='standalone-'+index;
+    const colony={v:APH.CFG.save.COLONY_VERSION-1,rulesVersion:1,buildings:[],buildQueue:[],pendingGround:[],
+      scene:{v:1,kind:'home',generation:0,seed:23,width:APH.CFG.WORLD,height:APH.CFG.WORLD,grid:APH.CFG.GRID},
+      metaSnapshot:bad,stock:{food:99}};
+    const colonyRaw=JSON.stringify(colony);
+    localStorage.setItem(APH.CFG.save.KEY_META,JSON.stringify(standalone));
+    localStorage.setItem(APH.CFG.save.KEY_COLONY,colonyRaw);
+    const loaded=Save.loadMeta();
+    assert(loaded&&loaded.marker==='standalone-'+index,'损坏 nested meta 应回退可读 standalone meta: '+JSON.stringify(bad));
+    assert(localStorage.getItem(APH.CFG.save.KEY_COLONY)===colonyRaw,
+      '回退损坏 nested meta 时不得迁移或改写 colony 原始字节: '+JSON.stringify(bad));
+  });
+});
+
+test('#202 saveMeta: 活动旧实例在 emit 前拒绝覆盖另一标签页的 future metaSnapshot',()=>{
+  const meta=fixture().meta,liveColony={v:APH.CFG.save.COLONY_VERSION,buildings:[],buildQueue:[],marker:'live'};
+  const futureMeta={v:APH.CFG.save.VERSION+1,res:{food:88},futureField:'new-tab'};
+  const diskColony={v:APH.CFG.save.COLONY_VERSION,rulesVersion:1,buildings:[],buildQueue:[],pendingGround:[],
+    scene:{v:1,kind:'home',generation:0,seed:24,width:APH.CFG.WORLD,height:APH.CFG.WORLD,grid:APH.CFG.GRID},
+    metaSnapshot:futureMeta,stock:futureMeta.res};
+  const raw=JSON.stringify(diskColony),beforeLive=JSON.stringify(liveColony),priorState=window.APH.state;
+  let emitted=0;const listener=function(){emitted++;};
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,raw);
+  window.APH.state={meta:meta,colony:liveColony,scene:'home',_worldReady:true};
+  APH.U.on('metaWillSave',listener);
+  try{
+    assert(Save.saveMeta(meta)===false,'活动旧实例必须拒绝 future authoritative meta');
+    assert(Save.saveColony(liveColony)===false,'统一 colony 写入口也必须拒绝 future authoritative meta');
+  }finally{APH.U.off('metaWillSave',listener);window.APH.state=priorState;}
+  assert(emitted===0,'拒绝必须发生在 metaWillSave/checkpoint 之前');
+  assert(JSON.stringify(liveColony)===beforeLive,'拒绝前不得把旧 meta 写进活动 colony 对象');
+  assert(localStorage.getItem(APH.CFG.save.KEY_COLONY)===raw,'磁盘 future colony 必须保持原始字节');
+  assert(localStorage.getItem(APH.CFG.save.KEY_META)===null,'拒绝后不得单独写出旧 meta key');
+});
+
+test('#202 save planet: future authoritative metaSnapshot 不得被发现或重访覆盖',()=>{
+  const spec=Planet.newObservedPlanet(0x20221),meta=fixture().meta;
+  const futureMeta={v:APH.CFG.save.VERSION+1,res:{food:77},futureField:'keep'};
+  const colony={v:APH.CFG.save.COLONY_VERSION,rulesVersion:1,buildings:[],buildQueue:[],pendingGround:[],
+    scene:APH.TerrainModel.newHome(221),metaSnapshot:futureMeta,stock:futureMeta.res};
+  const colonyRaw=JSON.stringify(colony);
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,colonyRaw);
+  let out=Save.savePlanetDiscovery(meta,spec,21);
+  assert(out&&!out.ok&&out.why==='persistence-failed','发现不得覆盖 future authoritative meta');
+  assert(localStorage.getItem(APH.CFG.save.KEY_COLONY)===colonyRaw&&Save.loadPlanet(spec.id)===null,
+    '发现拒绝后 colony 与 PlanetSpec 必须零变化');
+
+  Save.wipeAll();Save.savePlanet(spec.id,spec);localStorage.setItem(APH.CFG.save.KEY_COLONY,colonyRaw);
+  const planetRaw=localStorage.getItem(APH.CFG.save.KEY_PLANET+spec.id);
+  out=Save.savePlanetVisit(meta,spec,22);
+  assert(out&&!out.ok&&out.why==='persistence-failed','重访不得覆盖 future authoritative meta');
+  assert(localStorage.getItem(APH.CFG.save.KEY_COLONY)===colonyRaw&&
+    localStorage.getItem(APH.CFG.save.KEY_PLANET+spec.id)===planetRaw&&localStorage.getItem(APH.CFG.save.KEY_META)===null,
+    '重访拒绝后 colony、PlanetSpec 与 meta 必须零变化');
+});
+
 test('#201 expedition state: destination 必须已解析并写进唯一 Active Run',()=>{
   let s=fixture(),before=s.meta.res.food;
   let out=ExpeditionState.begin(s.meta,s.colony,['r1'],{food:2},'resources',null);
@@ -121,4 +201,86 @@ test('#201 expedition state: destination 必须已解析并写进唯一 Active R
   assert(out.ok&&s.meta.res.food===before-2,'有效目的地应只扣一次补给');
   assert(out.run.destination.planetId===spec.id&&out.run.destination.seed===spec.seed,'Active Run 缺少 Planet identity');
   assert(ExpeditionState.active(s.colony)===out.run,'不得另建第二份 active run');
+});
+
+test('#202 atlas: 首访与重访保留发现时间和扩展字段，只递增访问记录',()=>{
+  const meta=fixture().meta,spec=Planet.newObservedPlanet(0x20201);
+  let out=APH.Atlas.record(meta,spec,1200);
+  assert(out.ok&&out.entry.visits===1&&out.entry.lastVisitedAt===1200,'首次发现应同时记为第一次实际着陆');
+  meta.atlas.planets[spec.id].futureSummary={keep:true};
+  out=APH.Atlas.visit(meta,spec,2400);
+  assert(out.ok&&out.entry.visits===2&&out.entry.lastVisitedAt===2400,'重访应只递增 visits 并更新时间');
+  assert(out.entry.discoveredAt===1200&&out.entry.futureSummary.keep===true,'重访不得覆盖发现时间或未知摘要字段');
+});
+
+test('#202 legacy backfill: 旧短 P ID 原样进入 Atlas，且不伪造 Observation',()=>{
+  const p1=Planet.fallbackPlanet(1),p4097=Planet.fallbackPlanet(4097);
+  assert(p1.id==='P1'&&p4097.id==='P1','夹具必须复现旧低 12 位碰撞命名，而不是改写历史 ID');
+  const other=Planet.fallbackPlanet(0xABC);
+  assert(Save.savePlanet(p1.id,p1)&&Save.savePlanet(other.id,other),'旧 PlanetSpec 夹具写入失败');
+  const before1=localStorage.getItem(APH.CFG.save.KEY_PLANET+p1.id);
+  const beforeOther=localStorage.getItem(APH.CFG.save.KEY_PLANET+other.id);
+  const meta=Save.loadMeta(),ids=APH.Atlas.list(meta).map(function(e){return e.planetId;}).sort();
+  assert(ids.join(',')==='P1,PABC','Atlas 回填必须保留既有 key/ID: '+ids.join(','));
+  assert(APH.Atlas.find(meta,'P1').observed===false&&APH.Atlas.find(meta,'PABC').observed===false,
+    '无 Observation 的旧档不得被标成已观测地图');
+  assert(localStorage.getItem(APH.CFG.save.KEY_PLANET+p1.id)===before1&&
+    localStorage.getItem(APH.CFG.save.KEY_PLANET+other.id)===beforeOther,'回填索引不得改写 PlanetSpec 原始字节');
+  assert(Save.loadPlanet('P00000001')===null,'回填不得把旧 P1 偷偷重命名为新全 seed ID');
+});
+
+test('#202 atlas migration: #201 的 visits 0 发现先归一为首访，再重访变 2',()=>{
+  const spec=Planet.newObservedPlanet(0x20222),meta=fixture().meta;
+  meta.atlas={v:APH.Atlas.VERSION,order:[spec.id],planets:{}};
+  meta.atlas.planets[spec.id]={planetId:spec.id,seed:spec.seed,name:spec.name,discoveredAt:120,visits:0,observed:true};
+  Save.savePlanet(spec.id,spec);localStorage.setItem(APH.CFG.save.KEY_META,JSON.stringify(meta));
+  const loaded=Save.loadMeta(),migrated=APH.Atlas.find(loaded,spec.id);
+  assert(migrated.visits===1&&migrated.lastVisitedAt===120,'#201 发现应迁移为一次实际首访: '+JSON.stringify(migrated));
+  const out=Save.savePlanetVisit(loaded,spec,240),visited=APH.Atlas.find(loaded,spec.id);
+  assert(out.ok&&visited.visits===2&&visited.lastVisitedAt===240,'迁移后的第一次重访应成为第 2 次访问');
+});
+
+test('#202 legacy backfill: 危险运行字段损坏的 PlanetSpec 不进入 Atlas',()=>{
+  const badTier=Planet.fallbackPlanet(0x230),badDensity=Planet.fallbackPlanet(0x231),badNight=Planet.fallbackPlanet(0x232),badWeights=Planet.fallbackPlanet(0x233);
+  badTier.tier=999;badDensity.terrain.crystalDensity=-1;delete badNight.enemies.factions[0].nightBoost;badWeights.enemies.weights={};
+  [badTier,badDensity,badNight,badWeights].forEach(function(spec){
+    localStorage.setItem(APH.CFG.save.KEY_PLANET+spec.id,JSON.stringify(spec));
+  });
+  const meta=Save.loadMeta();
+  assert(APH.Atlas.list(meta).length===0,'损坏 PlanetSpec 不得成为可选目的地: '+JSON.stringify(APH.Atlas.list(meta)));
+});
+
+test('#202 visit: 已知星只原子保存 Atlas 访问记录，不改写 PlanetSpec',()=>{
+  const s=fixture(),spec=Planet.newObservedPlanet(0x20202);
+  assert(Save.savePlanetDiscovery(s.meta,spec,1000).ok,'已知星夹具发现失败');
+  const planetKey=APH.CFG.save.KEY_PLANET+spec.id,planetRaw=localStorage.getItem(planetKey);
+  const out=Save.savePlanetVisit(s.meta,spec,3000),entry=APH.Atlas.find(s.meta,spec.id);
+  assert(out.ok&&entry.visits===2&&entry.lastVisitedAt===3000&&entry.discoveredAt===1000,
+    '重访没有写入精确的访问记录: '+JSON.stringify(entry));
+  assert(localStorage.getItem(planetKey)===planetRaw,'重访不得序列化或改写 PlanetSpec');
+  const loaded=Save.loadMeta(),reloaded=APH.Atlas.find(loaded,spec.id);
+  assert(reloaded&&reloaded.visits===2&&reloaded.lastVisitedAt===3000,'重访记录必须可从持久 meta 重载');
+});
+
+test('#202 visit: colony 写失败回滚 meta/colony，PlanetSpec 与调用方内存零变化',()=>{
+  const s=fixture(),spec=Planet.newObservedPlanet(0x20203),priorState=window.APH.state;
+  assert(Save.savePlanetDiscovery(s.meta,spec,1001).ok,'失败夹具发现失败');
+  s.meta.marker='memory-meta';s.colony.marker='memory-colony';
+  const colony={v:APH.CFG.save.COLONY_VERSION,rulesVersion:1,buildings:[],buildQueue:[],pendingGround:[],
+    scene:APH.TerrainModel.newHome(202),metaSnapshot:JSON.parse(JSON.stringify(s.meta)),stock:JSON.parse(JSON.stringify(s.meta.res)),marker:'disk-colony'};
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,JSON.stringify(colony));
+  const keys=[APH.CFG.save.KEY_PLANET+spec.id,APH.CFG.save.KEY_META,APH.CFG.save.KEY_COLONY];
+  const raws=keys.map(function(key){return localStorage.getItem(key);}),memoryBefore=JSON.stringify(s);
+  const realSet=localStorage.setItem;let colonyWrites=0;
+  window.APH.state={meta:s.meta,colony:s.colony};
+  try{
+    localStorage.setItem=function(key,value){
+      if(key===APH.CFG.save.KEY_COLONY&&colonyWrites++===0)throw new Error('quota at colony');
+      return realSet.call(localStorage,key,value);
+    };
+    const out=Save.savePlanetVisit(s.meta,spec,3001);
+    assert(out&&!out.ok&&out.why==='persistence-failed','访问记录持久化失败应显式返回');
+  }finally{localStorage.setItem=realSet;window.APH.state=priorState;}
+  keys.forEach(function(key,i){assert(localStorage.getItem(key)===raws[i],key+' 未按原始字节回滚');});
+  assert(JSON.stringify(s)===memoryBefore,'失败事务不得改变调用方 meta/colony 内存');
 });

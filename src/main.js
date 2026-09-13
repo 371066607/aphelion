@@ -68,18 +68,44 @@ window.APH = window.APH || {};
     s.worlds[s.scene]=APH.WorldRuntime.capture(s);
   }
   function checkpointWorlds(s){
-    if(savingWorlds||!s.worlds)return;
+    if(savingWorlds||!s.worlds)return false;
     savingWorlds=true;
     try{
       rememberActive(s);
       var home=s.worlds.home, exp=s.worlds.expedition, run=APH.ExpeditionState.active(s.colony);
-      if(!home)return;
+      if(!home)return false;
       home.clock=s.clock;home.meta=s.meta;home.colony=s.colony;
       if(run&&exp){exp.clock=s.clock;run.cargo=Object.assign({},exp.carry||{});run.runtime=APH.WorldRuntime.serializable(exp);}
       s.colony.homeRuntime=APH.WorldRuntime.serializable(home);
       s.colony.activeWorld=run?s.scene:'home';
-      APH.WorldRuntime.run(home,function(ctx){APH.Colony.persist();});
+      return APH.WorldRuntime.run(home,function(){return APH.Colony.persist();});
     }finally{savingWorlds=false;}
+  }
+  /* 发射阶段会同时改名册、实体、物流和双世界引用。这里按对象图克隆，
+     保留 selectedPawns/entity、worlds.home/active 等别名关系和精确字段；
+     DOM/图片等非普通宿主对象保持引用，配置 def 也保持共享身份。 */
+  function cloneLaunchGraph(value,seen,copies){
+    if(value==null||typeof value!=='object')return value;
+    var proto=Object.getPrototypeOf(value);
+    if(proto!==Object.prototype&&proto!==Array.prototype&&proto!==null)return value;
+    seen=seen||[];copies=copies||[];
+    var found=seen.indexOf(value);if(found>=0)return copies[found];
+    var out=Array.isArray(value)?[]:(proto===null?Object.create(null):{});
+    seen.push(value);copies.push(out);
+    Object.keys(value).forEach(function(key){out[key]=key==='def'?value[key]:cloneLaunchGraph(value[key],seen,copies);});
+    return out;
+  }
+  function captureLaunchState(s){return {state:cloneLaunchGraph(s)};}
+  function restoreLaunchState(s,snapshot){
+    var seen=[snapshot],copies=[s];
+    Object.keys(s).forEach(function(key){delete s[key];});
+    Object.keys(snapshot).forEach(function(key){s[key]=key==='def'?snapshot[key]:cloneLaunchGraph(snapshot[key],seen,copies);});
+  }
+  function rollbackLaunch(s,before,persisted){
+    var diskOk=true;
+    if(persisted&&typeof persisted.rollback==='function')diskOk=persisted.rollback()!==false;
+    restoreLaunchState(s,before.state);
+    return diskOk;
   }
   function switchWorld(kind){
     var s=APH.state;
@@ -104,19 +130,25 @@ window.APH = window.APH || {};
     if(!a||!b||!APH.TerrainModel.hasObservation({observation:a})||!APH.TerrainModel.hasObservation({observation:b}))return false;
     try{return JSON.stringify(a)===JSON.stringify(b);}catch(e){return false;}
   }
+  function descriptorForPlanet(spec){
+    var observed=spec&&spec.observation&&APH.TerrainModel.hasObservation(APH.TerrainModel.planet(spec));
+    return observed?APH.TerrainModel.planet(spec):APH.TerrainModel.legacy(spec&&spec.seed,'expedition');
+  }
   function validExpeditionRuntime(run){
     var runtime=run&&run.runtime,destination=APH.ExpeditionState.validateDestination(run&&run.destination),stored=null;
     if(!destination.ok||!destination.resolved)return false;
     try{stored=APH.Save.loadPlanet(destination.destination.planetId);}catch(e){return false;}
-    var descriptor=runtime&&runtime.worldDescriptor,expected=stored&&APH.TerrainModel.planet(stored),storedValid=null;
+    var descriptor=runtime&&runtime.worldDescriptor,expected=stored&&descriptorForPlanet(stored),storedValid=null;
     try{storedValid=stored&&APH.Planet.validate(stored);}catch(e){return false;}
     var valid=!!(runtime&&runtime.scene==='expedition'&&
       Array.isArray(runtime.entities)&&storedValid&&storedValid.ok&&
       stored.id===destination.destination.planetId&&stored.seed===destination.destination.seed&&
       runtime.spec&&runtime.spec.id===stored.id&&runtime.spec.seed===stored.seed&&
-      descriptor&&descriptor.kind==='expedition'&&descriptor.generation===1&&descriptor.seed===stored.seed&&
-      descriptor.grid===expected.grid&&sameObservation(runtime.spec.observation,stored.observation)&&
-      sameObservation(descriptor.observation,stored.observation));
+      descriptor&&descriptor.kind==='expedition'&&descriptor.seed===stored.seed&&descriptor.grid===expected.grid);
+    if(valid&&stored.observation)valid=descriptor.generation===1&&sameObservation(runtime.spec.observation,stored.observation)&&
+      sameObservation(descriptor.observation,stored.observation);
+    else if(valid)valid=descriptor.generation===0&&!runtime.spec.observation&&!descriptor.observation&&
+      descriptor.width===expected.width&&descriptor.height===expected.height;
     if(!valid)return false;
     /* PlanetSpec/Observation 的持久档是事实源。runtime 只保存局内实体和进度，
        恢复时丢弃其中可能残缺或陈旧的 spec 镜像，避免装入“同 ID 的另一张图”。 */
@@ -233,56 +265,32 @@ window.APH = window.APH || {};
       if(preflight.why==='empty-squad')APH.UI.floatText('✕ 没有可派出的殖民者 —— 先招人', '#ff9a9a');
       return preflight;
     }
-    if(requestedDestination.kind!=='unknown')return {ok:false,why:'known-destination-not-supported'};
-
-    /* 先完成不可逆的星球发现事实，再让 ExpeditionState 扣补给和转移名册。 */
-    var seed=unknownPlanetSeed(s.meta,requestedDestination.seed);
-    var planet=APH.Planet.newObservedPlanet(seed),planetCheck=APH.Planet.validate(planet);
-    if(!planetCheck.ok)return {ok:false,why:'planet-generation-failed',errors:planetCheck.errors};
-    var discovered=APH.Save.savePlanetDiscovery(s.meta,planet,Date.now());
-    if(!discovered.ok){
+    var before=captureLaunchState(s);
+    var seed,planet,planetCheck,persisted,isNew=requestedDestination.kind==='unknown';
+    if(isNew){
+      /* 先完成不可逆的星球发现事实，再让 ExpeditionState 扣补给和转移名册。 */
+      seed=unknownPlanetSeed(s.meta,requestedDestination.seed);
+      planet=APH.Planet.newObservedPlanet(seed);planetCheck=APH.Planet.validate(planet);
+      if(!planetCheck.ok)return {ok:false,why:'planet-generation-failed',errors:planetCheck.errors};
+      persisted=APH.Save.savePlanetDiscovery(s.meta,planet,Date.now());
+    }else{
+      try{planet=APH.Save.loadPlanet(preflight.destination.planetId);}catch(e){planet=null;}
+      if(!planet)return {ok:false,why:'missing-planet'};
+      planetCheck=APH.Planet.validate(planet);
+      if(!planetCheck.ok)return {ok:false,why:'invalid-planet',errors:planetCheck.errors};
+      if(planet.id!==preflight.destination.planetId||planet.seed!==preflight.destination.seed)
+        return {ok:false,why:'planet-conflict'};
+      persisted=APH.Save.savePlanetVisit(s.meta,planet,Date.now());
+    }
+    if(!persisted.ok){
       APH.UI.floatText('✕ 星球档案未保存，远征没有出发','#ff9a9a');
-      return discovered;
+      return persisted;
     }
     var resolvedDestination={kind:'planet',planetId:planet.id,seed:planet.seed};
-    var begun=APH.ExpeditionState.begin(s.meta,s.colony,memberIds,options.supply||{food:0},
-      options.objective||'resources',resolvedDestination,s);
-    if(!begun.ok)return begun;
-    var squad=preflight.members;
-    squad.forEach(function(r){var e=s.entities.find(function(x){return x.rid===r.id||x.id===r.id;});if(e&&e.haulCarry){(Array.isArray(e.haulCarry)?e.haulCarry:[e.haulCarry]).forEach(function(p){APH.Combat.spawnDrop(e.x,e.y,p.itemId,p.n,{stock:true,jitter:0});});e.haulCarry=null;}var released=APH.Logistics.releaseCarrier(s.colony,r.id,e);(released.drops||[]).forEach(function(p){APH.Combat.spawnDrop(p.x,p.y,p.itemId,p.n,{stock:true,jitter:0});});});
-    delete s.squad;
-    syncResidentEntities();
-    if(s.meta.homePressure)s.meta.homePressure.residents=(s.meta.residents||[]).length;
-    s.worlds={home:APH.WorldRuntime.capture(s),expedition:null};
-    s.scene='expedition';s.worldDescriptor=APH.TerrainModel.planet(planet);
-    s.parts=[];s.scanning=null;s.target=null;s.selectedTarget=null;s.war={raidActive:false};s.designations={};s.prodT=0;s.squadNeedT=0;
-    closeColonyOverlays();
-    s.selectedRid=null;   /* ADR-29: 离开家园解除征召 (实体将重建) */
-    var sh=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
-    APH.UI.floatText(sh.mission,'#ffc857');
-    /* T9: 超重出发提醒(不阻止) */
-    var loadW=APH.Combat.carryWeight(s.carry);
-    var capNow=APH.Colony.carryMaxOf(s.colony.buildings);
-    if(loadW > capNow*.7){
-      APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
-        ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
-    }
-    applySpec(planet);
-    if(APH.LLM.enabled())APH.LLM.enrichPlanet(planet).then(function(rich){
-      var active=APH.ExpeditionState.active(s.colony);
-      if(rich&&active&&active.destination&&active.destination.planetId===planet.id){
-        rich.id=planet.id;rich.observation=planet.observation;
-        var entry=APH.Atlas.find(s.meta,planet.id);
-        checkpointWorlds(s);
-        if(APH.Save.savePlanetDiscovery(s.meta,rich,entry&&entry.discoveredAt).ok){
-          planet.name=rich.name||planet.name;planet.lore=rich.lore||planet.lore;
-          if(s.spec&&s.spec.id===planet.id){s.spec.name=planet.name;s.spec.lore=planet.lore;}
-        }
-      }
-    });
+    var begun,sh,loadW,capNow;
     function applySpec(p){
       s.spec=p; s.specSaved=true; s.seed=p.seed;s.meta.currentPlanet=p.id;
-      s.worldDescriptor=APH.TerrainModel.planet(p);
+      s.worldDescriptor=descriptorForPlanet(p);
       s.totalBeacons=p.beacons.length;
       s.entities=[];
       spawnSquadEntities(CFG.HAB.x, CFG.HAB.y+70);
@@ -365,19 +373,62 @@ window.APH = window.APH || {};
             bx+(Math.random()*120-60), by+(Math.random()*90-45)));
         }
       }
-      document.getElementById('planetTitle').textContent =
-        p.name+' · '+p.paletteName+' (远征)';
     }
-    s.scene='expedition';
+    try{
+      begun=APH.ExpeditionState.begin(s.meta,s.colony,memberIds,options.supply||{food:0},
+        options.objective||'resources',resolvedDestination,s);
+      if(!begun.ok){rollbackLaunch(s,before,persisted);return begun;}
+      var squad=preflight.members;
+      squad.forEach(function(r){var e=s.entities.find(function(x){return x.rid===r.id||x.id===r.id;});if(e&&e.haulCarry){(Array.isArray(e.haulCarry)?e.haulCarry:[e.haulCarry]).forEach(function(p){APH.Combat.spawnDrop(e.x,e.y,p.itemId,p.n,{stock:true,jitter:0});});e.haulCarry=null;}var released=APH.Logistics.releaseCarrier(s.colony,r.id,e);(released.drops||[]).forEach(function(p){APH.Combat.spawnDrop(p.x,p.y,p.itemId,p.n,{stock:true,jitter:0});});});
+      delete s.squad;
+      syncResidentEntities();
+      if(s.meta.homePressure)s.meta.homePressure.residents=(s.meta.residents||[]).length;
+      s.worlds={home:APH.WorldRuntime.capture(s),expedition:null};
+      s.scene='expedition';s.worldDescriptor=descriptorForPlanet(planet);
+      s.parts=[];s.scanning=null;s.target=null;s.selectedTarget=null;s.war={raidActive:false};s.designations={};s.prodT=0;s.squadNeedT=0;
+      s.selectedRid=null;   /* ADR-29: 离开家园解除征召 (实体将重建) */
+      sh=APH.Colony.shortageBrief(s.meta, s.colony.buildings, extraRes());
+      loadW=APH.Combat.carryWeight(s.carry);capNow=APH.Colony.carryMaxOf(s.colony.buildings);
+      applySpec(planet);
+      s.worlds.expedition=APH.WorldRuntime.capture(s);
+      if(!checkpointWorlds(s)){
+        var diskOk=rollbackLaunch(s,before,persisted);
+        APH.UI.floatText('✕ 远征状态未保存，队伍留在家园','#ff9a9a');
+        return {ok:false,why:'persistence-failed',rollbackOk:diskOk};
+      }
+    }catch(error){
+      var restored=rollbackLaunch(s,before,persisted);
+      APH.UI.floatText('✕ 远征启动失败，队伍留在家园','#ff9a9a');
+      return {ok:false,why:'launch-failed',rollbackOk:restored,error:error&&error.message};
+    }
+    closeColonyOverlays();
+    APH.UI.floatText(sh.mission,'#ffc857');
+    /* T9: 超重出发提醒(不阻止) */
+    if(loadW > capNow*.7){
+      APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
+        ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
+    }
     APH.UI.setHint('已着陆 '+s.spec.name+'。'+sh.mission+' · 返航按 [E]');
     var lawBits=[];
     if(APH.Planet.hasLaw(s.spec,'lw_echo')) lawBits.push('声追者：少开枪');
     if(APH.Planet.hasLaw(s.spec,'lw_spore_light')) lawBits.push('孢子趋光：光会开路');
     if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
     if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
-    s.worlds.expedition=APH.WorldRuntime.capture(s);
-    APH.World.buildTerrain();checkpointWorlds(s);
+    document.getElementById('planetTitle').textContent=planet.name+' · '+planet.paletteName+' (远征)';
+    APH.World.buildTerrain();
     U.emit('launched',{});
+    if(isNew&&APH.LLM.enabled())APH.LLM.enrichPlanet(planet).then(function(rich){
+      var active=APH.ExpeditionState.active(s.colony);
+      if(rich&&active&&active.destination&&active.destination.planetId===planet.id){
+        rich.id=planet.id;rich.observation=planet.observation;
+        var entry=APH.Atlas.find(s.meta,planet.id);
+        checkpointWorlds(s);
+        if(APH.Save.savePlanetDiscovery(s.meta,rich,entry&&entry.discoveredAt).ok){
+          planet.name=rich.name||planet.name;planet.lore=rich.lore||planet.lore;
+          if(s.spec&&s.spec.id===planet.id){s.spec.name=planet.name;s.spec.lore=planet.lore;}
+        }
+      }
+    });
     return {ok:true,run:begun.run};
   }
 

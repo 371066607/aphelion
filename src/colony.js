@@ -1499,7 +1499,7 @@ APH.Colony = (function(){
      原先住在 main.js, 于是 ui 每次改动殖民地都要反向调 APH.Main.saveColony。 */
   function persist(){
     var s = (window.APH && APH.state) || null;
-    if(!s || !s.colony || (s.scene&&s.scene!=='home')) return;
+    if(!s || !s.colony || (s.scene&&s.scene!=='home')) return false;
     U.emit('beforeColonySnapshot',s);
     if(s.meta)s.colony.stock=s.meta.res;
     s.colony.stockLocation={id:"landing_cargo",x:CFG.HAB.x,y:CFG.HAB.y+140};
@@ -1516,7 +1516,7 @@ APH.Colony = (function(){
       if(e.dead&&e.kind&&e.kind.indexOf('rock')===0)s.colony.depleted[e.uid||e.id]=true;
     }});
     s.colony.floraRespawn=s.floraRespawn||[];
-    APH.Save.saveColony(s.colony);
+    return APH.Save.saveColony(s.colony);
   }
 
   function serializeGround(entities){

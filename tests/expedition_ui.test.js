@@ -71,3 +71,46 @@ test('expeditionUI 编组只提交健康队员与显式补给目标', function()
     APH.ExpeditionUI.close(); APH.Planet.newObservedPlanet=oldNewPlanet;APH.CFG.expedition.objectives=oldObjectives; global.document=oldDoc; APH.state=oldState; APH.UI=oldUI;
   }
 });
+
+test('#202 expeditionUI 必须重选目的地，并可提交已知 observed/legacy 星球身份', function(){
+  var oldDoc=document,oldState=APH.state,oldUI=APH.UI,oldExpeditionUI=APH.ExpeditionUI,doc=fakeDocument(),got=null,commands={};
+  try{
+    global.document=doc;
+    APH.UI={registerCommands:function(map){Object.keys(map||{}).forEach(function(k){commands[k]=map[k];});},
+      cmd:function(name){var f=commands[name];return f&&f.apply(null,[].slice.call(arguments,1));}};
+    delete require.cache[require.resolve('../src/expedition_ui.js')];delete APH.ExpeditionUI;require('../src/expedition_ui.js');
+    APH.UI.registerCommands({beginExpedition:function(payload){got=payload;return {ok:true};}});
+    var observed=APH.Planet.newObservedPlanet(0x20204),legacy=APH.Planet.fallbackPlanet(0xABC),meta={res:{food:0},residents:[{id:'r1',name:'甲'}]};
+    APH.Atlas.record(meta,observed,100);APH.Atlas.record(meta,legacy,200);
+    var s={mode:'running',scene:'home',paused:false,colony:{rulesVersion:1,buildings:[],zones:[],logistics:{reservations:[]}},
+      meta:meta,entities:[]};
+    APH.state=s;
+    function all(node,out){out=out||[];out.push(node);(node.children||[]).forEach(function(c){all(c,out);});return out;}
+    function startButton(){return all(doc.body).filter(function(n){return n.tagName==='BUTTON'&&n.textContent==='出发';}).slice(-1)[0];}
+
+    APH.ExpeditionUI.open(s);
+    var select=doc.getElementById('expeditionDestination');
+    var labels=select.children.map(function(option){return option.textContent;});
+    if(select.value!==''||labels[0]!=='请选择目的地'||labels.indexOf(observed.name+' · 已观测')<0||labels.indexOf(legacy.name+' · 旧版地图')<0)
+      throw new Error('目的地列表没有明确提示或已知星类型: '+JSON.stringify(labels));
+    var prevented=false;
+    select.dispatchEvent({type:'keydown',key:'End',target:select,preventDefault:function(){prevented=true;}});
+    if(!prevented||select.value!=='planet:'+legacy.id)throw new Error('End 键没有选择最后一个已知目的地');
+    select.dispatchEvent({type:'keydown',key:'Home',target:select,preventDefault:function(){}});
+    if(select.value!=='unknown')throw new Error('Home 键没有选择第一个可用目的地');
+    select.value='';
+    startButton().click();
+    if(got)throw new Error('未选择目的地时不得调用出发命令');
+    var error=all(doc.body).find(function(n){return n.textContent==='请选择远征目的地';});
+    if(!error)throw new Error('未选择目的地应给出可恢复错误');
+
+    select.value='planet:'+observed.id;startButton().click();
+    if(!got||got.destination.kind!=='planet'||got.destination.planetId!==observed.id||got.destination.seed!==observed.seed)
+      throw new Error('observed 已知星没有提交稳定身份: '+JSON.stringify(got));
+    got=null;APH.ExpeditionUI.open(s);select=doc.getElementById('expeditionDestination');
+    if(select.value!=='')throw new Error('返航后重新打开必须要求再次选择，不能沿用上次目的地');
+    select.value='planet:'+legacy.id;startButton().click();
+    if(!got||got.destination.planetId!==legacy.id||got.destination.seed!==legacy.seed)
+      throw new Error('legacy 已知星没有提交原始 P ID/seed: '+JSON.stringify(got));
+  }finally{APH.ExpeditionUI.close();APH.ExpeditionUI=oldExpeditionUI;global.document=oldDoc;APH.state=oldState;APH.UI=oldUI;}
+});

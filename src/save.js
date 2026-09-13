@@ -30,6 +30,29 @@ APH.Save = (function(){
     try{ localStorage.removeItem(k); }catch(e){}
     delete mem[k];
   }
+  function restorePayloads(payloads,before){
+    var ok=true;
+    for(var i=payloads.length-1;i>=0;i--){
+      if(before[i]==null)rawDel(payloads[i].key);
+      else if(!rawSet(payloads[i].key,before[i]))ok=false;
+    }
+    return ok;
+  }
+
+  /* 另一个标签页可能已用较新构建写入 colony。mem 是本标签页的失败写
+     兜底，不能遮住 localStorage 中更高版本的权威快照；两处都要检查。 */
+  function futureColonyPayload(txt){
+    if(!txt)return false;
+    try{
+      var save=JSON.parse(txt);
+      return isFutureSave(save,'colony')||!!(save&&save.metaSnapshot&&isFutureSave(save.metaSnapshot,'meta'));
+    }catch(e){return false;}
+  }
+  function futureColonyAtRest(){
+    var key=CFG.save.KEY_COLONY;
+    if(Object.prototype.hasOwnProperty.call(mem,key)&&futureColonyPayload(mem[key]))return true;
+    try{return futureColonyPayload(localStorage.getItem(key));}catch(e){return false;}
+  }
 
   /* ---------- 版本迁移 (ADR-2: 唯一收口点) ----------
      迁移链: v0(无版本) → v1 → v2 → ...
@@ -119,21 +142,26 @@ APH.Save = (function(){
   }
 
   /* ---------- 通用读写 ---------- */
-  function read(key,persistMigration){
+  function prepareRead(key){
     var txt = rawGet(key);
-    if(!txt) return null;
+    if(!txt) return {obj:null,persist:false};
     var obj;
     try{ obj = JSON.parse(txt); }
-    catch(e){ return null; }           // 损坏存档视为不存在, 不抛错
+    catch(e){ return {obj:null,persist:false}; } // 损坏存档视为不存在, 不抛错
     var kind=key === CFG.save.KEY_COLONY ? 'colony' : null;
     var beforeVersion=obj&&obj.v||0;
     var neededObservation=kind==='colony'&&obj&&obj.scene&&obj.scene.generation===1&&
       (!APH.TerrainModel||!APH.TerrainModel.hasObservation(obj.scene));
     obj=migrate(obj,kind);               // migrate 对非存档对象返回 null; 未来版本抛错
-    if(persistMigration&&obj&&(beforeVersion<versionFor(obj,kind)||neededObservation)) rawSet(key,JSON.stringify(obj));
-    return obj;
+    return {obj:obj,persist:!!(obj&&(beforeVersion<versionFor(obj,kind)||neededObservation)),key:key};
+  }
+  function read(key,persistMigration){
+    var prepared=prepareRead(key);
+    if(persistMigration&&prepared.persist)rawSet(key,JSON.stringify(prepared.obj));
+    return prepared.obj;
   }
   function write(key, obj){
+    if(key === CFG.save.KEY_COLONY && futureColonyAtRest()) return false;
     if(key === CFG.save.KEY_COLONY) obj = migrate(obj, 'colony');
     obj.v = versionFor(obj, key === CFG.save.KEY_COLONY ? 'colony' : null);
     return rawSet(key, JSON.stringify(obj));
@@ -145,8 +173,24 @@ APH.Save = (function(){
     var m = read(CFG.save.KEY_META);
     /* v2+ 的家园快照把名册/库存与地面/在途材料存于同一个原子 JSON。
        meta key 保留兼容，但不能覆盖更新的整份家园快照。 */
-    var homeSnapshot=read(CFG.save.KEY_COLONY,true);
-    if(homeSnapshot&&homeSnapshot.metaSnapshot)m=homeSnapshot.metaSnapshot;
+    /* 先只在内存迁移 envelope，检查其中权威 meta 的版本后才允许把
+       colony 迁移结果写回；否则旧构建会在报错前先改动未来存档。 */
+    var preparedHome=prepareRead(CFG.save.KEY_COLONY),homeSnapshot=preparedHome.obj;
+    if(homeSnapshot&&Object.prototype.hasOwnProperty.call(homeSnapshot,'metaSnapshot')){
+      var nestedMeta=homeSnapshot.metaSnapshot;
+      if(isFutureSave(nestedMeta,'meta')){
+        var futureMetaError=new Error('家园快照中的 meta 版本 v'+nestedMeta.v+
+          ' 高于当前构建支持的 v'+CFG.save.VERSION+' —— 本次不会改写存档。');
+        futureMetaError.aphSaveVersion=nestedMeta.v;
+        throw futureMetaError;
+      }
+      /* 合法 JSON 的字符串/数组仍不是 meta 存档。回退 standalone meta，
+         并禁止 loadMeta 顺手写回已在内存迁移过的 colony envelope。 */
+      nestedMeta=migrate(clone(nestedMeta),'meta');
+      if(nestedMeta)m=nestedMeta;
+      else preparedHome.persist=false;
+    }
+    if(preparedHome.persist)rawSet(preparedHome.key,JSON.stringify(homeSnapshot));
     var existed = !!m;
     if(!m){
       m = {
@@ -242,18 +286,44 @@ APH.Save = (function(){
       m.res.mineral = Math.max(m.res.mineral||0, startM);
       m.econV2 = 1;
     }
-    if(window.APH.Atlas)APH.Atlas.ensure(m);
+    if(window.APH.Atlas){
+      APH.Atlas.ensure(m);
+      /* Atlas 出现前的 PlanetSpec 没有索引。只把仍能完整读取、且 key 与
+         内部 P 身份一致的旧档补进内存索引；不重命名、不重生成、不删档。 */
+      if(!APH.Atlas.isFuture(m)){
+        var known={},prefix=CFG.save.KEY_PLANET;
+        Object.keys(mem).forEach(function(key){if(key.indexOf(prefix)===0)known[key.slice(prefix.length)]=true;});
+        try{for(var pi=0;pi<localStorage.length;pi++){var pk=localStorage.key(pi);if(pk&&pk.indexOf(prefix)===0)known[pk.slice(prefix.length)]=true;}}catch(e){}
+        Object.keys(known).sort().forEach(function(id){
+          if(!/^P[0-9A-F]+$/.test(id))return;
+          try{
+            var spec=loadPlanet(id),check=window.APH.Planet&&spec&&APH.Planet.validate(spec);
+            if(spec&&spec.id===id&&check&&check.ok){
+              var prior=APH.Atlas.find(m,id);
+              APH.Atlas.record(m,spec,prior&&prior.discoveredAt!=null?prior.discoveredAt:0);
+            }
+          }catch(e){}
+        });
+      }
+    }
     return m;
   }
   function saveMeta(m){
+    /* metaWillSave 会 checkpoint 当前 runtime；必须先保护磁盘上由较新
+       标签页写入的权威 colony，避免旧实例在事件阶段就覆盖它。 */
+    if(futureColonyAtRest())return false;
     var s=APH.state;
     if(s&&s.meta===m&&s._worldReady){
       U.emit('metaWillSave',m);
     }else{
       var home=read(CFG.save.KEY_COLONY);
-      if(home&&home.metaSnapshot){home.metaSnapshot=m;home.stock=m.res;write(CFG.save.KEY_COLONY,home);}
+      if(home&&home.metaSnapshot){
+        if(isFutureSave(home.metaSnapshot,'meta'))return false;
+        home.metaSnapshot=m;home.stock=m.res;
+        if(!write(CFG.save.KEY_COLONY,home))return false;
+      }
     }
-    write(CFG.save.KEY_META, m);
+    return write(CFG.save.KEY_META, m);
   }
 
   function loadPlanet(id){ return read(CFG.save.KEY_PLANET + id); }
@@ -267,6 +337,7 @@ APH.Save = (function(){
     if(!meta||!spec||!window.APH.Atlas)return {ok:false,why:'invalid-discovery'};
     var nextMeta,recorded,nextPlanet,state,currentColony,nextColony,payloads,before,existingPlanet;
     try{
+      if(futureColonyAtRest())return {ok:false,why:'persistence-failed'};
       if(isFutureSave(meta)||APH.Atlas.isFuture(meta)||
         (typeof spec.v==='number'&&spec.v>CFG.save.VERSION))return {ok:false,why:'persistence-failed'};
       if(typeof spec.id!=='string'||!spec.id||typeof spec.seed!=='number'||!isFinite(spec.seed)||
@@ -288,6 +359,8 @@ APH.Save = (function(){
       nextColony=read(CFG.save.KEY_COLONY);
       if(!nextColony&&currentColony)nextColony=clone(currentColony);
       if(nextColony){
+        if(nextColony.metaSnapshot&&isFutureSave(nextColony.metaSnapshot,'meta'))
+          return {ok:false,why:'persistence-failed'};
         nextColony.metaSnapshot=clone(nextMeta);nextColony.stock=clone(nextMeta.res||{});
         nextColony=migrate(nextColony,'colony');
       }
@@ -301,15 +374,54 @@ APH.Save = (function(){
     var failed=false;
     for(var i=0;i<payloads.length;i++)if(!rawSet(payloads[i].key,payloads[i].value)){failed=true;break;}
     if(failed){
-      for(var j=payloads.length-1;j>=0;j--){
-        if(before[j]==null)rawDel(payloads[j].key);
-        else rawSet(payloads[j].key,before[j]);
-      }
+      restorePayloads(payloads,before);
       return {ok:false,why:'persistence-failed'};
     }
     meta.atlas=clone(nextMeta.atlas);
     if(currentColony){currentColony.metaSnapshot=clone(nextMeta);currentColony.stock=clone(nextMeta.res||{});}
-    return {ok:true,entry:recorded.entry,planet:nextPlanet};
+    return {ok:true,entry:recorded.entry,planet:nextPlanet,
+      rollback:function(){return restorePayloads(payloads,before);}};
+  }
+
+  /* 已知星重访不改写 PlanetSpec，只把访问记录与 colony.metaSnapshot
+     同批提交。失败时留在家园，原 PlanetSpec 字节也完全不动。 */
+  function savePlanetVisit(meta,spec,visitedAt){
+    if(!meta||!spec||!window.APH.Atlas)return {ok:false,why:'invalid-visit'};
+    var existing,nextMeta,visited,state,currentColony,nextColony,payloads,before;
+    try{
+      if(futureColonyAtRest())return {ok:false,why:'persistence-failed'};
+      if(isFutureSave(meta)||APH.Atlas.isFuture(meta))return {ok:false,why:'persistence-failed'};
+      existing=read(CFG.save.KEY_PLANET+spec.id);
+      if(!existing)return {ok:false,why:'missing-planet'};
+      if(existing.id!==spec.id||existing.seed!==spec.seed)return {ok:false,why:'planet-conflict'};
+      var check=window.APH.Planet&&APH.Planet.validate(existing);
+      if(!check||!check.ok)return {ok:false,why:'invalid-planet'};
+      nextMeta=clone(meta);visited=APH.Atlas.visit(nextMeta,existing,visitedAt);
+      if(!visited.ok)return visited;
+      nextMeta.v=CFG.save.VERSION;
+      state=window.APH&&APH.state;currentColony=state&&state.meta===meta&&state.colony;
+      nextColony=read(CFG.save.KEY_COLONY);
+      if(!nextColony&&currentColony)nextColony=clone(currentColony);
+      if(nextColony){
+        if(nextColony.metaSnapshot&&isFutureSave(nextColony.metaSnapshot,'meta'))
+          return {ok:false,why:'persistence-failed'};
+        nextColony.metaSnapshot=clone(nextMeta);nextColony.stock=clone(nextMeta.res||{});
+        nextColony=migrate(nextColony,'colony');
+      }
+      payloads=[{key:CFG.save.KEY_META,value:JSON.stringify(nextMeta)}];
+      if(nextColony)payloads.push({key:CFG.save.KEY_COLONY,value:JSON.stringify(nextColony)});
+      before=payloads.map(function(item){return rawGet(item.key);});
+    }catch(e){return {ok:false,why:'persistence-failed'};}
+    var failed=false;
+    for(var i=0;i<payloads.length;i++)if(!rawSet(payloads[i].key,payloads[i].value)){failed=true;break;}
+    if(failed){
+      restorePayloads(payloads,before);
+      return {ok:false,why:'persistence-failed'};
+    }
+    meta.atlas=clone(nextMeta.atlas);
+    if(currentColony){currentColony.metaSnapshot=clone(nextMeta);currentColony.stock=clone(nextMeta.res||{});}
+    return {ok:true,entry:visited.entry,planet:existing,
+      rollback:function(){return restorePayloads(payloads,before);}};
   }
 
   function loadRivals(id){ return read(CFG.save.KEY_RIVALS + id); }
@@ -342,6 +454,7 @@ APH.Save = (function(){
   }
   function saveColony(colony){
     if(!colony) return false;
+    if(futureColonyAtRest())return false;
     var s=APH.state;
     if(s&&s.colony===colony&&s.meta&&s.scene==='home'&&s._worldReady){
       colony.metaSnapshot=JSON.parse(JSON.stringify(s.meta));
@@ -381,7 +494,7 @@ APH.Save = (function(){
 
   return {
     loadMeta:loadMeta, saveMeta:saveMeta,
-    loadPlanet:loadPlanet, savePlanet:savePlanet, savePlanetDiscovery:savePlanetDiscovery,
+    loadPlanet:loadPlanet, savePlanet:savePlanet, savePlanetDiscovery:savePlanetDiscovery, savePlanetVisit:savePlanetVisit,
     loadRivals:loadRivals, saveRivals:saveRivals,
     metaQuiet:metaQuiet,
     loadColony:loadColony, saveColony:saveColony,

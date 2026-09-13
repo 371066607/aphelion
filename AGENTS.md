@@ -37,8 +37,8 @@ node tests/boss.test.js           # Boss 掉落测试 (独立入口)
 | config.js | `APH.CFG` | 全局数值表 (ADR-10: 代码零魔数) |
 | utils.js | `APH.U` | 工具 + 事件总线 `on/off/emit` (ADR-8) |
 | humanoid.js | `APH.Humanoid` | 人形 pose 缝：朝向/走停/脸/包 → sheet+帧 (ADR-0001) |
-| save.js | `APH.Save` | 三层存档读写/迁移收口 |
 | planet.js | `APH.Planet` | PlanetSpec 生成/tier 难度 |
+| save.js | `APH.Save` | 三层存档读写/迁移收口 |
 | llm.js | `APH.LLM` | OpenAI 兼容适配器+双层缓存+配额 |
 | colony.js | `APH.Colony` | 建筑/建造队列/科技/生产 |
 | rivals.js | `APH.Rivals` | 敌对殖民地战争态势 |
@@ -108,4 +108,3 @@ Canonical triage roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-
 ### Domain docs
 
 Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
-

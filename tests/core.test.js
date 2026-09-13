@@ -146,6 +146,25 @@ test('validate 对损坏的 PlanetSpec 深层数组只报错不抛异常', () =>
     if(result.ok)throw new Error('损坏深层结构不得通过校验');
   }
 });
+test('#202 validate: 拒绝会让坏运行数值的 tier、地形、夜间倍率和权重', () => {
+  const legacy=Planet.fallbackPlanet(13);delete legacy.tier;
+  if(!Planet.validate(legacy).ok)throw new Error('早期无 tier 的 v1 legacy PlanetSpec 应继续按 tier 1 兼容');
+  const cases=[
+    ['tier 越界',p=>{p.tier=999;}],
+    ['负岩石密度',p=>{p.terrain.rockDensity=-0.1;}],
+    ['晶体密度越界',p=>{p.terrain.crystalDensity=1.1;}],
+    ['湖半径越界',p=>{p.terrain.lakeR=APH.CFG.WORLD+1;}],
+    ['缺夜间倍率',p=>{delete p.enemies.factions[0].nightBoost;}],
+    ['空权重',p=>{p.enemies.weights={};}],
+    ['未归一权重',p=>{p.enemies.weights.fx_maw=0.1;}],
+  ];
+  cases.forEach(([name,breakIt])=>{
+    const spec=Planet.fallbackPlanet(14);breakIt(spec);
+    let out;
+    try{out=Planet.validate(spec);}catch(e){throw new Error(name+' 不得让校验器抛异常: '+e.message);}
+    if(out.ok)throw new Error(name+' 不得通过 PlanetSpec 校验');
+  });
+});
 test('hasLaw: 按 id 判断', () => {
   if (Planet.hasLaw(null, 'lw_echo')) throw new Error('空 spec 应为假');
   if (!Planet.hasLaw({ laws:[{id:'lw_echo'}] }, 'lw_echo')) throw new Error('应命中');

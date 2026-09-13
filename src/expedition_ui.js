@@ -48,6 +48,30 @@ APH.ExpeditionUI = (function(){
     modal._checks.forEach(function(c){ if(c.checked&&!c.disabled) out.push(c.value); });
     return out;
   }
+  function destinationOf(s,value){
+    if(value==='unknown')return {kind:'unknown'};
+    if(typeof value==='string'&&value.indexOf('planet:')===0&&window.APH.Atlas){
+      var entry=APH.Atlas.find(s&&s.meta,value.slice(7));
+      if(entry)return {kind:'planet',planetId:entry.planetId,seed:entry.seed};
+    }
+    return null;
+  }
+  function moveNativeSelect(select,key){
+    if(!select||['ArrowDown','ArrowUp','Home','End'].indexOf(key)<0)return false;
+    var options=Array.prototype.slice.call(select.options||select.children||[]),current=-1,next=null;
+    for(var i=0;i<options.length;i++)if(options[i].value===select.value){current=i;break;}
+    if(key==='Home'){
+      for(i=0;i<options.length;i++)if(!options[i].disabled){next=options[i];break;}
+    }else if(key==='End'){
+      for(i=options.length-1;i>=0;i--)if(!options[i].disabled){next=options[i];break;}
+    }else{
+      var step=key==='ArrowDown'?1:-1,start=current<0?(step>0?-1:options.length):current;
+      for(i=start+step;i>=0&&i<options.length;i+=step)if(!options[i].disabled){next=options[i];break;}
+    }
+    if(!next)return false;
+    options.forEach(function(option){option.selected=option===next;});select.value=next.value;
+    return true;
+  }
   function pauseFallback(s){ fallbackPaused=!!s.paused; s.paused=true; }
   function restoreFallback(){ if(activeState&&fallbackPaused!==null) activeState.paused=fallbackPaused; fallbackPaused=null; }
   function close(){
@@ -62,9 +86,10 @@ APH.ExpeditionUI = (function(){
     if(!s || !modal) return {ok:false,why:'远征面板未打开'};
     var food=Math.max(0,Math.floor(Number(modal._food&&modal._food.value)||0));
     var objective=modal._objective&&modal._objective.value;
-    var destination=modal._destination&&modal._destination.value;
+    var destination=destinationOf(s,modal._destination&&modal._destination.value);
+    if(!destination){var missing={ok:false,why:'请选择远征目的地'};if(modal._error)modal._error.textContent=missing.why;return missing;}
     var result=ui()&&ui().cmd ? ui().cmd('beginExpedition',{memberIds:selectedIds(),supply:{food:food},objective:objective,
-      destination:{kind:destination},context:{entities:s.entities||[]}}) : null;
+      destination:destination,context:{entities:s.entities||[]}}) : null;
     if(result&&result.ok){ close(); return result; }
     var why=(result&&result.why)||'暂时无法出发';
     if(modal._error) modal._error.textContent=why;
@@ -95,7 +120,16 @@ APH.ExpeditionUI = (function(){
     supply.appendChild(food); card.appendChild(supply); modal._food=food;
     card.appendChild(el('h3','目的地'));
     var destination=el('select'); destination.id='expeditionDestination'; destination.setAttribute('aria-label','远征目的地');
+    var prompt=el('option','请选择目的地');prompt.value='';prompt.disabled=true;prompt.selected=true;destination.appendChild(prompt);
     var unknown=el('option','未知星球 · 首次着陆时观测');unknown.value='unknown';destination.appendChild(unknown);
+    if(window.APH.Atlas)APH.Atlas.list(s&&s.meta).forEach(function(entry){
+      var known=el('option',(entry.name||entry.planetId)+' · '+(entry.observed?'已观测':'旧版地图'));
+      known.value='planet:'+entry.planetId;destination.appendChild(known);
+    });
+    destination.addEventListener('keydown',function(ev){
+      if(ev.altKey||ev.ctrlKey||ev.metaKey)return;
+      if(moveNativeSelect(destination,ev.key)&&ev.preventDefault)ev.preventDefault();
+    });
     card.appendChild(destination);modal._destination=destination;
     card.appendChild(el('h3','任务目标'));
     var objective=el('select'); objective.id='expeditionObjective'; objective.setAttribute('aria-label','远征任务目标');

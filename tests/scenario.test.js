@@ -103,7 +103,7 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','atlas.js','observe.js','entity_index.js', 'world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','atlas.js','observe.js','entity_index.js', 'world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','planet.js','save.js','opening.js','opening_data.js','llm.js',
                 'colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','weather.js','nav.js','residents.js','ecology.js', 'expedition_state.js','alerts.js','combat.js',
                 'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js', 'expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
@@ -2704,6 +2704,180 @@ test('#201 restore: 持久 PlanetSpec 深层数组损坏时启动不崩并安全
   try{restored=M.restoreWorldSession(S);}catch(e){throw new Error('损坏持久 PlanetSpec 不得让启动抛异常: '+e.message);}
   A(restored.recovered&&restored.recovered.ok&&S.scene==='home'&&!APH.ExpeditionState.active(S.colony),
     '深层数组损坏的持久 PlanetSpec 应安全返航');
+});
+
+test('#202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后返航仍幂等', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=3;
+  const first=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20210}});
+  A(first&&first.ok,'已观测重访夹具首次出征失败: '+JSON.stringify(first));
+  const firstRun=APH.ExpeditionState.active(S.colony),planetId=firstRun.destination.planetId;
+  const planetKey=APH.CFG.save.KEY_PLANET+planetId,planetRaw=localStorage.getItem(planetKey);
+  const stored=APH.Save.loadPlanet(planetId),observationRaw=JSON.stringify(stored.observation);
+  M.checkpointWorlds(S);
+
+  /* 模拟整页刷新：只重载 meta/colony，当前远征必须从 Active Run.runtime
+     与持久 PlanetSpec 两份职责明确的数据恢复。 */
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  let restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&restored.run.destination.planetId===planetId,
+    '首次远征刷新后没有恢复正确 Active Run');
+  A(JSON.stringify(S.spec)===JSON.stringify(stored)&&JSON.stringify(S.worldDescriptor.observation)===observationRaw,
+    '首次刷新恢复没有安装持久 PlanetSpec/Observation');
+  A(M.returnHome().ok,'首次远征返航失败');
+
+  const generate=APH.Planet.newObservedPlanet;
+  try{
+    APH.Planet.newObservedPlanet=function(){throw new Error('已知星重访不得重新生成地图');};
+    const revisit=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+      destination:{kind:'planet',planetId:stored.id,seed:stored.seed}});
+    A(revisit&&revisit.ok,'已知星重访失败: '+JSON.stringify(revisit));
+  }finally{APH.Planet.newObservedPlanet=generate;}
+  const revisitedRun=APH.ExpeditionState.active(S.colony),entry=APH.Atlas.find(S.meta,planetId);
+  A(revisitedRun&&revisitedRun.destination.planetId===planetId&&entry.visits===2,
+    '重访没有复用同一身份或访问次数不正确: '+JSON.stringify(entry));
+  A(JSON.stringify(S.spec)===JSON.stringify(stored)&&JSON.stringify(S.spec.observation)===observationRaw,
+    '重访没有恢复同一份 PlanetSpec/Observation');
+  A(localStorage.getItem(planetKey)===planetRaw,'重访不得改写 PlanetSpec 原始字节');
+  A(S.worldDescriptor.generation===1&&APH.TerrainModel.hasObservation(S.worldDescriptor),
+    '已观测星重访不得退化为 legacy 地图');
+
+  M.checkpointWorlds(S);
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&S.spec.id===planetId&&
+    JSON.stringify(S.worldDescriptor.observation)===observationRaw,'已知星 Active Run 刷新后恢复错误');
+  const runId=restored.run.id,returned=M.returnHome();
+  A(returned&&returned.ok&&!APH.ExpeditionState.active(S.colony)&&S.scene==='home','重访返航没有清除 Active Run');
+  const settled=JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene});
+  M.returnHome();
+  A(JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene})===settled,
+    '重复返航改变了家园或重复结算 run '+runId);
+});
+
+test('#202 revisit: 访问记录保存失败时不扣补给、不切世界且 PlanetSpec 不变', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=4;
+  const spec=APH.Planet.newObservedPlanet(0x20211);
+  A(APH.Save.savePlanetDiscovery(S.meta,spec,202110).ok,'重访失败夹具发现事务失败');
+  S.worlds={home:APH.WorldRuntime.capture(S),expedition:null};
+  const planetKey=APH.CFG.save.KEY_PLANET+spec.id,planetRaw=localStorage.getItem(planetKey);
+  const before=JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities});
+  const saveVisit=APH.Save.savePlanetVisit;
+  try{
+    APH.Save.savePlanetVisit=function(){return {ok:false,why:'persistence-failed'};};
+    const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:2},objective:'resources',
+      destination:{kind:'planet',planetId:spec.id,seed:spec.seed}});
+    A(out&&!out.ok&&out.why==='persistence-failed','重访持久化失败应作为可恢复错误返回');
+  }finally{APH.Save.savePlanetVisit=saveVisit;}
+  A(!APH.ExpeditionState.active(S.colony)&&S.scene==='home','失败后不得创建 Active Run 或切换世界');
+  A(JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities})===before,
+    '失败后补给、名册、Atlas、家园或双世界状态发生变化');
+  A(localStorage.getItem(planetKey)===planetRaw,'失败后 PlanetSpec 原始字节发生变化');
+});
+
+test('#202 launch transaction: begin 后首个 runtime 保存失败会撤回补给、run、Atlas 与磁盘', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=4;
+  const spec=APH.Planet.newObservedPlanet(0x20212);
+  A(APH.Save.savePlanetDiscovery(S.meta,spec,202120).ok,'最终 checkpoint 失败夹具发现事务失败');
+  S.worlds={home:APH.WorldRuntime.capture(S),expedition:null};
+  const keys=[APH.CFG.save.KEY_PLANET+spec.id,APH.CFG.save.KEY_META,APH.CFG.save.KEY_COLONY];
+  const raws=keys.map(function(key){return localStorage.getItem(key);});
+  const before=JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities});
+  const saveColony=APH.Save.saveColony;
+  try{
+    APH.Save.saveColony=function(){return false;};
+    const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:2},objective:'resources',
+      destination:{kind:'planet',planetId:spec.id,seed:spec.seed}});
+    A(out&&!out.ok&&out.why==='persistence-failed'&&out.rollbackOk!==false,
+      '首个 runtime checkpoint 失败应作为已回滚持久化错误返回: '+JSON.stringify(out));
+  }finally{APH.Save.saveColony=saveColony;}
+  A(S.scene==='home'&&!APH.ExpeditionState.active(S.colony)&&S.meta.res.food===4,
+    '失败后必须留在家园，不得扣补给或残留 Active Run');
+  A(S.meta.residents.every(function(r){return !r.worldId||r.worldId==='home';}),
+    '失败后远征队员必须回到家园名册');
+  A(S.worlds.home.entities===S.entities&&S.worlds.home.meta===S.meta&&S.worlds.home.colony===S.colony,
+    '回滚必须恢复 active/home slot 的共享引用语义');
+  const afterValue={meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities};
+  const after=JSON.stringify(afterValue);
+  function firstDiff(a,b,path){
+    if(a===b)return null;
+    if(!a||!b||typeof a!=='object'||typeof b!=='object')return path+': '+JSON.stringify(a)+' != '+JSON.stringify(b);
+    const ak=Object.keys(a),bk=Object.keys(b);
+    if(ak.join('|')!==bk.join('|'))return path+' keys: '+ak.join('|')+' != '+bk.join('|');
+    for(const key of ak){const diff=firstDiff(a[key],b[key],path+'.'+key);if(diff)return diff;}
+    return null;
+  }
+  A(after===before,'最终保存失败后内存家园、Atlas 或双世界状态未完整恢复: '+firstDiff(JSON.parse(before),afterValue,'state'));
+  keys.forEach(function(key,i){A(localStorage.getItem(key)===raws[i],key+' 未恢复到启动前原始字节');});
+});
+
+test('#202 launch transaction: 新星首个 runtime 保存失败也撤回 PlanetSpec 与发现记录', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=4;S.worlds={home:APH.WorldRuntime.capture(S),expedition:null};
+  const seed=0x20214,planetId=APH.Planet.idForSeed(seed),keys=[APH.CFG.save.KEY_META,APH.CFG.save.KEY_COLONY];
+  const raws=keys.map(function(key){return localStorage.getItem(key);});
+  const saveColony=APH.Save.saveColony;
+  try{
+    APH.Save.saveColony=function(){return false;};
+    const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:2},objective:'resources',
+      destination:{kind:'unknown',seed:seed}});
+    A(out&&!out.ok&&out.why==='persistence-failed'&&out.rollbackOk!==false,
+      '新星最终 checkpoint 失败应返回已回滚错误: '+JSON.stringify(out));
+  }finally{APH.Save.saveColony=saveColony;}
+  A(S.scene==='home'&&!APH.ExpeditionState.active(S.colony)&&S.meta.res.food===4&&!APH.Atlas.find(S.meta,planetId),
+    '新星失败后不得扣补给、残留 run 或内存发现记录');
+  A(localStorage.getItem(APH.CFG.save.KEY_PLANET+planetId)===null,'新星失败后必须移除预写 PlanetSpec');
+  keys.forEach(function(key,i){A(localStorage.getItem(key)===raws[i],key+' 未恢复到新星启动前原始字节');});
+});
+
+test('#202 known revisit: 运行危险字段损坏时拒绝启动且家园零变化', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=4;S.worlds={home:APH.WorldRuntime.capture(S),expedition:null};
+  const spec=APH.Planet.newObservedPlanet(0x20213);delete spec.enemies.factions[0].nightBoost;
+  localStorage.setItem(APH.CFG.save.KEY_PLANET+spec.id,JSON.stringify(spec));
+  const before=JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities});
+  const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:2},objective:'resources',
+    destination:{kind:'planet',planetId:spec.id,seed:spec.seed}});
+  A(out&&!out.ok&&out.why==='invalid-planet','损坏已知星应在 begin 前拒绝: '+JSON.stringify(out));
+  A(JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene,entities:S.entities})===before,
+    '拒绝损坏已知星时不得改变家园、补给、Atlas 或双世界状态');
+});
+
+test('#202 legacy revisit: 旧短 ID 星球保持 generation 0，刷新不会静默补 Observation', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  const legacy=APH.Planet.fallbackPlanet(1),planetRaw=JSON.stringify(legacy);
+  A(legacy.id==='P1'&&!legacy.observation,'夹具必须是旧短 ID 且没有 Observation');
+  localStorage.setItem(APH.CFG.save.KEY_PLANET+legacy.id,planetRaw);
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();
+  const entry=APH.Atlas.find(S.meta,legacy.id);
+  A(entry&&entry.planetId==='P1'&&entry.observed===false,'旧 PlanetSpec 没有按原 ID 回填 Atlas');
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();
+  const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'planet',planetId:legacy.id,seed:legacy.seed}});
+  A(out&&out.ok,'旧星球重访失败: '+JSON.stringify(out));
+  A(S.spec.id==='P1'&&!S.spec.observation&&S.worldDescriptor.generation===0,
+    '旧星球不得被重命名或静默升级为 observed generation 1');
+  A(!!APH.World.legacyLake(S.worldDescriptor,S.spec),'旧星球必须保留 generation 0 固定湖兼容表现');
+  A(localStorage.getItem(APH.CFG.save.KEY_PLANET+legacy.id)===planetRaw,'旧 PlanetSpec 原始字节不得改写');
+  M.checkpointWorlds(S);
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&S.spec.id==='P1'&&!S.spec.observation&&S.worldDescriptor.generation===0,
+    '旧星球刷新恢复后不得改变地图世代');
+  A(localStorage.getItem(APH.CFG.save.KEY_PLANET+legacy.id)===planetRaw,'刷新恢复也不得改写旧 PlanetSpec');
+  A(M.returnHome().ok,'旧星球场景清理返航失败');
 });
 
 
