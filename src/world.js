@@ -51,7 +51,7 @@ APH.World = (function(){
     c.width = CFG.CHUNK; c.height = CFG.CHUNK;
     var g = c.getContext('2d');
     var ox = ci*CFG.CHUNK, oy = cj*CFG.CHUNK;
-    var lakeR = APH.state.spec.terrain.lakeR;
+    var lakeR = (APH.state.spec.terrain && APH.state.spec.terrain.lakeR) || 0;
     g.fillStyle = pal.ground1;
     g.fillRect(0,0,CFG.CHUNK,CFG.CHUNK);
 
@@ -68,7 +68,7 @@ APH.World = (function(){
     }
     /* 湖岸沙环 */
     var lx = APH.CFG.LAKE.x-ox, ly = APH.CFG.LAKE.y-oy;
-    if(lx>-260 && lx<CFG.CHUNK+260 && ly>-260 && ly<CFG.CHUNK+260){
+    if(lakeR && lx>-260 && lx<CFG.CHUNK+260 && ly>-260 && ly<CFG.CHUNK+260){
       for(var k=0;k<160;k++){
         var a = Math.random()*U.TAU, rd = lakeR + 6 + Math.random()*80;
         var sx = APH.CFG.LAKE.x+Math.cos(a)*rd-ox, sy = APH.CFG.LAKE.y+Math.sin(a)*rd-oy;
@@ -82,7 +82,7 @@ APH.World = (function(){
     for(var j=0;j<120;j++){
       var px = U.hash2(j*3+ci*11, cj*17)*CFG.CHUNK,
           py = U.hash2(j*5, cj*13+j)*CFG.CHUNK;
-      if(U.dst(ox+px,oy+py,APH.CFG.LAKE.x,APH.CFG.LAKE.y) < lakeR) continue;
+      if(lakeR && U.dst(ox+px,oy+py,APH.CFG.LAKE.x,APH.CFG.LAKE.y) < lakeR) continue;
       if(U.hash2(j,99) > .82){
         g.globalAlpha=.5; g.strokeStyle='#3a4a3e'; g.lineWidth=1.4;
         g.beginPath(); g.moveTo(px,py); g.lineTo(px+(Math.random()*6-3),py-(4+Math.random()*4)); g.stroke();
@@ -185,7 +185,8 @@ APH.World = (function(){
       for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(chunks[ci][cj], ci*CFG.CHUNK, cj*CFG.CHUNK);
 
     /* 湖面 */
-    var lakeR = s.spec.terrain.lakeR, time = s.clock;
+    var lakeR = s.spec.terrain && s.spec.terrain.lakeR, time = s.clock;
+    if(lakeR){
     var lg = ctx.createRadialGradient(CFG.LAKE.x,CFG.LAKE.y,10, CFG.LAKE.x,CFG.LAKE.y,lakeR);
     lg.addColorStop(0,'#0f2233'); lg.addColorStop(1,s.spec.palette.water);
     ctx.fillStyle = lg;
@@ -201,6 +202,7 @@ APH.World = (function(){
       ctx.stroke();
     }
     ctx.restore();
+    }
 
     /* 粒子层(地面) */
     drawEntityFns.particles(dt, time);

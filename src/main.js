@@ -92,15 +92,34 @@ window.APH = window.APH || {};
     return drafted.length ? drafted : roster;
   }
 
-  function launchExpedition(){
+  function launchExpedition(dest){
     var s = APH.state;
-    if(s.scene==='expedition') return;
+    if(s.scene==='expedition') return {ok:false,why:'already'};
+    if((dest == null) && s.expeditionRun) dest = { kind: 'resume' };
+    else dest = dest || s.launchDest;
     /* ADR-45: 没有主角就没有「一个人出发」—— 得有人可派 */
     var squad = expeditionSquad();
     if(!squad.length){
       APH.UI.floatText('✕ 没有可派出的殖民者 —— 先招人', '#ff9a9a');
-      return;
+      return {ok:false,why:'no_squad'};
     }
+    var plan = window.APH.Observe && APH.Observe.land ? APH.Observe.land(dest, {
+      meta: s.meta,
+      seed: s.launchSeed,
+      run: s.expeditionRun,
+      makePlanet: function(seed){ return APH.Planet.fallbackPlanet(seed != null ? seed : ((Date.now()%100000)|0)); },
+      savePlanet: function(id, spec){ APH.Save.savePlanet(id, spec); },
+      loadPlanet: function(id){ return APH.Save.loadPlanet(id); }
+    }) : {ok:false,why:'no_destination'};
+    if(!plan.ok){
+      if(plan.why==='no_destination'){
+        APH.UI.floatText('✕ 先选目的地（已知星或未知新星）', '#ff9a9a');
+        if(APH.UI.open) APH.UI.open('launchDest');
+      }
+      return plan;
+    }
+    s.expeditionRun = { spec: plan.spec };
+    s.launchDest = dest || s.launchDest;
     s.squad = squad.map(function(r){ return r.id; });
     closeColonyOverlays();
     s.selectedRid=null;   /* ADR-29: 离开家园解除征召 (实体将重建) */
@@ -114,18 +133,14 @@ window.APH = window.APH || {};
       APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
         ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
     }
-    var seed=(Date.now()%100000)|0;
-    var planet = APH.Planet.fallbackPlanet(seed);
-    var cached = APH.Save.loadPlanet(planet.id);
-    if(cached){ applySpec(planet=cached); }
-    else{
-      applySpec(planet);
+    var planet = plan.spec;
+    var cached = !plan.first;
+    applySpec(planet);
+    if(!cached && APH.LLM && APH.LLM.enrichPlanet){
       APH.LLM.enrichPlanet(planet).then(function(rich){
-        if(rich && s.scene==='expedition' && !s.specSaved && s.spec.seed===planet.seed){
-          rich.id=planet.id;
-          APH.Save.savePlanet(rich.id, rich);
-          s.specSaved=true;
-          applySpec(rich);
+        if(rich && s.scene==='expedition' && s.spec && s.spec.seed===planet.seed){
+          planet.name=rich.name||planet.name; planet.lore=rich.lore||planet.lore;
+          APH.Save.savePlanet(planet.id, planet);
         }
       });
     }
@@ -142,6 +157,7 @@ window.APH = window.APH || {};
         if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
         if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
         if(p.beacons.some(function(b){return U.dst(rx,ry,b.x,b.y)<90;})) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, rx, ry)) continue;
         s.entities.push(APH.Ent.makeRock(rx,ry,rng)); pr++;
       }
       var pc=0; gd=0;
@@ -149,6 +165,7 @@ window.APH = window.APH || {};
         var cx=rng()*(CFG.WORLD-140)+70, cy=rng()*(CFG.WORLD-140)+70;
         if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
         if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, cx, cy)) continue;
         s.entities.push(APH.Ent.makeCrystal(cx,cy)); pc++;
       }
       p.beacons.forEach(function(d){ s.entities.push(APH.Ent.makeBeacon(d)); });
@@ -169,7 +186,9 @@ window.APH = window.APH || {};
         x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
       });
       /* 远征野生异星植物生成 (Flora #36) */
-      if(APH.Planet && APH.Planet.generateExpeditionFlora){
+      if(window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(p) && APH.Observe.floraFrom){
+        APH.Observe.floraFrom(p).forEach(function(f){ s.entities.push(f); });
+      } else if(APH.Planet && APH.Planet.generateExpeditionFlora){
         var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
         expFlora.forEach(function(f){ s.entities.push(f); });
       }
@@ -194,10 +213,14 @@ window.APH = window.APH || {};
       }
       /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
       if(p.rivals && p.rivals.length){
-        var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
-        var ba=Math.random()*U.TAU;
-        var bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
-        var by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
+        var rrng=U.makeRng(((p.seed||7)^0x51A7)>>>0);
+        var rv=p.rivals[Math.floor(rrng()*p.rivals.length)];
+        var ba=rrng()*U.TAU, btry=0, bx, by, tries=(CFG.observe&&CFG.observe.rivalTries)||24;
+        do{
+          ba=rrng()*U.TAU;
+          bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
+          by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
+        }while(btry++<tries && window.APH.Observe && APH.Observe.walkableWorld && !APH.Observe.walkableWorld(p, bx, by));
         s.entities.push({
           id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
           x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
@@ -207,7 +230,7 @@ window.APH = window.APH || {};
         for(var gi=0; gi<3; gi++){
           var gf=p.enemies.factions[gi % p.enemies.factions.length];
           s.entities.push(APH.Ent.makeEnemy(gf,
-            bx+(Math.random()*120-60), by+(Math.random()*90-45)));
+            bx+(rrng()*120-60), by+(rrng()*90-45)));
         }
       }
       document.getElementById('planetTitle').textContent =
@@ -218,10 +241,12 @@ window.APH = window.APH || {};
     var lawBits=[];
     if(APH.Planet.hasLaw(s.spec,'lw_echo')) lawBits.push('声追者：少开枪');
     if(APH.Planet.hasLaw(s.spec,'lw_spore_light')) lawBits.push('孢子趋光：光会开路');
-    if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
+    if(APH.Planet.hasLaw(s.spec,'lw_night_acid') && !(window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(s.spec) && APH.Observe.hasWater && !APH.Observe.hasWater(s.spec))) lawBits.push('夜间勿近湖');
     if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
     U.emit('launched',{});
+    return plan;
   }
+  U.on('launchPicked', function(dest){ launchExpedition(dest); });
 
   /* 返回殖民地(发射台交互) */
   /* T5: 通关 —— 呼叫救援离开这颗星球。 */
@@ -334,6 +359,7 @@ window.APH = window.APH || {};
         if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
         if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
         if(p.beacons.some(function(b){ return U.dst(rx,ry,b.x,b.y)<90; })) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, rx, ry)) continue;
         s.entities.push(APH.Ent.makeRock(rx,ry,rng));
         placedR++;
       }
@@ -342,6 +368,7 @@ window.APH = window.APH || {};
         var cx = rng()*(CFG.WORLD-140)+70, cy = rng()*(CFG.WORLD-140)+70;
         if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
         if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, cx, cy)) continue;
         s.entities.push(APH.Ent.makeCrystal(cx,cy));
         placedC++;
       }
@@ -463,7 +490,7 @@ window.APH = window.APH || {};
     var a = U.rr(0,U.TAU), d = U.rr(CFG.spawn.minDistFromPlayer, CFG.spawn.maxDistFromPlayer);
     var x = U.clamp(s.px + Math.cos(a)*d, 40, CFG.WORLD-40);
     var y = U.clamp(s.py + Math.sin(a)*d, 40, CFG.WORLD-40);
-    if(U.dst(x,y,CFG.LAKE.x,CFG.LAKE.y) < s.spec.terrain.lakeR+20) return;
+    if(s.spec.terrain && s.spec.terrain.lakeR && U.dst(x,y,CFG.LAKE.x,CFG.LAKE.y) < s.spec.terrain.lakeR+20) return;
     s.entities.push(APH.Ent.makeEnemy(faction, x, y));
     U.emit('enemySpawned', faction);
   }
@@ -485,7 +512,8 @@ window.APH = window.APH || {};
     var night=APH.World.daylight()<.5;
     var hasAcid=APH.Planet.hasLaw(s.spec, 'lw_night_acid');
     if(night && hasAcid){
-      var lakeR=(s.spec.terrain&&s.spec.terrain.lakeR)||CFG.LAKE.r;
+      var lakeR=s.spec.terrain&&s.spec.terrain.lakeR;
+      if(!lakeR){ s.acidT=0; } else
       if(U.dst(s.px,s.py,CFG.LAKE.x,CFG.LAKE.y) < lakeR+24){
         s.acidT=(s.acidT||0)+dt;
         if(s.acidT>=1){
@@ -870,7 +898,7 @@ window.APH = window.APH || {};
     var quiet = !s.nearVisitor && !s.war.raidActive && !(s.war.raidWarn>0);
     if(quiet){
       var nightW=APH.World.daylight()<.5;
-      var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW);
+      var wx=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightW, s.colony);
       if(wx.storm && !s._stormOn) APH.UI.floatText('⚡ 磁暴来袭 · 实验室停摆','#c39bff');
       if(wx.acid && !s._acidOn) APH.UI.floatText('🌧 酸雨 · 农田减半','#7dffab');
       s._stormOn=!!wx.storm; s._acidOn=!!wx.acid;
@@ -3405,7 +3433,8 @@ window.APH = window.APH || {};
       seatMap=APH.Res.diningSeatAlloc(hungryRes, diningChairs, diningTbls);
     }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
-    var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
+    var navHolder=s.scene==='expedition'?s.spec:s.colony;
+    var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[], navHolder):null;
     /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
     var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
 
@@ -4038,9 +4067,10 @@ window.APH = window.APH || {};
        因为出发/返航现在是殖民地级动作(派队/召回), 不再是走到发射台按键。 */
     debugPressE:function(){
       var s=APH.state;
-      if(s.scene==='home') launchExpedition();
+      if(s.scene==='home') launchExpedition(s.expeditionRun ? null : {kind:'unknown'});
       else returnHome();
     },
+    launchExpedition:launchExpedition,
     guardTrim:guardTrim,
     applyTech:applyTech,
     setupSiegeCamp:setupSiegeCamp,

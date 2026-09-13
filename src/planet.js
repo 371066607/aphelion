@@ -358,7 +358,9 @@ APH.Planet = (function(){
       cy = Math.floor(400 + rng() * 1400);
       cx = Math.floor(cx / G) * G;
       cy = Math.floor(cy / G) * G;
-      if(U.dst(cx, cy, 1100, 1100) >= 300) break;
+      if(U.dst(cx, cy, 1100, 1100) < 300) continue;
+      if(window.APH.Observe && APH.Observe.walkableWorld && !APH.Observe.walkableWorld(spec, cx, cy)) continue;
+      break;
     }
 
     var walls = [];

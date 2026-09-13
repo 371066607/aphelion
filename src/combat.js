@@ -287,7 +287,7 @@ APH.Combat = (function(){
   function trapBreachFocus(en, focus, s, costFn){
     if(!costFn || !window.APH.Nav) return null;
     var bs = (s && s.colony && s.colony.buildings) || [];
-    var grid = APH.Nav.gridOf(bs);
+    var grid = APH.Nav.gridOf(bs, s && (s.spec || s.colony));
     /* 零罚路径存在 → 堵点来自惩罚格(陷阱) */
     var freePath = APH.Nav.astar(grid, {x:en.x,y:en.y}, {x:focus.x,y:focus.y}, null);
     if(freePath) {
@@ -329,7 +329,7 @@ APH.Combat = (function(){
     }
     /* P2: 无墙但有待触发陷阱 → 也走寻路(绕陷阱); 两者皆无 → 直线 */
     if((!hasWall && !armedTraps.length) || !window.APH.Nav || !en || !focus) return { mode:'direct' };
-    var grid = APH.Nav.gridOf(bs);
+    var grid = APH.Nav.gridOf(bs, s && (s.spec || s.colony));
     var GRID = (CFG && CFG.GRID) || 48;   /* ADR-4 逻辑格网 (costFn 闭包用) */
     var trapPen = (CFG.defense && CFG.defense.trapAvoidCost != null) ? CFG.defense.trapAvoidCost : 6;
     var costFn = armedTraps.length ? function(gx, gy){
