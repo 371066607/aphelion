@@ -11,7 +11,7 @@ APH.World = (function(){
 
   var cv, ctx, VW=0, VH=0, DPR=1;
   /* 地形图块按相机需要生成；大地图不能再开场就把全部 canvas 塞进内存。 */
-  var chunks = new Map(), NCH = 0, terrainDesc = null;
+  var chunks = new Map(), NCHX = 0, NCHY = 0, terrainDesc = null;
   var chunkLimit = 36, chunkHits = 0, chunkMisses = 0;
   var wxParts = [], wxKind = '';          // W4 天气粒子池 (程序化绘制的表现层)
   var vigCv = document.createElement('canvas');
@@ -54,14 +54,29 @@ APH.World = (function(){
        描述缺失时明确退回 legacy，不去碰 CFG.WORLD。 */
     return TM.normalize((s.colony&&s.colony.scene)||s.worldDescriptor);
   }
-  function terrainSize(){ return terrainDesc ? terrainDesc.width : CFG.WORLD; }
+  function terrainWidth(){ return terrainDesc ? terrainDesc.width : CFG.WORLD; }
+  function terrainHeight(){ return terrainDesc ? terrainDesc.height : CFG.WORLD; }
   function terrainLandmarks(){
     if(terrainDesc && APH.TerrainModel) return APH.TerrainModel.landmarks(terrainDesc);
     return { hab:CFG.HAB, lake:CFG.LAKE };
   }
+  function descriptorKey(desc){
+    if(!desc)return 'expedition';
+    return APH.TerrainModel&&APH.TerrainModel.revision?APH.TerrainModel.revision(desc):
+      [desc.kind,desc.generation,desc.seed,desc.width,desc.height,desc.grid].join(':');
+  }
+  function terrainColor(desc,x,y,fallback){
+    return desc&&APH.TerrainModel?APH.TerrainModel.regionColor(desc,x,y,fallback):fallback;
+  }
+  function legacyLake(desc,spec){
+    if(desc&&APH.TerrainModel&&APH.TerrainModel.normalize(desc).generation===1)return null;
+    var lake=desc&&APH.TerrainModel?APH.TerrainModel.landmarks(desc).lake:CFG.LAKE;
+    var radius=desc?lake.r:(spec&&spec.terrain&&spec.terrain.lakeR);
+    return {x:lake.x,y:lake.y,r:typeof radius==='number'?radius:CFG.LAKE.r};
+  }
   function chunkKey(ci,cj){
     var d=terrainDesc;
-    return (d ? [d.kind,d.generation,d.seed,d.width].join(':') : 'expedition')+':'+ci+':'+cj;
+    return descriptorKey(d)+':'+ci+':'+cj;
   }
   function cacheChunk(key, chunk){
     if(chunks.has(key)) chunks.delete(key);
@@ -82,12 +97,11 @@ APH.World = (function(){
     c.width = CFG.CHUNK; c.height = CFG.CHUNK;
     var g = c.getContext('2d');
     var ox = ci*CFG.CHUNK, oy = cj*CFG.CHUNK;
-    var lakeR = APH.state.spec.terrain.lakeR;
     if(desc && APH.TerrainModel && APH.TerrainModel.isHome(desc)){
       var TM=APH.TerrainModel, g0=Math.floor(ox/desc.grid), g1=Math.ceil((ox+CFG.CHUNK)/desc.grid);
       var h0=Math.floor(oy/desc.grid), h1=Math.ceil((oy+CFG.CHUNK)/desc.grid);
       for(var gy=h0;gy<h1;gy++) for(var gx=g0;gx<g1;gx++){
-        var col=TM.regionColor(desc,(gx+.5)*desc.grid,(gy+.5)*desc.grid,pal.ground1);
+        var col=terrainColor(desc,(gx+.5)*desc.grid,(gy+.5)*desc.grid,pal.ground1);
         g.fillStyle=col;
         g.fillRect(gx*desc.grid-ox,gy*desc.grid-oy,desc.grid,desc.grid);
       }
@@ -95,6 +109,7 @@ APH.World = (function(){
     }
     g.fillStyle = pal.ground1;
     g.fillRect(0,0,CFG.CHUNK,CFG.CHUNK);
+    var lakeR = APH.state.spec.terrain.lakeR;
 
     for(var i=0;i<340;i++){
       var wx = U.hash2(ci*77+i, cj*31+i*3)*CFG.CHUNK,
@@ -145,7 +160,8 @@ APH.World = (function(){
 
   function buildTerrain(){
     terrainDesc=activeDescriptor();
-    NCH=Math.ceil(terrainSize()/CFG.CHUNK);
+    NCHX=Math.ceil(terrainWidth()/CFG.CHUNK);
+    NCHY=Math.ceil(terrainHeight()/CFG.CHUNK);
     chunks.clear(); chunkHits=0; chunkMisses=0;
   }
 
@@ -222,32 +238,34 @@ APH.World = (function(){
     /* 地形块 */
     /* main 接入 worldDescriptor 后无需重新加载模块：每帧检测描述 key。 */
     var nowDesc=activeDescriptor();
-    if((nowDesc&&(!terrainDesc || chunkKey(0,0).split(':').slice(0,4).join(':')!==[nowDesc.kind,nowDesc.generation,nowDesc.seed,nowDesc.width].join(':'))) || (!nowDesc&&terrainDesc)) buildTerrain();
-    var c0x=U.clamp(Math.floor(view.left/CFG.CHUNK),0,NCH-1),
-        c1x=U.clamp(Math.floor(view.right/CFG.CHUNK),0,NCH-1),
-        c0y=U.clamp(Math.floor(view.top/CFG.CHUNK),0,NCH-1),
-        c1y=U.clamp(Math.floor(view.bottom/CFG.CHUNK),0,NCH-1);
+    if(descriptorKey(nowDesc)!==descriptorKey(terrainDesc)) buildTerrain();
+    var c0x=U.clamp(Math.floor(view.left/CFG.CHUNK),0,NCHX-1),
+        c1x=U.clamp(Math.floor(view.right/CFG.CHUNK),0,NCHX-1),
+        c0y=U.clamp(Math.floor(view.top/CFG.CHUNK),0,NCHY-1),
+        c1y=U.clamp(Math.floor(view.bottom/CFG.CHUNK),0,NCHY-1);
     for(var ci=c0x;ci<=c1x;ci++)
       for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(getChunk(ci,cj,s.spec.palette), ci*CFG.CHUNK, cj*CFG.CHUNK);
 
-    /* 湖面 */
-    var lmarks=terrainLandmarks(), lake=lmarks.lake;
-    var lakeR = terrainDesc ? lake.r : s.spec.terrain.lakeR, time = s.clock;
-    var lg = ctx.createRadialGradient(lake.x,lake.y,10,lake.x,lake.y,lakeR);
-    lg.addColorStop(0,'#0f2233'); lg.addColorStop(1,s.spec.palette.water);
-    ctx.fillStyle = lg;
-    ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.fill();
-    ctx.save();
-    ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.clip();
-    for(var wv=0;wv<5;wv++){
-      var wy = lake.y-lakeR+((time*12+wv*67)%(lakeR*2));
-      ctx.strokeStyle='rgba(120,200,240,'+(0.05+wv*.012)+')'; ctx.lineWidth=2;
-      ctx.beginPath();
-      ctx.moveTo(lake.x-lakeR+20, wy);
-      ctx.quadraticCurveTo(lake.x, wy+Math.sin(time+wv)*7, lake.x+lakeR-20, wy);
-      ctx.stroke();
+    /* generation 1 水体已经逐格画进地形块；圆湖只属于旧地图与旧远征。 */
+    var lake=legacyLake(terrainDesc,s.spec),time=s.clock;
+    if(lake){
+      var lakeR=lake.r;
+      var lg = ctx.createRadialGradient(lake.x,lake.y,10,lake.x,lake.y,lakeR);
+      lg.addColorStop(0,'#0f2233'); lg.addColorStop(1,s.spec.palette.water);
+      ctx.fillStyle = lg;
+      ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.fill();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.clip();
+      for(var wv=0;wv<5;wv++){
+        var wy = lake.y-lakeR+((time*12+wv*67)%(lakeR*2));
+        ctx.strokeStyle='rgba(120,200,240,'+(0.05+wv*.012)+')'; ctx.lineWidth=2;
+        ctx.beginPath();
+        ctx.moveTo(lake.x-lakeR+20, wy);
+        ctx.quadraticCurveTo(lake.x, wy+Math.sin(time+wv)*7, lake.x+lakeR-20, wy);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     /* 粒子层(地面) */
     drawEntityFns.particles(dt, time);
@@ -548,9 +566,11 @@ APH.World = (function(){
     initCanvas:initCanvas, buildTerrain:buildTerrain,
     daylight:daylight, drawDarkness:drawDarkness, render:render,
     drawWeather:drawWeather, drawFog:drawFog,
+    terrainColor:terrainColor, legacyLake:legacyLake,
     wxCount:function(){ return wxParts.length; },
     getViewport:function(){ return {w:VW,h:VH}; },
     stats:function(){ return { cacheSize:chunks.size, cacheLimit:chunkLimit, hits:chunkHits, misses:chunkMisses,
-      chunksPerAxis:NCH, width:terrainSize(), descriptor:terrainDesc }; },
+      chunksPerAxis:NCHX, chunksX:NCHX, chunksY:NCHY,
+      width:terrainWidth(), height:terrainHeight(), descriptor:terrainDesc }; },
   };
 })();

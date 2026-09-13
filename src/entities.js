@@ -1032,6 +1032,33 @@ APH.Ent = (function(){
   }
 
   /* ================= 玩家逻辑 ================= */
+  function resolveTerrainMove(s,nx,ny){
+    s=s||{};
+    var TM=window.APH.TerrainModel,scene=window.APH.Scene&&APH.Scene.of?APH.Scene.of(s):
+      (s.scene==='home'&&s.colony&&s.colony.scene?s.colony.scene:s.worldDescriptor);
+    var modern=!!(TM&&scene&&TM.normalize(scene).generation===1);
+    var dims=modern&&TM.dimensions?TM.dimensions(scene):{width:CFG.WORLD,height:CFG.WORLD};
+    nx=U.clamp(nx,40,dims.width-40);ny=U.clamp(ny,40,dims.height-40);
+    var cx=nx,cy=ny;
+    if(modern){
+      function blocked(x,y){return !TM.cellAt(scene,x,y).walkable;}
+      if(blocked(cx,cy)){
+        if(!blocked(nx,s.py))cy=s.py;
+        else if(!blocked(s.px,ny))cx=s.px;
+        else{cx=s.px;cy=s.py;}
+      }
+      return {x:cx,y:cy};
+    }
+    /* generation 0 与现有远征继续使用固定圆湖，保证旧档手感不漂移。 */
+    var lakeR=s.spec&&s.spec.terrain&&s.spec.terrain.lakeR;
+    if(!(lakeR>=0))lakeR=CFG.LAKE.r;
+    if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<=lakeR-14){
+      if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14)cy=s.py;
+      else if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14)cx=s.px;
+      else{cx=s.px;cy=s.py;}
+    }
+    return {x:cx,y:cy};
+  }
   function updatePlayer(dt){
     var s = APH.state, P = CFG.player;
     /* #66 床边睡眠: meta 是唯一真源, 实体标志每帧同步(供 drawPlayer 俯卧) */
@@ -1110,16 +1137,8 @@ APH.Ent = (function(){
     }else{
       s.vx*=Math.pow(.0005,dt); s.vy*=Math.pow(.0005,dt);
     }
-    var nx=U.clamp(s.px+s.vx*dt,40,CFG.WORLD-40),
-        ny=U.clamp(s.py+s.vy*dt,40,CFG.WORLD-40);
-    var lakeR=s.spec.terrain.lakeR;
-    /* 湖面约束(轴分离): 候选点 → cx/cy */
-    var cx=nx, cy=ny;
-    if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<=lakeR-14){
-      if(U.dst(nx,s.py,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ cy=s.py; }
-      else if(U.dst(s.px,ny,CFG.LAKE.x,CFG.LAKE.y)>lakeR-14){ cx=s.px; }
-      else { cx=s.px; cy=s.py; }
-    }
+    var terrainMove=resolveTerrainMove(s,s.px+s.vx*dt,s.py+s.vy*dt),
+        cx=terrainMove.x,cy=terrainMove.y;
     /* T2 玩家撞墙推挤(ADR-13: 墙=48px格障碍): 墙约束, 轴分离滑墙 */
     if(s.scene==='home' && (s.colony&&(s.colony.buildings||[]).some(function(b2){ return b2.id==='bl_wall'; }))){
       var wallR=(CFG.wall && CFG.wall.collideR!=null) ? CFG.wall.collideR : 35;
@@ -1739,7 +1758,7 @@ APH.Ent = (function(){
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
     drawBuilding:drawBuilding, drawFlora:drawFlora, hitBuilding:hitBuilding,
     drawWalls:drawWalls,
-    updatePlayer:updatePlayer, findPlayer:findPlayer,
+    updatePlayer:updatePlayer, resolveTerrainMove:resolveTerrainMove, findPlayer:findPlayer,
     findNearest:findNearest,
     findNearestBuilding:findNearestBuilding,
     findNearestFood:findNearestFood,

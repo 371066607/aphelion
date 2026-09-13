@@ -1641,7 +1641,8 @@ APH.Res = (function(){
     var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
     /* 无墙=退化为逐帧直线(walkToward 原语义, 路径缓存清空) */
     /* 防御: Nav 模块缺失(旧测试桩未加载 nav.js)时同样退化直线 */
-    if(!window.APH.Nav || !grid || (!hasWall(grid) && !grid.costedAny)){
+    var observedGrid=grid&&grid.scene&&grid.scene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.hasObservation(grid.scene);
+    if(!window.APH.Nav || !grid || (!observedGrid&&!hasWall(grid) && !grid.costedAny)){
       clearPathCache(e);
       return walkToward(e, target, dt, speed, grid);
     }
@@ -1668,7 +1669,7 @@ APH.Res = (function(){
   }
 
   /* 过客在家园院子里闲逛(无寻路): 走一段、站住喘气、到边界折返 */
-  function wanderStep(e, dt, hab, yardR, rng, speed){
+  function wanderStep(e, dt, hab, yardR, rng, speed, grid){
     var rand = rng || Math.random;
     var V = CFG.visitor || {};
     var H = hab || CFG.HAB;
@@ -1695,17 +1696,19 @@ APH.Res = (function(){
       e.walking = false;
       return e;
     }
-    e.x += Math.cos(e.wanderA||0) * spd * dt;
-    e.y += Math.sin(e.wanderA||0) * spd * dt;
-    var dx = e.x - H.x, dy = e.y - H.y;
+    var nx=e.x+Math.cos(e.wanderA||0)*spd*dt;
+    var ny=e.y+Math.sin(e.wanderA||0)*spd*dt;
+    var dx = nx - H.x, dy = ny - H.y;
     var d = Math.sqrt(dx*dx + dy*dy) || 1;
     if(d > R){
-      e.x = H.x + dx / d * R;
-      e.y = H.y + dy / d * R;
+      nx = H.x + dx / d * R;
+      ny = H.y + dy / d * R;
       e.wanderA = Math.atan2(-dy, -dx) + (rand() - 0.5);
     }
-    e.x = U.clamp(e.x, 40, APH.Scene.width() - 40);
-    e.y = U.clamp(e.y, 40, APH.Scene.height() - 40);
+    nx=U.clamp(nx,40,APH.Scene.width()-40);
+    ny=U.clamp(ny,40,APH.Scene.height()-40);
+    if(grid)return walkAround(e,{x:nx,y:ny},dt,spd,grid);
+    e.x=nx;e.y=ny;
     e.walking = true;
     e.face = e.wanderA || 0;
     bumpWalkPh(e, dt);

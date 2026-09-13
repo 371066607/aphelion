@@ -2259,3 +2259,15 @@ console:  (无)
 ### 2026-09-14 02:12 +08 · #199 最终复审
 
 - Spec 与 Standards 最终复审均通过，无剩余 blocker。复审额外覆盖 7 类损坏的未来 Observation、完整未来版本原样保留、校验缓存边界和构建产物同步；聚焦测试 32/32，`git diff --check` 通过。
+
+### 2026-09-14 02:17 +08 · #200 家园地图单一事实源
+
+- `TerrainModel` 现在以 Observation 格数决定 observed 场景边界，并把 tile、颜色、水岸、通行、建设、肥力和移动代价作为同一格语义输出。World 地形块和 MapUI 总览共用这套颜色；generation 1 停止叠画固定圆湖，替换 Observation 对象会同时使世界、总览和导航缓存失效。
+- 玩家移动按活动 Observation 边界截断，并用 `cellAt.walkable` 轴分离挡水；纯陆地 Observation 的旧湖中心可进入。Nav 按同一行列数、阻挡和 moveCost 建格；正式种植区取同一肥力；生态从同一 region 选择 grazer/ridge_guard。generation 0 的 2200 边界、圆湖与移动规则保持原样。
+- 现代家园移除了 Observation 之外的 22 组程序化装饰岩，实体化的 flora ID 与 `TerrainModel.resources` 完全一致；generation 0 仍保留旧散布。新增 4 条纯逻辑契约与 1 条全模块场景契约，先得到 4/4 和 1/1 预期失败，再转绿。
+- 验证：`python3 build.py` 成功（game.html 40936KB）；1026 单元、124 scenario、5 perf、7 boss 全绿。DOM 性能桩记录 128 格、20 居民、2000 对象，模拟 P50=2ms/P95=3ms、20 次寻路 48ms、存档 1239015 字节；不代表浏览器实际帧率。双轴最终复审待确认，人工普通入口游玩留到 #204。
+
+### 2026-09-14 02:46 +08 · #200 最终复审与边界补齐
+
+- 二审补齐矩形 Observation、越界目的格、居民直线路径、野生动物重复移动、家畜/故障居民绕水，以及旧 `homeRuntime` 岩石/水晶污染现代家园的边界；历史 generation 0 的固定湖、世界尺寸和装饰实体继续保留。为消除 `BuildGrid → TerrainModel` 的隐式加载顺序，所有正式与测试入口统一把 `terrain_model.js` 放在 `build_grid.js` 之前。
+- Spec 与 Standards 最终复审均通过，无剩余 blocker；独立复跑为 1028 单元、128 scenario、5 perf、7 boss，另有 layering 与 #200 聚焦契约 12/12，`git diff --check` 通过。最终 DOM 性能桩记录 128 格、20 居民、2000 对象，模拟 P50=2ms/P95=4ms、20 次寻路 53ms、存档 1238995 字节；仍不代表浏览器实际帧率。人工普通入口游玩继续留到 #204。

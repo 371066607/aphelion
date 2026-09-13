@@ -10,7 +10,17 @@ APH.BuildGrid = (function(){
   var DEFAULT_GRID = 48;
   var DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
 
-  function gridOf(scene){ return (scene && scene.grid) || DEFAULT_GRID; }
+  function dimensionsOf(scene){
+    if(scene&&scene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.hasObservation(scene)){
+      var terrain=APH.TerrainModel.dimensions(scene);
+      return {grid:terrain.grid,cols:terrain.cols,rows:terrain.rows,bounded:true};
+    }
+    var grid=(scene&&scene.grid)||DEFAULT_GRID;
+    return {grid:grid,cols:scene&&scene.width!=null?Math.floor(scene.width/grid):0,
+      rows:scene&&scene.height!=null?Math.floor(scene.height/grid):0,
+      bounded:!!(scene&&scene.width!=null&&scene.height!=null)};
+  }
+  function gridOf(scene){ return dimensionsOf(scene).grid; }
   function key(gx, gy){ return gx + ',' + gy; }
   function rotationOf(record){
     var r = Math.round(Number(record && record.rotation) || 0) % 4;
@@ -65,9 +75,9 @@ APH.BuildGrid = (function(){
     return { x:record.gx * g, y:record.gy * g, w:fp.w * g, h:fp.h * g };
   }
   function valid(c, scene){
-    if (!scene || scene.width == null || scene.height == null) return c.gx >= 0 && c.gy >= 0;
-    var g = gridOf(scene);
-    return c.gx >= 0 && c.gy >= 0 && c.gx < Math.floor(scene.width / g) && c.gy < Math.floor(scene.height / g);
+    var dims=dimensionsOf(scene);
+    if (!dims.bounded) return c.gx >= 0 && c.gy >= 0;
+    return c.gx >= 0 && c.gy >= 0 && c.gx < dims.cols && c.gy < dims.rows;
   }
   function perimeterCells(record, definitions, scene){
     var own = {}, candidates = {};

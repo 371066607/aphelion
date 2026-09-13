@@ -37,7 +37,7 @@ APH.TerrainModel = (function(){
     return { v:1, width:LEGACY_SIZE, height:LEGACY_SIZE, grid:GRID,
       seed:u32(n(seed, 7)), kind:kind||'home', generation:LEGACY_GENERATION };
   }
-  var observationValidity=new WeakMap();
+  var observationValidity=new WeakMap(), observationRevisions=new WeakMap(), nextObservationRevision=1;
   function validVersionedObservation(o){
     if(typeof o.v!=='number'||o.v<1||o.v!==(o.v|0)||
       o.widthCells<=0||o.widthCells!==(o.widthCells|0)||
@@ -74,6 +74,11 @@ APH.TerrainModel = (function(){
        带版本的新格式必须保留 v1 行优先基础字段，不能借 grid 绕过版本保护。 */
     observationValidity.set(o,valid);
     return valid;
+  }
+  function observationShape(o){
+    if(o&&o.widthCells>0&&o.heightCells>0) return {widthCells:o.widthCells,heightCells:o.heightCells};
+    return {widthCells:o&&o.grid&&o.grid[0]?o.grid[0].length:0,
+      heightCells:o&&o.grid?o.grid.length:0};
   }
 
   function homeObservation(seed){
@@ -138,12 +143,14 @@ APH.TerrainModel = (function(){
     return scene;
   }
   function observed(scene){
-    var d={},key,o=scene.observation,grid=n(scene.grid,GRID);
+    var d={},key,o=scene.observation,shape=observationShape(o),grid=n(scene.grid,GRID);
+    if(!(grid>0))grid=GRID;
     for(key in scene) if(scene.hasOwnProperty(key)) d[key]=scene[key];
     d.v=n(scene.v,1);
     d.grid=grid;
-    d.width=n(scene.width,o.widthCells*grid);
-    d.height=n(scene.height,o.heightCells*grid);
+    /* Observation 是已观测世界的格网事实源；外层旧尺寸只能作为未观测档案的兼容字段。 */
+    d.width=shape.widthCells*grid;
+    d.height=shape.heightCells*grid;
     d.seed=u32(n(scene.seed,7));
     d.kind=scene.kind||'planet';
     d.generation=HOME_GENERATION;
@@ -155,6 +162,19 @@ APH.TerrainModel = (function(){
     if(scene.width===LEGACY_SIZE) return legacy(scene.seed,scene.kind);
     if(scene.kind==='home' && scene.generation===HOME_GENERATION && scene.width===HOME_SIZE && scene.height===HOME_SIZE){var d=home(scene.seed);d.resourceVersion=scene.resourceVersion===2?2:1;return d;}
     return legacy(scene&&scene.seed, scene&&scene.kind);
+  }
+  function dimensions(scene){
+    var d=normalize(scene),grid=n(d.grid,GRID),width=n(d.width,LEGACY_SIZE),height=n(d.height,LEGACY_SIZE);
+    if(!(grid>0))grid=GRID;
+    return {grid:grid,width:width,height:height,cols:Math.ceil(width/grid),rows:Math.ceil(height/grid)};
+  }
+  function revision(scene){
+    var d=normalize(scene),o=d.observation,oid='procedural';
+    if(o&&typeof o==='object'){
+      if(!observationRevisions.has(o)) observationRevisions.set(o,nextObservationRevision++);
+      oid='observation-'+observationRevisions.get(o);
+    }
+    return [d.kind,d.generation,d.seed,d.width,d.height,d.grid,oid].join(':');
   }
 
   function snapshotObservation(scene){
@@ -200,21 +220,29 @@ APH.TerrainModel = (function(){
   function cellAt(scene, x, y){
     var d=normalize(scene), gx=Math.floor(n(x,-1)/d.grid), gy=Math.floor(n(y,-1)/d.grid);
     if(gx<0 || gy<0 || gx>=Math.ceil(d.width/d.grid) || gy>=Math.ceil(d.height/d.grid)){
-      return { region:'void', walkable:false, buildable:false, fertility:0, moveCost:Infinity };
+      return { tile:null,region:'void',water:false,shore:false,color:null,
+        walkable:false,buildable:false,fertility:0,moveCost:Infinity };
     }
     if(d.generation===LEGACY_GENERATION){
-      return { region:'legacy', walkable:true, buildable:true, fertility:.5, moveCost:1 };
+      return { tile:'legacy',region:'legacy',water:false,shore:false,color:null,
+        walkable:true,buildable:true,fertility:.5,moveCost:1 };
     }
     if(d.observation&&APH.Observe&&APH.Observe.cellAt){
       var observedCell=APH.Observe.cellAt(d.observation,gx,gy);
-      if(!observedCell) return {region:'void',walkable:false,buildable:false,fertility:0,moveCost:Infinity};
-      return {region:observedCell.water?'water':observedCell.region,walkable:observedCell.walkable,
-        buildable:observedCell.buildable,fertility:observedCell.fertility,moveCost:observedCell.moveCost};
+      if(!observedCell) return {tile:null,region:'void',water:false,shore:false,color:null,
+        walkable:false,buildable:false,fertility:0,moveCost:Infinity};
+      var observedSemantics=CFG.observe.tileSemantics[observedCell.tile]||{};
+      return {tile:observedCell.tile,region:observedCell.water?'water':observedCell.region,
+        water:observedCell.water,shore:observedCell.shore,color:observedSemantics.color||null,
+        walkable:observedCell.walkable,buildable:observedCell.buildable,
+        fertility:observedCell.fertility,moveCost:observedCell.moveCost};
     }
     var r=regionAtGrid(d,gx,gy);
     var water=waterCell(d,gx,gy);
-    return { region:water?'water':r.id, walkable:!water, buildable:!water,
-      fertility:water?0:r.fertility, moveCost:water?Infinity:r.moveCost };
+    var tile=water?'water':r.id,semantics=CFG.observe.tileSemantics[tile]||{};
+    return {tile:tile,region:water?'water':r.id,water:water,shore:semantics.shore===true,
+      color:semantics.color||r.color,walkable:!water,buildable:!water,
+      fertility:water?0:r.fertility,moveCost:water?Infinity:r.moveCost };
   }
   /* 原地形的普通土倍率是 1；TerrainModel 的 .5 也代表普通土。
      将它归一化后，湖岸能高产、矿丘会贫瘠，而 generation 0 不改变旧档。 */
@@ -230,8 +258,9 @@ APH.TerrainModel = (function(){
     if(d.observation) return {hab:{x:1100,y:1100,r:92},lake:{x:0,y:0,r:0}};
     return { hab:{x:1100,y:1100,r:92}, lake:{x:GRID*84,y:GRID*(58+d.seed%5),r:GRID*8} };
   }
-  function resource(uid, kind, gx, gy, amount, extra){
-    var o={uid:uid, type:'flora', kind:kind, x:(gx+.5)*GRID, y:(gy+.5)*GRID, amount:amount};
+  function resource(uid, kind, gx, gy, amount, extra, grid){
+    grid=grid||GRID;
+    var o={uid:uid, type:'flora', kind:kind, x:(gx+.5)*grid, y:(gy+.5)*grid, amount:amount};
     if(extra) Object.keys(extra).forEach(function(k){ o[k]=extra[k]; });
     return o;
   }
@@ -251,7 +280,7 @@ APH.TerrainModel = (function(){
       if(extra) Object.keys(extra).forEach(function(k){ flags[k]=extra[k]; });
       if(mineral&&gone[uid]){flags.depleted=true;flags.mineralRemains=true;}
       if(flags.depleted)flags.amount=0;
-      out.push(resource(uid,kind,gx,gy,flags.depleted?0:yieldOf(kind),flags));
+      out.push(resource(uid,kind,gx,gy,flags.depleted?0:yieldOf(kind),flags,d.grid));
       return true;
     }
     if(d.observation){
@@ -304,14 +333,13 @@ APH.TerrainModel = (function(){
   }
   function regionColor(scene, x, y, fallback){
     var c=cellAt(scene,x,y);
-    if(c.region==='water') return '#173f50';
-    for(var i=0;i<REGIONS.length;i++) if(REGIONS[i].id===c.region) return REGIONS[i].color;
-    return fallback || '#1c2419';
+    return c.color || fallback || '#1c2419';
   }
 
   return { HOME_SIZE:HOME_SIZE, LEGACY_SIZE:LEGACY_SIZE, GRID:GRID, REGIONS:REGIONS,
     home:home, newHome:newHome, homeObservation:homeObservation, snapshotObservation:snapshotObservation,
-    legacy:legacy, normalize:normalize, hasObservation:hasObservation, isHome:isHome, cellAt:cellAt,
+    legacy:legacy, normalize:normalize, dimensions:dimensions, revision:revision,
+    hasObservation:hasObservation, isHome:isHome, cellAt:cellAt,
     landmarks:landmarks, resources:resources, regionColor:regionColor,
     fertilityMultiplier:fertilityMultiplier };
 })();

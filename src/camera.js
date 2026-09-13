@@ -29,6 +29,10 @@ APH.Camera=(function(){
   function bounds(s){
     s=s||{};
     var d=s.scene==='home'&&s.colony&&s.colony.scene?s.colony.scene:s.worldDescriptor;
+    if(d&&d.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.hasObservation(d)){
+      var terrain=APH.TerrainModel.dimensions(d);
+      return {width:terrain.width,height:terrain.height};
+    }
     return {
       width:Math.max(1,finite(d&&d.width,finite(CFG.WORLD,2200))),
       height:Math.max(1,finite(d&&d.height,finite(CFG.WORLD,2200)))

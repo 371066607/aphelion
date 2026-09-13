@@ -19,7 +19,7 @@ function codeOf(file) {
 
 /* build.py 的 MODULE_ORDER (含 DOM 层); main.js 是入口, 排最后 */
 const ORDER = [
-  'config.js','utils.js','observe.js','entity_index.js','world_runtime.js','build_grid.js','terrain_model.js','scene.js','camera.js',
+  'config.js','utils.js','observe.js','entity_index.js','world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js',
   'building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js',
   'planet.js','llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js',
   'production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js',

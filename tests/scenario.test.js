@@ -103,7 +103,7 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','observe.js','entity_index.js', 'world_runtime.js','build_grid.js','terrain_model.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','observe.js','entity_index.js', 'world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
                 'colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','weather.js','nav.js','residents.js','ecology.js', 'expedition_state.js','alerts.js','combat.js',
                 'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js', 'expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
@@ -131,6 +131,108 @@ test('#199: boot 在 running 前已持久化完整家园 Observation', () => {
     '内存家园 Observation 与持久化快照不一致');
   A(raw.metaSnapshot&&raw.metaSnapshot.residents&&raw.metaSnapshot.residents.length===3,
     '首次家园快照没有带上 boot 已播种的三人名册');
+});
+
+/* ---------- #200: 正式渲染与总览图共用 TerrainModel ---------- */
+test('#200: 世界渲染、总览图和零水体覆盖层读取同一 Observation', () => {
+  const scene={v:1,kind:'home',generation:1,seed:200,grid:48,width:144,height:96,
+    observation:{v:1,widthCells:3,heightCells:2,biomeId:'biome_landing',degraded:false,
+      ground:['landing','lakeshore','water','ridge','woodland','wreckage'],resources:[]}};
+  [[24,24,'landing'],[72,24,'lakeshore'],[120,24,'water'],[24,72,'ridge']].forEach(function(sample){
+    const expected=APH.CFG.observe.tileSemantics[sample[2]].color;
+    A(APH.TerrainModel.cellAt(scene,sample[0],sample[1]).color===expected,'TerrainModel 颜色错误 '+sample[2]);
+    A(APH.World.terrainColor(scene,sample[0],sample[1],'#bad')===expected,'正式渲染颜色分歧 '+sample[2]);
+    A(APH.MapUI.terrainColor(scene,sample[0],sample[1],'#bad')===expected,'总览颜色分歧 '+sample[2]);
+  });
+  A(APH.World.legacyLake(scene,S.spec)===null,'observed 家园不得叠加固定圆湖');
+  const dry={v:1,kind:'home',generation:1,seed:201,grid:48,width:2304,height:2304,
+    observation:{v:1,widthCells:48,heightCells:48,biomeId:'biome_landing',degraded:false,
+      ground:new Array(48*48).fill('landing'),resources:[]}};
+  A(APH.World.legacyLake(dry,S.spec)===null,'零水体 Observation 不得叠加固定圆湖');
+  const legacy=APH.World.legacyLake(APH.TerrainModel.legacy(200),S.spec);
+  A(legacy&&legacy.x===APH.CFG.LAKE.x&&legacy.y===APH.CFG.LAKE.y&&legacy.r===APH.CFG.LAKE.r,
+    'generation 0 应保留固定圆湖');
+});
+
+test('#200: 矩形 Observation 的世界区块分别按宽高覆盖', () => {
+  const priorScene=S.scene,priorDescriptor=S.colony.scene;
+  const scene={v:1,kind:'home',generation:1,seed:202,grid:48,width:48,height:48,
+    observation:{v:1,widthCells:20,heightCells:50,biomeId:'biome_landing',degraded:false,
+      ground:new Array(20*50).fill('landing'),resources:[]}};
+  try{
+    S.scene='home';S.colony.scene=scene;APH.World.buildTerrain();
+    const stats=APH.World.stats();
+    A(stats.chunksX===Math.ceil(20*48/APH.CFG.CHUNK),'横向区块数没有读取 Observation 宽度');
+    A(stats.chunksY===Math.ceil(50*48/APH.CFG.CHUNK),'纵向区块数没有读取 Observation 高度');
+  }finally{
+    S.scene=priorScene;S.colony.scene=priorDescriptor;APH.World.buildTerrain();
+  }
+});
+
+test('#200: 居民娱乐移动沿 Observation 导航绕过水格', () => {
+  const prior=APH.state;
+  const scene={v:1,kind:'home',generation:1,seed:203,grid:48,width:144,height:144,
+    observation:{v:1,widthCells:3,heightCells:3,biomeId:'biome_landing',degraded:false,
+      ground:['landing','water','landing','landing','landing','landing','landing','landing','landing'],resources:[]}};
+  const campfire={id:'bl_campfire',uid:'joy_fire',x:120,y:24};
+  const e={id:'joy_resident',x:24,y:24,walking:false},r={recreation:0};
+  const grid=APH.Nav.gridOf([campfire],scene);
+  try{
+    APH.state={scene:'home',colony:{scene:scene,buildings:[campfire]},entities:[]};
+    A(typeof M.residentJoyStep==='function','居民娱乐移动没有可验证的正式入口');
+    A(M.residentJoyStep(e,r,1,48,grid)===true,'低娱乐居民没有选择娱乐设施');
+    A(e.path&&e.path.length,'居民娱乐仍退化成无导航直线移动');
+    e.path.forEach(function(point){
+      A(APH.TerrainModel.cellAt(scene,point.x,point.y).walkable,'居民娱乐路径穿过 Observation 水格');
+    });
+  }finally{APH.state=prior;}
+});
+
+test('#200: 生态更新后野生动物不再经过第二套直移游荡', () => {
+  const scene={v:1,kind:'home',generation:1,seed:205,grid:48,width:96,height:96,
+    observation:{v:1,widthCells:2,heightCells:2,biomeId:'biome_landing',degraded:false,
+      ground:['woodland','water','woodland','woodland'],resources:[]}};
+  const wild={id:'wild',type:'animal',kind:'grazer',wild:true,x:24,y:24,wanderT:1};
+  const domestic={id:'domestic',type:'animal',kind:'sheep',x:24,y:72,wanderT:1};
+  const state={scene:'home',clock:0,meta:{residents:[]},colony:{scene:scene,buildings:[]},entities:[wild,domestic]};
+  const original=APH.Res.wanderStep,calls=[];
+  try{
+    APH.Res.wanderStep=function(entity,dt,hab,radius,rng,speed,grid){calls.push({entity:entity,grid:grid});return entity;};
+    A(typeof M.ecologyStep==='function','主循环没有独立的生态编排入口');
+    M.ecologyStep(state,0);
+    A(calls.length===1&&calls[0].entity===domestic,'野生动物在 Ecology.tick 后又走了旧游荡路径');
+    A(calls[0].grid&&calls[0].grid.scene===scene,'家畜游荡没有携带 observed 导航格');
+  }finally{APH.Res.wanderStep=original;}
+});
+
+test('#200: 升级恢复旧 homeRuntime 时清除第二套 rock/crystal', () => {
+  const stateBefore={};Object.keys(S).forEach(function(key){stateBefore[key]=S[key];});
+  const storeBefore={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);storeBefore[key]=localStorage.getItem(key);}
+  try{
+    const scene=APH.TerrainModel.newHome(206);
+    const colony=JSON.parse(JSON.stringify(S.colony));
+    colony.scene=scene;colony.buildings=[];colony.buildQueue=[];colony.ground=[];colony.pendingGround=[];
+    colony.expedition={v:1,sequence:1,active:null,settled:{}};
+    colony.homeRuntime={scene:'home',entities:[
+      {id:'rk_old_runtime',type:T.ROCK,x:300,y:300},
+      {id:'cr_old_runtime',type:T.CRYSTAL,x:360,y:300},
+      {id:'obs_resource',type:T.FLORA,kind:'tree',x:420,y:300}
+    ],parts:[],spores:[],carry:{}};
+    S.scene='home';S.colony=colony;S.meta=JSON.parse(JSON.stringify(S.meta));S.meta.residents=[];
+    S.entities=[];S.parts=[];S.spores=[];delete S.worlds;
+    M.restoreWorldSession(S);
+    A(!S.entities.some(function(e){return e.type===T.ROCK||e.type===T.CRYSTAL;}),
+      '旧 runtime 的第二套 rock/crystal 被重新装回 observed 家园');
+    A(S.entities.some(function(e){return e.id==='obs_resource'&&e.type===T.FLORA;}),
+      '过滤旧覆盖物时误删 Observation flora');
+    const saved=S.colony.homeRuntime&&S.colony.homeRuntime.entities||[];
+    A(!saved.some(function(e){return e.type===T.ROCK||e.type===T.CRYSTAL;}),
+      '清理结果没有写回 homeRuntime，下一次启动会复发');
+  }finally{
+    Object.keys(S).forEach(function(key){if(!Object.prototype.hasOwnProperty.call(stateBefore,key))delete S[key];});
+    Object.keys(stateBefore).forEach(function(key){S[key]=stateBefore[key];});
+    localStorage.clear();Object.keys(storeBefore).forEach(function(key){localStorage.setItem(key,storeBefore[key]);});
+  }
 });
 
 /* ---------- #84 sprite 启动/回退契约 ---------- */

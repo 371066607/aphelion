@@ -93,9 +93,16 @@ window.APH = window.APH || {};
     checkpointWorlds(s);
     return true;
   }
+  function pruneLegacyHomeNature(s){
+    var scene=s&&s.colony&&s.colony.scene;
+    if(!scene||scene.generation!==1||!window.APH.TerrainModel||!APH.TerrainModel.hasObservation(scene))return 0;
+    var before=(s.entities||[]).length;
+    s.entities=(s.entities||[]).filter(function(e){return e&&e.type!==T.ROCK&&e.type!==T.CRYSTAL;});
+    return before-s.entities.length;
+  }
   function restoreWorldSession(s){
-    var saved=s.colony.homeRuntime;
-    if(saved){var home=APH.WorldRuntime.restore(saved,s);APH.WorldRuntime.install(s,home);s.scene='home';s._worldReady=true;}
+    var saved=s.colony.homeRuntime,prunedLegacyNature=0;
+    if(saved){var home=APH.WorldRuntime.restore(saved,s);APH.WorldRuntime.install(s,home);s.scene='home';s._worldReady=true;prunedLegacyNature=pruneLegacyHomeNature(s);}
     s.worlds={home:APH.WorldRuntime.capture(s),expedition:null};
     var restoredRun=APH.ExpeditionState.restore(s.meta,s.colony,APH.ExpeditionState.snapshot(s.colony));
     var run=restoredRun.run;
@@ -123,6 +130,7 @@ window.APH = window.APH || {};
     }
     if(APH.Logistics){var logistics=APH.Logistics.restore(s.colony,s.meta.res,s.entities);(logistics.drops||[]).forEach(function(p){APH.Combat.spawnDrop(p.x,p.y,p.itemId,p.n,{stock:true,jitter:0});});}
     flushConstructionSurplus(s);
+    if(prunedLegacyNature)APH.Colony.persist();
     if(recoveryChanged)APH.Colony.persist();
     if(recovered&&recovered.ok)APH.Colony.persist();
     if(run){
@@ -860,7 +868,7 @@ window.APH = window.APH || {};
       dest = { x: hab.x + Math.cos(ang)*rad, y: hab.y + Math.sin(ang)*rad };
     }
     dest.x = U.clamp(dest.x, 80, APH.Scene.width()-80);
-    dest.y = U.clamp(dest.y, 80, APH.Scene.width()-80);
+    dest.y = U.clamp(dest.y, 80, APH.Scene.height()-80);
     var rid = arguments[2] || (s.meta && s.meta.playerRestrictId);
     if(rid && APH.Colony.pointAllowed){
       if(!APH.Colony.pointAllowed(s.colony.zones||[], { restrictId:rid }, dest.x, dest.y)){
@@ -902,7 +910,7 @@ window.APH = window.APH || {};
     }
     return best;
   }
-  function tryResidentJoy(e, r, dt, spdMul){
+  function tryResidentJoy(e, r, dt, spdMul, navGrid){
     if(!r || r.wantSleep || r.isSleeping || r.downed) return false;
     var joyAt=(CFG.residents&&CFG.residents.recreationJoyAt!=null)?CFG.residents.recreationJoyAt:30;
     if((r.recreation!=null?r.recreation:80) >= joyAt) return false;
@@ -913,7 +921,7 @@ window.APH = window.APH || {};
       e.walking=false; e.tx=e.x; e.ty=e.y;
     } else {
       e.tx=jy.x; e.ty=jy.y+12;
-      APH.Res.walkAround(e,{x:e.tx,y:e.ty},dt,spdMul);
+      APH.Res.walkAround(e,{x:e.tx,y:e.ty},dt,spdMul,navGrid);
     }
     return true;
   }
@@ -991,6 +999,17 @@ window.APH = window.APH || {};
   }
 
   /* 模拟: 推进世界。返回提示层需要的环境量(诊所距离/天气播报等)。 */
+  function ecologyStep(s,dt){
+    var scene=s&&s.colony&&s.colony.scene;
+    var observed=!!(scene&&scene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.hasObservation(scene));
+    var grid=observed&&window.APH.Nav&&APH.Nav.gridOf?APH.Nav.gridOf(s.colony.buildings||[],scene):null;
+    var wildHandled=!!(APH.Ecology&&APH.Ecology.tick(s,dt,grid));
+    (s.entities||[]).forEach(function(e){
+      if(e&&e.type==='animal'&&!e.dead&&(!e.wild||!wildHandled)&&APH.Res.wanderStep)
+        APH.Res.wanderStep(e,dt,{x:e.x,y:e.y},70,null,null,grid);
+    });
+    return wildHandled;
+  }
   function simHome(dt, context){
     var s=context||APH.state;
     if(!s._background)updateCamera(dt);
@@ -1032,12 +1051,7 @@ window.APH = window.APH || {};
 
     /* 居民活动循环与建造推进 (委托 APH.Colony, ADR-21) */
     updateResidents(dt);
-    if(APH.Ecology)APH.Ecology.tick(s,dt);
-    (s.entities||[]).forEach(function(e){
-      if(e && e.type==='animal' && !e.dead && APH.Res.wanderStep){
-        APH.Res.wanderStep(e, dt, { x:e.x, y:e.y }, 70);
-      }
-    });
+    ecologyStep(s,dt);
     if(APH.Colony && APH.Colony.tickConstruction){APH.Colony.tickConstruction(s, dt);flushConstructionSurplus(s);}
     /* 30s 生产时钟周期 (委托 APH.Colony, ADR-21) */
     /* ADR-38: 生产跳的编排归 main.js —— colony 只报告「这一跳发生了」,
@@ -3776,6 +3790,8 @@ window.APH = window.APH || {};
     }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
     var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[],s.colony&&s.colony.scene):null;
+    var observedNavGrid=s.colony&&s.colony.scene&&s.colony.scene.generation===1&&window.APH.TerrainModel&&
+      APH.TerrainModel.hasObservation(s.colony.scene)?navGrid:null;
     /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
     var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[],s.colony&&s.colony.scene):[];
 
@@ -3888,7 +3904,7 @@ window.APH = window.APH || {};
         e.breaking=r.breakType;
         if(r.breakType==='wander'){
           var wanderSpd=((CFG.visitor&&CFG.visitor.speed)||48)*sickSpeedMul*wxMul;
-          APH.Res.wanderStep(e, dt, CFG.HAB, (CFG.visitor&&CFG.visitor.yardR)||220, null, wanderSpd);
+          APH.Res.wanderStep(e,dt,CFG.HAB,(CFG.visitor&&CFG.visitor.yardR)||220,null,wanderSpd,observedNavGrid);
         }else{
           e.walking=false;
         }
@@ -4226,7 +4242,7 @@ window.APH = window.APH || {};
             APH.Res.walkAround(e, {x:gt.x,y:gt.y}, dt, spdMul, navGrid);
           }
         }else if(intent.type==='joy'){
-          tryResidentJoy(e, r, dt, spdMul);
+          tryResidentJoy(e, r, dt, spdMul, navGrid);
         }else if(intent.type==='job'){
           if(s.colony.rulesVersion){
             var stations=(s.colony.buildings||[]).filter(function(b){return b&&!b.dead&&(b.id===(e.job||r.job)||((e.job||r.job)==='bl_kitchen'&&b.id==='bl_campfire'));});
@@ -4520,6 +4536,7 @@ window.APH = window.APH || {};
     launchRescue:launchRescue,
     syncResidents:syncResidentEntities,
     updateResidents:updateResidents,
+    residentJoyStep:tryResidentJoy,
     /* ADR-29 征召与直接命令 (场景测试/程序化验证通道) */
     cmd:{
       select:function(eOrRid){
@@ -4594,6 +4611,7 @@ window.APH = window.APH || {};
     assignRestrict:assignRestrict,
     releasePrisoner:releasePrisoner,
     updateHome:updateHome,
+    ecologyStep:ecologyStep,
     simStep:simStep,
     setTimeScale:setTimeScale,
     updateCamera:updateCamera,

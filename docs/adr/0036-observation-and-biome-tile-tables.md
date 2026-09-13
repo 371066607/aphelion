@@ -68,3 +68,14 @@ Observation 的持久化版本从 `v: 1` 开始，归属家园或某颗星球的
 迁移先在内存生成完整 Observation，再把字段挂到解析出的殖民地对象，并以一次完整 JSON 写入持久层。若 `localStorage` 拒绝写入，原持久化 JSON 保持原样，完整 v3 对象留在会话内存覆盖层；本次会话继续读同一快照，后续写入恢复时可整份落盘。这个兜底避免半张地图，但浏览器存储始终不可用时仍只能保证当前会话。
 
 Observation 按“只增字段”演进：未来 `v>=1` 只要仍含 v1 的完整行优先地面，就由旧构建读取已知字段并原样保留未知字段；若未来版本缺少旧构建可读取的基础字段，则明确拒绝且不改写，不能降级重算成 v1。新家园的特殊资源仍从 `CFG.observe.resourceSemantics` 取产物和数量；例如核心残骸使用表内 `homeCore` 变体。运行时 traits 不能覆盖 `yieldItemId`、`amount` 或修复语义。
+
+## 2026-09-14 修订：家园单一事实源（#200）
+
+已观测场景不再信任 envelope 中可能陈旧的像素尺寸；正式宽高由 Observation 的格数乘场景 grid 得出。`TerrainModel.cellAt` 是每格地表语义的唯一入口，并返回原 tile、归一 region、水/岸标记、显示颜色、通行、建设、肥力和移动代价。
+
+- `World` 的地形块和 `MapUI` 总览使用同一个 `regionColor`；generation 1 的水格已在地形块内绘制，因此不会再叠加旧固定圆湖。零水 Observation 既没有可见圆湖，也没有圆湖碰撞。
+- 相机、建筑占格与玩家候选位置都按 Observation 边界截断，玩家再以 `cellAt.walkable` 做轴分离碰撞。A* 用同一 Observation 格数建矩阵，每格的阻挡和代价分别对应 `walkable` 与 `moveCost`；越界目标直接不可达，不能钳到边缘后再追加原始坐标。
+- 正式种植区从 `fertilityMultiplier` 保存格肥力；动物只在 `cellAt` 判定的 woodland/ridge 栖息，居民的娱乐与崩溃游荡、家畜移动都消费同一份 A* 地形格。observed 场景即使全图无障碍也不能绕开 A* 边界检查；野生动物只由 Ecology 推进一步。矩形 Observation 的世界渲染分别按宽高计算区块数量。
+- generation 1 家园的自然对象只由 `TerrainModel.resources` 把 Observation `resources` 实体化；旧的 22 组随机岩石只保留给 generation 0。恢复旧 homeRuntime 时移除历史 `rock`/`crystal` 覆盖物并立即写回干净快照，Observation 对应的 `flora` 不受影响。
+
+Observation 在运行时按不可变快照使用。世界块、总览和导航缓存把 Observation 对象 revision 纳入键；生成、迁移或恢复若要换图，必须替换整个 Observation 对象，不能原地改 `ground` 或 `resources`。为保持显式依赖顺序，`TerrainModel` 先于 `BuildGrid` 加载。generation 0 不进入上述分支，继续保留 2200×2200、固定圆湖与旧实体散布；描述中即使残留 Observation 也不能改变旧边界。
