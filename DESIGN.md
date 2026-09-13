@@ -273,3 +273,7 @@ ADR-11 增补：普通入口的墙与门也改用 48px 格层连续轮廓，替�
 ### ADR-48 修订：复合观测格（2026-09-14，#198）
 
 Observation 从 `v:1` 起归属家园或单颗星球；观测格由一个 Ground Tile 与可选的 Initial Natural Resource 组成，两者同次生成并一起持久化。Ground Tile 唯一决定地表、水体、通行、移动代价、肥力与建设；树、矿、灌木是占用物，不覆盖地面。HAB 20×20 核心只钉 landing，300–500px 木石环只钉资源，因此两项开局契约可以同时成立。资源产物与资源—地面兼容关系由 `CFG.observe` 的数据表定义。观测经纯 `APH.Observe` 有限重试并允许注入现有确定性生成作为 fallback；运行系统统一经 `APH.TerrainModel` 读取，generation 0 永不套用观测，observed 场景不再补固定圆湖。
+
+### ADR-48 修订：家园只观测一次（2026-09-14，#199）
+
+殖民地存档 envelope 升至 v3，PlanetSpec 版本不变。新家园创建时生成一次完整 Observation，并在进入 running 前和 `metaSnapshot` 一起写入殖民地存档。旧 generation 1 家园由 Save 唯一迁移入口把现有确定性地面和自然资源原样快照一次；generation 0 只升 envelope，不生成 Observation。持久化失败时保留一份完整的会话内存快照，存储恢复后整份重试，不能留下半迁移地图。未来 Observation 若保留 v1 基础字段则按增量格式读取并原样保存，否则拒绝改写；核心残骸等资源变体的产物和数量统一归 `CFG.observe.resourceSemantics`。详见 `docs/adr/0036-observation-and-biome-tile-tables.md`。

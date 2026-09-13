@@ -37,12 +37,105 @@ APH.TerrainModel = (function(){
     return { v:1, width:LEGACY_SIZE, height:LEGACY_SIZE, grid:GRID,
       seed:u32(n(seed, 7)), kind:kind||'home', generation:LEGACY_GENERATION };
   }
+  var observationValidity=new WeakMap();
+  function validVersionedObservation(o){
+    if(typeof o.v!=='number'||o.v<1||o.v!==(o.v|0)||
+      o.widthCells<=0||o.widthCells!==(o.widthCells|0)||
+      o.heightCells<=0||o.heightCells!==(o.heightCells|0)||
+      typeof o.biomeId!=='string'||!o.biomeId||typeof o.degraded!=='boolean'||
+      !Array.isArray(o.ground)||o.ground.length!==o.widthCells*o.heightCells||!Array.isArray(o.resources)) return false;
+    var i,resource,seen={};
+    for(i=0;i<o.ground.length;i++) if(typeof o.ground[i]!=='string'||!o.ground[i]) return false;
+    for(i=0;i<o.resources.length;i++){
+      resource=o.resources[i];
+      if(!resource||resource.gx!==(resource.gx|0)||resource.gy!==(resource.gy|0)||
+        resource.gx<0||resource.gy<0||resource.gx>=o.widthCells||resource.gy>=o.heightCells||
+        typeof resource.kind!=='string'||!resource.kind||typeof resource.yieldItemId!=='string'||!resource.yieldItemId||
+        typeof resource.amount!=='number'||!isFinite(resource.amount)||resource.amount<0||seen[resource.gx+','+resource.gy]) return false;
+      seen[resource.gx+','+resource.gy]=true;
+    }
+    return true;
+  }
+  function validLegacyObservation(o){
+    if(o.v!==undefined||!Array.isArray(o.grid)||!o.grid.length||!Array.isArray(o.grid[0])||!o.grid[0].length) return false;
+    var width=o.grid[0].length;
+    for(var y=0;y<o.grid.length;y++){
+      if(!Array.isArray(o.grid[y])||o.grid[y].length!==width) return false;
+      for(var x=0;x<width;x++) if(typeof o.grid[y][x]!=='string'||!o.grid[y][x]) return false;
+    }
+    return true;
+  }
   function hasObservation(scene){
     var o=scene&&scene.observation;
-    if(!o) return false;
-    if(o.v===1&&o.widthCells>0&&o.heightCells>0&&Array.isArray(o.ground))
-      return o.ground.length===o.widthCells*o.heightCells;
-    return Array.isArray(o.grid)&&o.grid.length>0&&Array.isArray(o.grid[0])&&o.grid[0].length>0;
+    if(!o||typeof o!=='object') return false;
+    if(observationValidity.has(o)) return observationValidity.get(o);
+    var valid=o.v!==undefined?validVersionedObservation(o):validLegacyObservation(o);
+    /* PR #196 前身曾写入无版本二维 grid；只兼容这一种历史格式。
+       带版本的新格式必须保留 v1 行优先基础字段，不能借 grid 绕过版本保护。 */
+    observationValidity.set(o,valid);
+    return valid;
+  }
+
+  function homeObservation(seed){
+    seed=u32(n(seed,7));
+    var scene=home(seed),widthCells=Math.ceil(scene.width/scene.grid),heightCells=Math.ceil(scene.height/scene.grid);
+    var observation=APH.Observe.observe({seed:seed,biomeId:'biome_landing',widthCells:widthCells,heightCells:heightCells,home:true});
+    var profile=CFG.observe.biomes.biome_landing,rules=CFG.observe.resourceSemantics;
+    var resources=[],used={};
+    var semanticFields={gx:1,gy:1,kind:1,uid:1,yieldItemId:1,amount:1,seedItem:1,
+      exposureRisk:1,repairable:1,repairBid:1,coreWreckage:1};
+    function resolvedRule(kind,variantId){
+      var base=rules[kind],variant=variantId&&base&&base.variants&&base.variants[variantId],out={},key;
+      if(!base||(variantId&&!variant)) return null;
+      for(key in base) if(base.hasOwnProperty(key)&&key!=='variants') out[key]=base[key];
+      if(variant) for(key in variant) if(variant.hasOwnProperty(key)) out[key]=variant[key];
+      return out;
+    }
+    function add(kind,gx,gy,extra,uid,variantId){
+      var key=gx+','+gy,cell=APH.Observe.cellAt(observation,gx,gy),allowed=profile.resourceGround[kind]||[],rule=resolvedRule(kind,variantId);
+      if(used[key]||!cell||!cell.walkable||!rule||allowed.indexOf(cell.tile)===-1) return false;
+      var yieldItemId=rule.yieldItemId;
+      if(Array.isArray(rule.yieldItemIds)&&rule.yieldItemIds.length){
+        yieldItemId=rule.yieldItemIds[hash(seed,gx+(rule.yieldSalt||0),gy)%rule.yieldItemIds.length];
+      }
+      var record={gx:gx,gy:gy,kind:kind,uid:uid||('obs_'+seed+'_'+kind+'_'+gx+'_'+gy),
+        yieldItemId:yieldItemId,amount:rule.amount};
+      if(extra) Object.keys(extra).forEach(function(k){if(!semanticFields[k])record[k]=extra[k];});
+      if(rule.seedItemFromYield) record.seedItem=record.yieldItemId;
+      if(rule.exposureRisk) record.exposureRisk=true;
+      if(rule.repairable!==false&&typeof rule.repairableCutoff==='number'){
+        record.repairable=rand(seed,gx,gy)<rule.repairableCutoff;record.repairBid=rule.repairBid;
+      }
+      if(rule.coreWreckage) record.coreWreckage=true;
+      resources.push(record);used[key]=true;return true;
+    }
+    (observation.resources||[]).forEach(function(source){
+      var traits={critical:true},key;
+      for(key in source) if(source.hasOwnProperty(key)) traits[key]=source[key];
+      add(source.kind,source.gx,source.gy,traits,source.uid);
+    });
+    var critical=CFG.observe.homeCriticalResources,berry=critical.starterBerries,starterBerries=0;
+    for(var b=0;starterBerries<berry.count&&b<berry.attempts;b++){
+      if(add(berry.kind,berry.startGX+(b%berry.columns)*berry.stepX,
+        berry.startGY+Math.floor(b/berry.columns),berry.traits)) starterBerries++;
+    }
+    var core=critical.coreWreckage;
+    add(core.kind,core.gx,core.gy,null,null,core.variant);
+    var scatter=CFG.observe.homeResourceScatter||{};
+    for(var gy=0;gy<heightCells;gy++) for(var gx=0;gx<widthCells;gx++){
+      if(used[gx+','+gy]) continue;
+      var cell=APH.Observe.cellAt(observation,gx,gy),roll=rand(seed,gx,gy),kind=null,choices=scatter[cell.tile]||[];
+      for(var ci=0;ci<choices.length;ci++) if(roll<choices[ci].max){kind=choices[ci].kind;break;}
+      if(kind) add(kind,gx,gy);
+    }
+    observation.resources=resources;
+    return observation;
+  }
+
+  function newHome(seed){
+    var scene=home(seed);
+    scene.observation=homeObservation(scene.seed);
+    return scene;
   }
   function observed(scene){
     var d={},key,o=scene.observation,grid=n(scene.grid,GRID);
@@ -62,6 +155,23 @@ APH.TerrainModel = (function(){
     if(scene.width===LEGACY_SIZE) return legacy(scene.seed,scene.kind);
     if(scene.kind==='home' && scene.generation===HOME_GENERATION && scene.width===HOME_SIZE && scene.height===HOME_SIZE){var d=home(scene.seed);d.resourceVersion=scene.resourceVersion===2?2:1;return d;}
     return legacy(scene&&scene.seed, scene&&scene.kind);
+  }
+
+  function snapshotObservation(scene){
+    var d=normalize(scene);
+    if(d.generation!==HOME_GENERATION) return null;
+    if(hasObservation(d)) return d.observation;
+    var widthCells=Math.ceil(d.width/d.grid),heightCells=Math.ceil(d.height/d.grid),ground=[];
+    for(var gy=0;gy<heightCells;gy++) for(var gx=0;gx<widthCells;gx++){
+      ground.push(cellAt(d,(gx+.5)*d.grid,(gy+.5)*d.grid).region);
+    }
+    var initial=resources(d,{}).map(function(source){
+      var record={gx:Math.floor(source.x/d.grid),gy:Math.floor(source.y/d.grid)},key;
+      for(key in source) if(source.hasOwnProperty(key)&&key!=='x'&&key!=='y'&&key!=='type') record[key]=source[key];
+      return record;
+    });
+    return {v:1,widthCells:widthCells,heightCells:heightCells,biomeId:'biome_landing',degraded:false,
+      ground:ground,resources:initial};
   }
   function isHome(scene){ return normalize(scene).generation===HOME_GENERATION; }
   function regionById(id){
@@ -200,7 +310,8 @@ APH.TerrainModel = (function(){
   }
 
   return { HOME_SIZE:HOME_SIZE, LEGACY_SIZE:LEGACY_SIZE, GRID:GRID, REGIONS:REGIONS,
-    home:home, legacy:legacy, normalize:normalize, isHome:isHome, cellAt:cellAt,
+    home:home, newHome:newHome, homeObservation:homeObservation, snapshotObservation:snapshotObservation,
+    legacy:legacy, normalize:normalize, hasObservation:hasObservation, isHome:isHome, cellAt:cellAt,
     landmarks:landmarks, resources:resources, regionColor:regionColor,
     fertilityMultiplier:fertilityMultiplier };
 })();

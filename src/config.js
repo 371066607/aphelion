@@ -67,8 +67,21 @@ APH.CFG = {
       rock_iron:     {yieldItemId:'it_iron',amount:3,mineral:true},
       bush_berry:    {yieldItemId:'it_berry',amount:3},
       bush_herb:     {yieldItemId:'it_herb',amount:2},
-      bush_alien:    {yieldItemId:'specimen_dew',amount:1},
-      rock_wreckage: {yieldItemId:'it_alloy',amount:2,mineral:true},
+      bush_alien:    {yieldItemId:'specimen_dew',yieldItemIds:['specimen_dew','specimen_flora_glow','specimen_crystal_vine','specimen_star_velvet'],yieldSalt:313,amount:1,seedItemFromYield:true,exposureRisk:true},
+      rock_wreckage: {yieldItemId:'it_alloy',amount:2,mineral:true,repairableCutoff:.008,repairBid:'bl_solar_panel',variants:{
+        homeCore:{yieldItemId:'it_alloy',amount:8,mineral:true,coreWreckage:true,repairable:false}
+      }},
+    },
+    homeCriticalResources: {
+      starterBerries:{kind:'bush_berry',count:12,attempts:48,startGX:14,startGY:29,columns:8,stepX:2,traits:{critical:true,days:2,forColonists:3}},
+      coreWreckage:{kind:'rock_wreckage',gx:25,gy:24,variant:'homeCore'},
+    },
+    homeResourceScatter: {
+      woodland:[{kind:'tree',max:.135},{kind:'bush_herb',max:.18}],
+      ridge:[{kind:'rock_stone',max:.085},{kind:'rock_iron',max:.14}],
+      lakeshore:[{kind:'bush_berry',max:.055},{kind:'bush_herb',max:.08}],
+      alien:[{kind:'bush_alien',max:.055}],
+      wreckage:[{kind:'rock_wreckage',max:.105}],
     },
     biomes: {
       biome_landing: {
@@ -77,7 +90,7 @@ APH.CFG = {
           tree:['landing','woodland','lakeshore','alien','wreckage'],
           rock_stone:['landing','ridge','wreckage'],
           rock_iron:['ridge','wreckage'],
-          bush_berry:['lakeshore','alien'],
+          bush_berry:['landing','lakeshore','alien'],
           bush_herb:['woodland','lakeshore'],
           bush_alien:['alien'],
           rock_wreckage:['landing','wreckage'],
@@ -1187,7 +1200,7 @@ APH.CFG = {
     KEY_COLONY: 'aphelion_colony_v1',
     KEY_RIVAL_STATES: 'aphelion_rivals_v1',
     VERSION: 1,
-    COLONY_VERSION: 2,          // Colony envelope only; PlanetSpec stays v1 (ADR-46)
+    COLONY_VERSION: 3,          // v3 snapshots generation 1 Observation; PlanetSpec stays v1
   },
 
   /* LLM (Phase2 启用) */

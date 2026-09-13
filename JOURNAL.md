@@ -2248,3 +2248,14 @@ console:  (无)
 ### 2026-09-14 01:25 +08 · #198 最终复审修订
 
 - Standards 二审补出两个输入边界：表外 Ground pin/fallback 曾能写入 v1，资源 pin 曾能伪造 `yieldItemId`/`amount`。新增失败用例后，在 Observe 边界统一规范化：非法地面约束进入 degraded 且 fallback 输出按群系表清洗，资源产物由 `CFG.observe.resourceSemantics` 强制给定。旧条目的 22/22、1015 是二审前证据，最终聚焦为 23/23，全量为 1016 单元、122 scenario、5 perf、7 boss，重建 game.html 40924KB；最终 Spec 与 Standards 代码复审均无剩余 blocker。
+
+### 2026-09-14 02:03 +08 · #199 家园首次观测与存档迁移
+
+- 殖民地 envelope 升至 v3。新档通过 `TerrainModel.newHome` 只生成一次完整 Observation；boot 在 `intro` 阶段便把它和三人名册的 `metaSnapshot` 写进同一份殖民地 JSON，刷新只读取快照，不再掷 seed。新观测沿用约 2000 个自然对象、首夜 24 木/18 石/12 浆果和核心残骸契约，资源位置、产物与特殊语义统一来自 `CFG.observe`。
+- 旧 generation 0 只升 envelope，仍是 2200×2200、固定旧湖和 legacy 实体规则；缺 Observation 的 generation 1 由 Save 唯一入口把旧 `cellAt`/`resources` 结果快照一次。测试逐格比较 16384 个格子的 region/通行/建设/肥力/代价，比较全部资源坐标与建筑占地，并用 a083229 的 resourceVersion 1/2 SHA-256 golden 防止迁移两边同时漂移。
+- 双轴审查发现并修复三类边界：未来 Observation 曾被降级覆写；带版本二维 grid 曾绕过保护；核心残骸数量和运行时 traits 曾覆盖 CFG。现在未来版本只有具备完整 v1 基础结构才按增量格式原样保留，损坏格式拒绝且不写盘；历史无版本二维 grid 继续兼容。localStorage 写失败时，原持久化档不动，完整迁移结果保留在会话内存，写入恢复后整份落盘。
+- 验证：`python3 build.py` 成功（game.html 40933KB）；1022 单元、123 scenario、5 perf、7 boss 全绿；另抽样 1000 个新 seed，均无 degraded、资源数量越界或核心残骸语义错误。DOM 性能桩记录模拟 P50=2ms/P95=3ms、20 次寻路 60ms、存档 1238953 字节；它不代表浏览器实际帧率。最终双轴复审待确认，人工普通入口游玩留到 #204。
+
+### 2026-09-14 02:12 +08 · #199 最终复审
+
+- Spec 与 Standards 最终复审均通过，无剩余 blocker。复审额外覆盖 7 类损坏的未来 Observation、完整未来版本原样保留、校验缓存边界和构建产物同步；聚焦测试 32/32，`git diff --check` 通过。
