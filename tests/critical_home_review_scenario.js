@@ -98,7 +98,7 @@ console.log('✓ remote selected deconstruction returns fuel and salvage to grou
 // A resource mission mines a finite deposit and returns physical iron, not just research.
 s.meta.residents.forEach(r=>{r.downed=false;r.dead=false;r.food=100;r.rest=100;r.recreation=100;r.isSleeping=false;r.medLying=false;});
 const explorerId=s.meta.residents[0].id;
-const launch=APH.Main.launchExpedition({memberIds:[explorerId],supply:{food:0},objective:'resources'});
+const launch=APH.Main.launchExpedition({memberIds:[explorerId],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});
 assert(launch&&launch.ok);
 // This is a mining/return fixture; combat is covered separately.
 s.entities=s.entities.filter(e=>e.type!==T.ENEMY);s.spawnT=Infinity;

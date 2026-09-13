@@ -878,7 +878,7 @@ APH.Combat = (function(){
           var member=(s.meta.residents||[]).find(function(r){return r.id===(squadHit.rid||squadHit.id);});
           if(member&&!(squadHit.hurtCd>0)){APH.Res.hurtResident(member,p.dmg);squadHit.hurtCd=CFG.residents.raidIFrame;squadHit.hitFlash=.12;}
           p.dead=true;
-        }else if(!projectileRun&&!(s.squad&&s.squad.length) && segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
+        }else if(!projectileRun && segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
           p.dead = true;
           hurtPlayer(p.dmg, '酸液');
         }else{
@@ -1179,7 +1179,8 @@ APH.Combat = (function(){
       if(e.type !== T.DROPPED || e.dead) return;
       if(s.scene==='home'&&s.colony&&s.colony.rulesVersion)return;
       e.bobA += dt*3;
-      if(s.scene==='expedition'&&s.squad&&s.squad.length){if(!(s.entities||[]).some(function(p){return p.type===T.RESIDENT&&!p.dead&&!p.downed&&U.dst(e.x,e.y,p.x,p.y)<26;}))return;}
+      var expeditionRun=activeExpedition(s);
+      if(s.scene==='expedition'&&expeditionRun){if(!(s.entities||[]).some(function(p){return p.type===T.RESIDENT&&!p.dead&&!p.downed&&expeditionRun.memberIds.indexOf(p.rid||p.id)>=0&&U.dst(e.x,e.y,p.x,p.y)<26;}))return;}
       else if(U.dst(e.x,e.y,s.px,s.py) >= 26) return;
       var it = CFG.items[e.itemId] || { name:e.itemId, w:1 };
       if(s.scene==='home' && window.APH.Colony && APH.Colony.collectHome){

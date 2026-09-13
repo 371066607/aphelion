@@ -281,3 +281,11 @@ Observation 从 `v:1` 起归属家园或单颗星球；观测格由一个 Ground
 ### ADR-48 修订：家园消费者统一读取 Observation（2026-09-14，#200）
 
 带 Observation 的场景以 `widthCells × grid` 和 `heightCells × grid` 为正式边界；`TerrainModel.cellAt` 同时给出 tile、region、水岸标记、颜色、通行、建设、肥力与移动代价。正式世界块和地图总览只按该查询着色，矩形地图分别计算横纵区块，generation 1 不再叠画圆湖；相机、建筑占格、玩家轴分离碰撞、A* 格网、种植区肥力与生态栖息地也读取同一格语义。居民娱乐、精神崩溃游荡和家畜移动必须携带同一导航格；即使全图没有障碍或额外代价，observed 场景也不能走绕过边界校验的直线快路径，野生动物由 Ecology 单独推进一次。现代家园只实体化 Observation 的 `resources`，不再追加旧版 22 组装饰岩；恢复 #200 前保存的 homeRuntime 时删除旧 `rock`/`crystal` 覆盖物并写回，保留 Observation 的 `flora`。Observation 视为不可变快照；替换对象会产生新的地形 revision，使世界块、总览和导航缓存一起失效。`TerrainModel` 在构建顺序中先于需要其边界的 `BuildGrid`。generation 0 继续保留 2200×2200、固定圆湖、旧装饰岩和旧移动规则，即使旧描述残留 Observation 也不能改写旧边界。
+
+### ADR-48 修订：未知目的地只在出发时落盘（2026-09-14，#201）
+
+远征规划器只提交目的地意图；打开菜单不会生成星球。选择未知目的地并提交后，主入口才用完整 32 位 seed 创建带 Observation 的 PlanetSpec。新星 ID 使用固定八位十六进制，旧 `fallbackPlanet` 的短 ID 保留兼容且不重命名。`meta.atlas` 只保存星球身份和展示摘要，PlanetSpec 本体仍以 `planet_<id>` 为事实源。
+
+发现事务先准备 PlanetSpec、Atlas 和殖民地 `metaSnapshot` 的完整 JSON，再逐层写入并在普通写失败时按原始字节恢复旧值；全部成功后才更新调用方内存。失败分支也不能预先 checkpoint 家园或双世界状态。未来版本的 PlanetSpec/Atlas 明确拒绝写入，当前版本记录则保留未知增量字段。随后 `ExpeditionState.begin` 才能扣补给、迁移居民归属并建立唯一 Active Run，run 必须保存已解析的 `planetId + seed`。跨 key 的 `localStorage` 无法抵御浏览器进程在两次写之间被强制终止，此时最多留下尚未出发的孤立 PlanetSpec，不会扣补给或建立 run。
+
+远征容器的 `spec`、`worldDescriptor` 与 Active Run destination 必须指向同一颗星；创建和重载均要求 generation 1 Observation。恢复时按 destination 读取并完整校验持久 PlanetSpec，再用它覆盖 runtime 中仅作快照镜像的 spec/descriptor，确保实际安装的是持久档中的精确世界；持久档损坏、Observation/身份不符或旧式无目的地 run 会沿幂等路径安全返航。正式入口和 `?exp=1`/调试 E 键走同一保存、状态机和 WorldRuntime 流程；旧结算页直接 `buildWorld` 的第二入口已删除。地面渲染、通行、敌人落点与夜间酸性水域读取 `TerrainModel`；远征初始资源和遗迹覆盖物的单一来源留给 #203 完成。

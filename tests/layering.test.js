@@ -19,7 +19,7 @@ function codeOf(file) {
 
 /* build.py 的 MODULE_ORDER (含 DOM 层); main.js 是入口, 排最后 */
 const ORDER = [
-  'config.js','utils.js','observe.js','entity_index.js','world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js',
+  'config.js','utils.js','atlas.js','observe.js','entity_index.js','world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js',
   'building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js',
   'planet.js','llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js',
   'production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js',
@@ -90,7 +90,7 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
     'building_art.js':'BuildArt','sfx.js':'SFX','sprites.js':'Sprites',
     'building_proto_model.js':'BuildProtoModel','building_proto_draw.js':'BuildProtoDraw','building_proto.js':'BuildPrototype',
     'ui.js':'UI','hints.js':'Hints','main.js':'Main','planet.js':'Planet',
-    'llm.js':'LLM','save.js':'Save','observe.js':'Observe',
+    'llm.js':'LLM','save.js':'Save','atlas.js':'Atlas','observe.js':'Observe',
     'opening.js':'Opening','input.js':'Input','humanoid.js':'Humanoid',
     'entity_index.js':'EntityIndex','world_runtime.js':'WorldRuntime','build_grid.js':'BuildGrid',
     'terrain_model.js':'TerrainModel','scene.js':'Scene','camera.js':'Camera',

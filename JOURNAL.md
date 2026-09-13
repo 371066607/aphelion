@@ -2271,3 +2271,14 @@ console:  (无)
 
 - 二审补齐矩形 Observation、越界目的格、居民直线路径、野生动物重复移动、家畜/故障居民绕水，以及旧 `homeRuntime` 岩石/水晶污染现代家园的边界；历史 generation 0 的固定湖、世界尺寸和装饰实体继续保留。为消除 `BuildGrid → TerrainModel` 的隐式加载顺序，所有正式与测试入口统一把 `terrain_model.js` 放在 `build_grid.js` 之前。
 - Spec 与 Standards 最终复审均通过，无剩余 blocker；独立复跑为 1028 单元、128 scenario、5 perf、7 boss，另有 layering 与 #200 聚焦契约 12/12，`git diff --check` 通过。最终 DOM 性能桩记录 128 格、20 居民、2000 对象，模拟 P50=2ms/P95=4ms、20 次寻路 53ms、存档 1238995 字节；仍不代表浏览器实际帧率。人工普通入口游玩继续留到 #204。
+
+### 2026-09-14 03:31 +08 · #201 未知目的地远征闭环
+
+- 新增 `APH.Atlas` 与完整 32 位新星 ID。远征规划器打开时只读状态，提交未知目的地后才生成带着陆安全区的 Observation；PlanetSpec、Atlas 和殖民地 metaSnapshot 全部写成后，`ExpeditionState.begin` 才扣补给、迁移所选居民并建立唯一 Active Run。正式入口、`?exp=1` 与调试 E 键共用同一链路，旧 `s.squad`/generation 0 第二创建路径已移除。
+- 发现保存对三个 key 先序列化后写入，任一可捕获失败都按原始字节回滚，第三步 colony 写失败也会撤回 planet/meta；失败前不 checkpoint 家园。未来 PlanetSpec/Atlas 拒绝降级，当前条目保留未知字段。恢复按 run destination 读取并完整校验持久 PlanetSpec，以它覆盖 runtime 镜像；身份、Observation 或持久结构损坏时沿幂等返航回收队员和已有货物。
+- 验证：`python3 build.py` 成功（game.html 40952KB）；1037 单元、134 scenario、5 perf、7 boss 全绿，`git diff --check` 通过。DOM 性能桩为 P50=1ms/P95=3ms、20 次寻路45ms、存档1239019字节，不代表浏览器真实帧率。Headless Chrome 实际走过鼠标编组和纯键盘 E→目的地 select→出发，单人移动66.4px、刷新保留2件货物、重复返航不重复结算，运行错误0。该浏览器链路含显式移动/货物夹具，不是新档长期人工游玩；下一步 #202 接通 Atlas 已知星球重访、恢复和重选。
+
+### 2026-09-14 03:37 +08 · #201 最终复审补齐损坏档边界
+
+- Spec 终审复现持久 PlanetSpec 的 `beacons:[null]` 会让旧校验器自身抛异常，`laws:[null]` 也会漏过后在图鉴崩溃。现在 PlanetSpec 对信标、法则、敌对殖民地、敌人、地形和调色板做非抛异常的深层运行结构校验；恢复入口另有异常兜底。runtime 镜像残缺仍由完整持久档覆盖，持久档自身损坏则启动不崩并幂等返航。
+- 最终重建 game.html 40953KB；1038 单元、135 scenario、5 perf、7 boss 全绿。最终 DOM 性能桩 P50=2ms/P95=3ms、20 次寻路44ms、存档1239088字节。重建后的 Headless Chrome 鼠标/纯键盘链路再次通过：移动66.4px、刷新保留2件货物、重复返航不重放、运行错误0。等待冻结树双轴最终 PASS 后提交 #201。

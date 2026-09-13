@@ -103,7 +103,7 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','observe.js','entity_index.js', 'world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
+for(const f of ['config.js','utils.js','atlas.js','observe.js','entity_index.js', 'world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
                 'colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','weather.js','nav.js','residents.js','ecology.js', 'expedition_state.js','alerts.js','combat.js',
                 'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js', 'expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
@@ -2533,7 +2533,7 @@ test('#163 right_click: 全局右键交互（出航、开箱、破译、送医�
   A(!!pad, '家园应有发射台');
   M.cmd.rightClick(pad.x, pad.y);
   A(S.scene === 'home', '右键点击发射台应打开编组面板而非直接出发');
-  const launch=APH.UI.cmd('beginExpedition',{memberIds:['rs_cmd1'],supply:{food:0},objective:'resources'});
+  const launch=APH.UI.cmd('beginExpedition',{memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});
   if(APH.ExpeditionUI) APH.ExpeditionUI.close();
   A(launch&&launch.ok&&S.scene === 'expedition', '编组确认后才应出发远征');
 
@@ -2582,6 +2582,131 @@ test('#163 right_click: 全局右键交互（出航、开箱、破译、送医�
 });
 
 
+test('#201 unknown destination: 先保存 PlanetSpec/Atlas，再扣补给并安装同一 observed runtime', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;S.meta.res.food=3;
+  cmdHomeSetup();S.meta.res.food=3;
+  const phases=[],saveDiscovery=APH.Save.savePlanetDiscovery,begin=APH.ExpeditionState.begin;
+  try{
+    APH.Save.savePlanetDiscovery=function(meta,spec,at){
+      phases.push({kind:'save',scene:S.scene,food:S.meta.res.food,planetId:spec.id});
+      return saveDiscovery.call(APH.Save,meta,spec,at);
+    };
+    APH.ExpeditionState.begin=function(meta,colony,ids,supply,objective,destination,context){
+      phases.push({kind:'begin',scene:S.scene,food:S.meta.res.food,planet:!!APH.Save.loadPlanet(destination.planetId),atlas:!!APH.Atlas.find(meta,destination.planetId)});
+      return begin.call(APH.ExpeditionState,meta,colony,ids,supply,objective,destination,context);
+    };
+    const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:1},objective:'resources',destination:{kind:'unknown',seed:0x20101}});
+    A(launch&&launch.ok,'未知目的地应成功进入远征: '+JSON.stringify(launch));
+  }finally{APH.Save.savePlanetDiscovery=saveDiscovery;APH.ExpeditionState.begin=begin;}
+  A(phases.length===2&&phases[0].kind==='save'&&phases[1].kind==='begin','保存必须先于 ExpeditionState.begin: '+JSON.stringify(phases));
+  A(phases[0].scene==='home'&&phases[1].scene==='home'&&phases[0].food===3&&phases[1].food===3,
+    '保存与 begin 调用前都应仍在家园且补给未扣: '+JSON.stringify(phases));
+  A(phases[1].planet&&phases[1].atlas,'begin 前 PlanetSpec 与 Atlas 必须均可重载');
+  const run=APH.ExpeditionState.active(S.colony),stored=APH.Save.loadPlanet(run.destination.planetId),stats=APH.World.stats();
+  A(run&&run.destination.seed===0x20101&&run.destination.planetId===S.spec.id,'Active Run 与当前 PlanetSpec 身份不一致');
+  A(!Object.prototype.hasOwnProperty.call(S,'squad'),'队员身份必须只由 Active Run 持有');
+  A(stored&&JSON.stringify(stored.observation)===JSON.stringify(S.spec.observation),'运行世界没有使用已保存 Observation');
+  A(S.worldDescriptor.generation===1&&APH.TerrainModel.hasObservation(S.worldDescriptor),'远征 WorldRuntime 不是 observed descriptor');
+  A(stats.descriptor&&stats.descriptor.kind==='expedition'&&APH.World.legacyLake(stats.descriptor,S.spec)===null,
+    '正式远征地面不得落回旧随机背景或固定圆湖');
+  M.checkpointWorlds(S);
+  A(run.runtime&&run.runtime.spec&&run.runtime.spec.id===run.destination.planetId,'checkpoint 未把同一星球写入远征 runtime');
+  const restored=M.restoreWorldSession(S);
+  A(restored.run&&restored.run.destination.planetId===stored.id&&S.scene==='expedition'&&S.spec.id===stored.id,
+    '恢复后没有安装该 PlanetSpec 对应的独立远征容器');
+  const returned=M.returnHome();A(returned&&returned.ok&&S.scene==='home','#201 场景清理返航失败');
+});
+
+test('#201 unknown destination: 星球持久化失败时留在家园且补给零变化', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();S.meta.res.food=4;
+  S.colony.homeRuntime={sentinel:'before'};S.colony.ground=[{sentinel:'before'}];S.colony.activeWorld='sentinel';
+  S.worlds={home:APH.WorldRuntime.capture(S),expedition:null};
+  const before=JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene});
+  const saveDiscovery=APH.Save.savePlanetDiscovery;
+  try{
+    APH.Save.savePlanetDiscovery=function(){return {ok:false,why:'persistence-failed'};};
+    const out=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:2},objective:'resources',destination:{kind:'unknown',seed:0x20102}});
+    A(out&&!out.ok&&out.why==='persistence-failed','持久化失败应明确返回且停止');
+  }finally{APH.Save.savePlanetDiscovery=saveDiscovery;}
+  A(S.scene==='home'&&!APH.ExpeditionState.active(S.colony),'失败后不得切世界或残留 Active Run');
+  A(JSON.stringify({meta:S.meta,colony:S.colony,worlds:S.worlds,scene:S.scene})===before,
+    '失败后 meta、殖民地快照或双世界管理状态发生了变化');
+});
+
+test('#201 debug expedition: 明确固定目的地也经过同一保存与 Active Run 流程', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();
+  M.debugPressE();
+  const run=APH.ExpeditionState.active(S.colony),expected=APH.CFG.expedition.debugDestinationSeed>>>0;
+  A(S.scene==='expedition'&&run&&run.destination.seed===expected,'调试入口没有使用明确固定目的地');
+  A(APH.Save.loadPlanet(run.destination.planetId)&&APH.Atlas.find(S.meta,run.destination.planetId),
+    '调试入口绕过了正式 PlanetSpec/Atlas 保存流程');
+  A(M.returnHome().ok,'调试远征清理返航失败');
+});
+
+test('#201 restore: 伪装成 generation 0 的 runtime 不得绕过 observed 绑定', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20103}});
+  A(launch&&launch.ok,'反例夹具应先建立合法 observed 远征');
+  M.checkpointWorlds(S);
+  const run=APH.ExpeditionState.active(S.colony),descriptor=run.runtime.worldDescriptor;
+  descriptor.kind='home';descriptor.generation=0;
+  const restored=M.restoreWorldSession(S);
+  A(restored.recovered&&restored.recovered.ok&&S.scene==='home'&&!APH.ExpeditionState.active(S.colony),
+    'generation 0/home descriptor 即使保留 seed/Observation 也必须安全返航');
+});
+
+test('#201 restore: runtime 的 PlanetSpec 镜像残缺时以完整持久档恢复', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20104}});
+  A(launch&&launch.ok,'残缺 spec 反例应先建立合法 observed 远征');
+  M.checkpointWorlds(S);
+  const run=APH.ExpeditionState.active(S.colony),stored=APH.Save.loadPlanet(run.destination.planetId),runtime=run.runtime;
+  runtime.spec={id:runtime.spec.id,seed:runtime.spec.seed,observation:runtime.spec.observation};
+  const restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&APH.ExpeditionState.active(S.colony),
+    'runtime 镜像残缺时应使用持久 PlanetSpec 恢复进行中的远征');
+  A(JSON.stringify(S.spec)===JSON.stringify(stored)&&S.spec.enemies&&S.spec.terrain,
+    '恢复后必须安装完整且精确的持久 PlanetSpec');
+  A(M.returnHome().ok,'持久档恢复用例清理返航失败');
+});
+
+test('#201 restore: 持久 PlanetSpec 自身残缺时安全返航', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20105}});
+  A(launch&&launch.ok,'损坏持久档反例应先建立合法 observed 远征');
+  M.checkpointWorlds(S);
+  const run=APH.ExpeditionState.active(S.colony),stored=APH.Save.loadPlanet(run.destination.planetId);
+  delete stored.enemies;APH.Save.savePlanet(stored.id,stored);
+  const restored=M.restoreWorldSession(S);
+  A(restored.recovered&&restored.recovered.ok&&S.scene==='home'&&!APH.ExpeditionState.active(S.colony),
+    '缺少运行必需字段的持久 PlanetSpec 不得安装');
+});
+
+test('#201 restore: 持久 PlanetSpec 深层数组损坏时启动不崩并安全返航', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';cmdHomeSetup();
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20106}});
+  A(launch&&launch.ok,'深层损坏反例应先建立合法 observed 远征');
+  M.checkpointWorlds(S);
+  const run=APH.ExpeditionState.active(S.colony),stored=APH.Save.loadPlanet(run.destination.planetId);
+  stored.beacons=[null,null,null,null];stored.laws=[null];APH.Save.savePlanet(stored.id,stored);
+  let restored;
+  try{restored=M.restoreWorldSession(S);}catch(e){throw new Error('损坏持久 PlanetSpec 不得让启动抛异常: '+e.message);}
+  A(restored.recovered&&restored.recovered.ok&&S.scene==='home'&&!APH.ExpeditionState.active(S.colony),
+    '深层数组损坏的持久 PlanetSpec 应安全返航');
+});
+
+
 test('双世界: 单人出征，两个世界各结算一次并可切换、暂停和幂等返航', () => {
   APH.Save.wipeAll();
   S.meta=APH.Save.loadMeta(); S.colony=APH.Save.loadColony();
@@ -2597,7 +2722,7 @@ test('双世界: 单人出征，两个世界各结算一次并可切换、暂停
   const farmer=S.entities.find(e=>e.rid==='rs_cmd2');
   const farmSpot=APH.Construction.spot(S,farm,farmer);
   if(farmSpot){farmer.x=farmSpot.x; farmer.y=farmSpot.y;}
-  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources'});
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});
   A(launch&&launch.ok,'应只派指定一人出征');
   const run=APH.ExpeditionState.active(S.colony);
   A(run.memberIds.length===1&&run.memberIds[0]==='rs_cmd1','run 只能包含一名队员');
@@ -3176,7 +3301,7 @@ test('season boundary and rooting-condition recovery fixture',()=>{
   A(S.meta.rooting.seconds===0,'坏天气/断电导致冷库失效时连续扎根必须中断，可修复而非锁死');
   cooler.powered=true;rooms[0].temp=-2;
 
-  const launched=M.launchExpedition({memberIds:['rs_root3'],supply:{food:0},objective:'resources'});
+  const launched=M.launchExpedition({memberIds:['rs_root3'],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});
   A(launched&&launched.ok,'第三名居民应能实际出征: '+JSON.stringify(launched));
   M.simStep(30);const returned=M.returnHome();
   A(returned&&returned.ok&&!APH.ExpeditionState.active(S.colony),'远征返航应自动回流家园名册');

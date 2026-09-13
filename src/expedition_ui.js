@@ -62,8 +62,9 @@ APH.ExpeditionUI = (function(){
     if(!s || !modal) return {ok:false,why:'远征面板未打开'};
     var food=Math.max(0,Math.floor(Number(modal._food&&modal._food.value)||0));
     var objective=modal._objective&&modal._objective.value;
+    var destination=modal._destination&&modal._destination.value;
     var result=ui()&&ui().cmd ? ui().cmd('beginExpedition',{memberIds:selectedIds(),supply:{food:food},objective:objective,
-      context:{entities:s.entities||[]}}) : null;
+      destination:{kind:destination},context:{entities:s.entities||[]}}) : null;
     if(result&&result.ok){ close(); return result; }
     var why=(result&&result.why)||'暂时无法出发';
     if(modal._error) modal._error.textContent=why;
@@ -92,6 +93,10 @@ APH.ExpeditionUI = (function(){
     var food=el('input'); food.id='expeditionSupplyFood'; food.type='number'; food.min='0'; food.step='1'; food.value='0'; food.setAttribute('aria-label','携带粮食');
     food.max=String(foodAvailable);
     supply.appendChild(food); card.appendChild(supply); modal._food=food;
+    card.appendChild(el('h3','目的地'));
+    var destination=el('select'); destination.id='expeditionDestination'; destination.setAttribute('aria-label','远征目的地');
+    var unknown=el('option','未知星球 · 首次着陆时观测');unknown.value='unknown';destination.appendChild(unknown);
+    card.appendChild(destination);modal._destination=destination;
     card.appendChild(el('h3','任务目标'));
     var objective=el('select'); objective.id='expeditionObjective'; objective.setAttribute('aria-label','远征任务目标');
     var objectives=cfgObjectives();
@@ -163,7 +168,7 @@ APH.ExpeditionUI = (function(){
     document.addEventListener('keydown',function(ev){
       if(!activeState) return;
       if(ev.key==='Escape'){ if(ev.preventDefault) ev.preventDefault(); close(); }
-      else if(ev.key==='Enter' && ev.target!==modal._objective){ if(ev.preventDefault) ev.preventDefault(); submit(activeState); }
+      else if(ev.key==='Enter' && ev.target!==modal._objective&&ev.target!==modal._destination){ if(ev.preventDefault) ev.preventDefault(); submit(activeState); }
       /* Tab 使用浏览器原生焦点顺序；所有控件均为原生可聚焦元素。 */
     });
   }

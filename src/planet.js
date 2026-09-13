@@ -124,14 +124,16 @@ APH.Planet = (function(){
 
   /* ---------- 生成 PlanetSpec ----------
      确定性: 同 seed 永远同一颗星球 (ADR-5) */
-  function fallbackPlanet(seed){
+  function fallbackPlanet(seed, options){
+    seed=seed>>>0;options=options||{};
     var rng = U.makeRng(seed);
     function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
     function rr(a,b){ return a+rng()*(b-a); }
 
     var b = biomeOf(seed);
     var pal = b.palette || pick(PALETTES);
-    var id = 'P' + (seed % 4096).toString(16).toUpperCase();
+    /* 旧调用保留低 12 位 ID，不能重命名已落盘星球；新发现显式传完整 ID。 */
+    var id = options.id || ('P' + (seed % 4096).toString(16).toUpperCase());
 
     /* 信标: 6 座, 撒在世界内并避开湖/基地 */
     var beacons = [];
@@ -226,6 +228,38 @@ APH.Planet = (function(){
     };
   }
 
+  function idForSeed(seed){
+    var hex=(seed>>>0).toString(16).toUpperCase();
+    return 'P'+('00000000'+hex).slice(-8);
+  }
+
+  function landingGroundPins(biomeId,widthCells,heightCells){
+    var observe=CFG.observe||{},profile=observe.biomes&&observe.biomes[biomeId];
+    if(!profile||!Array.isArray(profile.tiles)||!profile.tiles.length)return [];
+    var semantics=observe.tileSemantics||{},tile=profile.dryTile||null;
+    if(!tile)for(var i=0;i<profile.tiles.length;i++){
+      var candidate=profile.tiles[i].id,meaning=semantics[candidate]||{};
+      if(!meaning.water&&!meaning.shore){tile=candidate;break;}
+    }
+    if(!tile)return [];
+    var grid=CFG.GRID,cx=Math.floor(CFG.HAB.x/grid),cy=Math.floor(CFG.HAB.y/grid);
+    var radius=Math.max(0,Math.floor(Number(CFG.expedition.landingSafeRadiusCells)||0)),pins=[];
+    for(var gy=cy-radius;gy<=cy+radius;gy++)for(var gx=cx-radius;gx<=cx+radius;gx++){
+      if(gx>=0&&gy>=0&&gx<widthCells&&gy<heightCells)pins.push({gx:gx,gy:gy,tile:tile});
+    }
+    return pins;
+  }
+
+  function newObservedPlanet(seed){
+    seed=seed>>>0;
+    var spec=fallbackPlanet(seed,{id:idForSeed(seed)}),grid=CFG.GRID;
+    var widthCells=Math.ceil(CFG.WORLD/grid),heightCells=Math.ceil(CFG.WORLD/grid);
+    spec.observation=APH.Observe.observe({seed:seed,biomeId:spec.biome.id,
+      widthCells:widthCells,heightCells:heightCells,
+      groundPins:landingGroundPins(spec.biome.id,widthCells,heightCells)});
+    return spec;
+  }
+
   /* ---------- Schema 校验 (Phase2 LLM 路径用) ----------
      返回 { ok:true, spec } 或 { ok:false, errors:[...] } */
   /* ---------- 难度分级 (T2, 纯函数) ----------
@@ -242,16 +276,50 @@ APH.Planet = (function(){
   function validate(spec){
     var errors = [];
     if(!spec || typeof spec !== 'object') return { ok:false, errors:['not an object'] };
-    if(!spec.id) errors.push('missing id');
+    function finite(v){return typeof v==='number'&&isFinite(v);}
+    if(spec.v!==1) errors.push('v must be 1');
+    if(typeof spec.id!=='string'||!spec.id) errors.push('missing id');
+    if(!finite(spec.seed)||spec.seed!==(spec.seed>>>0)) errors.push('invalid seed');
+    if(typeof spec.name!=='string'||!spec.name) errors.push('missing name');
+    if(!spec.biome||typeof spec.biome.id!=='string'||!spec.biome.id) errors.push('missing biome');
     if(!Array.isArray(spec.beacons) || spec.beacons.length < 4)
       errors.push('beacons must be array of >=4');
     else spec.beacons.forEach(function(b,i){
-      if(typeof b.x !== 'number' || typeof b.y !== 'number') errors.push('beacon['+i+'] pos');
-      if(!b.name) errors.push('beacon['+i+'] name');
+      if(!b||typeof b!=='object')errors.push('beacon['+i+'] invalid');
+      else{
+        if(!finite(b.x)||!finite(b.y)) errors.push('beacon['+i+'] pos');
+        if(typeof b.id!=='string'||!b.id||typeof b.name!=='string'||!b.name) errors.push('beacon['+i+'] identity');
+      }
     });
     if(!Array.isArray(spec.laws)) errors.push('laws must be array');
+    else spec.laws.forEach(function(l,i){
+      if(!l||typeof l!=='object'||typeof l.id!=='string'||!l.id||typeof l.name!=='string'||!l.name||
+        typeof l.fact!=='string')errors.push('law['+i+'] invalid');
+    });
     if(!Array.isArray(spec.rivals)) errors.push('rivals must be array');
-    if(!spec.palette) errors.push('missing palette');
+    else spec.rivals.forEach(function(r,i){
+      if(!r||typeof r!=='object'||typeof r.id!=='string'||!r.id||typeof r.name!=='string'||!r.name||
+        !r.base||!finite(r.base.x)||!finite(r.base.y))errors.push('rival['+i+'] invalid');
+    });
+    if(!spec.palette||typeof spec.palette!=='object'||
+      ['ground1','ground2','accent','water','spore'].some(function(k){return typeof spec.palette[k]!=='string'||!spec.palette[k];}))
+      errors.push('invalid palette');
+    if(!spec.terrain||typeof spec.terrain!=='object'||!finite(spec.terrain.lakeR)||!finite(spec.terrain.rockDensity)||!finite(spec.terrain.crystalDensity))
+      errors.push('invalid terrain');
+    if(!spec.enemies||typeof spec.enemies!=='object'||!Array.isArray(spec.enemies.factions)||!spec.enemies.factions.length||
+      !spec.enemies.weights||typeof spec.enemies.weights!=='object') errors.push('invalid enemies');
+    else spec.enemies.factions.forEach(function(f,i){
+      var gene=f&&f.gene;
+      if(!f||typeof f.id!=='string'||!f.id||typeof f.name!=='string'||!f.name||typeof f.behavior!=='string'||!f.behavior||!gene||
+        ['hue','sides','limbs','size','spikes','eyes'].some(function(k){return !finite(gene[k]);})||
+        !finite(f.hp)||f.hp<=0||!finite(f.speed)||f.speed<=0||!finite(f.dmg)||f.dmg<=0)
+        errors.push('enemy['+i+'] invalid');
+    });
+    if(spec.observation){
+      var descriptor={v:1,kind:'expedition',generation:1,seed:spec.seed,grid:CFG.GRID,observation:spec.observation};
+      if(!APH.TerrainModel||!APH.TerrainModel.hasObservation(descriptor)) errors.push('invalid observation');
+      if(!spec.biome||spec.observation.biomeId!==spec.biome.id) errors.push('observation biome mismatch');
+    }
     return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
   }
 
@@ -439,7 +507,8 @@ APH.Planet = (function(){
     };
   }
 
-  return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
+  return { fallbackPlanet:fallbackPlanet, newObservedPlanet:newObservedPlanet,idForSeed:idForSeed,
+           validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
            generateExpeditionFlora:generateExpeditionFlora, expeditionDeposits:expeditionDeposits,
            generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,

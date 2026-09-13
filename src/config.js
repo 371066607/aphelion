@@ -754,6 +754,8 @@ APH.CFG = {
      (docs/colony-first-redesign.md T4) */
   expedition: {
     checkpointSeconds:5, supplyFoodGain:25, oxygenWarning:25,
+    landingSafeRadiusCells:2,
+    debugDestinationSeed:0xA201,
     resourceDeposits:[{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_stone',itemId:'it_stone',amount:6,hp:20}],
     depositRadius:330,depositSpacing:72,
     objectives:{

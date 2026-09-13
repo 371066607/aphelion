@@ -1959,7 +1959,8 @@ APH.UI = (function(){
   function colonistBarHtml(residents, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var m = s.meta || {};
-    var list = residents || (m.residents || []).filter(function(r){return s.scene==='expedition'?(s.squad||[]).indexOf(r.id)>=0:(!r.worldId||r.worldId==='home');});
+    var active=s.scene==='expedition'&&window.APH.ExpeditionState&&APH.ExpeditionState.active?APH.ExpeditionState.active(s.colony):null;
+    var list = residents || (m.residents || []).filter(function(r){return s.scene==='expedition'?!!(active&&active.memberIds.indexOf(r.id)>=0):(!r.worldId||r.worldId==='home');});
     var curSel = s.selectedTarget || { type: 'player' };
     var curRid = s.selectedRid;
     var h = '';
