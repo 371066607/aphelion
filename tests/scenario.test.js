@@ -51,7 +51,7 @@ let frameFn=null;
 /* ---------- 加载模块(顺序同 build.py) ---------- */
 const SRC = path.join(__dirname,'..','src');
 for(const f of ['config.js','utils.js','humanoid.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','residents.js','combat.js',
+                'colony.js','rivals.js','events.js','weather.js','residents.js','combat.js',
                 'world.js','entities.js','sfx.js','sprites.js','ui.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
@@ -1800,6 +1800,45 @@ test('#69 home: residentsTick 击倒判定与送医接线 (checkDowned/rescueTic
     S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
     S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
     S.meta.res=oldRes; S.meta.workPrio=oldPrio;
+  }
+});
+
+/* ---------- W3 天气效果接线冒烟 (#88) ---------- */
+test('W3 冒烟: 雷暴室外居民暴露+10, HUD 天气行显示雷暴, 寒潮防寒服免减速', () => {
+  const oldScene=S.scene, oldResidents=S.meta.residents, oldEntities=S.entities,
+        oldBuildings=S.colony.buildings, oldQueue=S.colony.buildQueue, oldWar=S.war,
+        oldRes=S.meta.res, oldPrio=S.meta.workPrio, oldWx=S.meta.weather;
+  try{
+    S.scene='home'; S.war={ raidActive:false };
+    S.colony.buildings=[]; S.colony.buildQueue=[]; S.entities=[];
+    S.meta.res={ food:10, mineral:0, med:0 };
+    S.meta.workPrio={};
+    S.meta.weather={ id:'wx_thunder', t:0, cd:null };
+    S.meta.residents=[{ id:'rs_wxp', name:'暴露测试员', job:'bl_farm', skills:{sk_farm:5},
+      mood:80, food:80, illness:0, rest:80, recreation:80, exposure:0,
+      ailments:[], downed:false, isSleeping:false, bedId:null,
+      gear:{tool:null,suit:null,head:null} }];
+    M.syncResidents();
+    const e=S.entities.find(x=>x.type===T.RESIDENT && (x.rid||x.id)==='rs_wxp');
+    A(!!e, '应创建居民实体');
+    e.x=600; e.y=600;                        /* 开阔荒野: 室外(核心/建筑外) */
+    /* 接线判定: 极端=exposureGain>0 → 喂入 exposureTick */
+    M.residentsTick();
+    const r=S.meta.residents[0];
+    A(r.exposure===10, '雷暴室外 1 生产跳暴露应 +10, got '+r.exposure);
+    /* HUD 天气行: updHUD 读 meta.weather → 图标+雷暴+预计时长 */
+    APH.UI.updHUD();
+    const rowWx=document.getElementById('rowWeather');
+    A(rowWx && rowWx.textContent && rowWx.textContent.indexOf('雷暴')>=0,
+      'HUD 应显示雷暴+时长, got: '+(rowWx&&rowWx.textContent));
+    /* 装备减免: 寒潮+防寒服免减速 (纯函数侧) */
+    A(APH.Res.weatherMoveMul({gear:{suit:'it_suit_cryo'}},'wx_cold',0.85,false)===1,
+      '寒潮+防寒服应免减速');
+    A(APH.Res.weatherMoveMul({gear:null},'wx_rain',0.7,false)===0.7, '雨室外应 0.7');
+  }finally{
+    S.scene=oldScene; S.meta.residents=oldResidents; S.entities=oldEntities;
+    S.colony.buildings=oldBuildings; S.colony.buildQueue=oldQueue; S.war=oldWar;
+    S.meta.res=oldRes; S.meta.workPrio=oldPrio; S.meta.weather=oldWx;
   }
 });
 

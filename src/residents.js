@@ -114,6 +114,8 @@ APH.Res = (function(){
     /* #72 家园击倒: 默认不击倒; downT 倒计时空(老档保护, 不秒死) */
     if(meta.playerNeeds.downed == null) meta.playerNeeds.downed = false;
     if(meta.playerNeeds.downT == null) meta.playerNeeds.downT = null;
+    /* W3 天气装备: 玩家 gear 挂载点(与居民同结构; 寒潮防寒服/酸雨防酸服减免读取处) */
+    if(meta.playerNeeds.gear == null) meta.playerNeeds.gear = { tool:null, suit:null, head:null };
     return meta;
   }
 
@@ -1125,6 +1127,22 @@ APH.Res = (function(){
     });
   }
 
+  /* W3 装备减免(纯函数): 当前所穿防具 suit 的指定抗性 (acidResist/cryoResist), 无装=0 */
+  function suitResistOf(r, key){
+    var g = r && r.gear;
+    var suit = (g && g.suit) ? ((CFG.items && CFG.items[g.suit]) || null) : null;
+    return (suit && suit[key] != null) ? suit[key] : 0;
+  }
+  /* 酸雨类天气判定: 家园 wx_acid + 远征遗留 lw_night_acid/toxic 兼容 */
+  function isAcidWx(t){ return t==='wx_acid' || t==='lw_night_acid' || t==='toxic'; }
+  /* W3 天气移动乘子(纯函数): 室外 ×speedMul(雨0.7/雪0.8/暴雪0.6/寒潮0.85/酸雨0.85);
+     室内避难所免罚; 寒潮+防寒服(it_suit_cryo)=免减速。 */
+  function weatherMoveMul(r, weatherType, speedMul, sheltered){
+    var mul = (speedMul != null) ? speedMul : 1;
+    if(weatherType === 'wx_cold' && suitResistOf(r, 'cryoResist') > 0) return 1;
+    return sheltered ? 1 : mul;
+  }
+
   /* 气候暴露与急性伤病转化(纯函数): 极端天气室外累积、避难所消退、>80 转化伤病 (Survival #19) */
   function exposureTick(r, sheltered, hasExtremeWeather, weatherType){
     if(!r) return r;
@@ -1134,6 +1152,11 @@ APH.Res = (function(){
     r.exposure = r.exposure!=null ? r.exposure : 0;
 
     if(hasExtremeWeather && !sheltered){
+      /* W3 装备减免: 酸雨+防酸服(it_suit_hazard) → 暴露增 ×(1-acidResist) */
+      if(isAcidWx(weatherType)){
+        var resist = suitResistOf(r, 'acidResist');
+        if(resist > 0) gain = Math.round(gain * (1 - resist) * 100) / 100;
+      }
       r.exposure = Math.min(100, r.exposure + gain);
     }else{
       r.exposure = Math.max(0, r.exposure - cool);
@@ -1148,7 +1171,7 @@ APH.Res = (function(){
     var acuteAt = C.exposureAcuteAt!=null ? C.exposureAcuteAt : 80;
     var acuteSev = C.exposureAcuteSev!=null ? C.exposureAcuteSev : 12;
     if(r.exposure >= acuteAt){
-      var type = (weatherType==='lw_night_acid' || weatherType==='toxic') ? 'infection' : 'wound';
+      var type = isAcidWx(weatherType) ? 'infection' : 'wound';
       addAilment(r, type, acuteSev);
       r.exposure = 40;
     }
@@ -1231,6 +1254,7 @@ APH.Res = (function(){
     needsMedBed:needsMedBed, clinicBedSpot:clinicBedSpot,
     enjoyRecreation:enjoyRecreation, checkDowned:checkDowned, rescueTick:rescueTick,
     isSheltered:isSheltered, exposureTick:exposureTick, campfireAuraTick:campfireAuraTick,
+    suitResistOf:suitResistOf, weatherMoveMul:weatherMoveMul,
     /* F 健康分型 */
     AILMENT_NAMES:AILMENT_NAMES,
     ensureAilments:ensureAilments, syncIllness:syncIllness,

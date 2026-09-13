@@ -87,10 +87,32 @@ APH.Weather = (function(){
     return E[id] || E.wx_clear || { speedMul: 1, farmMul: 1, exposureGain: 0, enemySightMul: 1, solarMul: 1 };
   }
 
+  /* ---------- W3 接线辅助(纯函数: 各循环读取同一真源, 单点兜底) ---------- */
+  /* 当前天气 id: 读 meta.weather, 老档/缺省兜底 wx_clear (零迁移) */
+  function currentId(meta){
+    var w = meta && meta.weather;
+    return (w && w.id) || 'wx_clear';
+  }
+  /* 预计持续秒数: dur 区间中值 × dayLen (HUD 预计时长用; 粗估即可) */
+  function expectDur(id){
+    var cfg = W();
+    var d = (cfg.dur && cfg.dur[id]) || [2, 5];
+    var dayLen = (cfg.dayLen != null ? cfg.dayLen : 210);
+    return ((d[0] + d[1]) / 2) * dayLen;
+  }
+  /* 预计剩余秒数: 中值 - 已持续 t, 不取负 */
+  function expectRemain(state){
+    var id = (state && state.id) || 'wx_clear';
+    return Math.max(0, expectDur(id) - ((state && state.t) || 0));
+  }
+
   return {
     weatherDefs: weatherDefs,
     defaultWeather: defaultWeather,
     tickWeather: tickWeather,
     weatherEffects: weatherEffects,
+    currentId: currentId,
+    expectDur: expectDur,
+    expectRemain: expectRemain,
   };
 })();

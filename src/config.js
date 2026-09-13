@@ -528,6 +528,17 @@ APH.CFG = {
       wx_storm:       { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 1,    solarMul: 0.1 },
       wx_fog:         { speedMul: 1,    farmMul: 1,    exposureGain: 0,  enemySightMul: 0.7, solarMul: 0.6 },
     },
+    /* W3 HUD: 天气名与图标 (显示数据; 同 CFG.items 的 name 模式) */
+    names: {
+      wx_clear:'晴', wx_rain:'雨', wx_rain_heavy:'大雨', wx_thunder:'雷暴',
+      wx_snow:'雪', wx_blizzard:'暴雪', wx_heat:'热浪', wx_cold:'寒潮',
+      wx_acid:'酸雨', wx_storm:'磁暴', wx_fog:'雾',
+    },
+    icons: {
+      wx_clear:'☀', wx_rain:'🌧', wx_rain_heavy:'🌧', wx_thunder:'⛈',
+      wx_snow:'🌨', wx_blizzard:'❄', wx_heat:'🔥', wx_cold:'🥶',
+      wx_acid:'☣', wx_storm:'🌀', wx_fog:'🌫',
+    },
   },
 
   /* 存档 */
