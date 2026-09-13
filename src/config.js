@@ -12,6 +12,9 @@ APH.CFG = {
   WORLD: 2200,
   CHUNK: 550,
   GRID: 48,                    // ADR-4 逻辑格网
+  observe: {
+    retries: 8                 // 观测失败换子种子次数，用尽则降级
+  },
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },
   DAY_LEN: 3600,               // 一天 60 分钟（ADR-30 / #166）
