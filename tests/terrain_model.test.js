@@ -16,6 +16,50 @@ test('TerrainModel 旧场景保持 2200 与 generation 0', function(){
   if(!c.walkable || !c.buildable || c.region!=='legacy') throw new Error('旧档格子不兼容');
 });
 
+test('#198 TerrainModel 同时归一化 observed、未观测 generation 1 与 generation 0', function(){
+  const observation=APH.Observe.observe({
+    seed:4,biomeId:'biome_landing',widthCells:2,heightCells:1,
+    groundPins:[{gx:0,gy:0,tile:'lakeshore'},{gx:1,gy:0,tile:'water'}]
+  });
+  const observed={v:1,width:96,height:48,grid:48,seed:4,kind:'planet',generation:1,observation:observation};
+  const normalized=TerrainModel.normalize(observed);
+  if(normalized.observation!==observation||normalized.kind!=='planet'||normalized.generation!==1)
+    throw new Error('observed descriptor 在 normalize 时丢失');
+  const water=TerrainModel.cellAt(normalized,72,24);
+  if(!water||water.region!=='water'||water.walkable||water.moveCost!==Infinity)
+    throw new Error('TerrainModel 没有读取 Observation 的格子语义');
+  const modern=TerrainModel.normalize(TerrainModel.home(4));
+  if(modern.generation!==1||modern.observation) throw new Error('未观测 generation 1 被错误改写');
+  const legacy=TerrainModel.legacy(4);
+  legacy.observation=observation;
+  const old=TerrainModel.normalize(legacy);
+  if(old.generation!==0||old.observation||TerrainModel.cellAt(old,72,24).region!=='legacy')
+    throw new Error('generation 0 被 Observation 改写');
+  const priorObservation={grid:[['lakeshore','water']],degraded:false,biomeId:'biome_landing'};
+  const prior=TerrainModel.normalize({v:1,width:96,height:48,grid:48,seed:5,kind:'planet',generation:1,observation:priorObservation});
+  if(prior.observation!==priorObservation||TerrainModel.cellAt(prior,72,24).region!=='water')
+    throw new Error('已合入版本的二维 observation.grid 无法继续读取');
+});
+
+test('#198 observed TerrainModel 只导出 Observation 的自然资源层', function(){
+  const observation=APH.Observe.observe({seed:9301,biomeId:'biome_landing',widthCells:128,heightCells:128,home:true});
+  const scene=Object.assign(TerrainModel.home(9301),{observation:observation});
+  const resources=TerrainModel.resources(scene,{});
+  if(resources.length!==observation.resources.length)
+    throw new Error('observed map 又运行了第二套资源散布 '+resources.length+'/'+observation.resources.length);
+  observation.resources.forEach(function(pin){
+    const found=resources.find(r=>r.kind===pin.kind&&Math.floor(r.x/48)===pin.gx&&Math.floor(r.y/48)===pin.gy);
+    if(!found||!found.starter||!found.yieldItemId) throw new Error('Observation 资源没有进入 TerrainModel '+pin.kind+'@'+pin.gx+','+pin.gy);
+  });
+});
+
+test('#198 零水 Observation 不再暴露固定湖泊地标', function(){
+  const observation=APH.Observe.observe({seed:12,biomeId:'biome_landing',widthCells:48,heightCells:48,allowWater:false});
+  const scene={v:1,width:2304,height:2304,grid:48,seed:12,kind:'home',generation:1,observation:observation};
+  const lake=TerrainModel.landmarks(scene).lake;
+  if(lake.r!==0) throw new Error('零水 Observation 仍返回固定湖泊半径 '+lake.r);
+});
+
 test('TerrainModel 湖岸沃土与贫瘠矿丘导出可用于作物的倍率', function(){
   const s=TerrainModel.home(42), g=s.grid;
   /* 湖中心在 x≈84 格，取远离湖面的同一 lakeshore 带；矿丘取 ridge。 */
