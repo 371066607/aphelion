@@ -1,7 +1,7 @@
 /* ============================================================
    Aphelion · observe.js — 从群系砖表观测格网 (ADR-48)
    挂载: window.APH.Observe
-   对外只有 observe。求解器、邻接、重试都藏在里面。
+   对外：observe / ensure* / gridOf / cellAt / land。求解器藏在里面。
    ============================================================ */
 window.APH = window.APH || {};
 
@@ -221,17 +221,46 @@ APH.Observe = (function(){
     }
     return null;
   }
-  function fallbackGrid(tab, W, H, pins, rng){
-    var g = [], y, x, row, pinned = pinMap(pins, W, H), i, all = allTiles(tab.tiles);
+  function partitionTile(tab, x, y){
+    var G = CFG.GRID || 48, hab = CFG.HAB || {x:1100,y:1100,r:92}, lake = CFG.LAKE || {x:1660,y:1560,r:148};
+    var wx = (x + 0.5) * G, wy = (y + 0.5) * G;
+    var dHab = U.dst(wx, wy, hab.x, hab.y), dLake = U.dst(wx, wy, lake.x, lake.y);
+    if(dHab < (hab.r || 92) + 40 && tab.tiles.landing) return 'landing';
+    if(dLake < (lake.r || 148) && tab.tiles.water) return 'water';
+    if(dLake < (lake.r || 148) + G && tab.tiles.lakeshore) return 'lakeshore';
+    if(tab.tiles.woodland) return 'woodland';
+    var ids = keysOf(tab.tiles);
+    return ids[0];
+  }
+  function fallbackGrid(tab, W, H, pins, rng, biomeId){
+    var g = [], y, x, row, pinned = pinMap(pins, W, H), i, all = allTiles(tab.tiles), tile;
     for(y = 0; y < H; y++){
       row = [];
       for(x = 0; x < W; x++){
         i = y * W + x;
-        row.push(pinned.hasOwnProperty(i) && tab.tiles[pinned[i]] ? pinned[i] : pickWeighted(all, tab.tiles, rng));
+        if(pinned.hasOwnProperty(i) && tab.tiles[pinned[i]]) tile = pinned[i];
+        else if(biomeId === 'biome_landing') tile = partitionTile(tab, x, y);
+        else tile = pickWeighted(all, tab.tiles, rng);
+        row.push(tile);
       }
       g.push(row);
     }
     return g;
+  }
+  function hushDryShore(grid, pins){
+    var W, H, y, x, i, pinned, wet = false, waters, woodland;
+    if(!grid || !grid.length) return grid;
+    H = grid.length; W = grid[0].length;
+    waters = (CFG.observe && CFG.observe.waterTiles) || ['water'];
+    for(y = 0; y < H; y++) for(x = 0; x < W; x++) if(inList(waters, grid[y][x])) wet = true;
+    if(wet) return grid;
+    pinned = pinMap(pins, W, H);
+    woodland = 'woodland';
+    for(y = 0; y < H; y++) for(x = 0; x < W; x++){
+      i = y * W + x;
+      if(grid[y][x] === 'lakeshore' && !pinned.hasOwnProperty(i)) grid[y][x] = woodland;
+    }
+    return grid;
   }
 
   function observe(opts){
@@ -249,11 +278,14 @@ APH.Observe = (function(){
     for(attempt = 0; attempt < retries; attempt++){
       rng = U.makeRng((seed ^ Math.imul(attempt + 1, 0x9E3779B9)) >>> 0);
       grid = tryWfc(tab, W, H, pins, rng);
-      if(grid) return { grid: grid, degraded: false, biomeId: TABLES[biomeId] ? biomeId : 'biome_landing' };
+      if(grid){
+        grid = hushDryShore(grid, pins);
+        return { grid: grid, degraded: false, biomeId: TABLES[biomeId] ? biomeId : 'biome_landing' };
+      }
     }
     rng = U.makeRng((seed ^ 0xC0FFEE11) >>> 0);
     return {
-      grid: fallbackGrid(tab, W, H, pins, rng),
+      grid: hushDryShore(fallbackGrid(tab, W, H, pins, rng, biomeId), pins),
       degraded: true,
       biomeId: TABLES[biomeId] ? biomeId : 'biome_landing'
     };
@@ -278,18 +310,47 @@ APH.Observe = (function(){
       heightCells: (opts && opts.heightCells) || cells
     };
   }
+  function defaultHomePins(W, H){
+    var G = CFG.GRID || 48, o = CFG.observe || {}, hab = CFG.HAB || {x:1100,y:1100};
+    var cx = Math.floor(hab.x / G), cy = Math.floor(hab.y / G);
+    var half = (o.habCells || 20) / 2, pins = [], gx, gy, i, ang, r, nWood, nStone;
+    for(gy = Math.floor(cy - half); gy < cy + half; gy++){
+      for(gx = Math.floor(cx - half); gx < cx + half; gx++){
+        if(gx >= 0 && gy >= 0 && gx < W && gy < H) pins.push({ gx: gx, gy: gy, tile: 'landing' });
+      }
+    }
+    nWood = o.starterWood || 24; nStone = o.starterStone || 18; r = o.starterRing || 8;
+    for(i = 0; i < nWood; i++){
+      ang = i * Math.PI * 2 / nWood;
+      gx = Math.round(cx + Math.cos(ang) * r); gy = Math.round(cy + Math.sin(ang) * r);
+      if(gx >= 0 && gy >= 0 && gx < W && gy < H) pins.push({ gx: gx, gy: gy, tile: 'tree' });
+    }
+    for(i = 0; i < nStone; i++){
+      ang = i * Math.PI * 2 / nStone + 0.19;
+      gx = Math.round(cx + Math.cos(ang) * (r + 1)); gy = Math.round(cy + Math.sin(ang) * (r + 1));
+      if(gx >= 0 && gy >= 0 && gx < W && gy < H) pins.push({ gx: gx, gy: gy, tile: 'rock_stone' });
+    }
+    return pins;
+  }
+  function syncLakeR(holder){
+    if(!holder || !holder.terrain) return;
+    if(!hasWater(holder)) holder.terrain.lakeR = 0;
+  }
   function ensureHome(colony, opts){
     colony = colony || {};
     if(gridOf(colony)) return colony;
     opts = opts || {};
     var sz = sizeOf(opts);
-    return stamp(colony, observe({
+    var pins = opts.pins != null ? opts.pins : defaultHomePins(sz.widthCells, sz.heightCells);
+    stamp(colony, observe({
       seed: opts.seed,
       biomeId: (CFG.observe && CFG.observe.homeBiome) || 'biome_landing',
       widthCells: sz.widthCells,
       heightCells: sz.heightCells,
-      pins: opts.pins
+      pins: pins
     }));
+    syncLakeR(colony);
+    return colony;
   }
   function ensurePlanet(spec, opts){
     if(!spec) return spec;
@@ -297,13 +358,15 @@ APH.Observe = (function(){
     opts = opts || {};
     var sz = sizeOf(opts);
     var biomeId = (spec.biome && spec.biome.id) || opts.biomeId;
-    return stamp(spec, observe({
+    stamp(spec, observe({
       seed: spec.seed,
       biomeId: biomeId,
       widthCells: sz.widthCells,
       heightCells: sz.heightCells,
       pins: opts.pins
     }));
+    syncLakeR(spec);
+    return spec;
   }
 
   function inList(list, id){
@@ -330,7 +393,7 @@ APH.Observe = (function(){
     water = inList((CFG.observe && CFG.observe.waterTiles) || ['water'], tile);
     fertTbl = (CFG.observe && CFG.observe.fertility) || {};
     fertility = fertTbl[tile];
-    if(fertility == null) fertility = water ? 0 : 0.5;
+    if(fertility == null) fertility = water ? 0 : (fertTbl.default != null ? fertTbl.default : 0);
     return {
       tile: tile,
       walkable: !water,
@@ -347,11 +410,9 @@ APH.Observe = (function(){
     return !!(c && c.walkable);
   }
   function floraHp(kind){
-    if(kind === 'tree') return 30;
-    if(kind === 'rock_iron') return 40;
-    if(kind === 'rock_stone' || kind === 'rock_wreckage') return 35;
-    if(kind === 'bush_berry') return 15;
-    return 20;
+    var hp = (CFG.observe && CFG.observe.floraHp) || {};
+    if(hp[kind] != null) return hp[kind];
+    return hp.default != null ? hp.default : 0;
   }
   function floraFrom(holder){
     var grid = gridOf(holder), out = [], y, x, c, G, hp;
@@ -415,15 +476,11 @@ APH.Observe = (function(){
     if(dest.kind === 'known'){
       spec = opts.loadPlanet ? opts.loadPlanet(dest.id) : null;
       if(!spec) return { ok: false, why: 'missing' };
-      first = !gridOf(spec);
-      ensurePlanet(spec, opts);
-      persistPlanet(spec, opts);
-      rememberAtlas(opts.meta, spec);
-      return { ok: true, spec: spec, resumed: false, first: first };
+    } else {
+      if(!opts.makePlanet) return { ok: false, why: 'no_planet' };
+      spec = opts.makePlanet(opts.seed);
+      if(!spec) return { ok: false, why: 'no_planet' };
     }
-    if(!opts.makePlanet) return { ok: false, why: 'no_planet' };
-    spec = opts.makePlanet(opts.seed);
-    if(!spec) return { ok: false, why: 'no_planet' };
     first = !gridOf(spec);
     ensurePlanet(spec, opts);
     persistPlanet(spec, opts);

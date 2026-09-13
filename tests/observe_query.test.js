@@ -75,6 +75,29 @@ test('#194 acid: 零水则岸不算岸，酸化熄火；未观测仍酸化', () 
   if (!on.acid) throw new Error('未观测夜间酸雨仍应生效');
 });
 
+test('#194 pins: 默认钉 HAB 核心为 landing', () => {
+  const h = {};
+  APH.Observe.ensureHome(h, { seed: 2, widthCells: 32, heightCells: 32 });
+  const G = APH.CFG.GRID, hab = APH.CFG.HAB;
+  const gx = Math.floor(hab.x / G), gy = Math.floor(hab.y / G);
+  const c = APH.Observe.cellAt(h, gx, gy);
+  if (!c || c.tile !== 'landing') throw new Error('HAB 格应为 landing，得到 ' + (c && c.tile));
+});
+
+test('#194 dry: 无水则无岸砖且 lakeR=0', () => {
+  const dry = { terrain: { lakeR: 90 } };
+  APH.Observe.ensureHome(dry, {
+    seed: 8, widthCells: 2, heightCells: 2,
+    pins: [
+      { gx: 0, gy: 0, tile: 'woodland' }, { gx: 1, gy: 0, tile: 'woodland' },
+      { gx: 0, gy: 1, tile: 'woodland' }, { gx: 1, gy: 1, tile: 'woodland' }
+    ]
+  });
+  const g = APH.Observe.gridOf(dry);
+  g.forEach(function(row){ row.forEach(function(t){ if (t === 'lakeshore') throw new Error('无水不应有岸砖'); }); });
+  if (dry.terrain.lakeR !== 0) throw new Error('无水 lakeR 应为 0');
+});
+
 test('#194 ruins: 有格网时落在可走格', () => {
   const spec = APH.Planet.fallbackPlanet(9);
   spec.tier = 3;

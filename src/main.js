@@ -95,7 +95,8 @@ window.APH = window.APH || {};
   function launchExpedition(dest){
     var s = APH.state;
     if(s.scene==='expedition') return {ok:false,why:'already'};
-    dest = dest || s.launchDest;
+    if((dest == null) && s.expeditionRun) dest = { kind: 'resume' };
+    else dest = dest || s.launchDest;
     /* ADR-45: 没有主角就没有「一个人出发」—— 得有人可派 */
     var squad = expeditionSquad();
     if(!squad.length){
@@ -210,13 +211,14 @@ window.APH = window.APH || {};
       }
       /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
       if(p.rivals && p.rivals.length){
-        var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
-        var ba=Math.random()*U.TAU, btry=0, bx, by;
+        var rrng=U.makeRng(((p.seed||7)^0x51A7)>>>0);
+        var rv=p.rivals[Math.floor(rrng()*p.rivals.length)];
+        var ba=rrng()*U.TAU, btry=0, bx, by, tries=(CFG.observe&&CFG.observe.rivalTries)||24;
         do{
-          ba=Math.random()*U.TAU;
+          ba=rrng()*U.TAU;
           bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, CFG.WORLD-100);
           by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, CFG.WORLD-100);
-        }while(btry++<24 && window.APH.Observe && APH.Observe.walkableWorld && !APH.Observe.walkableWorld(p, bx, by));
+        }while(btry++<tries && window.APH.Observe && APH.Observe.walkableWorld && !APH.Observe.walkableWorld(p, bx, by));
         s.entities.push({
           id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
           x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
@@ -226,7 +228,7 @@ window.APH = window.APH || {};
         for(var gi=0; gi<3; gi++){
           var gf=p.enemies.factions[gi % p.enemies.factions.length];
           s.entities.push(APH.Ent.makeEnemy(gf,
-            bx+(Math.random()*120-60), by+(Math.random()*90-45)));
+            bx+(rrng()*120-60), by+(rrng()*90-45)));
         }
       }
       document.getElementById('planetTitle').textContent =
@@ -237,7 +239,7 @@ window.APH = window.APH || {};
     var lawBits=[];
     if(APH.Planet.hasLaw(s.spec,'lw_echo')) lawBits.push('声追者：少开枪');
     if(APH.Planet.hasLaw(s.spec,'lw_spore_light')) lawBits.push('孢子趋光：光会开路');
-    if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
+    if(APH.Planet.hasLaw(s.spec,'lw_night_acid') && !(window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(s.spec) && APH.Observe.hasWater && !APH.Observe.hasWater(s.spec))) lawBits.push('夜间勿近湖');
     if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
     U.emit('launched',{});
     return plan;
@@ -484,7 +486,7 @@ window.APH = window.APH || {};
     var a = U.rr(0,U.TAU), d = U.rr(CFG.spawn.minDistFromPlayer, CFG.spawn.maxDistFromPlayer);
     var x = U.clamp(s.px + Math.cos(a)*d, 40, CFG.WORLD-40);
     var y = U.clamp(s.py + Math.sin(a)*d, 40, CFG.WORLD-40);
-    if(U.dst(x,y,CFG.LAKE.x,CFG.LAKE.y) < s.spec.terrain.lakeR+20) return;
+    if(s.spec.terrain && s.spec.terrain.lakeR && U.dst(x,y,CFG.LAKE.x,CFG.LAKE.y) < s.spec.terrain.lakeR+20) return;
     s.entities.push(APH.Ent.makeEnemy(faction, x, y));
     U.emit('enemySpawned', faction);
   }
@@ -506,7 +508,8 @@ window.APH = window.APH || {};
     var night=APH.World.daylight()<.5;
     var hasAcid=APH.Planet.hasLaw(s.spec, 'lw_night_acid');
     if(night && hasAcid){
-      var lakeR=(s.spec.terrain&&s.spec.terrain.lakeR)||CFG.LAKE.r;
+      var lakeR=s.spec.terrain&&s.spec.terrain.lakeR;
+      if(!lakeR){ s.acidT=0; } else
       if(U.dst(s.px,s.py,CFG.LAKE.x,CFG.LAKE.y) < lakeR+24){
         s.acidT=(s.acidT||0)+dt;
         if(s.acidT>=1){

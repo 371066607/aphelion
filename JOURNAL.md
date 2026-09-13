@@ -2158,3 +2158,7 @@ console:  (无)
 ### 2026-09-13 · feat/adr-48-observe · #195
 
 - `land`/`canLaunch`/`destinations`/`fromCodex`：不选星不能飞；未知新星着陆才观测；已知星读旧图；图鉴只读；同一趟回家再进不重测。出发面板点选。单元 860 绿。ADR-48 示踪四票代码齐。未 push。
+
+### 2026-09-13 · review fixes on feat/adr-48-observe
+
+- 审查修补：floraHp/肥力/敌基地重试进 CFG；敌基地 seeded；HAB 钉子；无水去岸砖且 lakeR=0；降级走 HAB/湖分区；同一趟 dest 空则 resume；无水不画湖、不酸化。单元 862 绿。未把 A* 整段改读观测格。未 push。

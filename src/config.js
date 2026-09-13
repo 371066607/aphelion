@@ -19,8 +19,14 @@ APH.CFG = {
     floraTiles: ['tree','rock_stone','rock_iron','bush_berry','bush_herb','bush_alien','rock_wreckage','glow_cap','shard','reed','frost_shrub'],
     fertility: {
       landing: .45, woodland: .64, lakeshore: .72, ridge: .16,
-      alien: .58, wreckage: .28, water: 0
-    }
+      alien: .58, wreckage: .28, water: 0, default: .5
+    },
+    floraHp: { tree:30, rock_iron:40, rock_stone:35, rock_wreckage:35, bush_berry:15, default:20 },
+    habCells: 20,
+    starterWood: 24,
+    starterStone: 18,
+    starterRing: 8,
+    rivalTries: 24
   },
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },
