@@ -330,7 +330,7 @@ APH.ColonyTick = (function(){
     var ranchers=workers.filter(function(r){return r.job==='bl_pasture';});
     var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm'||b.id==='bl_crop_plot';});
     var nightF=window.APH.World&&APH.World.daylight?APH.World.daylight()<.5:false;
-    var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF, s.colony).farmMul;
+    var lawFarm=APH.Colony.harvestMods(s.spec&&s.spec.laws, s.clock, nightF).farmMul;
     var farmWx=(wxFx.farmMul!=null)?wxFx.farmMul:1;   // W3: 天气农产乘子(雨+30%/酸雨×0.5/雪停滞) 乘入 harvestMods 链
     /* T3 季节生长乘子: 冬天为 0 —— 冬天种不出东西, 只能吃存粮 */
     var seasonGrow = (window.APH.Weather && APH.Weather.seasonAt)
