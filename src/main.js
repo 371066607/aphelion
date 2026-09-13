@@ -157,6 +157,7 @@ window.APH = window.APH || {};
         if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
         if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
         if(p.beacons.some(function(b){return U.dst(rx,ry,b.x,b.y)<90;})) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, rx, ry)) continue;
         s.entities.push(APH.Ent.makeRock(rx,ry,rng)); pr++;
       }
       var pc=0; gd=0;
@@ -164,6 +165,7 @@ window.APH = window.APH || {};
         var cx=rng()*(CFG.WORLD-140)+70, cy=rng()*(CFG.WORLD-140)+70;
         if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
         if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, cx, cy)) continue;
         s.entities.push(APH.Ent.makeCrystal(cx,cy)); pc++;
       }
       p.beacons.forEach(function(d){ s.entities.push(APH.Ent.makeBeacon(d)); });
@@ -357,6 +359,7 @@ window.APH = window.APH || {};
         if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
         if(U.dst(rx,ry,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+40) continue;
         if(p.beacons.some(function(b){ return U.dst(rx,ry,b.x,b.y)<90; })) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, rx, ry)) continue;
         s.entities.push(APH.Ent.makeRock(rx,ry,rng));
         placedR++;
       }
@@ -365,6 +368,7 @@ window.APH = window.APH || {};
         var cx = rng()*(CFG.WORLD-140)+70, cy = rng()*(CFG.WORLD-140)+70;
         if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
         if(U.dst(cx,cy,CFG.LAKE.x,CFG.LAKE.y)<p.terrain.lakeR+30) continue;
+        if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(p, cx, cy)) continue;
         s.entities.push(APH.Ent.makeCrystal(cx,cy));
         placedC++;
       }
@@ -3429,7 +3433,8 @@ window.APH = window.APH || {};
       seatMap=APH.Res.diningSeatAlloc(hungryRes, diningChairs, diningTbls);
     }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
-    var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[]):null;
+    var navHolder=s.scene==='expedition'?s.spec:s.colony;
+    var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[], navHolder):null;
     /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
     var rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[]):[];
 

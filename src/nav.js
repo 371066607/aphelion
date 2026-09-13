@@ -17,7 +17,7 @@ APH.Nav = (function(){
   var BLOCKERS = { bl_wall: 1, bl_siege_camp: 1 };
 
   /* ---------- 障碍矩阵: 殖民地建筑记录 → 46×46 0/1 ---------- */
-  function gridOf(buildings){
+  function gridOf(buildings, holder){
     var g = [];
     for (var y = 0; y < NC; y++) { g.push(new Array(NC).fill(0)); }
     (buildings || []).forEach(function(b){
@@ -27,6 +27,7 @@ APH.Nav = (function(){
       cy = Math.max(0, Math.min(NC - 1, cy));
       g[cy][cx] = 1;
     });
+    if(holder && window.APH.Observe && APH.Observe.paintBlockers) APH.Observe.paintBlockers(g, holder);
     return g;
   }
 

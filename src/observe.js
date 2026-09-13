@@ -409,6 +409,24 @@ APH.Observe = (function(){
     c = cellAt(holder, Math.floor(x / G), Math.floor(y / G));
     return !!(c && c.walkable);
   }
+  function scatterFree(holder, x, y){
+    var G = CFG.GRID || 48, c;
+    if(!gridOf(holder)) return true;
+    c = cellAt(holder, Math.floor(x / G), Math.floor(y / G));
+    if(!c) return true;
+    return !!(c.walkable && !c.floraKind);
+  }
+  function paintBlockers(nav, holder){
+    var y, x, c;
+    if(!nav || !gridOf(holder)) return nav;
+    for(y = 0; y < nav.length; y++){
+      for(x = 0; x < nav[y].length; x++){
+        c = cellAt(holder, x, y);
+        if(c && !c.walkable) nav[y][x] = 1;
+      }
+    }
+    return nav;
+  }
   function floraHp(kind){
     var hp = (CFG.observe && CFG.observe.floraHp) || {};
     if(hp[kind] != null) return hp[kind];
@@ -490,7 +508,8 @@ APH.Observe = (function(){
 
   return {
     observe: observe, ensureHome: ensureHome, ensurePlanet: ensurePlanet, gridOf: gridOf,
-    cellAt: cellAt, hasWater: hasWater, walkableWorld: walkableWorld, floraFrom: floraFrom,
+    cellAt: cellAt, hasWater: hasWater, walkableWorld: walkableWorld, scatterFree: scatterFree,
+    paintBlockers: paintBlockers, floraFrom: floraFrom,
     destinations: destinations, canLaunch: canLaunch, fromCodex: fromCodex, land: land
   };
 })();

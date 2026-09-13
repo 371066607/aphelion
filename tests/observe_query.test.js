@@ -98,6 +98,24 @@ test('#194 dry: 无水则无岸砖且 lakeR=0', () => {
   if (dry.terrain.lakeR !== 0) throw new Error('无水 lakeR 应为 0');
 });
 
+test('#194 nav: 水格进障碍矩阵，林格可走', () => {
+  const h = {};
+  APH.Observe.ensureHome(h, {
+    seed: 1, widthCells: 4, heightCells: 4,
+    pins: [
+      { gx: 0, gy: 0, tile: 'water' }, { gx: 1, gy: 0, tile: 'woodland' },
+      { gx: 0, gy: 1, tile: 'woodland' }, { gx: 1, gy: 1, tile: 'tree' }
+    ]
+  });
+  const g = APH.Nav.gridOf([], h);
+  if (g[0][0] !== 1) throw new Error('水应不可寻路');
+  if (g[0][1] !== 0) throw new Error('林应可寻路');
+  const G = APH.CFG.GRID;
+  if (APH.Observe.scatterFree(h, 0.5 * G, 0.5 * G)) throw new Error('水上不应再撒');
+  if (APH.Observe.scatterFree(h, 1.5 * G, 1.5 * G)) throw new Error('树格不应再撒');
+  if (!APH.Observe.scatterFree(h, 1.5 * G, 0.5 * G)) throw new Error('空林可撒');
+});
+
 test('#194 ruins: 有格网时落在可走格', () => {
   const spec = APH.Planet.fallbackPlanet(9);
   spec.tier = 3;

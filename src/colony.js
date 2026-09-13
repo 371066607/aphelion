@@ -229,6 +229,7 @@ APH.Colony = (function(){
       var x = rng()*(CFG.WORLD-160)+80, y = rng()*(CFG.WORLD-160)+80;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 260) continue;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y+240) < 140) continue;   // 发射台区
+      if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(s.colony, x, y)) continue;
       s.entities.push(APH.Ent.makeRock(x,y,rng));
       placed++;
     }

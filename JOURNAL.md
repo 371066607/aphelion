@@ -2162,3 +2162,7 @@ console:  (无)
 ### 2026-09-13 · review fixes on feat/adr-48-observe
 
 - 审查修补：floraHp/肥力/敌基地重试进 CFG；敌基地 seeded；HAB 钉子；无水去岸砖且 lakeR=0；降级走 HAB/湖分区；同一趟 dest 空则 resume；无水不画湖、不酸化。单元 862 绿。未把 A* 整段改读观测格。未 push。
+
+### 2026-09-13 · review: 水格进 A*、观测格不叠撒
+
+- Nav.gridOf 第二参把观测水格标障碍；石/晶体/装饰石跳过水和花草格。debugPressE 仍自动未知新星（scenario 通道）。单元 863 绿。未 push。
