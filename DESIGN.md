@@ -289,3 +289,13 @@ Observation 从 `v:1` 起归属家园或单颗星球；观测格由一个 Ground
 发现事务先准备 PlanetSpec、Atlas 和殖民地 `metaSnapshot` 的完整 JSON，再逐层写入并在普通写失败时按原始字节恢复旧值；全部成功后才更新调用方内存。失败分支也不能预先 checkpoint 家园或双世界状态。未来版本的 PlanetSpec/Atlas 明确拒绝写入，当前版本记录则保留未知增量字段。随后 `ExpeditionState.begin` 才能扣补给、迁移居民归属并建立唯一 Active Run，run 必须保存已解析的 `planetId + seed`。跨 key 的 `localStorage` 无法抵御浏览器进程在两次写之间被强制终止，此时最多留下尚未出发的孤立 PlanetSpec，不会扣补给或建立 run。
 
 远征容器的 `spec`、`worldDescriptor` 与 Active Run destination 必须指向同一颗星；创建和重载均要求 generation 1 Observation。恢复时按 destination 读取并完整校验持久 PlanetSpec，再用它覆盖 runtime 中仅作快照镜像的 spec/descriptor，确保实际安装的是持久档中的精确世界；持久档损坏、Observation/身份不符或旧式无目的地 run 会沿幂等路径安全返航。正式入口和 `?exp=1`/调试 E 键走同一保存、状态机和 WorldRuntime 流程；旧结算页直接 `buildWorld` 的第二入口已删除。地面渲染、通行、敌人落点与夜间酸性水域读取 `TerrainModel`；远征初始资源和遗迹覆盖物的单一来源留给 #203 完成。
+
+### ADR-48 修订：已知星球重访与旧档恢复（2026-09-14，#202）
+
+Atlas 中的新发现从实际首次着陆起记 `visits:1` 和 `lastVisitedAt`；已知星重访只递增访问记录并更新最后访问时间，保留首次发现时间和未知增量字段。规划器每次打开都先停在不可提交的“请选择目的地”，随后列未知星及 Atlas 中的已知星；鼠标和键盘最终提交同一 `{kind:'planet', planetId, seed}`，返航后必须再次选择，不能因上次选择直接发射。
+
+已知星出发按 ID 读取、完整校验并安装持久 `planet_<id>`，不重新调用观测或 LLM 富化。访问记录和殖民地 `metaSnapshot` 先序列化并提交，成功事务不写 PlanetSpec，因此同一星球重访前后的 PlanetSpec 字节相同。`ExpeditionState.begin`、远征容器创建和首个 `WorldRuntime` checkpoint 共同组成发射提交段：只有带 Active Run、已扣补给和首帧 runtime 的 colony 快照落盘成功，才关闭规划器和展示着陆；失败会按提交前对象图恢复家园、名册、物流、Atlas 与双世界共享引用，并用前序保存回执恢复各 key 原始字节。
+
+Atlas 出现前已经落盘的 `P` 前缀 PlanetSpec，由 `Save.loadMeta` 在内存中按实际存储 key 回填索引：key 必须与 spec 内部 ID 相同且完整校验通过；旧短 ID 不改名，碰撞过而未能同时落盘的历史数据也不臆造恢复。无 Observation 的旧 PlanetSpec 继续使用 generation 0、2200×2200 和固定湖语义；刷新只在持久 spec 无 Observation、runtime 同为 generation 0 且身份与尺寸吻合时恢复。所有新未知星仍必须创建 generation 1 Observation。带 Observation 的已知星仍要求 runtime 与持久 Observation 完全相同。两种恢复路径都以持久 PlanetSpec 为事实源，损坏或身份冲突时沿幂等返航回收队员。
+
+#201 已写入的 `visits:0` 且没有 `lastVisitedAt` 的条目可唯一识别为已经着陆的旧发现，加载回填时归一为首访，下一次重访记为 2；显式带访问时间的 0 不猜测。PlanetSpec 校验拒绝越界 tier、负数/越界地形密度、无效敌人夜间倍率和未归一权重，但继续接受早期缺 tier 的 v1 legacy 档并按既有默认 tier 1 运行。若 colony 中权威 `metaSnapshot` 来自未来版本，必须在 envelope 迁移写回、Atlas 扫描、`metaWillSave` checkpoint 或任何 colony 写入之前检查磁盘与会话兜底，随后抛错或拒绝，原始存档字节保持不变；合法 JSON 但不是存档对象的损坏快照回退独立 meta，本次加载不写回 colony。

@@ -280,6 +280,9 @@ APH.Planet = (function(){
     if(spec.v!==1) errors.push('v must be 1');
     if(typeof spec.id!=='string'||!spec.id) errors.push('missing id');
     if(!finite(spec.seed)||spec.seed!==(spec.seed>>>0)) errors.push('invalid seed');
+    /* tier 是 PlanetSpec v1 后加字段；缺失的早期 legacy 档仍按消费者的
+       tier 1 默认值运行，只拒绝会让刷怪间隔变成 NaN 的显式坏值。 */
+    if(spec.tier!=null&&(!finite(spec.tier)||Math.floor(spec.tier)!==spec.tier||spec.tier<1||spec.tier>3)) errors.push('invalid tier');
     if(typeof spec.name!=='string'||!spec.name) errors.push('missing name');
     if(!spec.biome||typeof spec.biome.id!=='string'||!spec.biome.id) errors.push('missing biome');
     if(!Array.isArray(spec.beacons) || spec.beacons.length < 4)
@@ -304,17 +307,25 @@ APH.Planet = (function(){
     if(!spec.palette||typeof spec.palette!=='object'||
       ['ground1','ground2','accent','water','spore'].some(function(k){return typeof spec.palette[k]!=='string'||!spec.palette[k];}))
       errors.push('invalid palette');
-    if(!spec.terrain||typeof spec.terrain!=='object'||!finite(spec.terrain.lakeR)||!finite(spec.terrain.rockDensity)||!finite(spec.terrain.crystalDensity))
+    if(!spec.terrain||typeof spec.terrain!=='object'||!finite(spec.terrain.lakeR)||spec.terrain.lakeR<0||spec.terrain.lakeR>CFG.WORLD||
+      !finite(spec.terrain.rockDensity)||spec.terrain.rockDensity<0||spec.terrain.rockDensity>1||
+      !finite(spec.terrain.crystalDensity)||spec.terrain.crystalDensity<0||spec.terrain.crystalDensity>1)
       errors.push('invalid terrain');
     if(!spec.enemies||typeof spec.enemies!=='object'||!Array.isArray(spec.enemies.factions)||!spec.enemies.factions.length||
-      !spec.enemies.weights||typeof spec.enemies.weights!=='object') errors.push('invalid enemies');
-    else spec.enemies.factions.forEach(function(f,i){
-      var gene=f&&f.gene;
-      if(!f||typeof f.id!=='string'||!f.id||typeof f.name!=='string'||!f.name||typeof f.behavior!=='string'||!f.behavior||!gene||
-        ['hue','sides','limbs','size','spikes','eyes'].some(function(k){return !finite(gene[k]);})||
-        !finite(f.hp)||f.hp<=0||!finite(f.speed)||f.speed<=0||!finite(f.dmg)||f.dmg<=0)
-        errors.push('enemy['+i+'] invalid');
-    });
+      !spec.enemies.weights||typeof spec.enemies.weights!=='object'||Array.isArray(spec.enemies.weights)) errors.push('invalid enemies');
+    else{
+      var factionIds={},weightTotal=0;
+      spec.enemies.factions.forEach(function(f,i){
+        var gene=f&&f.gene,id=f&&f.id,weight=id&&spec.enemies.weights[id];
+        if(!f||typeof id!=='string'||!id||factionIds[id]||typeof f.name!=='string'||!f.name||typeof f.behavior!=='string'||!f.behavior||!gene||
+          ['hue','sides','limbs','size','spikes','eyes'].some(function(k){return !finite(gene[k]);})||
+          !finite(f.hp)||f.hp<=0||!finite(f.speed)||f.speed<=0||!finite(f.dmg)||f.dmg<=0||
+          !finite(f.nightBoost)||f.nightBoost<=0||!finite(weight)||weight<0)
+          errors.push('enemy['+i+'] invalid');
+        if(typeof id==='string'&&id){factionIds[id]=true;if(finite(weight)&&weight>=0)weightTotal+=weight;}
+      });
+      if(Math.abs(weightTotal-1)>1e-6)errors.push('enemy weights must sum to 1');
+    }
     if(spec.observation){
       var descriptor={v:1,kind:'expedition',generation:1,seed:spec.seed,grid:CFG.GRID,observation:spec.observation};
       if(!APH.TerrainModel||!APH.TerrainModel.hasObservation(descriptor)) errors.push('invalid observation');

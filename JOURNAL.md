@@ -2282,3 +2282,32 @@ console:  (无)
 
 - Spec 终审复现持久 PlanetSpec 的 `beacons:[null]` 会让旧校验器自身抛异常，`laws:[null]` 也会漏过后在图鉴崩溃。现在 PlanetSpec 对信标、法则、敌对殖民地、敌人、地形和调色板做非抛异常的深层运行结构校验；恢复入口另有异常兜底。runtime 镜像残缺仍由完整持久档覆盖，持久档自身损坏则启动不崩并幂等返航。
 - 最终重建 game.html 40953KB；1038 单元、135 scenario、5 perf、7 boss 全绿。最终 DOM 性能桩 P50=2ms/P95=3ms、20 次寻路44ms、存档1239088字节。重建后的 Headless Chrome 鼠标/纯键盘链路再次通过：移动66.4px、刷新保留2件货物、重复返航不重放、运行错误0。等待冻结树双轴最终 PASS 后提交 #201。
+
+### 2026-09-14 04:01 +08 · #202 已知星球重访与故障恢复
+
+- Atlas 首次实际着陆记一次访问，已知星重访只更新访问次数和最后访问时间。远征规划器每次打开都要求显式选择，并列出已观测/旧版地图；已知星按稳定 ID/seed 读取原 PlanetSpec，不重新观测或触发 LLM。访问记录与殖民地 metaSnapshot 同批写入，任一可捕获失败回滚且不扣补给、不切世界，PlanetSpec 原始字节始终不写。
+- 启动时从现存 `aphelion_planet_P…` 回填缺失 Atlas，只接受 key 与内部 ID 相同且完整可读的档案；历史短 ID 保留。无 Observation 的旧 PlanetSpec 继续 generation 0/固定湖，带 Observation 的星球继续 generation 1；Active Run 刷新恢复都以持久 PlanetSpec 为事实源。完整门禁发现并修复 `save.js → Planet` 向后依赖：将只依赖 CFG/Observe/TerrainModel 的 `planet.js` 前移到 `save.js` 前，并同步全部构建/测试入口，未登记新层级债。
+- 最终验证：`python3 build.py` 成功（game.html 40959KB，SHA-256 `047cddfca81326cce32595e242b110e7156ee20cd2c958ffa2af27d471352485`）；1043 单元、138 scenario、5 perf、7 boss 全绿，`git diff --check` 通过。DOM 性能桩 P50=1ms/P95=3ms、20 次寻路49ms、存档1239120字节，不代表浏览器真实帧率。
+- 重建产物用独立 profile 的 Headless Chrome 走过：鼠标首次发现、远征移动66.4px、刷新保留2件货物、重复返航不重放、纯键盘聚焦并选择同一已知星、访问次数1→2、PlanetSpec 字节不变、再次返航后目的地恢复未选择、运行错误0。该链路含显式移动/货物夹具，不是长期人工游玩。下一步 #203 收口远征资源与遗迹覆盖物；#202 冻结树等待双轴最终复审。
+
+### 2026-09-14 04:22 +08 · #202 复审阻断修复与最终门禁
+
+- 04:01 的证据属于首轮冻结树，Spec 复审随后复现了 `ExpeditionState.begin` 之后首个殖民地 runtime 保存失败仍显示着陆的问题。现在发射提交段在关闭规划器前保存完整 Active Run；失败会恢复提交前的对象图、家园/远征 slot 共享引用、名册与补给，并用保存回执恢复 localStorage 原始字节。新星的 PlanetSpec/发现记录和已知星的访问记录都会一并撤回。
+- Standards 复审边界同步补齐：未来版本 `metaSnapshot` 在 envelope 迁移或 Atlas 回填前拒绝写回；#201 的 `visits:0` 且无访问时间按已完成首访归一；PlanetSpec 拒绝越界 tier/密度/湖半径、非法夜间倍率和未归一阵营权重，同时保留早期缺 tier 的 v1 legacy 档。
+- 最终重建 `game.html` 41947629 字节，SHA-256 `09c38c7468cb06166c63d87219616d0e9a0dbe11c118e3c70d9bbae4e9bd44bc`；1048 单元、141 scenario、5 perf、7 boss 全绿，`git diff --check` 通过。DOM 性能桩记录 P50=1ms/P95=3ms、20 次寻路56ms、存档1239032字节，不代表浏览器实际帧率。
+- 重建产物的 Headless Chrome 再次走过鼠标首次发现、刷新、幂等返航、纯键盘选择原星重访、访问次数1→2、PlanetSpec 字节不变和返航后强制重选，运行错误0。移动与货物为显式夹具，普通入口长期人工游玩仍留到 #204；冻结树交双轴终审。
+
+### 2026-09-14 04:33 +08 · #202 多标签页与损坏权威快照终审修复
+
+- Standards 终审复现活动旧页面会在 `metaWillSave` 阶段覆盖另一标签页写入的未来 `metaSnapshot`。保护现已收口到所有 colony 写入口，并在事件/checkpoint 前同时检查 localStorage 与本标签页内存兜底；拒绝时不改活动 colony 对象，也不单写旧 meta。合法 JSON 字符串/数组等损坏 nested meta 则回退 standalone meta，加载过程保持 colony 原始字节。
+- 两条聚焦回归加入后 27/27 通过；最终重建 `game.html` 41949077 字节，SHA-256 `cb83182d734ac86aacb74cfc7d940f30ada16d8ae37a6caa36902751566207be`。1050 单元、141 scenario、5 perf、7 boss 全绿，`git diff --check` 通过；DOM 性能桩 P50=1ms/P95=5ms、20 次寻路51ms、存档1239030字节，不代表浏览器实际帧率。
+- 新产物 Headless Chrome 链路再次通过：鼠标发现、刷新、幂等返航、纯键盘重访、访问次数1→2、PlanetSpec 字节不变、再次打开强制重选、运行错误0。Spec 上轮真实 quota 注入已 PASS；本次新增边界交双轴复核后再提交。
+
+### 2026-09-14 04:36 +08 · #202 损坏快照空值边界
+
+- Spec 增量复核发现空字符串、0、null 的 nested `metaSnapshot` 会绕过 truthy 判断，使待迁移 v2 colony 被写成 v3。读取现改按字段存在性判断；字符串、数组、空字符串、0、null 五类非对象值均回退 standalone meta，并保持待迁移 colony 原始字节。
+- 聚焦 27/27；最终重建 `game.html` 41949117 字节，SHA-256 `30c8cac251a4bbe2d2ccfdb8250467b09b662dccd8a4ab8578e604dad8f607e2`。1050 单元、141 scenario、5 perf、7 boss、Headless Chrome 重访链路全绿，运行错误0，`git diff --check` 通过。DOM 性能桩 P50=1ms/P95=4ms、20 次寻路54ms、存档1239056字节；冻结树再次交双轴终审。
+
+### 2026-09-14 04:39 +08 · #202 双轴终审通过
+
+- Spec 最终复核覆盖五类损坏 nested meta、跨标签未来快照与构建同步，Standards 最终复核覆盖真实 quota 回滚、完整门禁、Chrome 链路、追加日志和产物字节；两轴均 PASS，无剩余 blocker。#202 可提交，下一步 #203。
