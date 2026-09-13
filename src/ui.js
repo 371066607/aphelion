@@ -865,6 +865,35 @@ APH.UI = (function(){
   }
 
   /* 默认面板注册 */
+  function renderLaunchDest(){
+    var s=window.APH && window.APH.state;
+    var body=document.getElementById('launchDestBody');
+    var el=document.getElementById('launchDest');
+    if(!s || !body || !APH.Observe || !APH.Observe.destinations) return;
+    var html='';
+    APH.Observe.destinations(s.meta).forEach(function(d){
+      var label=d.kind==='unknown'?'未知新星':(d.name||d.id);
+      html+='<div class="launchDestItem" data-kind="'+d.kind+'" data-id="'+(d.id||'')+'">'+esc(label)+'</div>';
+    });
+    body.innerHTML=html;
+    if(el && !el._launchBound){
+      el._launchBound=true;
+      el.addEventListener('click', function(ev){
+        var n=ev.target;
+        while(n && n!==el){
+          if(n.getAttribute && n.getAttribute('data-kind')){
+            var dest={ kind:n.getAttribute('data-kind') };
+            if(dest.kind==='known') dest.id=n.getAttribute('data-id');
+            APH.UI.close('launchDest');
+            APH.U.emit('launchPicked', dest);
+            return;
+          }
+          n=n.parentNode;
+        }
+      });
+    }
+  }
+  registerModal('launchDest', { elId: 'launchDest', isOverlay: true, render: renderLaunchDest });
   registerModal('codex', { elId: 'codex', isOverlay: true, render: renderCodex });
   registerModal('techMap', { elId: 'techMap', isOverlay: true, render: renderTechMap, onOpen: ensureTechSel });
 

@@ -92,15 +92,33 @@ window.APH = window.APH || {};
     return drafted.length ? drafted : roster;
   }
 
-  function launchExpedition(){
+  function launchExpedition(dest){
     var s = APH.state;
-    if(s.scene==='expedition') return;
+    if(s.scene==='expedition') return {ok:false,why:'already'};
+    dest = dest || s.launchDest;
     /* ADR-45: 没有主角就没有「一个人出发」—— 得有人可派 */
     var squad = expeditionSquad();
     if(!squad.length){
       APH.UI.floatText('✕ 没有可派出的殖民者 —— 先招人', '#ff9a9a');
-      return;
+      return {ok:false,why:'no_squad'};
     }
+    var plan = window.APH.Observe && APH.Observe.land ? APH.Observe.land(dest, {
+      meta: s.meta,
+      seed: s.launchSeed,
+      run: s.expeditionRun,
+      makePlanet: function(seed){ return APH.Planet.fallbackPlanet(seed != null ? seed : ((Date.now()%100000)|0)); },
+      savePlanet: function(id, spec){ APH.Save.savePlanet(id, spec); },
+      loadPlanet: function(id){ return APH.Save.loadPlanet(id); }
+    }) : {ok:false,why:'no_destination'};
+    if(!plan.ok){
+      if(plan.why==='no_destination'){
+        APH.UI.floatText('✕ 先选目的地（已知星或未知新星）', '#ff9a9a');
+        if(APH.UI.open) APH.UI.open('launchDest');
+      }
+      return plan;
+    }
+    s.expeditionRun = { spec: plan.spec };
+    s.launchDest = dest || s.launchDest;
     s.squad = squad.map(function(r){ return r.id; });
     closeColonyOverlays();
     s.selectedRid=null;   /* ADR-29: 离开家园解除征召 (实体将重建) */
@@ -114,18 +132,14 @@ window.APH = window.APH || {};
       APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
         ' — 星球上的晶体可以回氧，别浪费舱位','#ffc857');
     }
-    var seed=(Date.now()%100000)|0;
-    var planet = APH.Planet.fallbackPlanet(seed);
-    var cached = APH.Save.loadPlanet(planet.id);
-    if(cached){ applySpec(planet=cached); }
-    else{
-      applySpec(planet);
+    var planet = plan.spec;
+    var cached = !plan.first;
+    applySpec(planet);
+    if(!cached && APH.LLM && APH.LLM.enrichPlanet){
       APH.LLM.enrichPlanet(planet).then(function(rich){
-        if(rich && s.scene==='expedition' && !s.specSaved && s.spec.seed===planet.seed){
-          rich.id=planet.id;
-          APH.Save.savePlanet(rich.id, rich);
-          s.specSaved=true;
-          applySpec(rich);
+        if(rich && s.scene==='expedition' && s.spec && s.spec.seed===planet.seed){
+          planet.name=rich.name||planet.name; planet.lore=rich.lore||planet.lore;
+          APH.Save.savePlanet(planet.id, planet);
         }
       });
     }
@@ -226,7 +240,9 @@ window.APH = window.APH || {};
     if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
     if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
     U.emit('launched',{});
+    return plan;
   }
+  U.on('launchPicked', function(dest){ launchExpedition(dest); });
 
   /* 返回殖民地(发射台交互) */
   /* T5: 通关 —— 呼叫救援离开这颗星球。 */
@@ -4043,9 +4059,10 @@ window.APH = window.APH || {};
        因为出发/返航现在是殖民地级动作(派队/召回), 不再是走到发射台按键。 */
     debugPressE:function(){
       var s=APH.state;
-      if(s.scene==='home') launchExpedition();
+      if(s.scene==='home') launchExpedition(s.expeditionRun ? null : {kind:'unknown'});
       else returnHome();
     },
+    launchExpedition:launchExpedition,
     guardTrim:guardTrim,
     applyTech:applyTech,
     setupSiegeCamp:setupSiegeCamp,

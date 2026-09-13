@@ -373,8 +373,67 @@ APH.Observe = (function(){
     return out;
   }
 
+  function destinations(meta){
+    var out = [{ kind: 'unknown' }], seen = {}, list, i, p;
+    list = (meta && meta.atlas) || [];
+    for(i = 0; i < list.length; i++){
+      p = list[i];
+      if(!p || !p.id || seen[p.id]) continue;
+      seen[p.id] = 1;
+      out.push({ kind: 'known', id: p.id, name: p.name, biomeId: p.biomeId });
+    }
+    return out;
+  }
+  function canLaunch(dest){
+    if(!dest || dest.kind == null) return { ok: false, why: 'no_destination' };
+    if(dest.kind === 'unknown') return { ok: true };
+    if(dest.kind === 'known' && dest.id) return { ok: true };
+    return { ok: false, why: 'no_destination' };
+  }
+  function fromCodex(){ return { ok: false, why: 'codex_readonly' }; }
+  function rememberAtlas(meta, spec){
+    var i;
+    if(!meta || !spec || !spec.id) return;
+    meta.atlas = meta.atlas || [];
+    for(i = 0; i < meta.atlas.length; i++) if(meta.atlas[i] && meta.atlas[i].id === spec.id) return;
+    meta.atlas.push({ id: spec.id, name: spec.name, biomeId: spec.biome && spec.biome.id });
+  }
+  function persistPlanet(spec, opts){
+    if(!spec || !spec.id || !opts || !opts.savePlanet) return;
+    opts.savePlanet(spec.id, spec);
+  }
+  function land(dest, opts){
+    opts = opts || {};
+    var spec, first, gate;
+    if(opts.run && opts.run.spec && gridOf(opts.run.spec)){
+      if(!dest || dest.kind === 'resume' || (dest.kind === 'known' && dest.id === opts.run.spec.id)){
+        return { ok: true, spec: opts.run.spec, resumed: true, first: false };
+      }
+    }
+    gate = canLaunch(dest);
+    if(!gate.ok) return gate;
+    if(dest.kind === 'known'){
+      spec = opts.loadPlanet ? opts.loadPlanet(dest.id) : null;
+      if(!spec) return { ok: false, why: 'missing' };
+      first = !gridOf(spec);
+      ensurePlanet(spec, opts);
+      persistPlanet(spec, opts);
+      rememberAtlas(opts.meta, spec);
+      return { ok: true, spec: spec, resumed: false, first: first };
+    }
+    if(!opts.makePlanet) return { ok: false, why: 'no_planet' };
+    spec = opts.makePlanet(opts.seed);
+    if(!spec) return { ok: false, why: 'no_planet' };
+    first = !gridOf(spec);
+    ensurePlanet(spec, opts);
+    persistPlanet(spec, opts);
+    rememberAtlas(opts.meta, spec);
+    return { ok: true, spec: spec, resumed: false, first: first };
+  }
+
   return {
     observe: observe, ensureHome: ensureHome, ensurePlanet: ensurePlanet, gridOf: gridOf,
-    cellAt: cellAt, hasWater: hasWater, walkableWorld: walkableWorld, floraFrom: floraFrom
+    cellAt: cellAt, hasWater: hasWater, walkableWorld: walkableWorld, floraFrom: floraFrom,
+    destinations: destinations, canLaunch: canLaunch, fromCodex: fromCodex, land: land
   };
 })();
