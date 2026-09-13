@@ -77,11 +77,13 @@ test('#182 fire: 灭火格熄灭', () => {
 });
 
 test('#185 prisoner: 俘虏与释放', () => {
-  const meta = { prisoners: [] };
-  const en = { id:'en_1', name:'袭击者', x:10, y:10, dead:false };
+  const meta = { prisoners: [], residents: [] };
+  const person = Res.hostilePawn(1, []);
+  const en = Res.embodyHostile(person, 10, 10);
   const p = Res.capturePrisoner(meta, en);
   if (!p || meta.prisoners.length !== 1) throw new Error('应入监');
-  if (!en.dead) throw new Error('俘虏后战场实体应消失');
+  if (p.id !== en.id) throw new Error('俘虏应是同一 id');
+  if (en.dead) throw new Error('人型俘虏不得把原对象标死');
   if (!Res.releasePrisoner(meta, p.id) || meta.prisoners.length !== 0) throw new Error('应释放');
 });
 

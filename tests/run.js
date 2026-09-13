@@ -37,13 +37,13 @@ global.test = test;
 
 /* ---- 加载被测模块(顺序同 build.py, 不含 DOM 依赖模块) ---- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'input.js', 'humanoid.js', 'save.js', 'opening.js', 'planet.js', 'combat.js', 'entities.js', 'colony.js', 'rivals.js', 'events.js', 'nav.js', 'weather.js', 'residents.js', 'alerts.js', 'visitors.js', 'colonytick.js', 'draw.js', 'sprites.js', 'llm.js', 'hints.js']) {
+for (const f of ['config.js', 'utils.js','entity_index.js', 'world_runtime.js', 'build_grid.js', 'terrain_model.js','scene.js','camera.js', 'input.js', 'humanoid.js', 'save.js', 'opening.js', 'planet.js', 'combat.js', 'entities.js', 'colony.js', 'construction.js','recovery.js','home_progress.js', 'logistics.js','production_jobs.js','storage.js', 'rivals.js', 'events.js', 'nav.js', 'weather.js', 'residents.js','ecology.js', 'expedition_state.js', 'alerts.js', 'visitors.js', 'colonytick.js', 'draw.js', 'sprites.js', 'llm.js', 'hints.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 
 /* ---- 加载测试文件 ---- */
 const argFiles = process.argv.slice(2);
-const EXCLUDE = ['scenario.test.js', 'perf.test.js', 'boss.test.js', 'ui_modals.test.js',
+const EXCLUDE = ['scenario.test.js', 'perf.test.js', 'boss.test.js', 'season_soak.test.js', 'ui_modals.test.js',
   'building_proto.test.js', 'building_proto_boot.test.js', 'building_proto_ui.test.js'];   // 独立入口(DOM桩/require)
 let files = argFiles.length ? argFiles
   : fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js') && !EXCLUDE.includes(f));

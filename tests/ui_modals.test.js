@@ -40,7 +40,7 @@ global.document = {
 
 /* ---------- 加载被测模块 ---------- */
 const SRC = path.join(__dirname, '..', 'src');
-for (const f of ['config.js', 'utils.js', 'input.js', 'ui.js']) {
+for (const f of ['config.js', 'utils.js', 'input.js', 'colony.js', 'ui.js']) {
   new Function(fs.readFileSync(path.join(SRC, f), 'utf-8'))();
 }
 
@@ -130,6 +130,7 @@ UI.open('buildCatalog');
 assert('buildCatalog DOM display 显示', elements.mockBuildCatalog.style.display === '');
 assert('抽屉模态打开不会将 state.mode 改为 paused', window.APH.state.mode === 'running');
 assert('抽屉模态不算阻断全屏模态 (hasActiveModal 为 false)', UI.hasActiveModal() === false);
+assert('建造抽屉不占用 modal 上下文', window.APH.Input.currentContext() === 'game');
 UI.close('buildCatalog');
 assert('buildCatalog 正常关闭', elements.mockBuildCatalog.style.display === 'none');
 assert('state.mode 保持 running', window.APH.state.mode === 'running');
@@ -176,6 +177,13 @@ assert('roster 默认已注册并能打开', UI.open('roster') === true);
 UI.close('roster');
 assert('orders 默认已注册并能打开', UI.open('orders') === true);
 assert('orders 作为抽屉模态不阻断主循环', UI.hasActiveModal() === false);
+assert('命令抽屉打开时上下文仍是 game', window.APH.Input.currentContext() === 'game');
+let orderDowns = 0;
+const onOrderDown = () => { orderDowns++; };
+window.APH.Input.onAction('POINTER_DOWN', onOrderDown);
+window.APH.Input.dispatchPointer('pointerdown', { button: 0, clientX: 10, clientY: 10 });
+window.APH.Input.offAction('POINTER_DOWN', onOrderDown);
+assert('命令抽屉打开时仍能按下画布开始拉框', orderDowns === 1);
 UI.close('orders');
 
 // 10. ADR-28 补丁: 指挥官(玩家)行出现在命令表
@@ -357,10 +365,14 @@ window.APH.state = {
   meta: { residents: [], res: {} },
 };
 const txHtml = UI.inspectorHtml({ type: 'building', entity: { bid: 'bl_transmitter', x: 10, y: 10 } }, window.APH.state);
-assert('通电的发射器给出呼叫救援按钮', txHtml.indexOf("callRescue") !== -1);
-assert('按钮文案说清楚这是终局', txHtml.indexOf('呼叫救援') !== -1);
+assert('通电的通信灯塔给出进度按钮', txHtml.indexOf("callRescue") !== -1);
+assert('按钮文案指向继续经营的扎根目标', txHtml.indexOf('家园扎根进展') !== -1);
+assert('不再提供离开星球结局', txHtml.indexOf('呼叫救援') === -1);
 
 window.APH.state.colony.buildings[0].powered = false;
 const txOff = UI.inspectorHtml({ type: 'building', entity: { bid: 'bl_transmitter', x: 10, y: 10 } }, window.APH.state);
 assert('没电时不给按钮', txOff.indexOf("callRescue") === -1);
 assert('没电时说明原因', txOff.indexOf('未通电') !== -1);
+
+console.log(`最终结果: ${pass} 通过 / ${fail} 失败`);
+if(fail) process.exit(1);

@@ -30,7 +30,7 @@ APH.Events = (function(){
     { id:'ev_plague',       can:function(c){ return (c.residentCount||0)>0; } },
     { id:'ev_blight',       can:function(c){ return !!c.hasFarm; } },
     { id:'ev_solar_flare',  can:function(c){ return !!c.hasTurret; } },
-    { id:'ev_raid',         can:function(c){ return !!c.rivalReady && !c.raidActive; } },
+    { id:'ev_raid',         can:function(c){ return !!c.rivalReady && !c.raidActive && !c.raidProtected && !c.recovering; } },
     /* 天气切换(ADR-15): 导演掷骰推进马尔可夫状态机;
        can 谓词=非冷却期(与通用冷却同判) + 需天气上下文(驱动方必带)。 */
     { id:'ev_weather',      can:function(c){
@@ -141,6 +141,7 @@ APH.Events = (function(){
       if(w==null && E.baseWeights) w = E.baseWeights[card.id];
       w = w||0;
       if(cfg.neg){
+        if(ctx.recovering)return;
         if((ctx.sinceNeg!=null?ctx.sinceNeg:1e9) < rest) return;   // 喘息窗口
         w *= 1 + (ctx.threat||0) * negMulPer;                      // 富→险
         if((ctx.moodAvg!=null?ctx.moodAvg:100) < mercyAt) w *= mercyMul;
@@ -202,6 +203,7 @@ APH.Events = (function(){
         E.weatherStepSec!=null ? E.weatherStepSec : 210);
       st.weatherAcc = 0;
       var next = APH.Weather.tickWeather(cur, grant, rng);
+      if(ctx&&ctx.recovering&&weatherIsExtreme(next.id)&&next.id!==cur.id)next=cur;
       if(weatherIsExtreme(cur.id) && !weatherIsExtreme(next.id)
          && next.id !== 'wx_clear'){
         next = { id:'wx_clear', t:0, cd: next.cd || null };   // 1 天气周期晴天窗口

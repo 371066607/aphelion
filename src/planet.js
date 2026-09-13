@@ -306,6 +306,18 @@ APH.Planet = (function(){
   }
 
   /* 远征星球野生异星植物生成 (Flora #36, Biome #42) */
+  function expeditionDeposits(seed,kind){
+    if(kind!=='resources')return [];
+    var cfg=CFG.expedition,a=((seed>>>0)%4)*Math.PI/2;
+    return cfg.resourceDeposits.map(function(d,i){
+      var side=(i-(cfg.resourceDeposits.length-1)/2)*cfg.depositSpacing;
+      return {id:'exp_ore_'+seed+'_'+i,type:'flora',kind:d.kind,
+        x:CFG.HAB.x+Math.cos(a)*cfg.depositRadius-Math.sin(a)*side,
+        y:CFG.HAB.y+Math.sin(a)*cfg.depositRadius+Math.cos(a)*side,
+        hp:d.hp,maxHp:d.hp,amount:d.amount,yieldItemId:d.itemId,expeditionResource:true};
+    });
+  }
+
   function generateExpeditionFlora(seed, tier, biome){
     var rng = U.makeRng((seed ^ 0xEE7A) >>> 0 || 31);
     var out = [];
@@ -427,7 +439,7 @@ APH.Planet = (function(){
 
   return { fallbackPlanet:fallbackPlanet, validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
-           generateExpeditionFlora:generateExpeditionFlora,
+           generateExpeditionFlora:generateExpeditionFlora, expeditionDeposits:expeditionDeposits,
            generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,
            openArtifactVault:openArtifactVault,
            AUTOMATON_FACTION:AUTOMATON_FACTION,

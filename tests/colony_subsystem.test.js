@@ -12,12 +12,16 @@ test('colony: tickConstruction 推进蓝图进度并在满进度时实体化建�
       buildings: [],
       buildQueue: [{ bid: 'bl_mine', x: 100, y: 100, total: 10, progress: 0.9, building: false }]
     },
-    meta: { residents: [], tech: {} },
-    entities: [{ type: T.BLUEPRINT, bid: 'bl_mine', x: 100, y: 100, progress: 0.9, building: false }],
+    meta: { residents: [{ id:'r_builder', mainSkill:'sk_build', skills:{sk_build:4} }], tech: {}, workPrio:{} },
+    entities: [
+      { id:'bp_mine', type: T.BLUEPRINT, bid: 'bl_mine', x: 100, y: 100, progress: 0.9, building: false },
+      { id:'r_builder', rid:'r_builder', type:T.RESIDENT, x:150, y:100 }
+    ],
     parts: []
   };
 
-  // 玩家在蓝图旁 (100, 100)，推进 2 秒 (0.9 + 2/10 = 1.1 >= 1 完工)
+  // 有效建造居民在蓝图旁，推进 2 秒 (0.9 + 2/10 = 1.1 >= 1 完工)。
+  // ADR-45 已无玩家化身，s.px 不能再当幽灵施工者。
   Colony.tickConstruction(s, 2);
 
   // 1. 蓝图出队

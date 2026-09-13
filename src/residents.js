@@ -80,21 +80,77 @@ APH.Res = (function(){
   function capturePrisoner(meta, enemy){
     if(!meta || !enemy) return null;
     meta.prisoners = meta.prisoners || [];
-    var p = { id: enemy.id || ('rv_cap_' + meta.prisoners.length), name: enemy.name || '俘虏', x: enemy.x, y: enemy.y };
-    meta.prisoners.push(p);
+    var person = enemy.pawn || enemy;
+    var human = !!(enemy.humanlike || person.humanlike || isHumanlike(enemy));
+    if(human){
+      person.prisoner = true;
+      person.faction = person.faction && person.faction !== 'home' ? person.faction : (person.faction || 'hostile');
+      enemy.prisoner = true;
+      enemy.captured = true;
+      enemy.dead = false;
+      enemy.state = 'idle';
+      var exists = false;
+      for(var i=0;i<meta.prisoners.length;i++) if(meta.prisoners[i] && meta.prisoners[i].id===person.id) exists=true;
+      if(!exists) meta.prisoners.push(person);
+      return person;
+    }
+    var stub = { id: enemy.id || ('rv_cap_' + meta.prisoners.length), name: enemy.name || '俘虏', x: enemy.x, y: enemy.y };
+    meta.prisoners.push(stub);
     enemy.dead = true;
     enemy.prisoner = true;
-    return p;
+    return stub;
   }
   function releasePrisoner(meta, id){
     if(!meta) return false;
     var n = (meta.prisoners || []).length;
-    meta.prisoners = (meta.prisoners || []).filter(function(p){ return p.id !== id; });
-    return meta.prisoners.length < n;
+    var released = null;
+    meta.prisoners = (meta.prisoners || []).filter(function(p){
+      if(p && p.id === id){ released = p; p.prisoner = false; return false; }
+      return true;
+    });
+    return !!(released || meta.prisoners.length < n);
+  }
+  function recruitPrisoner(meta, id, housingCap){
+    if(!meta) return { ok:false, why:'无存档' };
+    var list = meta.prisoners || [];
+    var person = null;
+    for(var i=0;i<list.length;i++) if(list[i] && list[i].id===id) person=list[i];
+    if(!person) return { ok:false, why:'找不到俘虏' };
+    person.origin = person.origin || '本地出生';
+    var rec = recruitInto(meta, person, housingCap);
+    if(!rec.ok) return rec;
+    rec.resident.faction = 'home';
+    rec.resident.prisoner = false;
+    person.faction = 'home';
+    person.prisoner = false;
+    meta.prisoners = list.filter(function(p){ return p && p.id !== id; });
+    return rec;
   }
   function buryCorpse(c){
     if(c) c.dead = true;
     return c;
+  }
+  /* Event IDs make shared history idempotent across return/reload. The roster is canonical. */
+  function rememberShared(meta, ids, event){
+    if(!meta || !event || !event.id) return false;
+    var cfg=CFG.sharedMemory, people=(meta.residents||[]).filter(function(r){
+      return r&&!r.dead&&(ids||[]).indexOf(r.id)>=0;
+    }), added=[];
+    people.forEach(function(r){
+      var list=r.memories||(r.memories=[]);
+      if(list.some(function(m){return m.id===event.id;}))return;
+      list.push({id:event.id,kind:event.kind,text:event.text,clock:event.clock||0,
+        until:(event.clock||0)+CFG.DAY_LEN*cfg.days,mood:cfg.mood,
+        others:people.filter(function(o){return o!==r;}).map(function(o){return o.id;})});
+      if(list.length>cfg.limit)list.splice(0,list.length-cfg.limit);
+      added.push(r.id);
+    });
+    var bonds=meta.bonds||(meta.bonds={});
+    for(var i=0;i<people.length;i++)for(var j=i+1;j<people.length;j++){
+      if(added.indexOf(people[i].id)>=0&&added.indexOf(people[j].id)>=0)
+        applyBond(bonds,people[i].id,people[j].id,cfg.bond);
+    }
+    return added.length>0;
   }
   function collectThoughts(pawn, ctx){
     pawn = pawn || {};
@@ -112,6 +168,12 @@ APH.Res = (function(){
       var d = cat[id];
       if(!d || !mood) return;
       out.push({ id:id, text:d.text, mood:mood });
+    }
+    var now=ctx.clock;
+    if(now!=null){
+      var recent=(pawn.memories||[]).filter(function(m){return m.until>now&&m.clock<=now;});
+      /* A single recent experience affects mood; repeated voyages cannot stack bonuses. */
+      if(recent.length){var memory=recent[recent.length-1];out.push({id:'memory:'+memory.id,text:memory.text,mood:memory.mood});}
     }
     var food = pawn.food;
     if(food != null){
@@ -264,6 +326,82 @@ APH.Res = (function(){
       schedule: defaultSchedule(),
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
+      faction:'home',
+      humanlike:true,
+    };
+  }
+
+  /* ADR-47: 人型袭击者与殖民者同一套 generate，只改阵营。不写入玩家名册。 */
+  function hostilePawn(seed, takenNames, opts){
+    opts = opts || {};
+    var p = generate(opts.id || ('h' + (seed || 0)), seed, takenNames);
+    p.faction = opts.faction || 'hostile';
+    p.humanlike = true;
+    moodFromThoughts(p, { raid: true });
+    return p;
+  }
+  function isHumanlike(e){
+    if(!e) return false;
+    if(e.humanlike) return true;
+    if(e.pawn && e.pawn.humanlike) return true;
+    return false;
+  }
+  function isPlayerFaction(p){
+    if(!p || p.prisoner || (p.pawn && p.pawn.prisoner)) return false;
+    var f = (p.pawn && typeof p.pawn.faction === 'string') ? p.pawn.faction
+      : (typeof p.faction === 'string' ? p.faction : null);
+    return !f || f === 'home';
+  }
+  function embodyHostile(person, x, y){
+    if(!person) return null;
+    var C = CFG.humanlikeRaid || {};
+    var hp = C.hp != null ? C.hp : 36;
+    var fac = {
+      id: person.faction || 'hostile',
+      name: person.name,
+      behavior: 'melee_swarm',
+      speed: C.speed != null ? C.speed : 96,
+      dmg: C.dmg != null ? C.dmg : 8,
+      hp: hp,
+      gene: { hue: 18, sides: 4, limbs: 4, size: 1, spikes: 0, eyes: 2 }
+    };
+    return {
+      id: person.id,
+      type: (CFG.entType && CFG.entType.ENEMY) || 'enemy',
+      humanlike: true,
+      name: person.name,
+      pawn: person,
+      x: x || 0, y: y || 0,
+      hp: hp, maxHp: hp,
+      faction: fac,
+      state: 'idle',
+      wanderA: 0,
+      atkCd: 0,
+      walkPh: 0
+    };
+  }
+  function embodySoldier(person, x, y){
+    if(!person) return null;
+    person.faction = 'home';
+    person.humanlike = true;
+    person.prisoner = false;
+    person.drafted = true;
+    var C = CFG.soldier || {};
+    var hp = C.hp != null ? C.hp : 40;
+    return {
+      id: person.id,
+      rid: person.id,
+      type: (CFG.entType && CFG.entType.RESIDENT) || 'resident',
+      humanlike: true,
+      isSoldier: true,
+      drafted: true,
+      name: person.name,
+      pawn: person,
+      faction: { speed: C.speed != null ? C.speed : 120, dmg: C.dmg != null ? C.dmg : 6, hp: hp, nightBoost: 1, behavior: 'melee' },
+      x: x || 0, y: y || 0,
+      hp: hp, maxHp: hp,
+      state: 'idle',
+      walkPh: 0
     };
   }
 
@@ -277,9 +415,10 @@ APH.Res = (function(){
        - 就近分配: 每轮取「居民→椅」距离最小的一对
      输出: { 由rid到 {chair, table} 的映射 }
      返回是否全员有座无关——调用方对无座者退化为旧的无桌吃。 */
-  function diningSeatAlloc(hungry, chairs, tables){
+  function diningSeatAlloc(hungry, chairs, tables, opts){
+    opts=opts||{};
     var C=RS();
-    var chairR=C.diningChairR!=null?C.diningChairR:90;
+    var chairR=opts.modern?Infinity:(C.diningChairR!=null?C.diningChairR:90);
     var tableR=C.chairTableR!=null?C.chairTableR:60;
     if(!hungry || !hungry.length || !chairs || !chairs.length || !tables || !tables.length){
       return {};
@@ -290,7 +429,12 @@ APH.Res = (function(){
       var near=null;
       for(var i=0;i<tables.length;i++){
         var d=Math.sqrt(Math.pow(ch.x-tables[i].x,2)+Math.pow(ch.y-tables[i].y,2));
-        if(d<=tableR){ near=tables[i]; break; }
+        var adjacent=d<=tableR;
+        if(opts.modern&&ch.geometryVersion===1&&tables[i].geometryVersion===1){
+          var cr=APH.BuildGrid.rectOf(ch),tr=APH.BuildGrid.rectOf(tables[i]);
+          adjacent=cr.x<=tr.x+tr.w&&cr.x+cr.w>=tr.x&&cr.y<=tr.y+tr.h&&cr.y+cr.h>=tr.y;
+        }
+        if(adjacent){ near=tables[i]; break; }
       }
       if(!near) return;
       var reachable=false;
@@ -304,6 +448,14 @@ APH.Res = (function(){
     var out={};
     /* 贪心: 反复取全局最近 (居民↔可用椅) 对 */
     var left=hungry.slice();
+    if(opts.modern){
+      left.slice().forEach(function(r){
+        var preferred=(opts.preferred||{})[r.id];
+        var j=usable.findIndex(function(u){return preferred&&(u.chair.uid||u.chair.id)===preferred;});
+        if(j<0)return;
+        var u=usable.splice(j,1)[0];out[r.id]=u;left.splice(left.indexOf(r),1);
+      });
+    }
     while(left.length && usable.length){
       var bi=-1, bj=-1, bd=Infinity;
       for(var i=0;i<left.length;i++){
@@ -1437,7 +1589,7 @@ APH.Res = (function(){
   }
 
   /* 直线走向目标(无寻路): 到达后停下. 坐标不落盘 */
-  function walkToward(e, target, dt, speed){
+  function walkToward(e, target, dt, speed, grid){
     if(!e || !target) return e;
     /* #68: 睡着居民不移动(俯卧贴地): 冻结位置并清走位残留 */
     /* #69: 医疗舱俯卧者同守卫(防御; updateResidents 已短路) */
@@ -1451,7 +1603,8 @@ APH.Res = (function(){
       e.x=target.x; e.y=target.y; e.walking=false;
       return e;
     }
-    var step=spd*(dt||0);
+    var moveCost=(window.APH.Nav&&APH.Nav.terrainCost&&grid)?APH.Nav.terrainCost(grid,Math.floor(target.x/((grid.scene&&grid.scene.grid)||CFG.GRID)),Math.floor(target.y/((grid.scene&&grid.scene.grid)||CFG.GRID))):1;
+    var step=spd*(dt||0)/moveCost;
     if(step>=d){
       e.x=target.x; e.y=target.y; e.walking=false;
       return e;
@@ -1473,6 +1626,7 @@ APH.Res = (function(){
     e.path=null; e.pathI=0; e.pathGoal=null;
   }
   function hasWall(grid){
+    if(grid.blockedAny!=null)return grid.blockedAny;
     for(var y=0;y<grid.length;y++){
       var row=grid[y];
       for(var x=0;x<row.length;x++) if(row[x]===1) return true;
@@ -1487,27 +1641,28 @@ APH.Res = (function(){
     var spd=speed!=null?speed:(C.speed!=null?C.speed:56);
     /* 无墙=退化为逐帧直线(walkToward 原语义, 路径缓存清空) */
     /* 防御: Nav 模块缺失(旧测试桩未加载 nav.js)时同样退化直线 */
-    if(!window.APH.Nav || !grid || !hasWall(grid)){
+    if(!window.APH.Nav || !grid || (!hasWall(grid) && !grid.costedAny)){
       clearPathCache(e);
-      return walkToward(e, target, dt, speed);
+      return walkToward(e, target, dt, speed, grid);
     }
     var eps=(CFG.navWalk&&CFG.navWalk.goalEps!=null)?CFG.navWalk.goalEps:1e-6;
     var goal=e.pathGoal;
-    var sameGoal=!!goal && Math.abs(goal.x-target.x)<eps && Math.abs(goal.y-target.y)<eps;
+    var sameGoal=e.pathRevision===grid.revision && !!goal && Math.abs(goal.x-target.x)<eps && Math.abs(goal.y-target.y)<eps;
     /* 缓存命中: 目标未变且路径未走完 → 沿 e.path 继续 (followPath 消费) */
     if(sameGoal && e.path && e.path.length && e.pathI>=0 && e.pathI<e.path.length){
-      APH.Nav.followPath(e, e.path, dt, spd);
+      APH.Nav.followPath(e, e.path, dt, spd, grid);
       if(e.walking) bumpWalkPh(e, dt);
       return e;
     }
     var p=APH.Nav.astar(grid, e, target);
     if(!p || !p.length){
-      /* 寻路失败(封闭/目标在墙内): 退化直线, 不卡死 */
       clearPathCache(e);
-      return walkToward(e, target, dt, speed);
+      e.walking=false;e.workReason="目的地不可达";
+      return e;
     }
     e.pathGoal={x:target.x, y:target.y};
-    APH.Nav.followPath(e, p, dt, spd);
+    e.pathRevision=grid.revision;
+    APH.Nav.followPath(e, p, dt, spd, grid);
     if(e.walking) bumpWalkPh(e, dt);
     return e;
   }
@@ -1549,8 +1704,8 @@ APH.Res = (function(){
       e.y = H.y + dy / d * R;
       e.wanderA = Math.atan2(-dy, -dx) + (rand() - 0.5);
     }
-    e.x = U.clamp(e.x, 40, CFG.WORLD - 40);
-    e.y = U.clamp(e.y, 40, CFG.WORLD - 40);
+    e.x = U.clamp(e.x, 40, APH.Scene.width() - 40);
+    e.y = U.clamp(e.y, 40, APH.Scene.height() - 40);
     e.walking = true;
     e.face = e.wanderA || 0;
     bumpWalkPh(e, dt);
@@ -1595,14 +1750,28 @@ APH.Res = (function(){
   }
 
   /* 床位分配(纯函数): 按居住舱(bl_house)与医疗舱(bl_clinic)总容量分配床位, 超容者打地铺 */
-  function assignBeds(buildings, residents){
-    var cap = (APH.Colony && APH.Colony.housingCapacity) ? APH.Colony.housingCapacity(buildings||[]) : 2;
-    (residents||[]).forEach(function(r, idx){
-      if(idx < cap){
-        r.bedId = r.bedId || ('bed_' + (idx + 1));
-      }else{
-        r.bedId = null;
-      }
+  function assignBeds(buildings, residents, options){
+    var modern=!!(options&&options.modern)||(buildings||[]).some(function(b){return b.id==='bl_bed';});
+    if(!modern){
+      var cap=(APH.Colony&&APH.Colony.housingCapacity)?APH.Colony.housingCapacity(buildings||[]):2;
+      (residents||[]).forEach(function(r,i){r.bedId=i<cap?(r.bedId||('bed_'+(i+1))):null;});
+      return residents;
+    }
+    var slots=[];
+    (buildings||[]).forEach(function(b){
+      if(!b||b.dead)return;
+      var count=b.id==='bl_bed'?1:b.id==='bl_house'?3*(b.lv||1):0;
+      for(var i=0;i<count;i++)slots.push({id:(b.uid||(b.id+'@'+b.x+','+b.y))+':'+i,building:b});
+    });
+    var used={};
+    (residents||[]).forEach(function(r){
+      var found=slots.find(function(b){return b.id===r.bedId&&!used[b.id];});
+      if(found)used[found.id]=true;else r.bedId=null;
+    });
+    (residents||[]).forEach(function(r){
+      if(r.bedId)return;
+      var free=slots.find(function(b){return !used[b.id];});
+      if(free){r.bedId=free.id;used[free.id]=true;}
     });
     return residents;
   }
@@ -2025,6 +2194,7 @@ APH.Res = (function(){
       roomFriction = APH.Res.roomFrictionOf(env.self, mates, env.bonds);
     }
     return {
+      clock:env.clock!=null?env.clock:s.clock,
       roomMood: roomMood,
       roomPretty: roomPretty,
       roomFriction: roomFriction,
@@ -2051,7 +2221,8 @@ APH.Res = (function(){
     var season = (W && W.seasonAt) ? W.seasonAt(s.clock, CFG.DAY_LEN) : null;
     var buildings = (s.colony && s.colony.buildings) || [];
     return {
-      rooms: (Nav && Nav.roomsOf) ? Nav.roomsOf(buildings) : [],
+      clock:s.clock,
+      rooms: (Nav && Nav.roomsOf) ? Nav.roomsOf(buildings,s.colony&&s.colony.scene) : [],
       ambT: (W && W.ambientTemperatureOf) ? W.ambientTemperatureOf(wxId, isDay, season && season.id) : 22,
       night: !isDay,
       wxExtreme: ((wxFx.exposureGain) || 0) > 0,
@@ -2245,7 +2416,7 @@ APH.Res = (function(){
     var start=(CFG.recruit&&CFG.recruit.impressStart)||50;
     return {
       residentCount:(s.meta.residents||[]).length,
-      housingCap:APH.Colony.housingCapacity(s.colony.buildings),
+      housingCap:APH.Colony.housingCapacity(s.colony.buildings,s.colony),
       food:APH.Colony.haveStock('food'),
       buildings:(s.colony&&s.colony.buildings)||[],
       raidActive:!!(s.war&&s.war.raidActive),
@@ -2299,10 +2470,12 @@ APH.Res = (function(){
     thinkPawn:thinkPawn,
     defaultSchedule:defaultSchedule, ensureSchedule:ensureSchedule,
     hourOfDay:hourOfDay, cycleScheduleSlot:cycleScheduleSlot, scheduleAt:scheduleAt,
-    collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum,
+    collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum, rememberShared:rememberShared,
     moodFromThoughts:moodFromThoughts,
     ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
     makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
-    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner,
+    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner, recruitPrisoner:recruitPrisoner,
+    hostilePawn:hostilePawn, isHumanlike:isHumanlike, isPlayerFaction:isPlayerFaction,
+    embodyHostile:embodyHostile, embodySoldier:embodySoldier,
   };
 })();

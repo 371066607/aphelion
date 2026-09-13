@@ -21,6 +21,24 @@ APH.CFG = {
     prodTick: 30,              // 生产跳秒数（与 tickProduction 一致）
   },
 
+  homeMap:{cells:128,entityCap:4000},
+  entityIndex:{cellPixels:192},
+  rooting:{days:3,foodDays:2},
+  recovery:{materialFraction:.5},
+  homePressure:{firstRaidDay:1,recoveryDays:1,warningSeconds:60},
+  sharedMemory:{limit:24,days:3,mood:3,bond:4},
+
+  /* 新家园野生动物：仅 generation=1 的家园生态层读取。 */
+  ecology:{
+    count:12, hp:20, spawnMinHab:320, spawnSearch:320,
+    alienExposureRadius:72,
+    speed:42, wanderSeconds:4, wanderRange:144,
+    fleeRadius:150, fleeRange:180,
+    forageRadius:110, feedCooldown:8, feedProgress:1,
+    guardWarningRadius:128, guardAttackRadius:54,
+    guardWarningSeconds:2, guardDamage:4, guardCooldown:5
+  },
+
   /* HUD 警报条 (#167) */
   alerts: {
     commander: '指挥官',
@@ -86,14 +104,14 @@ APH.CFG = {
        每一级读真实殖民地状态, 不写死剧本, 因此永远不会枯竭。 */
     goalTexts: {
       recruit:  '招募第一位同伴 —— 等过客路过, [F] 请客提升印象',
-      farm:     '建一座农场 —— 远征带不回粮食，家里得自己种',
+      farm:     '建一座农场 —— 储备口粮，再建立稳定供给',
       food:     '入冬前囤粮：把粮食堆到 {n}（够全员过冬）',
       power:    '通电 —— 建一台发电机(烧木或太阳能)',
       defense:  '立起防线 —— 袭击会随殖民地财富一起变强',
       clinic:   '建医疗舱 —— 没有它，倒下就是死',
-      endtech:  '研发「深空信标阵列」——那是回家的路',
-      endbuild: '建造深空发射器（终局工程，造价高昂）',
-      endgame:  '给发射器通电，走过去按 [E] 呼叫救援',
+      endtech:  '研发「深空信标阵列」——恢复深空通信',
+      endbuild: '建造通信灯塔，建立长期联络',
+      endgame:  '维持通信和稳定生活，在异星扎根',
     },
   },
 
@@ -168,6 +186,7 @@ APH.CFG = {
 
   /* 相机 (ADR-29 / Ticket #160) */
   camera: {
+    zoomMin: 0.5, zoomMax: 2, zoomStep: 1.25,
     panSpeed: 520,              // 基础平移速度 (px/s)
     shiftMul: 2.2,              // Shift 加速平移倍率
   },
@@ -198,6 +217,13 @@ APH.CFG = {
     speed: 120,
     dmg: 6,
     perBarracks: 2,      // 每级兵营+2兵
+  },
+
+  /* ADR-47: 人型袭击者是小人，战斗数值走这张表，不是基因团 */
+  humanlikeRaid: {
+    hp: 36,
+    speed: 96,
+    dmg: 8
   },
 
   /* 战斗 */
@@ -580,9 +606,17 @@ APH.CFG = {
      现在远征只产出「研究点」与「独有物」——
        晶体矿 / 信标遗件 → 研究点(settleGoods)
        实物标本            → 化验解锁作物与种荚(specimenDropsOf, 另行掉落)
-     散装粮食/木材/金属一律回家自己种、自己挖。
+     默认战斗随机掉落仍不发散装粮食/木材/金属。ADR-46 修订：资源搜集远征另生成有限矿点，实际开采后运回家园。
      (docs/colony-first-redesign.md T4) */
   expedition: {
+    checkpointSeconds:5, supplyFoodGain:25, oxygenWarning:25,
+    resourceDeposits:[{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_stone',itemId:'it_stone',amount:6,hp:20}],
+    depositRadius:330,depositSpacing:72,
+    objectives:{
+      resources:{name:'资源搜集',description:'回收晶体矿与可用材料，为家园建设补给。',target:6,itemIds:['it_crystal_ore','it_mineral','it_iron','it_stone','it_wood']},
+      samples:{name:'植物取样',description:'采集异星植物标本，带回实验室化验。',target:2,itemIds:['specimen_dew','specimen_crystal_vine','specimen_flora_glow']},
+      relics:{name:'遗迹设备',description:'搜查遗迹，回收遗件与古代部件。',target:1,itemIds:['it_relic','it_ancient_core','it_ancient_blueprint']}
+    },
     lootTable: [
       { id: 'it_crystal_ore', w: 70, n: [1, 2] },   // → 研究点
       { id: 'it_relic',       w: 30, n: [1, 1] },   // → 大量研究点
@@ -703,6 +737,7 @@ APH.CFG = {
   },
   /* 地上物(RimWorld 式): 产出堆在地上, 搬进仓库才入账 */
   haul: {
+    carryWeight:40,      // 每位居民每趟物理携带重量，普通搬运与工单共用
     pickR: 52,           // 有岗时脚边捡
     seekR: 1200,         // 闲人全殖民地搜索搬运 (ADR-23: 扩展至 1200px)
     grabR: 18,           // 捡起距离
@@ -974,7 +1009,7 @@ APH.CFG = {
          prio 2: 供电不足时先停发射器, 不许它把炮塔和医疗舱挤停机。 */
       bl_transmitter: { load: 35, prio: 2 },
     },
-    wood:  { watts: 14, burnSec: 15 },    // 木柴发电机: 额定功率, 每 burnSec 秒烧 1 木材
+    wood:  { watts: 14, burnSec: 15, refillAt:2, refillBatch:8 }, // 低于阈值时搬一批实物木材进机仓
     solar: { watts: 8 },                  // 太阳能板: 基础功率 × 天气 solarMul (仅白天)
     battery: { cap: 100 },                // 蓄电池容量 (瓦·秒)
     blackoutSec: 60,                      // 停电兜底秒数 (电池耗尽后仍按兜底计时全负荷运行)
@@ -1021,6 +1056,7 @@ APH.CFG = {
     KEY_COLONY: 'aphelion_colony_v1',
     KEY_RIVAL_STATES: 'aphelion_rivals_v1',
     VERSION: 1,
+    COLONY_VERSION: 2,          // Colony envelope only; PlanetSpec stays v1 (ADR-46)
   },
 
   /* LLM (Phase2 启用) */
@@ -1048,6 +1084,9 @@ APH.CFG = {
       KeyK: 'DEBUG_SPAWN',
       KeyC: 'TOGGLE_CAMERA_LOCK',
       KeyM: 'TOGGLE_MUTE',
+      KeyV: 'OPEN_MAP',
+      Equal: 'ZOOM_IN',
+      Minus: 'ZOOM_OUT',
       KeyO: 'TOGGLE_DIPLOMACY',
       KeyR: 'TOGGLE_DRAFT',
       Home: 'FOCUS_COMMANDER',

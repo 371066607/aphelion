@@ -15,6 +15,8 @@ APH.Draw = (function(){
 
   function vpW(){ var v=APH.World.getViewport(); return (v&&v.w)||window.innerWidth; }
   function vpH(){ var v=APH.World.getViewport(); return (v&&v.h)||window.innerHeight; }
+  function viewport(){return {w:vpW(),h:vpH()};}
+  function screenOf(x,y){return APH.Camera.toScreen(APH.state,x,y,viewport());}
 
   function particlesDrawer(dt2,t){
     var ctx2=document.getElementById('cv').getContext('2d');
@@ -74,12 +76,13 @@ APH.Draw = (function(){
     var ctx2=document.getElementById('cv').getContext('2d');
     var C=CFG.command||{};
     var ringR=(C.selectedRingR!=null)?C.selectedRingR:22;
+    var z=APH.Camera.zoom(s),p=screenOf(ent.x,ent.y+10);
     /* 脚底选中环 (脉动) */
     var pulse=Math.sin(time*4)*.5+.5;
     ctx2.strokeStyle='rgba(89,217,255,'+(0.55+pulse*.4)+')';
     ctx2.lineWidth=2;
     ctx2.beginPath();
-    ctx2.ellipse(ent.x, ent.y+10, ringR, ringR*.42, 0, 0, U.TAU);
+    ctx2.ellipse(p.x,p.y,ringR*z,ringR*.42*z,0,0,U.TAU);
     ctx2.stroke();
     /* 命令旗标: 虚线到目标点 */
     var uo=ent.userOrder;
@@ -87,13 +90,14 @@ APH.Draw = (function(){
       ctx2.setLineDash([6,6]);
       ctx2.strokeStyle='rgba(125,255,171,.55)';
       ctx2.beginPath();
-      ctx2.moveTo(ent.x, ent.y+6);
-      ctx2.lineTo(uo.x, uo.y);
+      var from=screenOf(ent.x,ent.y+6),to=screenOf(uo.x,uo.y);
+      ctx2.moveTo(from.x,from.y);
+      ctx2.lineTo(to.x,to.y);
       ctx2.stroke();
       ctx2.setLineDash([]);
       ctx2.strokeStyle='rgba(125,255,171,.9)';
       ctx2.beginPath();
-      ctx2.arc(uo.x, uo.y, 8+pulse*3, 0, U.TAU);
+      ctx2.arc(to.x,to.y,(8+pulse*3)*z,0,U.TAU);
       ctx2.stroke();
     }
   }
@@ -108,7 +112,7 @@ APH.Draw = (function(){
     if(!cv2 || !cv2.getContext) return;
     var ctx2=cv2.getContext('2d');
     if(!ctx2) return;
-    var g=CFG.GRID||48;
+    var z=APH.Camera.zoom(s),g=(CFG.GRID||48)*z;
     var sel = s.selectedTarget && s.selectedTarget.type==='zone' && s.selectedTarget.zone;
     zones.forEach(function(z){
       if(!z || (z.type!=='stockpile' && z.type!=='grow')) return;
@@ -119,8 +123,7 @@ APH.Draw = (function(){
       var stroke = grow ? ((sel && sel.id===z.id) ? '#7dffab' : 'rgba(125,255,171,0.55)')
         : ((sel && sel.id===z.id) ? '#ffc857' : 'rgba(255,200,87,0.55)');
       (z.cells||[]).forEach(function(c){
-        var sx=c.x - s.camX + vpW()/2;
-        var sy=c.y - s.camY + vpH()/2;
+        var p=screenOf(c.x,c.y),sx=p.x,sy=p.y;
         ctx2.fillStyle=col;
         ctx2.fillRect(sx-g/2, sy-g/2, g, g);
         ctx2.strokeStyle=stroke;
@@ -132,12 +135,12 @@ APH.Draw = (function(){
     Object.keys(filth).forEach(function(k){
       var amt=filth[k]; if(!amt) return;
       var xy=k.split(','); var fx=+xy[0], fy=+xy[1];
-      var sx=fx - s.camX + vpW()/2, sy=fy - s.camY + vpH()/2;
+      var p=screenOf(fx,fy),sx=p.x,sy=p.y;
       ctx2.fillStyle='rgba(110,70,30,'+Math.min(0.45, amt/80)+')';
       ctx2.beginPath(); ctx2.arc(sx, sy+4, 6, 0, Math.PI*2); ctx2.fill();
     });
     (s.colony.fires||[]).forEach(function(f){
-      var sx=f.x - s.camX + vpW()/2, sy=f.y - s.camY + vpH()/2;
+      var p=screenOf(f.x,f.y),sx=p.x,sy=p.y;
       ctx2.fillStyle='rgba(255,120,40,0.7)';
       ctx2.beginPath(); ctx2.arc(sx, sy, 10, 0, Math.PI*2); ctx2.fill();
     });
@@ -146,37 +149,41 @@ APH.Draw = (function(){
     var s = APH.state;
     if(!s || s.scene!=='home' || !s.buildMode) return;
     if(s.pointerWx==null || s.pointerWy==null) return;
-    if(!APH.Colony || !APH.Colony.placementGhost) return;
-    var occupied=(s.colony.buildings||[]).concat((s.colony.buildQueue||[]).map(function(q){
-      return {id:q.bid, x:q.x, y:q.y};
-    }));
-    var ghost=APH.Colony.placementGhost(s.buildMode, s.pointerWx, s.pointerWy, occupied, s.meta&&s.meta.tech, s.meta&&s.meta.res, !!s.devFreeBuild);
+    if(!APH.Colony) return;
+    /* Formal construction owns geometry; queued records must remain intact here. */
+    var ghost=(APH.Construction&&APH.Construction.ghost)
+      ? APH.Construction.ghost(s,s.buildMode,s.pointerWx,s.pointerWy,s.buildRotation||0)
+      : (APH.Colony.placementGhost&&APH.Colony.placementGhost(s.buildMode,s.pointerWx,s.pointerWy,
+          (s.colony.buildings||[]).concat((s.colony.buildQueue||[]).map(function(q){return q;})),s.meta&&s.meta.tech,s.meta&&s.meta.res,!!s.devFreeBuild));
     if(!ghost) return;
     var cv2=document.getElementById('cv');
     if(!cv2 || !cv2.getContext) return;
     var ctx2=cv2.getContext('2d');
     if(!ctx2) return;
-    var sx=ghost.x - s.camX + vpW()/2;
-    var sy=ghost.y - s.camY + vpH()/2;
+    var rect=(ghost.record&&APH.BuildGrid&&APH.BuildGrid.rectOf)
+      ? APH.BuildGrid.rectOf(ghost.record,APH.Colony.list&&APH.Colony.list(),s.colony.scene) : null;
+    var center=screenOf(rect?rect.x+rect.w/2:ghost.x,rect?rect.y+rect.h/2:ghost.y);
+    var sx=center.x,sy=center.y,z=APH.Camera.zoom(s);
     var ok=!!ghost.ok;
     ctx2.save();
     ctx2.fillStyle=ok?'rgba(89,217,255,0.18)':'rgba(255,80,80,0.22)';
     ctx2.strokeStyle=ok?'#59d9ff':'#ff6d7a';
     ctx2.lineWidth=2;
     ctx2.setLineDash([6,5]);
-    ctx2.fillRect(sx-ghost.w/2, sy-ghost.h/2, ghost.w, ghost.h);
-    ctx2.strokeRect(sx-ghost.w/2, sy-ghost.h/2, ghost.w, ghost.h);
+    var gw=(rect?rect.w:ghost.w)*z,gh=(rect?rect.h:ghost.h)*z;
+    ctx2.fillRect(sx-gw/2, sy-gh/2, gw, gh);
+    ctx2.strokeRect(sx-gw/2, sy-gh/2, gw, gh);
     ctx2.setLineDash([]);
     var def=(APH.Colony.get&&APH.Colony.get(ghost.bid))||{};
     ctx2.font='12px sans-serif';
     ctx2.textAlign='center';
     ctx2.textBaseline='bottom';
     ctx2.fillStyle=ok?'#c8f0ff':'#ffd0d0';
-    ctx2.fillText((ok?'':'✕ ')+(def.name||ghost.bid), sx, sy-ghost.h/2-6);
+    ctx2.fillText((ok?'':'✕ ')+(def.name||ghost.bid), sx, sy-gh/2-6);
     if(!ok && ghost.why){
       ctx2.font='11px sans-serif';
       ctx2.fillStyle='#ff9a9a';
-      ctx2.fillText(ghost.why, sx, sy+ghost.h/2+16);
+      ctx2.fillText(ghost.why, sx, sy+gh/2+16);
     }
     ctx2.restore();
   }
@@ -196,8 +203,7 @@ APH.Draw = (function(){
       var borderCol = des.type === 'deconstruct' ? '#ff5050' : '#59d9ff';
 
       /* 世界坐标转屏幕坐标 */
-      var sx = e.x - s.camX + vpW()/2;
-      var sy = (e.y - 28) - s.camY + vpH()/2;
+      var p=screenOf(e.x,e.y-28),sx=p.x,sy=p.y;
 
       ctx2.save();
       ctx2.fillStyle = bgCol;
@@ -224,10 +230,8 @@ APH.Draw = (function(){
     if(!cv2) return;
     var ctx2 = cv2.getContext('2d');
 
-    var sx0 = s.orderFrom.x - s.camX + vpW()/2;
-    var sy0 = s.orderFrom.y - s.camY + vpH()/2;
-    var sx1 = s.orderTo.x - s.camX + vpW()/2;
-    var sy1 = s.orderTo.y - s.camY + vpH()/2;
+    var p0=screenOf(s.orderFrom.x,s.orderFrom.y),p1=screenOf(s.orderTo.x,s.orderTo.y);
+    var sx0=p0.x,sy0=p0.y,sx1=p1.x,sy1=p1.y;
 
     var minX = Math.min(sx0, sx1);
     var maxX = Math.max(sx0, sx1);
@@ -254,10 +258,8 @@ APH.Draw = (function(){
     if(!cv2) return;
     var ctx2 = cv2.getContext('2d');
 
-    var sx0 = s.pawnDragStart.x - s.camX + vpW()/2;
-    var sy0 = s.pawnDragStart.y - s.camY + vpH()/2;
-    var sx1 = s.pawnDragEnd.x - s.camX + vpW()/2;
-    var sy1 = s.pawnDragEnd.y - s.camY + vpH()/2;
+    var p0=screenOf(s.pawnDragStart.x,s.pawnDragStart.y),p1=screenOf(s.pawnDragEnd.x,s.pawnDragEnd.y);
+    var sx0=p0.x,sy0=p0.y,sx1=p1.x,sy1=p1.y;
 
     var minX = Math.min(sx0, sx1);
     var maxX = Math.max(sx0, sx1);
@@ -283,9 +285,9 @@ APH.Draw = (function(){
     var pulse=Math.sin(time*4)*.5+.5;
     /* 玩家→发射台方向的浮动三角 */
     var dx=pad.x-s.px, dy=(pad.y-40)-s.py, L=Math.sqrt(dx*dx+dy*dy)||1;
-    var ax=s.px+dx/L*46, ay=s.py+dy/L*46 - Math.sin(time*3)*4;
+    var ax=s.px+dx/L*46, ay=s.py+dy/L*46-Math.sin(time*3)*4,p=screenOf(ax,ay);
     ctx2.save();
-    ctx2.translate(ax,ay);
+    ctx2.translate(p.x,p.y);
     ctx2.rotate(Math.atan2(dy,dx));
     ctx2.fillStyle='rgba(255,200,87,'+(0.45+pulse*.5)+')';
     ctx2.beginPath();
@@ -295,7 +297,7 @@ APH.Draw = (function(){
     /* 距离标签 */
     ctx2.fillStyle='rgba(255,200,87,.75)';
     ctx2.font='10px monospace'; ctx2.textAlign='center';
-    ctx2.fillText('发射台 '+Math.round(L)+'m', ax, ay+20);
+    ctx2.fillText('发射台 '+Math.round(L)+'m',p.x,p.y+20);
   }
 
   function homeDrawers(){
@@ -316,6 +318,10 @@ APH.Draw = (function(){
         var cv=document.getElementById('cv'); if(!cv||!cv.getContext) return;
         var ctx=cv.getContext('2d');
         ctx.save(); ctx.translate(e.x,e.y);
+        if(e.wild){
+          if(e.warning){ctx.strokeStyle='#e39a67';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,3,25,12,0,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#ffcf85';ctx.font='14px sans-serif';ctx.fillText('!',0,-25);}
+          ctx.fillStyle=e.kind==='ridge_guard'?'#9b7961':'#b6b99c';ctx.beginPath();ctx.ellipse(0,-3,16,10,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ded6b4';ctx.beginPath();ctx.ellipse(11,-10,7,9,-.3,0,Math.PI*2);ctx.fill();ctx.fillStyle='#353d36';ctx.fillRect(-9,4,3,8);ctx.fillRect(7,4,3,8);ctx.beginPath();ctx.arc(14,-12,1.5,0,Math.PI*2);ctx.fill();ctx.restore();return;
+        }
         ctx.fillStyle='#e8e0d4';
         ctx.beginPath(); ctx.ellipse(0,2,10,7,0,0,Math.PI*2); ctx.fill();
         ctx.fillStyle='#333'; ctx.font='10px sans-serif'; ctx.textAlign='center';

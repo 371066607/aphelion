@@ -287,7 +287,7 @@ APH.Combat = (function(){
   function trapBreachFocus(en, focus, s, costFn){
     if(!costFn || !window.APH.Nav) return null;
     var bs = (s && s.colony && s.colony.buildings) || [];
-    var grid = APH.Nav.gridOf(bs);
+    var grid = APH.Nav.gridOf(bs,s.scene==='home'&&s.colony?s.colony.scene:null);
     /* 零罚路径存在 → 堵点来自惩罚格(陷阱) */
     var freePath = APH.Nav.astar(grid, {x:en.x,y:en.y}, {x:focus.x,y:focus.y}, null);
     if(freePath) {
@@ -328,8 +328,9 @@ APH.Combat = (function(){
       if(bs[i] && bs[i].id === 'bl_spike_trap' && bs[i].armed !== false) armedTraps.push(bs[i]);
     }
     /* P2: 无墙但有待触发陷阱 → 也走寻路(绕陷阱); 两者皆无 → 直线 */
-    if((!hasWall && !armedTraps.length) || !window.APH.Nav || !en || !focus) return { mode:'direct' };
-    var grid = APH.Nav.gridOf(bs);
+    if(!window.APH.Nav || !en || !focus) return { mode:'direct' };
+    var grid = APH.Nav.gridOf(bs,s.scene==='home'&&s.colony?s.colony.scene:null);
+    if(!grid.blockedAny&&!grid.costedAny&&!armedTraps.length)return {mode:'direct'};
     var GRID = (CFG && CFG.GRID) || 48;   /* ADR-4 逻辑格网 (costFn 闭包用) */
     var trapPen = (CFG.defense && CFG.defense.trapAvoidCost != null) ? CFG.defense.trapAvoidCost : 6;
     var costFn = armedTraps.length ? function(gx, gy){
@@ -341,7 +342,7 @@ APH.Combat = (function(){
       return 0;
     } : null;
     var path = APH.Nav.astar(grid, { x:en.x, y:en.y }, { x:focus.x, y:focus.y }, costFn);
-    if(path && path.length > 1){
+    if(path && (path.length > 1 || grid.costedAny)){
       /* P2b: 路径途经陷阱(罚格)且无绕行 → 拆陷阱意图(标记; 敌人到边 attack 拆, 不踩) */
       var trapOnPath = pathHasTrap(path, armedTraps, GRID);
       if(trapOnPath){
@@ -351,7 +352,7 @@ APH.Combat = (function(){
           return { mode:'breach', wall:tf, trap:true };
         }
       }
-      return { mode:'path', path:path };
+      return { mode:'path', path:path, grid:grid };
     }
     if(!path){
       var wf = breachFocus(en, s);
@@ -484,8 +485,8 @@ APH.Combat = (function(){
       en.state='idle';
       var idle=moveIntent(en, { px:en.x, py:en.y, night:!!night });
       en.x+=idle.vx*dt; en.y+=idle.vy*dt;
-      en.x=U.clamp(en.x,30,CFG.WORLD-30);
-      en.y=U.clamp(en.y,30,CFG.WORLD-30);
+      en.x=U.clamp(en.x,30,APH.Scene.width()-30);
+      en.y=U.clamp(en.y,30,APH.Scene.width()-30);
       if(en.hp<=0) en.dead=true;
       return;
     }
@@ -517,8 +518,8 @@ APH.Combat = (function(){
     }
     var mi=moveIntent(en, c);
     en.x+=mi.vx*dt; en.y+=mi.vy*dt;
-    en.x=U.clamp(en.x,30,CFG.WORLD-30);
-    en.y=U.clamp(en.y,30,CFG.WORLD-30);
+    en.x=U.clamp(en.x,30,APH.Scene.width()-30);
+    en.y=U.clamp(en.y,30,APH.Scene.width()-30);
     en.walkPh=(en.walkPh||0)+dt*(Math.abs(mi.vx)+Math.abs(mi.vy)>1?9:3);
     if(en.hp<=0) en.dead=true;
   }
@@ -526,20 +527,35 @@ APH.Combat = (function(){
   /* ============================================================
      3. 世界侧更新(非纯, 每帧调用)
      ============================================================ */
+  function activeExpedition(s){
+    return s&&s.scene==='expedition'&&window.APH.ExpeditionState&&APH.ExpeditionState.active
+      ? APH.ExpeditionState.active(s.colony)
+      : null;
+  }
+  function expeditionFocus(en,s){
+    var run=activeExpedition(s);
+    var pawns=(s.entities||[]).filter(function(e){
+      return e&&e.type===T.RESIDENT&&!e.dead&&!e.downed
+        &&(!run||run.memberIds.indexOf(e.rid||e.id)>=0);
+    });
+    var best=null,d=Infinity;
+    pawns.forEach(function(e){var nd=U.dst(en.x,en.y,e.x,e.y);if(nd<d){d=nd;best=e;}});
+    if(best)return {x:best.x,y:best.y,kind:'resident',e:best};
+    return run?null:{x:s.px,y:s.py,kind:'player'};
+  }
   function updateCombat(dt, night){
     var s = APH.state;
     var ctx2 = { night:night, px:s.px, py:s.py };
 
     var alive = 0;
     s.entities.forEach(function(en){
-      if(en.type !== T.ENEMY || en.dead || en.downed) return;
-      alive++;
-
-      /* 驻守士兵: 打袭击敌人, 永不打玩家, 不因离玩家过远回收 */
+      if(en.dead || en.downed || en.captured) return;
       if(en.isSoldier){
         stepSoldier(en, dt, night);
         return;
       }
+      if(en.type !== T.ENEMY) return;
+      alive++;
 
       /* 阶段E: 溃退者——背向家园撤离, 越界消失 */
       if(en.retreat){
@@ -548,8 +564,8 @@ APH.Combat = (function(){
         var rl=Math.sqrt(rdx*rdx+rdy*rdy)||1;
         var rspd=en.faction.speed*(RT.fleeSpdMul!=null?RT.fleeSpdMul:1.15);
         en.state='flee';
-        en.x=U.clamp(en.x+rdx/rl*rspd*dt,30,CFG.WORLD-30);
-        en.y=U.clamp(en.y+rdy/rl*rspd*dt,30,CFG.WORLD-30);
+        en.x=U.clamp(en.x+rdx/rl*rspd*dt,30,APH.Scene.width()-30);
+        en.y=U.clamp(en.y+rdy/rl*rspd*dt,30,APH.Scene.width()-30);
         en.walkPh=(en.walkPh||0)+dt*9;
         if(rl>(RT.fleeDespawnR||1000)) en.dead=true;
         if(en.hp<=0) killEnemy(en);
@@ -567,8 +583,8 @@ APH.Combat = (function(){
         var sdx=stx-en.x, sdy=sty-en.y;
         var sl=Math.sqrt(sdx*sdx+sdy*sdy)||1;
         var sspd=en.faction.speed*(SRT.siegeWalkMul!=null?SRT.siegeWalkMul:.35);
-        en.x=U.clamp(en.x+sdx/sl*sspd*dt,30,CFG.WORLD-30);
-        en.y=U.clamp(en.y+sdy/sl*sspd*dt,30,CFG.WORLD-30);
+        en.x=U.clamp(en.x+sdx/sl*sspd*dt,30,APH.Scene.width()-30);
+        en.y=U.clamp(en.y+sdy/sl*sspd*dt,30,APH.Scene.width()-30);
         en.walkPh=(en.walkPh||0)+dt*3;
         if(en.hp<=0) killEnemy(en);
         return;
@@ -578,7 +594,9 @@ APH.Combat = (function(){
          盗掠者(阶段E)只奔地上物堆/仓库 */
       var focus = (s.scene==='home')
         ? (en.pillager ? pickPillageFocus(en, s) : pickRaidFocus(en, s))
-        : { x:s.px, y:s.py, kind:'player' };
+        : expeditionFocus(en,s);
+      /* 活跃远征没有可战斗队员时，敌人不得继续追打旧 px/py 的幽灵主角。 */
+      if(!focus){en.state='idle';en.walking=false;return;}
       /* T4 绕墙寻路: 非逃跑状态都算路径(0.6s 缓存, 防每帧 A*);
          完全堵死 → 改瞄最近墙(拆墙工兵), 墙被拆后立即重算 */
       var pathPlan = null;
@@ -628,6 +646,9 @@ APH.Combat = (function(){
       /* FSM */
       var prev = en.state;
       en.state = fsmStep(en, c);
+      /* 家园袭击者低血逃跑也必须进入统一撤退回收分支；只改 state 会在
+         世界边界永久存活，令 raidActive 和所有战时工作门控永不结束。 */
+      if(s.scene === 'home' && en.state === 'flee') en.retreat = true;
       /* 家园袭击: 刷在视口外, 远征脱战半径会 idle/回收; 非逃跑者保持冲锋 */
       if(s.scene === 'home' && en.state !== 'flee' && en.state !== 'attack') en.state = 'chase';
       if(s.scene === 'home'){
@@ -640,11 +661,11 @@ APH.Combat = (function(){
       en.atkCd -= dt;
       en.wanderA += (U.rr(-1,1)) * dt * 2;
 
-      /* spitter 远程(仍瞄准玩家); 盗掠者不伤人 */
+      /* spitter 远程瞄准当前真实目标；盗掠者不伤人 */
       if(!en.pillager &&
-         shouldSpit(en, Object.assign({}, c, { dist:U.dst(en.x,en.y,s.px,s.py), px:s.px, py:s.py }))){
+         shouldSpit(en, Object.assign({}, c, { dist:U.dst(en.x,en.y,focus.x,focus.y), px:focus.x, py:focus.y }))){
         en.atkCd = 2.2;
-        var ddx = s.px-en.x, ddy = s.py-en.y, dd = Math.sqrt(ddx*ddx+ddy*ddy)||1;
+        var ddx = focus.x-en.x, ddy = focus.y-en.y, dd = Math.sqrt(ddx*ddx+ddy*ddy)||1;
         s.entities.push(makeProj(en.x, en.y, ddx/dd*CFG.enemy.projSpeed, ddy/dd*CFG.enemy.projSpeed, 'enemy', en.faction.dmg));
         U.emit('enemySpit', en);
       }
@@ -680,7 +701,9 @@ APH.Combat = (function(){
           solHit.hp -= en.faction.dmg;
           solHit.hitFlash=0.1;
           if(solHit.hp<=0) solHit.dead=true;
-        }else if(U.dst(en.x,en.y,s.px,s.py) < CFG.enemy.attackR){
+        }else if(focus.kind==='resident'&&strikeResident(en,s,focus.e)){
+          // 真实远征队员受伤，不能再伤到已经不存在的主角。
+        }else if(focus.kind==='player'&&!activeExpedition(s)&&U.dst(en.x,en.y,s.px,s.py) < CFG.enemy.attackR){
           hurtPlayer(en.faction.dmg, en.faction.name);
         }else if(s.scene==='home' && strikeResident(en, s)){
           /* 打伤殖民者, 不致死 */
@@ -707,15 +730,15 @@ APH.Combat = (function(){
       }
       if(pathPlan && pathPlan.mode === 'path' && en.state === 'chase'){
         var pSpd = en.faction.speed * (night ? ((en.faction.nightBoost != null) ? en.faction.nightBoost : 1) : 1) * t10Mul;
-        APH.Nav.followPath(en, pathPlan.path, dt, pSpd);
-        en.x = U.clamp(en.x, 30, CFG.WORLD-30);
-        en.y = U.clamp(en.y, 30, CFG.WORLD-30);
+        APH.Nav.followPath(en, pathPlan.path, dt, pSpd, pathPlan.grid);
+        en.x = U.clamp(en.x, 30, APH.Scene.width()-30);
+        en.y = U.clamp(en.y, 30, APH.Scene.width()-30);
         en.walkPh += dt * (en.walking ? 9 : 3);
       }else{
         var mi = moveIntent(en, c);
         en.x += mi.vx * t10Mul * dt; en.y += mi.vy * t10Mul * dt;
-        en.x = U.clamp(en.x, 30, CFG.WORLD-30);
-        en.y = U.clamp(en.y, 30, CFG.WORLD-30);
+        en.x = U.clamp(en.x, 30, APH.Scene.width()-30);
+        en.y = U.clamp(en.y, 30, APH.Scene.width()-30);
         en.walkPh += dt * (Math.abs(mi.vx)+Math.abs(mi.vy) > 1 ? 9 : 3);
       }
 
@@ -773,7 +796,7 @@ APH.Combat = (function(){
       /* T5 弹道掩体 (issue #78): 墙块拦截一切弹丸(player/siege/enemy)
          本帧路径线段 vs 48px 格碰撞盒; 仅 bl_wall 拦弹(闸门不挡, 穿门语义延续)。
          自家墙不豁免: 玩家/炮塔弹药打自家墙同扣血——墙=真实掩体。 */
-      var wList = (s.colony && s.colony.buildings) || [];
+      var wList = s.scene==='home' ? ((s.colony && s.colony.buildings) || []) : [];
       for(var wi = 0; wi < wList.length; wi++){
         var wb = wList[wi];
         if(!wb || wb.id !== 'bl_wall') continue;
@@ -849,7 +872,13 @@ APH.Combat = (function(){
           }
         }
       }else if(p.side === 'enemy'){
-        if(segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
+        var projectileRun=activeExpedition(s);
+        var squadHit=(s.scene==='expedition')&&(s.entities||[]).find(function(e){return e&&e.type===T.RESIDENT&&!e.dead&&!e.downed&&(!projectileRun||projectileRun.memberIds.indexOf(e.rid||e.id)>=0)&&segDist(segX0,segY0,p.x,p.y,e.x,e.y)<CFG.player.radius+5;});
+        if(squadHit){
+          var member=(s.meta.residents||[]).find(function(r){return r.id===(squadHit.rid||squadHit.id);});
+          if(member&&!(squadHit.hurtCd>0)){APH.Res.hurtResident(member,p.dmg);squadHit.hurtCd=CFG.residents.raidIFrame;squadHit.hitFlash=.12;}
+          p.dead=true;
+        }else if(!projectileRun&&!(s.squad&&s.squad.length) && segDist(segX0,segY0,p.x,p.y,s.px,s.py) < CFG.player.radius+5){
           p.dead = true;
           hurtPlayer(p.dmg, '酸液');
         }else{
@@ -892,13 +921,17 @@ APH.Combat = (function(){
     if(extra.merge !== false){
       for(var i=0;i<s.entities.length;i++){
         var e=s.entities[i];
-        if(!e || e.dead || e.type!==T.DROPPED || e.itemId!==itemId) continue;
+        if(!e || e.dead || e.containerId || e.type!==T.DROPPED || e.itemId!==itemId) continue;
         if(U.dst(e.x,e.y,x,y)<stackR){ found=e; break; }
       }
     }
     if(found){ found.n=(found.n||1)+n; return found; }
+    var nextDropId;
+    var worlds=s.worlds||{},liveLists=[s.entities];
+    Object.keys(worlds).forEach(function(k){if(worlds[k]&&worlds[k].entities)liveLists.push(worlds[k].entities);});
+    do{nextDropId='dp_'+(++pid);}while(liveLists.some(function(list){return list.some(function(e){return e&&e.id===nextDropId;});}));
     var drop={
-      id:'dp_'+(++pid), type:T.DROPPED,
+      id:nextDropId, type:T.DROPPED,
       x:x+(Math.random()*2-1)*jitter, y:y+(Math.random()*2-1)*jitter*0.7,
       itemId:itemId, n:n, bobA:Math.random()*6.28,
       stock: s.scene==='home' || !!extra.stock
@@ -1030,7 +1063,7 @@ APH.Combat = (function(){
   }
 
   /* 袭击近战打伤最近的殖民者; 无敌帧内跳过; 找不到名册则当没打中 */
-  function strikeResident(en, s){
+  function strikeResident(en, s, target){
     var R=window.APH.Res;
     if(!R || !R.hurtResident) return false;
     var C=CFG.residents||{};
@@ -1038,7 +1071,7 @@ APH.Combat = (function(){
     var wound=C.raidWound!=null?C.raidWound:18;
     var best=null, bd=CFG.enemy.attackR;
     (s.entities||[]).forEach(function(o){
-      if(!o || o.dead || o.type!==T.RESIDENT) return;
+      if(!o || o.dead || o.downed || o.type!==T.RESIDENT || target&&o!==target) return;
       if((o.hurtCd||0)>0) return;
       var d=U.dst(en.x,en.y,o.x,o.y);
       if(d<bd){ bd=d; best=o; }
@@ -1144,8 +1177,10 @@ APH.Combat = (function(){
     var s = APH.state;
     s.entities.forEach(function(e){
       if(e.type !== T.DROPPED || e.dead) return;
+      if(s.scene==='home'&&s.colony&&s.colony.rulesVersion)return;
       e.bobA += dt*3;
-      if(U.dst(e.x,e.y,s.px,s.py) >= 26) return;
+      if(s.scene==='expedition'&&s.squad&&s.squad.length){if(!(s.entities||[]).some(function(p){return p.type===T.RESIDENT&&!p.dead&&!p.downed&&U.dst(e.x,e.y,p.x,p.y)<26;}))return;}
+      else if(U.dst(e.x,e.y,s.px,s.py) >= 26) return;
       var it = CFG.items[e.itemId] || { name:e.itemId, w:1 };
       if(s.scene==='home' && window.APH.Colony && APH.Colony.collectHome){
         var got=APH.Colony.collectHome(s.meta, e.itemId, e.n||1);
@@ -1162,12 +1197,13 @@ APH.Combat = (function(){
       var r = addToCarry(s.carry, e.itemId, e.n,
         APH.Colony.carryMaxOf(s.colony&&s.colony.buildings));
       if(r.ok){
-        e.dead = true;
+        var picked=e.n-(r.overflow||0);
+        if(r.overflow){e.n=r.overflow;e.dead=false;}else e.dead=true;
         s.carry = r.carry;
-        s.runLoot=(s.runLoot||0)+Math.min(e.n, e.n-(r.overflow||0));
-        U.emit('lootPicked', { id:e.itemId, n:Math.min(e.n, e.n - (r.overflow||0)) });
+        s.runLoot=(s.runLoot||0)+picked;
+        U.emit('lootPicked', { id:e.itemId, n:picked });
         var nm = it.name;
-        U.emit('notice', {text:'+'+ (e.n - (r.overflow||0)) +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), color:'#9fe8c8'});
+        U.emit('notice', {text:'+'+ picked +' '+nm + (r.overflow? '（超重遗落'+r.overflow+'）':''), color:'#9fe8c8'});
       }else{
         U.emit('notice', {text:'负重已满！回舱卸货', color:'#ff9a9a'});
       }
@@ -1185,17 +1221,25 @@ APH.Combat = (function(){
     var n = soldierCount(barracks);
 
     for(var i = 0; i < n; i++){
-      var sf = (window.APH.Planet && APH.Planet.pickRaidFaction)
-        ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
-        : null;
-      var sol = (window.APH.Ent && APH.Ent.makeEnemy)
-        ? APH.Ent.makeEnemy(sf, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60))
-        : { type: T.ENEMY, x: CFG.HAB.x, y: CFG.HAB.y };
-      sol.isSoldier = true;
-      sol.hp = CFG.soldier.hp;
-      sol.maxHp = CFG.soldier.hp;
-      sol.faction = Object.assign({}, sf || {}, { speed: CFG.soldier.speed, dmg: CFG.soldier.dmg });
-      sol.state = 'idle';
+      var sol;
+      if(window.APH.Res && APH.Res.embodySoldier && APH.Res.generate){
+        var taken=((s.meta&&s.meta.residents)||[]).map(function(r){return r&&r.name;});
+        var person=APH.Res.generate('sol'+(s.meta&&s.meta.residentSeq||0)+'_'+i, (((s.seed||7)*41)+i*913)>>>0, taken);
+        if(s.meta){ s.meta.residentSeq=(s.meta.residentSeq||0)+1; s.meta.residents=s.meta.residents||[]; s.meta.residents.push(person); }
+        sol=APH.Res.embodySoldier(person, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60));
+      } else {
+        var sf = (window.APH.Planet && APH.Planet.pickRaidFaction)
+          ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
+          : null;
+        sol = (window.APH.Ent && APH.Ent.makeEnemy)
+          ? APH.Ent.makeEnemy(sf, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60))
+          : { type: T.ENEMY, x: CFG.HAB.x, y: CFG.HAB.y };
+        sol.isSoldier = true;
+        sol.hp = CFG.soldier.hp;
+        sol.maxHp = CFG.soldier.hp;
+        sol.faction = Object.assign({}, sf || {}, { speed: CFG.soldier.speed, dmg: CFG.soldier.dmg });
+        sol.state = 'idle';
+      }
       if(s.entities) s.entities.push(sol);
     }
 
@@ -1277,7 +1321,7 @@ APH.Combat = (function(){
     // 炮塔射击
     var raidFoes = [];
     (s.entities || []).forEach(function(e2){
-      if(e2.type === T.ENEMY && !e2.dead && !e2.isSoldier) raidFoes.push(e2);
+      if(e2.type === T.ENEMY && !e2.dead && !e2.isSoldier && !e2.captured) raidFoes.push(e2);
     });
 
     var buildings = (s.colony && s.colony.buildings) || [];
@@ -1314,7 +1358,7 @@ APH.Combat = (function(){
     s.war.raidSpawnT = (s.war.raidSpawnT || 0) - dt;
     var aliveEnemies = 0;
     (s.entities || []).forEach(function(e){
-      if(e.type === T.ENEMY && !e.dead && !e.isSoldier) aliveEnemies++;
+      if(e.type === T.ENEMY && !e.dead && !e.isSoldier && !e.captured) aliveEnemies++;
     });
 
     var waveCount = (s.war.wave && s.war.wave.count) || 4;
@@ -1334,14 +1378,24 @@ APH.Combat = (function(){
       var ex, ey;
       var camping = s.war.siege && s.war.siege.phase === 'camp';
       if(camping){
-        ex = U.clamp(s.war.siege.cx + U.rr(-60, 60), 40, CFG.WORLD - 40);
-        ey = U.clamp(s.war.siege.cy + U.rr(-60, 60), 40, CFG.WORLD - 40);
+        ex = U.clamp(s.war.siege.cx + U.rr(-60, 60), 40, APH.Scene.width() - 40);
+        ey = U.clamp(s.war.siege.cy + U.rr(-60, 60), 40, APH.Scene.width() - 40);
       } else {
-        ex = U.clamp(CFG.HAB.x + Math.cos(ang) * d, 40, CFG.WORLD - 40);
-        ey = U.clamp(CFG.HAB.y + Math.sin(ang) * d, 40, CFG.WORLD - 40);
+        ex = U.clamp(CFG.HAB.x + Math.cos(ang) * d, 40, APH.Scene.width() - 40);
+        ey = U.clamp(CFG.HAB.y + Math.sin(ang) * d, 40, APH.Scene.width() - 40);
       }
 
-      var en = (window.APH.Ent && APH.Ent.makeEnemy) ? APH.Ent.makeEnemy(f, ex, ey) : { type: T.ENEMY, x: ex, y: ey };
+      var en;
+      if(window.APH.Res && APH.Res.hostilePawn && APH.Res.embodyHostile){
+        var taken=((s.meta&&s.meta.residents)||[]).map(function(r){return r&&r.name;});
+        (s.entities||[]).forEach(function(exEnt){ if(exEnt&&exEnt.name) taken.push(exEnt.name); });
+        var person=APH.Res.hostilePawn((((s.seed||7)*31)+((s.war.spawned||0)*917))>>>0, taken, {
+          faction:(s.war&&s.war.rivalId)||'hostile'
+        });
+        en=APH.Res.embodyHostile(person, ex, ey);
+      } else {
+        en = (window.APH.Ent && APH.Ent.makeEnemy) ? APH.Ent.makeEnemy(f, ex, ey) : { type: T.ENEMY, x: ex, y: ey };
+      }
       if(camping){
         en.sieging = true; en.campX = s.war.siege.cx; en.campY = s.war.siege.cy;
         en.state = 'idle';
@@ -1366,7 +1420,7 @@ APH.Combat = (function(){
     if(!s.war.betweenWaves && (s.war.spawned || 0) >= waveCount){
       var left = 0;
       (s.entities || []).forEach(function(e){
-        if(e.type === T.ENEMY && !e.dead && !e.isSoldier) left++;
+        if(e.type === T.ENEMY && !e.dead && !e.isSoldier && !e.captured) left++;
       });
       if(left === 0){
         if(!s.war.routed && (s.war.wavesLeft || 0) > 0){

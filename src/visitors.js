@@ -111,7 +111,11 @@ APH.Visitors = (function(){
       U.emit('notice', {text:'✕ 粮食不足，无法请客', color:'#ff9a9a'});
       return false;
     }
-    APH.Colony.takeStock(s.meta.res, s.entities, 'food', need);
+    var paid=APH.Colony.takeStock(s.meta.res, s.entities, 'food', need);
+    if(!paid.ok){
+      U.emit('notice', {text:'✕ 粮食已被取走或预订', color:'#ff9a9a'});
+      return false;
+    }
     APH.Res.applyBond(s.meta.bonds || (s.meta.bonds={}), 'player', r.id, 8);
     r.mood = Math.min(100, (r.mood || 70) + 12);
     ent.socialBubble = '❤️';
@@ -130,14 +134,19 @@ APH.Visitors = (function(){
       return false;
     }
     var cookedDrop = (s.entities||[]).find(function(e){
-      return e && !e.dead && e.type===T.DROPPED && CFG.items[e.itemId] && CFG.items[e.itemId].isCooked && (e.n||1)>0;
+      if(!e || e.dead || e.type!==T.DROPPED || !CFG.items[e.itemId] || !CFG.items[e.itemId].isCooked) return false;
+      if(s.colony&&s.colony.rulesVersion===1&&APH.Logistics&&APH.Logistics.availableDrop)
+        return APH.Logistics.availableDrop(s.colony,e)>0;
+      return (e.n||1)>0;
     });
     var isCooked = false;
     var need = (CFG.recruit&&CFG.recruit.mealCost)||2;
     if(cookedDrop){
-      isCooked = true;
-      need = 0;
-      APH.Colony.nibblePile(cookedDrop, 1);
+      if(APH.Colony.nibblePile(cookedDrop, 1)!==1){
+        U.emit('notice', {text:'✕ 熟食已被取走或预订', color:'#ff9a9a'});
+        return false;
+      }
+      isCooked = true; need = 0;
     }else{
       if(!APH.Colony.ensureStock(s.meta.res, s.entities, 'food', need)){
         U.emit('notice', {text:'✕ 食物不够请客', color:'#ff9a9a'});

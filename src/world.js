@@ -7,10 +7,12 @@ window.APH = window.APH || {};
 
 APH.World = (function(){
   'use strict';
-  var U = APH.U, CFG = APH.CFG;
+  var U = APH.U, CFG = APH.CFG, Camera=APH.Camera;
 
   var cv, ctx, VW=0, VH=0, DPR=1;
-  var chunks = [], NCH = 0;
+  /* 地形图块按相机需要生成；大地图不能再开场就把全部 canvas 塞进内存。 */
+  var chunks = new Map(), NCH = 0, terrainDesc = null;
+  var chunkLimit = 36, chunkHits = 0, chunkMisses = 0;
   var wxParts = [], wxKind = '';          // W4 天气粒子池 (程序化绘制的表现层)
   var vigCv = document.createElement('canvas');
   var darkCv = document.createElement('canvas'), darkCtx = darkCv.getContext('2d');
@@ -45,13 +47,52 @@ APH.World = (function(){
     g.fillStyle = gr; g.fillRect(0,0,VW,VH);
   }
 
+  function activeDescriptor(){
+    var s=APH.state, TM=APH.TerrainModel;
+    if(!TM || !s || s.scene!=='home') return null;
+    /* 接场景的人可把描述放到 colony.scene 或 state.worldDescriptor；
+       描述缺失时明确退回 legacy，不去碰 CFG.WORLD。 */
+    return TM.normalize((s.colony&&s.colony.scene)||s.worldDescriptor);
+  }
+  function terrainSize(){ return terrainDesc ? terrainDesc.width : CFG.WORLD; }
+  function terrainLandmarks(){
+    if(terrainDesc && APH.TerrainModel) return APH.TerrainModel.landmarks(terrainDesc);
+    return { hab:CFG.HAB, lake:CFG.LAKE };
+  }
+  function chunkKey(ci,cj){
+    var d=terrainDesc;
+    return (d ? [d.kind,d.generation,d.seed,d.width].join(':') : 'expedition')+':'+ci+':'+cj;
+  }
+  function cacheChunk(key, chunk){
+    if(chunks.has(key)) chunks.delete(key);
+    chunks.set(key,chunk);
+    while(chunks.size>chunkLimit) chunks.delete(chunks.keys().next().value);
+    return chunk;
+  }
+  function getChunk(ci,cj,pal){
+    var key=chunkKey(ci,cj), hit=chunks.get(key);
+    if(hit){ chunkHits++; chunks.delete(key); chunks.set(key,hit); return hit; }
+    chunkMisses++;
+    return cacheChunk(key, paintChunk(ci,cj,pal,terrainDesc));
+  }
+
   /* ---------- 地形分块预渲染（调色板来自 PlanetSpec） ---------- */
-  function paintChunk(ci, cj, pal){
+  function paintChunk(ci, cj, pal, desc){
     var c = document.createElement('canvas');
     c.width = CFG.CHUNK; c.height = CFG.CHUNK;
     var g = c.getContext('2d');
     var ox = ci*CFG.CHUNK, oy = cj*CFG.CHUNK;
     var lakeR = APH.state.spec.terrain.lakeR;
+    if(desc && APH.TerrainModel && APH.TerrainModel.isHome(desc)){
+      var TM=APH.TerrainModel, g0=Math.floor(ox/desc.grid), g1=Math.ceil((ox+CFG.CHUNK)/desc.grid);
+      var h0=Math.floor(oy/desc.grid), h1=Math.ceil((oy+CFG.CHUNK)/desc.grid);
+      for(var gy=h0;gy<h1;gy++) for(var gx=g0;gx<g1;gx++){
+        var col=TM.regionColor(desc,(gx+.5)*desc.grid,(gy+.5)*desc.grid,pal.ground1);
+        g.fillStyle=col;
+        g.fillRect(gx*desc.grid-ox,gy*desc.grid-oy,desc.grid,desc.grid);
+      }
+      return c;
+    }
     g.fillStyle = pal.ground1;
     g.fillRect(0,0,CFG.CHUNK,CFG.CHUNK);
 
@@ -67,28 +108,29 @@ APH.World = (function(){
       g.fill();
     }
     /* 湖岸沙环 */
-    var lx = APH.CFG.LAKE.x-ox, ly = APH.CFG.LAKE.y-oy;
+    var marks=terrainLandmarks(), lake=marks.lake;
+    var lx = lake.x-ox, ly = lake.y-oy;
     if(lx>-260 && lx<CFG.CHUNK+260 && ly>-260 && ly<CFG.CHUNK+260){
       for(var k=0;k<160;k++){
-        var a = Math.random()*U.TAU, rd = lakeR + 6 + Math.random()*80;
-        var sx = APH.CFG.LAKE.x+Math.cos(a)*rd-ox, sy = APH.CFG.LAKE.y+Math.sin(a)*rd-oy;
+        var a = U.hash2(ci*193+k,cj*101+k)*U.TAU, rd = lakeR + 6 + U.hash2(k,ci+cj)*80;
+        var sx = lake.x+Math.cos(a)*rd-ox, sy = lake.y+Math.sin(a)*rd-oy;
         if(sx<-20||sx>CFG.CHUNK+20||sy<-20||sy>CFG.CHUNK+20) continue;
-        g.globalAlpha = .05+Math.random()*.11;
+        g.globalAlpha = .05+U.hash2(k,ci*7+cj)*.11;
         g.fillStyle = rd < lakeR+34 ? '#6b6248' : '#4a4636';
-        g.beginPath(); g.ellipse(sx,sy,6+Math.random()*14,4+Math.random()*8,a,0,U.TAU); g.fill();
+        g.beginPath(); g.ellipse(sx,sy,6+U.hash2(k,ci)*14,4+U.hash2(k,cj)*8,a,0,U.TAU); g.fill();
       }
     }
     /* 砾石草茎 */
     for(var j=0;j<120;j++){
       var px = U.hash2(j*3+ci*11, cj*17)*CFG.CHUNK,
           py = U.hash2(j*5, cj*13+j)*CFG.CHUNK;
-      if(U.dst(ox+px,oy+py,APH.CFG.LAKE.x,APH.CFG.LAKE.y) < lakeR) continue;
+      if(U.dst(ox+px,oy+py,lake.x,lake.y) < lakeR) continue;
       if(U.hash2(j,99) > .82){
         g.globalAlpha=.5; g.strokeStyle='#3a4a3e'; g.lineWidth=1.4;
-        g.beginPath(); g.moveTo(px,py); g.lineTo(px+(Math.random()*6-3),py-(4+Math.random()*4)); g.stroke();
+        g.beginPath(); g.moveTo(px,py); g.lineTo(px+(U.hash2(j,ci)*6-3),py-(4+U.hash2(j,cj)*4)); g.stroke();
       }else{
         g.globalAlpha=.35; g.fillStyle = U.hash2(j,7)>.5?'#1a221f':'#39404d';
-        g.beginPath(); g.arc(px,py,1+Math.random()*1.4,0,U.TAU); g.fill();
+        g.beginPath(); g.arc(px,py,1+U.hash2(j,ci+cj)*1.4,0,U.TAU); g.fill();
       }
     }
     g.globalAlpha = 1;
@@ -102,13 +144,9 @@ APH.World = (function(){
   }
 
   function buildTerrain(){
-    NCH = CFG.WORLD / CFG.CHUNK;
-    chunks = [];
-    var pal = APH.state.spec.palette;
-    for(var ci=0;ci<NCH;ci++){
-      chunks.push([]);
-      for(var cj=0;cj<NCH;cj++) chunks[ci].push(paintChunk(ci,cj,pal));
-    }
+    terrainDesc=activeDescriptor();
+    NCH=Math.ceil(terrainSize()/CFG.CHUNK);
+    chunks.clear(); chunkHits=0; chunkMisses=0;
   }
 
   /* ---------- 昼夜 ---------- */
@@ -126,14 +164,16 @@ APH.World = (function(){
     g.fillStyle = 'rgba(5,8,26,' + (na*.82) + ')';
     g.fillRect(0,0,VW,VH);
     g.globalCompositeOperation = 'destination-out';
+    var s=APH.state,vp={w:VW,h:VH},z=Camera.zoom(s);
     function hole(wx,wy,r,str){
-      var sx = wx - APH.state.camX + VW/2, sy = wy - APH.state.camY + VH/2;
-      if(sx<-r||sx>VW+r||sy<-r||sy>VH+r) return;
-      var gr = g.createRadialGradient(sx,sy,0,sx,sy,r);
+      var p=Camera.toScreen(s,wx,wy,vp),sx=p.x,sy=p.y,sr=r*z;
+      if(sx<-sr||sx>VW+sr||sy<-sr||sy>VH+sr) return;
+      var gr = g.createRadialGradient(sx,sy,0,sx,sy,sr);
       gr.addColorStop(0,'rgba(0,0,0,'+str+')'); gr.addColorStop(1,'rgba(0,0,0,0)');
-      g.fillStyle = gr; g.beginPath(); g.arc(sx,sy,r,0,U.TAU); g.fill();
+      g.fillStyle = gr; g.beginPath(); g.arc(sx,sy,sr,0,U.TAU); g.fill();
     }
-    hole(CFG.HAB.x, CFG.HAB.y, 250, 1);
+    var marks=terrainLandmarks();
+    hole(marks.hab.x, marks.hab.y, 250, 1);
     hole(APH.state.px, APH.state.py, 95, .95);
     hole(APH.state.px + Math.cos(APH.state.face)*70,
          APH.state.py + Math.sin(APH.state.face)*70 - 10, 75, .8);
@@ -144,7 +184,6 @@ APH.World = (function(){
     g.globalCompositeOperation = 'source-over';
 
     /* Task5+: 建筑自带微光(夜间可见) */
-    var s = APH.state;
     (s.colony? s.colony.buildings : []).forEach(function(b){
       if(b.id==='bl_landing_pad') return;
       if(b.id==='bl_lamp'){
@@ -155,7 +194,11 @@ APH.World = (function(){
       }
       hole(b.x, b.y, 70, .45);
     });
-    ctx.drawImage(darkCv, 0, 0, VW, VH);
+    /* 暗幕是屏幕层。若沿用世界 transform，缩放/平移会把整张遮罩拖离画布。 */
+    ctx.save();
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.drawImage(darkCv,0,0,VW,VH);
+    ctx.restore();
   }
 
   /* ---------- 主渲染入口（main.js 每帧调用） ----------
@@ -163,9 +206,10 @@ APH.World = (function(){
   function render(dt, drawEntityFns){
     var s = APH.state, dL = daylight();
     var VW2=VW, VH2=VH;
+    var view=Camera.viewport(s,{w:VW2,h:VH2}),z=view.zoom;
     /* 无状态变换: 每帧绝对重算(任何一帧异常都不会累积成画面漂移) */
-    function applyWorld(){ ctx.setTransform(DPR,0,0,DPR,
-      DPR*(VW2/2 - s.camX), DPR*(VH2/2 - s.camY)); }
+    function applyWorld(shX,shY){ ctx.setTransform(DPR*z,0,0,DPR*z,
+      DPR*(VW2/2-s.camX*z+(shX||0)),DPR*(VH2/2-s.camY*z+(shY||0))); }
     function applyScreen(){ ctx.setTransform(DPR,0,0,DPR,0,0); }
 
     applyScreen();
@@ -173,31 +217,34 @@ APH.World = (function(){
     ctx.fillRect(0,0,VW,VH);
     var shX = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0,
         shY = s.shake>0 ? U.rr(-1,1)*s.shake*4 : 0;
-    applyWorld();
-    ctx.translate(shX,shY);
+    applyWorld(shX,shY);
 
     /* 地形块 */
-    var c0x=U.clamp(Math.floor((s.camX-VW/2)/CFG.CHUNK),0,NCH-1),
-        c1x=U.clamp(Math.floor((s.camX+VW/2)/CFG.CHUNK),0,NCH-1),
-        c0y=U.clamp(Math.floor((s.camY-VH/2)/CFG.CHUNK),0,NCH-1),
-        c1y=U.clamp(Math.floor((s.camY+VH/2)/CFG.CHUNK),0,NCH-1);
+    /* main 接入 worldDescriptor 后无需重新加载模块：每帧检测描述 key。 */
+    var nowDesc=activeDescriptor();
+    if((nowDesc&&(!terrainDesc || chunkKey(0,0).split(':').slice(0,4).join(':')!==[nowDesc.kind,nowDesc.generation,nowDesc.seed,nowDesc.width].join(':'))) || (!nowDesc&&terrainDesc)) buildTerrain();
+    var c0x=U.clamp(Math.floor(view.left/CFG.CHUNK),0,NCH-1),
+        c1x=U.clamp(Math.floor(view.right/CFG.CHUNK),0,NCH-1),
+        c0y=U.clamp(Math.floor(view.top/CFG.CHUNK),0,NCH-1),
+        c1y=U.clamp(Math.floor(view.bottom/CFG.CHUNK),0,NCH-1);
     for(var ci=c0x;ci<=c1x;ci++)
-      for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(chunks[ci][cj], ci*CFG.CHUNK, cj*CFG.CHUNK);
+      for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(getChunk(ci,cj,s.spec.palette), ci*CFG.CHUNK, cj*CFG.CHUNK);
 
     /* 湖面 */
-    var lakeR = s.spec.terrain.lakeR, time = s.clock;
-    var lg = ctx.createRadialGradient(CFG.LAKE.x,CFG.LAKE.y,10, CFG.LAKE.x,CFG.LAKE.y,lakeR);
+    var lmarks=terrainLandmarks(), lake=lmarks.lake;
+    var lakeR = terrainDesc ? lake.r : s.spec.terrain.lakeR, time = s.clock;
+    var lg = ctx.createRadialGradient(lake.x,lake.y,10,lake.x,lake.y,lakeR);
     lg.addColorStop(0,'#0f2233'); lg.addColorStop(1,s.spec.palette.water);
     ctx.fillStyle = lg;
-    ctx.beginPath(); ctx.arc(CFG.LAKE.x,CFG.LAKE.y,lakeR,0,U.TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.fill();
     ctx.save();
-    ctx.beginPath(); ctx.arc(CFG.LAKE.x,CFG.LAKE.y,lakeR,0,U.TAU); ctx.clip();
+    ctx.beginPath(); ctx.arc(lake.x,lake.y,lakeR,0,U.TAU); ctx.clip();
     for(var wv=0;wv<5;wv++){
-      var wy = CFG.LAKE.y-lakeR+((time*12+wv*67)%(lakeR*2));
+      var wy = lake.y-lakeR+((time*12+wv*67)%(lakeR*2));
       ctx.strokeStyle='rgba(120,200,240,'+(0.05+wv*.012)+')'; ctx.lineWidth=2;
       ctx.beginPath();
-      ctx.moveTo(CFG.LAKE.x-lakeR+20, wy);
-      ctx.quadraticCurveTo(CFG.LAKE.x, wy+Math.sin(time+wv)*7, CFG.LAKE.x+lakeR-20, wy);
+      ctx.moveTo(lake.x-lakeR+20, wy);
+      ctx.quadraticCurveTo(lake.x, wy+Math.sin(time+wv)*7, lake.x+lakeR-20, wy);
       ctx.stroke();
     }
     ctx.restore();
@@ -209,8 +256,15 @@ APH.World = (function(){
     if(drawEntityFns.walls) drawEntityFns.walls(time);
 
     /* 统一实体 Y 排序 (ADR-3) */
-    var sorted = s.entities.filter(function(e){ return !e.dead && e.type!=='player'; })
-                  .concat([s.entities.find(function(e){return e.type==='player'})])
+    var entityPad=256/z;
+    function entityVisible(e){return e&&e.x>=view.left-entityPad&&e.x<=view.right+entityPad&&e.y>=view.top-entityPad&&e.y<=view.bottom+entityPad;}
+    /* EntityIndex is deliberately optional: a cold index falls back to the
+       canonical list, while a prepared one only narrows render candidates. */
+    if(window.APH.EntityIndex&&APH.EntityIndex.prepare)APH.EntityIndex.prepare(s.entities);
+    var entityCandidates=(window.APH.EntityIndex&&APH.EntityIndex.queryRect&&
+      APH.EntityIndex.queryRect(s.entities,view.left-entityPad,view.top-entityPad,view.right+entityPad,view.bottom+entityPad))||s.entities;
+    var sorted = entityCandidates.filter(function(e){ return !e.dead && e.type!=='player'&&entityVisible(e); })
+                  .concat([entityCandidates.find(function(e){return e.type==='player'&&entityVisible(e);})])
                   .filter(Boolean)
                   .sort(function(a,b){ return a.y-b.y; });
     sorted.forEach(function(e){ drawEntityFns[e.type] && drawEntityFns[e.type](e, time); });
@@ -224,6 +278,7 @@ APH.World = (function(){
     /* 暗幕 + 发光体重绘 */
     drawDarkness(dL);
     s.entities.forEach(function(e){
+      if(!entityVisible(e))return;
       if(e.type==='beacon') drawBeaconGem(e,time);
       else if(e.type==='crystal' && !e.taken) APH.Ent.drawCrystalGlow(e,time);
     });
@@ -240,6 +295,7 @@ APH.World = (function(){
 
   function drawSpores(time,dL){
     var spores = APH.state.spores;
+    var view=Camera.viewport(APH.state,{w:VW,h:VH}),pad=20/view.zoom;
     var sporeCol = APH.state.spec.palette.spore;      // '#9fe8c8' → '159,232,200'
     var sr=parseInt(sporeCol.slice(1,3),16),
         sg=parseInt(sporeCol.slice(3,5),16),
@@ -247,7 +303,7 @@ APH.World = (function(){
     for(var i=0;i<spores.length;i++){
       var sp = spores[i];
       var sx = sp.x+Math.sin(time*.4+sp.ph)*14, sy = sp.y+Math.cos(time*.3+sp.ph*1.3)*10;
-      if(Math.abs(sx-APH.state.camX)>innerWidth/2+20||Math.abs(sy-APH.state.camY)>innerHeight/2+20) continue;
+      if(sx<view.left-pad||sx>view.right+pad||sy<view.top-pad||sy>view.bottom+pad) continue;
       var tw = .5+.5*Math.sin(time*1.5+sp.ph*3);
       ctx.fillStyle='rgba('+sr+','+sg+','+sb+','+((0.10+(1-dL)*0.30)*tw)+')';
       ctx.beginPath(); ctx.arc(sx,sy,1.6*sp.s,0,U.TAU); ctx.fill();
@@ -290,10 +346,11 @@ APH.World = (function(){
     var s = APH.state, rain = fx.rain, snow = fx.snow;
     var target = APH.Weather.fxCount(curWeatherId(), VW, VH);
     var cap = (CFG.caps && CFG.caps.wxParticles != null) ? CFG.caps.wxParticles : 240;
-    var topY = s.camY - VH/2 - 40;
-    var botY = s.camY + VH/2 + 20;
-    var leftX = s.camX - VW/2 - 60;
-    var rightX = s.camX + VW/2 + 60;
+    var view=Camera.viewport(s,{w:VW,h:VH}),z=view.zoom;
+    var topY = view.top - 40/z;
+    var botY = view.bottom + 20/z;
+    var leftX = view.left - 60/z;
+    var rightX = view.right + 60/z;
     var out = [];
     for(var i=0;i<wxParts.length;i++){
       var p = wxParts[i];
@@ -425,7 +482,7 @@ APH.World = (function(){
 
   /* 居住舱暖光池 + 舷窗（暗幕之上） */
   function drawEmissive(time){
-    var H = CFG.HAB;
+    var H = terrainLandmarks().hab;
     var g = ctx.createRadialGradient(H.x,H.y,10,H.x,H.y,120);
     g.addColorStop(0,'rgba(255,233,196,'+(0.16+Math.sin(time*1.2)*.03)+')');
     g.addColorStop(1,'rgba(255,233,196,0)');
@@ -468,13 +525,13 @@ APH.World = (function(){
       if(cBest) marks.push({e:cBest, col:'#ff4fd8', dist:cd});
       if(rBest) marks.push({e:rBest, col:'#ff6d7a', dist:rd});
     }
-    var VW2=innerWidth, VH2=innerHeight;
+    var VW2=VW, VH2=VH, vp={w:VW2,h:VH2};
     marks.forEach(function(m, i){
       var e=m.e;
-      var sx=e.x-s.camX+VW2/2, sy=e.y-s.camY+VH2/2;
+      var pos=Camera.toScreen(s,e.x,e.y,vp),sx=pos.x,sy=pos.y;
       if(sx>60&&sx<VW2-60&&sy>70&&sy<VH2-70) return;
       var cx=U.clamp(sx,46+i*18,VW2-46), cy=U.clamp(sy,84,VH2-96);
-      var ang=Math.atan2(e.y-s.py,e.x-s.px);
+      var ang=Math.atan2(sy-VH2/2,sx-VW2/2);
       ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
       ctx.fillStyle=m.col;
       ctx.shadowColor=m.col; ctx.shadowBlur=8;
@@ -493,5 +550,7 @@ APH.World = (function(){
     drawWeather:drawWeather, drawFog:drawFog,
     wxCount:function(){ return wxParts.length; },
     getViewport:function(){ return {w:VW,h:VH}; },
+    stats:function(){ return { cacheSize:chunks.size, cacheLimit:chunkLimit, hits:chunkHits, misses:chunkMisses,
+      chunksPerAxis:NCH, width:terrainSize(), descriptor:terrainDesc }; },
   };
 })();

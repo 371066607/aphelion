@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+/* Chrome/CDP runtime smoke: fresh ordinary home, then labelled construction fixture.
+   node tests/home_live_probe.js [output directory]
+   Requires local Google Chrome; no dependency installation and no user profile access. */
+'use strict';
+const fs=require('fs'),path=require('path'),os=require('os'),{spawn}=require('child_process'),{pathToFileURL}=require('url');
+const out=process.argv[2]||'/tmp/aphelion-dual-qa';fs.mkdirSync(out,{recursive:true});
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'aph-home-qa-'));
+const chrome=spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',['--headless=new','--disable-gpu','--no-sandbox','--window-size=1280,800','--remote-debugging-port=0','--user-data-dir='+profile,pathToFileURL(path.resolve(__dirname,'../game.html')).href+'?autostart=1'],{stdio:'ignore'});
+let ws,id=0;const requests=new Map(),errors=[];const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function cdp(method,params={}){
+  return new Promise((resolve,reject)=>{const n=++id,t=setTimeout(()=>{requests.delete(n);reject(Error('CDP timeout: '+method));},10000);requests.set(n,{resolve:r=>{clearTimeout(t);resolve(r);},reject:e=>{clearTimeout(t);reject(e);}});ws.send(JSON.stringify({id:n,method,params}));});
+}
+async function evaluate(expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
+async function shot(name){const r=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
+(async()=>{
+  try{
+    let port;
+    for(let i=0;i<80;i++){await sleep(100);try{port=fs.readFileSync(path.join(profile,'DevToolsActivePort'),'utf8').split('\n')[0];if(port)break;}catch{}}
+    if(!port)throw Error('Chrome did not start');
+    const targets=await(await fetch('http://127.0.0.1:'+port+'/json')).json(),target=targets.find(t=>t.type==='page');
+    ws=new WebSocket(target.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
+    ws.onmessage=ev=>{const m=JSON.parse(String(ev.data));if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails);if(m.method==='Runtime.consoleAPICalled'&&m.params.type==='error')errors.push(m.params.args);if(m.id&&requests.has(m.id)){const p=requests.get(m.id);requests.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}};
+    await cdp('Runtime.enable');await cdp('Page.enable');
+    let ready=false;for(let i=0;i<80;i++){await sleep(100);ready=await evaluate("!!(window.APH&&APH.state&&APH.state.mode==='running'&&APH.state._worldReady)");if(ready)break;}
+    if(!ready)throw Error('ordinary startup did not reach running home');
+    const baseline=await evaluate(`(()=>{const s=APH.state;return {mode:s.mode,scene:s.scene,width:s.colony.scene.width,residents:s.meta.residents.length,buildings:s.colony.buildings.length,objects:s.entities.length,bedCapacity:APH.Colony.housingCapacity(s.colony.buildings,s.colony)};})()`);
+    if(baseline.scene!=='home'||baseline.width!==6144||baseline.residents!==3||baseline.buildings!==0||baseline.bedCapacity!==0)throw Error('fresh startup contract: '+JSON.stringify(baseline));
+    await sleep(1200); // let the ordinary intro fade finish before visual evidence
+    await shot('ordinary-home');
+    const fixture=await evaluate(`(()=>{const s=APH.state;APH.ExpeditionUI.open(s);const panel=document.getElementById('expeditionPlannerOverlay');const checks=[...panel.querySelectorAll('input[type=checkbox]')];checks.forEach((c,i)=>c.checked=i===0);panel.querySelector('#expeditionSupplyFood').value='0';[...panel.querySelectorAll('button')].find(b=>b.textContent==='出发').click();return {scene:s.scene,mode:s.mode,away:s.squad.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
+    if(fixture.scene!=='expedition'||fixture.mode!=='running'||fixture.away!==1||fixture.home!==2)throw Error('planner failed '+JSON.stringify(fixture));
+    await sleep(400);await shot('expedition-squad');
+    const movement=await evaluate(`(()=>{const s=APH.state,p=s.entities.find(e=>e.rid===s.squad[0]);s.spawnT=-10000;s.entities=s.entities.filter(e=>e.type!==APH.CFG.entType.ENEMY);const before={x:p.x,y:p.y};s.paused=false;APH.Main.tacticalMoveTo(p.x+70,p.y);for(let i=0;i<100;i++)APH.Main.simStep(.05);return {distance:Math.hypot(p.x-before.x,p.y-before.y),id:p.rid};})()`);
+    if(movement.distance<20)throw Error('squad did not move '+JSON.stringify(movement));
+    await evaluate(`(()=>{const s=APH.state;s.carry.specimen_dew=2;APH.Main.checkpointWorlds(s);})()`);
+    await cdp('Page.reload');await sleep(1300);
+    const restored=await evaluate(`(()=>{const s=APH.state;return {scene:s.scene,carry:s.carry.specimen_dew,away:s.squad.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
+    if(restored.scene!=='expedition'||restored.carry!==2||restored.away!==1||restored.home!==2)throw Error('reload failed '+JSON.stringify(restored));
+    const returned=await evaluate(`(()=>{const s=APH.state;APH.UI.cmd('switchWorld','home');APH.UI.cmd('returnExpedition');const count=()=>s.entities.filter(e=>!e.dead&&e.itemId==='specimen_dew').reduce((n,e)=>n+e.n,0);const first=count();APH.UI.cmd('returnExpedition');return {scene:s.scene,residents:s.meta.residents.length,pawns:s.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length,first,again:count()};})()`);
+    if(returned.scene!=='home'||returned.pawns!==3||returned.first!==2||returned.again!==2)throw Error('return failed '+JSON.stringify(returned));
+    await shot('returned-home');
+    if(errors.length)throw Error('runtime errors: '+JSON.stringify(errors));
+    const report={baseline,fixture,movement,restored,returned,runtimeErrors:errors,scope:'Headless Chrome; real planner DOM, squad movement, reload, return. Movement and cargo are explicit fixtures; not a season survival playthrough.'};
+    fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+  }finally{if(ws)ws.close();chrome.kill();await sleep(250);fs.rmSync(profile,{recursive:true,force:true});}
+})().catch(e=>{console.error(e.stack);process.exitCode=1;});

@@ -1,0 +1,36 @@
+{
+  "baseline": {
+    "mode": "running",
+    "scene": "home",
+    "width": 6144,
+    "residents": 3,
+    "buildings": 0,
+    "objects": 2117,
+    "bedCapacity": 0
+  },
+  "fixture": {
+    "scene": "expedition",
+    "mode": "running",
+    "away": 1,
+    "home": 2
+  },
+  "movement": {
+    "distance": 67.19999999999891,
+    "id": "rs_start1"
+  },
+  "restored": {
+    "scene": "expedition",
+    "carry": 2,
+    "away": 1,
+    "home": 2
+  },
+  "returned": {
+    "scene": "home",
+    "residents": 3,
+    "pawns": 3,
+    "first": 2,
+    "again": 2
+  },
+  "runtimeErrors": [],
+  "scope": "Headless Chrome; real planner DOM, squad movement, reload, return. Movement and cargo are explicit fixtures; not a season survival playthrough."
+}

@@ -206,7 +206,7 @@ test('ADR-39 save: 殖民地存档往返, 且带上当前版本号', () => {
   if (!back || !Array.isArray(back.buildings)) throw new Error('应读回殖民地');
   if (back.buildings.length !== 1 || back.buildings[0].id !== 'bl_house')
     throw new Error('建筑清单不得丢失');
-  if (back.v !== APH.CFG.save.VERSION) throw new Error('应带当前版本号, got ' + back.v);
+  if (back.v !== APH.CFG.save.COLONY_VERSION) throw new Error('应带当前版本号, got ' + back.v);
   if (back.buildings[0].lv !== 1) throw new Error('缺省等级应补成 1');
 });
 

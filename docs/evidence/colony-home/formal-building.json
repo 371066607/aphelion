@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "mode": "running",
+    "scene": "home",
+    "width": 6144,
+    "residents": 3,
+    "buildings": 0,
+    "objects": 2132,
+    "bedCapacity": 0
+  },
+  "fixture": {
+    "expected": 14,
+    "placed": 14,
+    "bedRotations": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "runtimeErrors": [],
+  "scope": "Headless Chrome actual Canvas; autostart skips intro only. Furniture screenshot uses explicit free-build fixture, not survival acceptance."
+}
