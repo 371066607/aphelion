@@ -55,3 +55,16 @@ Observation 的持久化版本从 `v: 1` 开始，归属家园或某颗星球的
 资源产物由 `CFG.observe.resourceSemantics` 定义；调用方传入的产物 ID 或数量不能覆盖这张表。每张群系砖表的 `resourceGround` 再声明该资源允许占用哪些 Ground Tile。求解时 resource pin 会限制所在格的地面候选，但不会把资源种类写进 `ground`。Ground pin 与 fallback 输出都要经过当前群系砖表校验；非法约束进入确定性 degraded 路径，表外地面不会写进 Observation。未知群系 ID 原样保留并进入确定性 degraded 路径，`Observe` 不修改全局配置或把它伪装成迫降点群系。Observed 场景也不再从 `landmarks` 补一座固定圆湖；水体只来自 `ground`。
 
 本修订先做 expand：新旧路径并存，后续票逐个迁移存档、渲染、碰撞、寻路、肥力、生态与总览；所有消费者迁完前不删除 legacy 分支。
+
+## 2026-09-14 修订：家园首次观测与保守迁移（#199）
+
+殖民地存档 envelope 升至 `v:3`，PlanetSpec 仍为 `v:1`。全新家园由 `TerrainModel.newHome(seed)` 在创建时完成一次 Observation；`Save.loadColony` 把完整地面、自然资源与当时的 `metaSnapshot` 作为同一份殖民地 JSON 立即写入，因此开场仍处于 `intro` 时地图已经稳定，进入 `running` 不再触发观测。
+
+两类旧档分开处理：
+
+- generation 0 的 2200×2200 家园只升级 envelope，不添加 Observation，继续使用原边界、湖泊、地形与实体规则。
+- 缺少 Observation 的 generation 1 家园经 `save.js` 唯一迁移入口，把旧确定性 `cellAt` 与 `resources` 的结果完整快照一次；建筑坐标、占地版本与旋转不参与重算。后续读取只认已保存的 Observation，不再重复快照。
+
+迁移先在内存生成完整 Observation，再把字段挂到解析出的殖民地对象，并以一次完整 JSON 写入持久层。若 `localStorage` 拒绝写入，原持久化 JSON 保持原样，完整 v3 对象留在会话内存覆盖层；本次会话继续读同一快照，后续写入恢复时可整份落盘。这个兜底避免半张地图，但浏览器存储始终不可用时仍只能保证当前会话。
+
+Observation 按“只增字段”演进：未来 `v>=1` 只要仍含 v1 的完整行优先地面，就由旧构建读取已知字段并原样保留未知字段；若未来版本缺少旧构建可读取的基础字段，则明确拒绝且不改写，不能降级重算成 v1。新家园的特殊资源仍从 `CFG.observe.resourceSemantics` 取产物和数量；例如核心残骸使用表内 `homeCore` 变体。运行时 traits 不能覆盖 `yieldItemId`、`amount` 或修复语义。

@@ -18,10 +18,12 @@ APH.Save = (function(){
   var mem = {};                       // localStorage 不可用时的兜底
   var persistent = true;
   function rawGet(k){
-    try{ return localStorage.getItem(k); }catch(e){ persistent=false; return mem[k]||null; }
+    if(Object.prototype.hasOwnProperty.call(mem,k)) return mem[k];
+    try{ return localStorage.getItem(k); }catch(e){ persistent=false; return null; }
   }
   function rawSet(k,v){
-    try{ localStorage.setItem(k,v); }catch(e){ persistent=false; mem[k]=v; }
+    try{ localStorage.setItem(k,v);delete mem[k];persistent=Object.keys(mem).length===0;return true; }
+    catch(e){ persistent=false;mem[k]=v;return false; }
   }
   function rawDel(k){
     try{ localStorage.removeItem(k); }catch(e){}
@@ -44,7 +46,7 @@ APH.Save = (function(){
   function isFutureSave(save, kind){
     return !!(save && typeof save.v === 'number' && save.v > versionFor(save, kind));
   }
-  /* Colony v2 is a separate envelope: PlanetSpec remains v1 (ADR-1). */
+  /* Colony v2+ is a separate envelope: PlanetSpec remains v1 (ADR-1). */
   function legacyColony(save){
     var two = {bl_warehouse:1,bl_lab:1,bl_barracks:1,bl_clinic:1,
       bl_farm:1,bl_house:1,bl_pasture:1,bl_workshop:1,bl_kitchen:1};
@@ -73,6 +75,19 @@ APH.Save = (function(){
     if(!save.logistics) save.logistics={v:1,nextTask:1,nextReservation:1,tasks:[],reservations:[]};
     return save;
   }
+  function ensureColonyObservation(save){
+    var scene=save&&save.scene;
+    if(!scene||scene.generation!==1||!APH.TerrainModel||APH.TerrainModel.hasObservation(scene)) return false;
+    if(scene.observation&&typeof scene.observation.v==='number'&&scene.observation.v>1){
+      var error=new Error('Observation v'+scene.observation.v+' 缺少当前构建可读取的基础字段，本次不会改写存档。');
+      error.aphObservationVersion=scene.observation.v;
+      throw error;
+    }
+    var observation=APH.TerrainModel.snapshotObservation(scene);
+    if(!observation) return false;
+    scene.observation=observation;
+    return true;
+  }
   function migrate(save, kind){
     if(save === null || typeof save !== 'object' || Array.isArray(save)){
       /* 合法 JSON 但不是存档对象(数字/字符串/数组/null): 当损坏处理。
@@ -90,36 +105,46 @@ APH.Save = (function(){
     while(v < version){
       v++;
       if(v === 2 && (kind === 'colony' || Array.isArray(save.buildings))) save=legacyColony(save);
+      else if(v === 3 && (kind === 'colony' || Array.isArray(save.buildings))) ensureColonyObservation(save);
       else if(migrations[v]) save = migrations[v](save);
       else save.v = v;                 // 无显式迁移 = 仅推进版本号
     }
-    if(kind === 'colony' || Array.isArray(save.buildings)) legacyColony(save);
+    if(kind === 'colony' || Array.isArray(save.buildings)){
+      legacyColony(save);
+      ensureColonyObservation(save);
+    }
     save.v = version;
     return save;
   }
 
   /* ---------- 通用读写 ---------- */
-  function read(key){
+  function read(key,persistMigration){
     var txt = rawGet(key);
     if(!txt) return null;
     var obj;
     try{ obj = JSON.parse(txt); }
     catch(e){ return null; }           // 损坏存档视为不存在, 不抛错
-    return migrate(obj, key === CFG.save.KEY_COLONY ? 'colony' : null);               // migrate 对非存档对象返回 null; 未来版本抛错
+    var kind=key === CFG.save.KEY_COLONY ? 'colony' : null;
+    var beforeVersion=obj&&obj.v||0;
+    var neededObservation=kind==='colony'&&obj&&obj.scene&&obj.scene.generation===1&&
+      (!APH.TerrainModel||!APH.TerrainModel.hasObservation(obj.scene));
+    obj=migrate(obj,kind);               // migrate 对非存档对象返回 null; 未来版本抛错
+    if(persistMigration&&obj&&(beforeVersion<versionFor(obj,kind)||neededObservation)) rawSet(key,JSON.stringify(obj));
+    return obj;
   }
   function write(key, obj){
     if(key === CFG.save.KEY_COLONY) obj = migrate(obj, 'colony');
     obj.v = versionFor(obj, key === CFG.save.KEY_COLONY ? 'colony' : null);
-    rawSet(key, JSON.stringify(obj));
+    return rawSet(key, JSON.stringify(obj));
   }
   function remove(key){ rawDel(key); }
 
   /* ---------- 三层接口 ---------- */
   function loadMeta(){
     var m = read(CFG.save.KEY_META);
-    /* v2 的家园快照把名册/库存与地面/在途材料存于同一个原子 JSON。
+    /* v2+ 的家园快照把名册/库存与地面/在途材料存于同一个原子 JSON。
        meta key 保留兼容，但不能覆盖更新的整份家园快照。 */
-    var homeSnapshot=read(CFG.save.KEY_COLONY);
+    var homeSnapshot=read(CFG.save.KEY_COLONY,true);
     if(homeSnapshot&&homeSnapshot.metaSnapshot)m=homeSnapshot.metaSnapshot;
     var existed = !!m;
     if(!m){
@@ -245,25 +270,29 @@ APH.Save = (function(){
   }
 
   function loadColony(){
-    var v = read(CFG.save.KEY_COLONY);
+    var v = read(CFG.save.KEY_COLONY,true);
     if(v && Array.isArray(v.buildings)){
       v.buildQueue = v.buildQueue || [];
       v.ground = v.ground || [];
       v.buildings.forEach(function(b){ b.lv = b.lv || 1; });
       return v;
     }
-    return { v:CFG.save.COLONY_VERSION, rulesVersion:1, buildings:[], buildQueue:[], builtAt:Date.now(), ground:[],
-      scene:APH.TerrainModel.home(Date.now()%100000),
+    var now=Date.now(),fresh={ v:CFG.save.COLONY_VERSION, rulesVersion:1, buildings:[], buildQueue:[], builtAt:now, ground:[],
+      scene:APH.TerrainModel.newHome(now%100000),
       depleted:{}, logistics:{v:1,nextTask:1,nextReservation:1,tasks:[],reservations:[]} };
+    var state=window.APH&&APH.state;
+    if(state&&state.meta){fresh.metaSnapshot=JSON.parse(JSON.stringify(state.meta));fresh.stock=fresh.metaSnapshot.res;}
+    saveColony(fresh);
+    return fresh;
   }
   function saveColony(colony){
-    if(!colony) return;
+    if(!colony) return false;
     var s=APH.state;
     if(s&&s.colony===colony&&s.meta&&s.scene==='home'&&s._worldReady){
       colony.metaSnapshot=JSON.parse(JSON.stringify(s.meta));
       colony.stock=colony.metaSnapshot.res;
     }
-    try{ write(CFG.save.KEY_COLONY, colony); }catch(e){}
+    try{ return write(CFG.save.KEY_COLONY, colony); }catch(e){return false;}
   }
 
   /* 势力关系存的是数组, 走不了 read/write —— migrate 只认存档对象, 会把数组判为损坏。

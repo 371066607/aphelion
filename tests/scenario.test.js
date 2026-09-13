@@ -118,6 +118,21 @@ function test(name, fn){
 const A = (cond,msg)=>{ if(!cond) throw new Error(msg||'断言失败'); };
 const S = window.APH.state, M = window.APH.Main, C = window.APH.Colony, U = window.APH.U, T=window.APH.CFG.entType;
 
+/* ---------- #199: 新家园先观测并落盘，再允许进入 running ---------- */
+test('#199: boot 在 running 前已持久化完整家园 Observation', () => {
+  const observation=S.colony&&S.colony.scene&&S.colony.scene.observation;
+  A(S.mode==='intro', '新档验证点应仍处于 intro, got '+S.mode);
+  A(observation&&observation.v===1, 'boot 后家园缺少 Observation v1');
+  A(observation.ground.length===observation.widthCells*observation.heightCells,
+    '家园 Observation 地面格数量不完整');
+  const raw=JSON.parse(localStorage.getItem(APH.CFG.save.KEY_COLONY)||'null');
+  A(raw&&raw.scene&&raw.scene.observation, '进入 running 前 Observation 尚未写入殖民地存档');
+  A(JSON.stringify(raw.scene.observation)===JSON.stringify(observation),
+    '内存家园 Observation 与持久化快照不一致');
+  A(raw.metaSnapshot&&raw.metaSnapshot.residents&&raw.metaSnapshot.residents.length===3,
+    '首次家园快照没有带上 boot 已播种的三人名册');
+});
+
 /* ---------- #84 sprite 启动/回退契约 ---------- */
 test('#84: boot 注册 11 项 256 格 sheet 并生成夜间 tint', () => {
   ASSET_IDS.forEach(function(id){
