@@ -49,10 +49,11 @@ APH.World = (function(){
 
   function activeDescriptor(){
     var s=APH.state, TM=APH.TerrainModel;
-    if(!TM || !s || s.scene!=='home') return null;
-    /* 接场景的人可把描述放到 colony.scene 或 state.worldDescriptor；
-       描述缺失时明确退回 legacy，不去碰 CFG.WORLD。 */
-    return TM.normalize((s.colony&&s.colony.scene)||s.worldDescriptor);
+    if(!TM || !s) return null;
+    var source=APH.Scene&&APH.Scene.of?APH.Scene.of(s):((s.colony&&s.colony.scene)||s.worldDescriptor);
+    /* 家园兼容 generation 0；远征只有持有正式 Observation 时才进入格网渲染。 */
+    if(s.scene==='home'||(source&&source.generation===1&&TM.hasObservation(source)))return TM.normalize(source);
+    return null;
   }
   function terrainWidth(){ return terrainDesc ? terrainDesc.width : CFG.WORLD; }
   function terrainHeight(){ return terrainDesc ? terrainDesc.height : CFG.WORLD; }
@@ -97,7 +98,7 @@ APH.World = (function(){
     c.width = CFG.CHUNK; c.height = CFG.CHUNK;
     var g = c.getContext('2d');
     var ox = ci*CFG.CHUNK, oy = cj*CFG.CHUNK;
-    if(desc && APH.TerrainModel && APH.TerrainModel.isHome(desc)){
+    if(desc && APH.TerrainModel && APH.TerrainModel.hasObservation(desc)){
       var TM=APH.TerrainModel, g0=Math.floor(ox/desc.grid), g1=Math.ceil((ox+CFG.CHUNK)/desc.grid);
       var h0=Math.floor(oy/desc.grid), h1=Math.ceil((oy+CFG.CHUNK)/desc.grid);
       for(var gy=h0;gy<h1;gy++) for(var gx=g0;gx<g1;gx++){
@@ -246,7 +247,7 @@ APH.World = (function(){
     for(var ci=c0x;ci<=c1x;ci++)
       for(var cj=c0y;cj<=c1y;cj++) ctx.drawImage(getChunk(ci,cj,s.spec.palette), ci*CFG.CHUNK, cj*CFG.CHUNK);
 
-    /* generation 1 水体已经逐格画进地形块；圆湖只属于旧地图与旧远征。 */
+    /* observed 水体已经逐格画进地形块；圆湖只属于 generation 0。 */
     var lake=legacyLake(terrainDesc,s.spec),time=s.clock;
     if(lake){
       var lakeR=lake.r;

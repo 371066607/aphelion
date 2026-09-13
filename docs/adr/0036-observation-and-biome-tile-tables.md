@@ -79,3 +79,21 @@ Observation 按“只增字段”演进：未来 `v>=1` 只要仍含 v1 的完�
 - generation 1 家园的自然对象只由 `TerrainModel.resources` 把 Observation `resources` 实体化；旧的 22 组随机岩石只保留给 generation 0。恢复旧 homeRuntime 时移除历史 `rock`/`crystal` 覆盖物并立即写回干净快照，Observation 对应的 `flora` 不受影响。
 
 Observation 在运行时按不可变快照使用。世界块、总览和导航缓存把 Observation 对象 revision 纳入键；生成、迁移或恢复若要换图，必须替换整个 Observation 对象，不能原地改 `ground` 或 `resources`。为保持显式依赖顺序，`TerrainModel` 先于 `BuildGrid` 加载。generation 0 不进入上述分支，继续保留 2200×2200、固定圆湖与旧实体散布；描述中即使残留 Observation 也不能改变旧边界。
+
+## 2026-09-14 修订：未知目的地远征事务（#201）
+
+`APH.Atlas` 是 `meta.atlas` 的纯数据索引，结构为 `{v, order, planets}`。每个条目只保存 `planetId`、32 位 `seed`、名称、调色板名、群系 ID、首次发现时间和访问次数；完整 PlanetSpec 仍由 `planet_<id>` 保存。这样规划器可以列目的地而不复制地图，后续 #202 重访时再按 ID 读取同一 PlanetSpec。新发现使用 `P` 加八位大写十六进制 seed，避免旧低 12 位算法的碰撞；历史短 ID 仍是合法持久身份，不做迁移改名。
+
+未知选项是意图而不是 PlanetSpec。打开或浏览原生 `<select>` 只读状态；点击出发或在非下拉控件上按 Enter 后，`main.js` 才选择 seed、调用 `Planet.newObservedPlanet` 并校验 Observation。着陆点周围固定半径的格子作为可走地面约束参与同一次观测，因此返回舱和远征队不会落在水格。普通入口的 seed 避开 Atlas 与已有 PlanetSpec，`?exp=1` 和调试 E 键使用配置中的固定 seed，但仍经过完全相同的事务。
+
+保存顺序是一条显式提交边界：
+
+1. 在副本中生成下一份 Atlas、PlanetSpec 和殖民地 `metaSnapshot`，并完成迁移与 JSON 序列化。
+2. 写入 `planet_<id>`、`meta` 和存在时的殖民地快照；任一普通写失败便按相反顺序恢复各 key 的原始 JSON 字节，第三步失败也必须撤回前两步。
+3. 全部写成功后才替换运行中 `meta.atlas`；再由 `ExpeditionState.begin` 扣粮、转移名册和建立 Active Run。
+
+事务准备和失败分支都不 checkpoint 当前家园或双世界容器，因此保存拒绝时内存中的 `meta`、colony、homeRuntime、ground 与 activeWorld 也保持原样。未来版本的 PlanetSpec 或 Atlas 会被明确拒绝，不能被旧构建降级；当前版本条目合并时保留未知顶层字段。`localStorage` 没有跨 key 原子提交，因此进程在两次 `setItem` 之间被强制终止时仍可能留下孤立 PlanetSpec。这个孤立条目没有 Atlas 引用，且保存发生在补给扣除和 Active Run 之前；它不会伪造一次已经出发的远征。可捕获的配额、序列化和未来存档错误都返回 `persistence-failed`，调用方继续停在家园。
+
+Active Run 的 `destination` 必须是已解析 `{kind:'planet', planetId, seed}`，会随 snapshot、restore 和返航回执保存。WorldRuntime 只恢复同时满足以下条件的远征容器：scene 为 expedition、实体数组存在、spec 的 ID/seed 与 destination 一致、descriptor 明确为 generation 1 expedition，且两份 Observation 都与持久 PlanetSpec 相同。恢复层会完整校验持久 PlanetSpec 的地形、调色板和敌人运行结构，再以持久 spec 和由它派生的 descriptor 覆盖 runtime 镜像；runtime 镜像缺字段不会制造半颗星，持久档自身损坏则不安装。无目的地、身份或 Observation 不一致的旧/损坏 run 会沿幂等返航路径回收队员与已有货物。
+
+`main.js` 只编排发现保存、状态机提交、WorldRuntime 切换和异步文案富化。旧结算页直接创建 generation 0 星球的 `buildWorld/newPlanet` 路径已删除。AI 返回时沿用原 ID、seed 和 Observation，并在重写展示文案前先 checkpoint 当前 runtime，避免晚到的响应覆盖远征进度。远征地面、边界、敌人落点和酸性水域均查询 `TerrainModel`；岩石、水晶、植物、矿点和遗迹目前仍由既有生成器补入实体列表，#203 将把这些覆盖物收口到 Observation。

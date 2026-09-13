@@ -86,10 +86,23 @@ APH.ExpeditionState = (function(){
     return Math.max(0,Number(meta&&meta.res&&meta.res.food)||0);
   }
 
-  function validateSelection(meta, ids, supply, objectiveKind, colony, context){
+  function validateDestination(destination){
+    if(!destination||typeof destination!=='object'||Array.isArray(destination))
+      return {ok:false,why:'invalid-destination'};
+    if(destination.kind==='unknown')return {ok:true,destination:{kind:'unknown'},resolved:false};
+    var seed=Number(destination.seed),planetId=destination.planetId;
+    if(destination.kind!=='planet'||typeof planetId!=='string'||!/^P[0-9A-F]+$/.test(planetId)||
+      !Number.isFinite(seed)||seed<0||seed>0xffffffff||Math.floor(seed)!==seed)
+      return {ok:false,why:'invalid-destination'};
+    return {ok:true,destination:{kind:'planet',planetId:planetId,seed:seed>>>0},resolved:true};
+  }
+
+  function validateSelection(meta, ids, supply, objectiveKind, destination, colony, context){
     meta=meta||{}; ids=Array.isArray(ids)?ids:[]; supply=supply||{};
     var objective=objectiveFrom(objectiveKind);
     if(!objective.ok) return objective;
+    var target=validateDestination(destination);
+    if(!target.ok)return target;
     var rawFood=supply.food==null?0:Number(supply.food);
     if(!Number.isFinite(rawFood)||rawFood<0||Math.floor(rawFood)!==rawFood)
       return {ok:false,why:'invalid-supply'};
@@ -109,16 +122,21 @@ APH.ExpeditionState = (function(){
     }
     var have=availableFood(meta,colony,context);
     if(have<food) return {ok:false,why:'insufficient-food',need:food,have:have};
-    return {ok:true,members:members,memberIds:unique,food:food,objective:objective.objective};
+    return {ok:true,members:members,memberIds:unique,food:food,objective:objective.objective,
+      destination:target.destination,resolvedDestination:target.resolved};
   }
 
-  function active(colony){ return ensureState(colony).active; }
+  function active(colony){
+    var state=colony&&colony.expedition;
+    return state&&typeof state==='object'&&!Array.isArray(state)?state.active||null:null;
+  }
 
-  function begin(meta, colony, ids, supply, objectiveKind, context){
-    var state=ensureState(colony);
-    if(state.active) return {ok:false,why:'active-run',run:state.active};
-    var valid=validateSelection(meta,ids,supply,objectiveKind,colony,context);
+  function begin(meta, colony, ids, supply, objectiveKind, destination, context){
+    var current=active(colony);
+    if(current) return {ok:false,why:'active-run',run:current};
+    var valid=validateSelection(meta,ids,supply,objectiveKind,destination,colony,context);
     if(!valid.ok) return valid;
+    if(!valid.resolvedDestination)return {ok:false,why:'unresolved-destination'};
     var foodLots=[];
     if(colony&&colony.rulesVersion===1&&APH.Storage&&APH.Storage.takeFood){
       var taken=APH.Storage.takeFood(supplyWorld(meta,colony,context),valid.food);
@@ -129,10 +147,11 @@ APH.ExpeditionState = (function(){
       meta.res.food=(meta.res.food||0)-valid.food;
       if(valid.food>0)foodLots=[{itemId:'it_food',n:valid.food}];
     }
+    var state=ensureState(colony);
     var runId='ex_'+(state.sequence++);
     var run={status:'active',id:runId,memberIds:valid.memberIds.slice(),
       roster:valid.members.map(clone),supply:{food:valid.food,foodLots:foodLots},cargo:{},runtime:{},
-      objective:valid.objective};
+      objective:valid.objective,destination:clone(valid.destination)};
     /* 所有校验完成后才扣补给并转移 world 归属，失败路径零副作用。 */
     valid.members.forEach(function(r){r.worldId=runId;});
     state.active=run;
@@ -238,7 +257,7 @@ APH.ExpeditionState = (function(){
     var settled=settlementOf(run.cargo,spot);
     settled.drops=settled.drops.concat(unusedFoodDrops(run.supply,spot));
     var objective=clone(refreshObjective(run));
-    var receipt={runId:runId,memberIds:run.memberIds.slice(),supply:clone(run.supply),
+    var receipt={runId:runId,memberIds:run.memberIds.slice(),destination:clone(run.destination),supply:clone(run.supply),
       cargo:clone(run.cargo),objective:objective,research:settled.research,drops:clone(settled.drops)};
     state.settled[runId]=receipt;
     colony.pendingGround=(colony.pendingGround||[]).concat(clone(settled.drops));
@@ -265,9 +284,12 @@ APH.ExpeditionState = (function(){
     try{if(typeof raw==='string')raw=JSON.parse(raw);}catch(e){return {ok:false,why:'invalid-snapshot'};}
     if(!raw||typeof raw!=='object'||Array.isArray(raw)) return {ok:false,why:'invalid-snapshot'};
     colony.expedition=clone(raw);
-    var state=ensureState(colony), run=state.active;
+    var state=ensureState(colony), run=state.active,destinationError=null;
     if(run&&state.settled[run.id]){run.status='returned';state.active=null;run=null;}
     if(run){
+      var destination=validateDestination(run.destination);
+      if(!destination.ok||!destination.resolved)destinationError='invalid-destination';
+      else run.destination=destination.destination;
       run.memberIds=Array.isArray(run.memberIds)?run.memberIds.slice():[];
       run.roster=Array.isArray(run.roster)?run.roster:[];
       run.cargo=counts(run.cargo);run.runtime=clone(run.runtime||{});
@@ -284,11 +306,12 @@ APH.ExpeditionState = (function(){
     }else{
       (meta.residents||[]).forEach(function(r){if(r&&/^ex_\d+$/.test(r.worldId||''))r.worldId='home';});
     }
+    if(destinationError)return {ok:false,why:destinationError,state:state,run:state.active};
     return {ok:true,state:state,run:state.active};
   }
 
   return {ensureState:ensureState,objective:objective,eligibleMembers:eligibleMembers,
-    validateSelection:validateSelection,availableFood:availableFood,begin:begin,active:active,
+    validateDestination:validateDestination,validateSelection:validateSelection,availableFood:availableFood,begin:begin,active:active,
     runFor:runFor,membersForWorld:membersForWorld,addCargo:addCargo,setCargo:setCargo,
     objectiveState:objectiveState,setRuntime:setRuntime,returnHome:returnHome,
     noteGuardianCleared:noteGuardianCleared,snapshot:snapshot,restore:restore};

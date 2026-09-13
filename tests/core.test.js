@@ -137,6 +137,15 @@ test('validate 拒绝残缺 spec、接受合法 spec', () => {
   const good = Planet.validate(Planet.fallbackPlanet(9));
   if (!good.ok) throw new Error('合法 spec 被误拒: ' + good.errors.join(','));
 });
+test('validate 对损坏的 PlanetSpec 深层数组只报错不抛异常', () => {
+  const badBeacon=Planet.fallbackPlanet(10),badLaw=Planet.fallbackPlanet(11),badRival=Planet.fallbackPlanet(12);
+  badBeacon.beacons=[null,null,null,null];badLaw.laws=[null];badRival.rivals=[null];
+  for(const spec of [badBeacon,badLaw,badRival]){
+    let result;
+    try{result=Planet.validate(spec);}catch(e){throw new Error('损坏 JSON 不得让校验器抛异常: '+e.message);}
+    if(result.ok)throw new Error('损坏深层结构不得通过校验');
+  }
+});
 test('hasLaw: 按 id 判断', () => {
   if (Planet.hasLaw(null, 'lw_echo')) throw new Error('空 spec 应为假');
   if (!Planet.hasLaw({ laws:[{id:'lw_echo'}] }, 'lw_echo')) throw new Error('应命中');
@@ -553,4 +562,3 @@ test('ADR-45: 覆灭仍是唯一失败出口, 且开局即已立殖民地', () =
     if (APH.state.mode !== 'dead') throw new Error('覆灭应结束本局');
   } finally { APH.state = prev; }
 });
-

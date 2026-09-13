@@ -17,6 +17,7 @@ APH.Save = (function(){
   /* ---------- 存储后端（带降级） ---------- */
   var mem = {};                       // localStorage 不可用时的兜底
   var persistent = true;
+  function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
   function rawGet(k){
     if(Object.prototype.hasOwnProperty.call(mem,k)) return mem[k];
     try{ return localStorage.getItem(k); }catch(e){ persistent=false; return null; }
@@ -241,6 +242,7 @@ APH.Save = (function(){
       m.res.mineral = Math.max(m.res.mineral||0, startM);
       m.econV2 = 1;
     }
+    if(window.APH.Atlas)APH.Atlas.ensure(m);
     return m;
   }
   function saveMeta(m){
@@ -255,7 +257,60 @@ APH.Save = (function(){
   }
 
   function loadPlanet(id){ return read(CFG.save.KEY_PLANET + id); }
-  function savePlanet(id, spec){ write(CFG.save.KEY_PLANET + id, spec); }
+  function savePlanet(id, spec){ return write(CFG.save.KEY_PLANET + id, spec); }
+
+  /* 新星发现跨 planet_<id> 与 meta.atlas 两层；只有全部持久写成功才改
+     调用方的内存对象。localStorage 没有事务，正常写失败时按旧值回滚；
+     浏览器在进程级中断两个 setItem 之间仍可能留下孤立 PlanetSpec，
+     但绝不会因此扣补给或建立 Active Run。 */
+  function savePlanetDiscovery(meta,spec,discoveredAt){
+    if(!meta||!spec||!window.APH.Atlas)return {ok:false,why:'invalid-discovery'};
+    var nextMeta,recorded,nextPlanet,state,currentColony,nextColony,payloads,before,existingPlanet;
+    try{
+      if(isFutureSave(meta)||APH.Atlas.isFuture(meta)||
+        (typeof spec.v==='number'&&spec.v>CFG.save.VERSION))return {ok:false,why:'persistence-failed'};
+      if(typeof spec.id!=='string'||!spec.id||typeof spec.seed!=='number'||!isFinite(spec.seed)||
+        !spec.observation||!APH.TerrainModel||!APH.TerrainModel.hasObservation(APH.TerrainModel.planet(spec)))
+        return {ok:false,why:'invalid-planet'};
+      existingPlanet=read(CFG.save.KEY_PLANET+spec.id);
+      if(existingPlanet){
+        if(existingPlanet.id!==spec.id||existingPlanet.seed!==spec.seed||!existingPlanet.observation||
+          JSON.stringify(existingPlanet.observation)!==JSON.stringify(spec.observation))
+          return {ok:false,why:'planet-conflict'};
+      }
+      nextMeta=clone(meta);recorded=APH.Atlas.record(nextMeta,spec,discoveredAt);
+      if(!recorded.ok)return recorded;
+      nextMeta.v=CFG.save.VERSION;
+      nextPlanet=clone(existingPlanet)||{};
+      Object.keys(spec).forEach(function(key){nextPlanet[key]=clone(spec[key]);});
+      nextPlanet.v=CFG.save.VERSION;
+      state=window.APH&&APH.state;currentColony=state&&state.meta===meta&&state.colony;
+      nextColony=read(CFG.save.KEY_COLONY);
+      if(!nextColony&&currentColony)nextColony=clone(currentColony);
+      if(nextColony){
+        nextColony.metaSnapshot=clone(nextMeta);nextColony.stock=clone(nextMeta.res||{});
+        nextColony=migrate(nextColony,'colony');
+      }
+      payloads=[{key:CFG.save.KEY_PLANET+spec.id,value:JSON.stringify(nextPlanet)},
+        {key:CFG.save.KEY_META,value:JSON.stringify(nextMeta)}];
+      if(nextColony)payloads.push({key:CFG.save.KEY_COLONY,value:JSON.stringify(nextColony)});
+      before=payloads.map(function(item){return rawGet(item.key);});
+    }catch(e){
+      return {ok:false,why:'persistence-failed'};
+    }
+    var failed=false;
+    for(var i=0;i<payloads.length;i++)if(!rawSet(payloads[i].key,payloads[i].value)){failed=true;break;}
+    if(failed){
+      for(var j=payloads.length-1;j>=0;j--){
+        if(before[j]==null)rawDel(payloads[j].key);
+        else rawSet(payloads[j].key,before[j]);
+      }
+      return {ok:false,why:'persistence-failed'};
+    }
+    meta.atlas=clone(nextMeta.atlas);
+    if(currentColony){currentColony.metaSnapshot=clone(nextMeta);currentColony.stock=clone(nextMeta.res||{});}
+    return {ok:true,entry:recorded.entry,planet:nextPlanet};
+  }
 
   function loadRivals(id){ return read(CFG.save.KEY_RIVALS + id); }
   function saveRivals(id, state){ write(CFG.save.KEY_RIVALS + id, state); }
@@ -326,7 +381,7 @@ APH.Save = (function(){
 
   return {
     loadMeta:loadMeta, saveMeta:saveMeta,
-    loadPlanet:loadPlanet, savePlanet:savePlanet,
+    loadPlanet:loadPlanet, savePlanet:savePlanet, savePlanetDiscovery:savePlanetDiscovery,
     loadRivals:loadRivals, saveRivals:saveRivals,
     metaQuiet:metaQuiet,
     loadColony:loadColony, saveColony:saveColony,

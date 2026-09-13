@@ -26,7 +26,7 @@ test('后台世界继续模拟，但视觉 UI 与异步事件文案只属于当�
     APH.Main.start();
     const member = APH.state.meta.residents[0];
     const launched = APH.Main.launchExpedition({
-      memberIds: [member.id], supply: { food: 0 }, objective: 'resources'
+      memberIds: [member.id], supply: { food: 0 }, objective: 'resources', destination: { kind: 'unknown' }
     });
     assert.ok(launched && launched.ok, '测试前置：远征应成功启动');
 

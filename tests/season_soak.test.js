@@ -9,7 +9,7 @@ global.document={getElementById(){return el();},createElement(){return el();},bo
 global.addEventListener=()=>{};global.innerWidth=800;global.innerHeight=600;global.devicePixelRatio=1;global.requestAnimationFrame=()=>0;global.location={search:'',reload(){}};global.performance={now:()=>0};global.Image=class{set src(v){this._src=v;if(this.onload)this.onload();}};
 global.APH={SPRITE_DATA:{}};
 const SRC=path.join(__dirname,'..','src');
-for(const f of ['config.js','utils.js','observe.js','entity_index.js','world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js','residents.js','ecology.js','expedition_state.js','alerts.js','combat.js','world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js'])new Function(fs.readFileSync(path.join(SRC,f),'utf8'))();
+for(const f of ['config.js','utils.js','atlas.js','observe.js','entity_index.js','world_runtime.js','terrain_model.js','build_grid.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js','residents.js','ecology.js','expedition_state.js','alerts.js','combat.js','world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js'])new Function(fs.readFileSync(path.join(SRC,f),'utf8'))();
 const S=APH.state,M=APH.Main,T=APH.CFG.entType,CFG=APH.CFG;
 // Make the independent fixture reproducible, including idle wandering.
 Math.random=APH.U.makeRng(9301);
@@ -121,7 +121,7 @@ try{
   let firstFailure=null,firstDowned=null,executedSteps=0;
   const expectedIds=['soak_a','soak_b','soak_c'];
   /* A real expedition with cargo returns during the run; two residents remain home. */
-  const launch=M.launchExpedition({memberIds:['soak_c'],supply:{food:0},objective:'resources'});ok(launch&&launch.ok,'setup expedition failed');
+  const launch=M.launchExpedition({memberIds:['soak_c'],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});ok(launch&&launch.ok,'setup expedition failed');
   const run=APH.ExpeditionState.active(S.colony);ok(run&&S.meta.residents.filter(r=>r.worldId==='home').length===2,'expedition must leave two residents');
   /* 资源远征必须真的走到有限矿脉并采完；测试仅隔离随机战斗，不伪造 cargo。 */
   S.entities=S.entities.filter(e=>e.type!==T.ENEMY);S.spawnT=Infinity;

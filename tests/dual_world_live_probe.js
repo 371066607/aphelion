@@ -13,6 +13,7 @@ async function cdp(method,params={}){
 }
 async function evaluate(expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
 async function shot(name){const r=await cdp('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.data,'base64'));}
+async function key(keyName,code,keyCode,modifiers=0){const args={key:keyName,code,windowsVirtualKeyCode:keyCode,nativeVirtualKeyCode:keyCode,modifiers};await cdp('Input.dispatchKeyEvent',{...args,type:'keyDown'});await cdp('Input.dispatchKeyEvent',{...args,type:'keyUp'});}
 (async()=>{
   try{
     let port;
@@ -28,20 +29,42 @@ async function shot(name){const r=await cdp('Page.captureScreenshot',{format:'pn
     if(baseline.scene!=='home'||baseline.width!==6144||baseline.residents!==3||baseline.buildings!==0||baseline.bedCapacity!==0)throw Error('fresh startup contract: '+JSON.stringify(baseline));
     await sleep(1200); // let the ordinary intro fade finish before visual evidence
     await shot('ordinary-home');
-    const fixture=await evaluate(`(()=>{const s=APH.state;APH.ExpeditionUI.open(s);const panel=document.getElementById('expeditionPlannerOverlay');const checks=[...panel.querySelectorAll('input[type=checkbox]')];checks.forEach((c,i)=>c.checked=i===0);panel.querySelector('#expeditionSupplyFood').value='0';[...panel.querySelectorAll('button')].find(b=>b.textContent==='出发').click();return {scene:s.scene,mode:s.mode,away:s.squad.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
+    const fixture=await evaluate(`(()=>{const s=APH.state;APH.ExpeditionUI.open(s);const panel=document.getElementById('expeditionPlannerOverlay');const checks=[...panel.querySelectorAll('input[type=checkbox]')];checks.forEach((c,i)=>c.checked=i===0);panel.querySelector('#expeditionSupplyFood').value='0';[...panel.querySelectorAll('button')].find(b=>b.textContent==='出发').click();const run=APH.ExpeditionState.active(s.colony);return {scene:s.scene,mode:s.mode,away:run.memberIds.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
     if(fixture.scene!=='expedition'||fixture.mode!=='running'||fixture.away!==1||fixture.home!==2)throw Error('planner failed '+JSON.stringify(fixture));
     await sleep(400);await shot('expedition-squad');
-    const movement=await evaluate(`(()=>{const s=APH.state,p=s.entities.find(e=>e.rid===s.squad[0]);s.spawnT=-10000;s.entities=s.entities.filter(e=>e.type!==APH.CFG.entType.ENEMY);const before={x:p.x,y:p.y};s.paused=false;APH.Main.tacticalMoveTo(p.x+70,p.y);for(let i=0;i<100;i++)APH.Main.simStep(.05);return {distance:Math.hypot(p.x-before.x,p.y-before.y),id:p.rid};})()`);
+    const movement=await evaluate(`(()=>{const s=APH.state,run=APH.ExpeditionState.active(s.colony),p=s.entities.find(e=>e.rid===run.memberIds[0]);s.spawnT=-10000;s.entities=s.entities.filter(e=>e.type!==APH.CFG.entType.ENEMY);const before={x:p.x,y:p.y};s.paused=false;APH.Main.tacticalMoveTo(p.x+70,p.y);for(let i=0;i<100;i++)APH.Main.simStep(.05);return {distance:Math.hypot(p.x-before.x,p.y-before.y),id:p.rid};})()`);
     if(movement.distance<20)throw Error('squad did not move '+JSON.stringify(movement));
     await evaluate(`(()=>{const s=APH.state;s.carry.specimen_dew=2;APH.Main.checkpointWorlds(s);})()`);
     await cdp('Page.reload');await sleep(1300);
-    const restored=await evaluate(`(()=>{const s=APH.state;return {scene:s.scene,carry:s.carry.specimen_dew,away:s.squad.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
+    const restored=await evaluate(`(()=>{const s=APH.state,run=APH.ExpeditionState.active(s.colony);return {scene:s.scene,carry:s.carry.specimen_dew,away:run.memberIds.length,home:s.worlds.home.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length};})()`);
     if(restored.scene!=='expedition'||restored.carry!==2||restored.away!==1||restored.home!==2)throw Error('reload failed '+JSON.stringify(restored));
     const returned=await evaluate(`(()=>{const s=APH.state;APH.UI.cmd('switchWorld','home');APH.UI.cmd('returnExpedition');const count=()=>s.entities.filter(e=>!e.dead&&e.itemId==='specimen_dew').reduce((n,e)=>n+e.n,0);const first=count();APH.UI.cmd('returnExpedition');return {scene:s.scene,residents:s.meta.residents.length,pawns:s.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT).length,first,again:count()};})()`);
     if(returned.scene!=='home'||returned.pawns!==3||returned.first!==2||returned.again!==2)throw Error('return failed '+JSON.stringify(returned));
     await shot('returned-home');
+
+    // Pure keyboard route: E opens the planner; reverse Tab reaches the native
+    // destination select; Tab returns through the form to Start.
+    await key('e','KeyE',69);await sleep(80);
+    const keyboardOpen=await evaluate(`(()=>{const panel=document.getElementById('expeditionPlannerOverlay');return {shown:panel&&panel.style.display==='flex',focusText:document.activeElement&&document.activeElement.textContent};})()`);
+    if(!keyboardOpen.shown||keyboardOpen.focusText!=='出发')throw Error('keyboard planner open/focus failed '+JSON.stringify(keyboardOpen));
+    for(let i=0;i<3;i++)await key('Tab','Tab',9,8);
+    const destinationFocus=await evaluate(`(()=>({id:document.activeElement&&document.activeElement.id,value:document.activeElement&&document.activeElement.value}))()`);
+    if(destinationFocus.id!=='expeditionDestination')throw Error('keyboard destination focus failed '+JSON.stringify(destinationFocus));
+    const focusTrace=[];let startFocus=null;
+    for(let i=0;i<8;i++){
+      await key('Tab','Tab',9);
+      const focused=await evaluate(`(()=>{const a=document.activeElement,p=document.getElementById('expeditionPlannerOverlay');return {tag:a&&a.tagName,id:a&&a.id,text:a&&a.textContent,inside:!!(p&&a&&p.contains(a))};})()`);
+      focusTrace.push(focused);
+      if(focused.text==='出发'){startFocus=focused;break;}
+      if(!focused.inside)break;
+    }
+    if(!startFocus)throw Error('keyboard did not return to Start: '+JSON.stringify(focusTrace));
+    await key('Enter','Enter',13);await sleep(250);
+    const keyboard=await evaluate(`(()=>{const s=APH.state,run=APH.ExpeditionState.active(s.colony),stored=run&&APH.Save.loadPlanet(run.destination.planetId);return {scene:s.scene,runId:run&&run.id,planetId:run&&run.destination.planetId,stored:!!stored,atlas:!!(run&&APH.Atlas.find(s.meta,run.destination.planetId)),observed:!!(s.worldDescriptor&&s.worldDescriptor.kind==='expedition'&&s.worldDescriptor.generation===1&&APH.TerrainModel.hasObservation(s.worldDescriptor))};})()`);
+    if(keyboard.scene!=='expedition'||!keyboard.runId||!keyboard.stored||!keyboard.atlas||!keyboard.observed)throw Error('keyboard launch failed '+JSON.stringify(keyboard));
+    await evaluate(`APH.Main.returnHome()`);
     if(errors.length)throw Error('runtime errors: '+JSON.stringify(errors));
-    const report={baseline,fixture,movement,restored,returned,runtimeErrors:errors,scope:'Headless Chrome; real planner DOM, squad movement, reload, return. Movement and cargo are explicit fixtures; not a season survival playthrough.'};
+    const report={baseline,fixture,movement,restored,returned,keyboardOpen,destinationFocus,focusTrace,keyboard,runtimeErrors:errors,scope:'Headless Chrome; real planner DOM with mouse and pure keyboard routes, squad movement, reload, idempotent return. Movement and cargo are explicit fixtures; not a season survival playthrough.'};
     fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
   }finally{if(ws)ws.close();chrome.kill();await sleep(250);fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(e=>{console.error(e.stack);process.exitCode=1;});

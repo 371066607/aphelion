@@ -142,6 +142,11 @@ APH.TerrainModel = (function(){
     scene.observation=homeObservation(scene.seed);
     return scene;
   }
+  function planet(spec){
+    spec=spec||{};
+    return {v:1,kind:'expedition',generation:HOME_GENERATION,seed:u32(n(spec.seed,7)),
+      grid:GRID,observation:spec.observation};
+  }
   function observed(scene){
     var d={},key,o=scene.observation,shape=observationShape(o),grid=n(scene.grid,GRID);
     if(!(grid>0))grid=GRID;
@@ -337,7 +342,7 @@ APH.TerrainModel = (function(){
   }
 
   return { HOME_SIZE:HOME_SIZE, LEGACY_SIZE:LEGACY_SIZE, GRID:GRID, REGIONS:REGIONS,
-    home:home, newHome:newHome, homeObservation:homeObservation, snapshotObservation:snapshotObservation,
+    home:home, newHome:newHome, planet:planet, homeObservation:homeObservation, snapshotObservation:snapshotObservation,
     legacy:legacy, normalize:normalize, dimensions:dimensions, revision:revision,
     hasObservation:hasObservation, isHome:isHome, cellAt:cellAt,
     landmarks:landmarks, resources:resources, regionColor:regionColor,
