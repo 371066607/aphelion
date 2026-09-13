@@ -2338,6 +2338,16 @@ window.APH = window.APH || {};
             return;
           }
 
+          /* ADR-47: 点人型袭击者只检查，不征召 */
+          var hitHostile=(s.entities||[]).find(function(en){
+            return en && !en.dead && APH.Res && APH.Res.isHumanlike && APH.Res.isHumanlike(en) && U.dst(en.x,en.y,t.x,t.y)<=pickR;
+          });
+          if(hitHostile){
+            s.selectedTarget = { type: 'enemy', entity: hitHostile };
+            updateInspectorNow();
+            return;
+          }
+
           /* 3. 选中且已征召的居民：点地走路（无右键） */
           if(s.selectedRid){
             var selEnt = selectedPawnEnt();

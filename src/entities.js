@@ -85,7 +85,7 @@ APH.Ent = (function(){
       ctx.arc(0, 0, s + 6, 0, U.TAU);
       ctx.stroke();
     }
-    if (e.isSoldier && window.APH.Humanoid) {
+    if ((e.isSoldier || e.humanlike) && window.APH.Humanoid) {
       /* #1: 士兵仍是程序化小人，缩放到与玩家 drawH 等高 */
       s = (CFG.humanoid && CFG.humanoid.chibiBodyR) || 21.5;
       ctx.scale(APH.Humanoid.chibiScale(), APH.Humanoid.chibiScale());
@@ -98,7 +98,7 @@ APH.Ent = (function(){
     /* N2: 敌人8帧序列帧(idle/move/attack/hurt/death), 士兵不适用 */
     var factionSheet = {fx_maw:'enemy_lighteater', fx_spit:'enemy_acidsplitter',
                         fx_bulwark:'enemy_siloshell', fx_automaton:'enemy_automaton'}[e.faction.id]||'';
-    var sheetName = e.isSoldier ? '' : factionSheet;
+    var sheetName = (e.isSoldier || e.humanlike) ? '' : factionSheet;
     if (!e.isSoldier && window.APH.Sprites && APH.Sprites.isReady(sheetName)){
       var st;
       if (e.dead)                    st=7;                       // death

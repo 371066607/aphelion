@@ -80,17 +80,51 @@ APH.Res = (function(){
   function capturePrisoner(meta, enemy){
     if(!meta || !enemy) return null;
     meta.prisoners = meta.prisoners || [];
-    var p = { id: enemy.id || ('rv_cap_' + meta.prisoners.length), name: enemy.name || '俘虏', x: enemy.x, y: enemy.y };
-    meta.prisoners.push(p);
+    var person = enemy.pawn || enemy;
+    var human = !!(enemy.humanlike || person.humanlike || isHumanlike(enemy));
+    if(human){
+      person.prisoner = true;
+      person.faction = person.faction && person.faction !== 'home' ? person.faction : (person.faction || 'hostile');
+      enemy.prisoner = true;
+      enemy.captured = true;
+      enemy.dead = false;
+      enemy.state = 'idle';
+      var exists = false;
+      for(var i=0;i<meta.prisoners.length;i++) if(meta.prisoners[i] && meta.prisoners[i].id===person.id) exists=true;
+      if(!exists) meta.prisoners.push(person);
+      return person;
+    }
+    var stub = { id: enemy.id || ('rv_cap_' + meta.prisoners.length), name: enemy.name || '俘虏', x: enemy.x, y: enemy.y };
+    meta.prisoners.push(stub);
     enemy.dead = true;
     enemy.prisoner = true;
-    return p;
+    return stub;
   }
   function releasePrisoner(meta, id){
     if(!meta) return false;
     var n = (meta.prisoners || []).length;
-    meta.prisoners = (meta.prisoners || []).filter(function(p){ return p.id !== id; });
-    return meta.prisoners.length < n;
+    var released = null;
+    meta.prisoners = (meta.prisoners || []).filter(function(p){
+      if(p && p.id === id){ released = p; p.prisoner = false; return false; }
+      return true;
+    });
+    return !!(released || meta.prisoners.length < n);
+  }
+  function recruitPrisoner(meta, id, housingCap){
+    if(!meta) return { ok:false, why:'无存档' };
+    var list = meta.prisoners || [];
+    var person = null;
+    for(var i=0;i<list.length;i++) if(list[i] && list[i].id===id) person=list[i];
+    if(!person) return { ok:false, why:'找不到俘虏' };
+    person.origin = person.origin || '本地出生';
+    var rec = recruitInto(meta, person, housingCap);
+    if(!rec.ok) return rec;
+    rec.resident.faction = 'home';
+    rec.resident.prisoner = false;
+    person.faction = 'home';
+    person.prisoner = false;
+    meta.prisoners = list.filter(function(p){ return p && p.id !== id; });
+    return rec;
   }
   function buryCorpse(c){
     if(c) c.dead = true;
@@ -264,6 +298,82 @@ APH.Res = (function(){
       schedule: defaultSchedule(),
       trait:pick(['勤恳','话痨','独行','乐观','谨慎','暴脾气']),
       arrivedAt:0,
+      faction:'home',
+      humanlike:true,
+    };
+  }
+
+  /* ADR-47: 人型袭击者与殖民者同一套 generate，只改阵营。不写入玩家名册。 */
+  function hostilePawn(seed, takenNames, opts){
+    opts = opts || {};
+    var p = generate(opts.id || ('h' + (seed || 0)), seed, takenNames);
+    p.faction = opts.faction || 'hostile';
+    p.humanlike = true;
+    moodFromThoughts(p, { raid: true });
+    return p;
+  }
+  function isHumanlike(e){
+    if(!e) return false;
+    if(e.humanlike) return true;
+    if(e.pawn && e.pawn.humanlike) return true;
+    return false;
+  }
+  function isPlayerFaction(p){
+    if(!p || p.prisoner || (p.pawn && p.pawn.prisoner)) return false;
+    var f = (p.pawn && typeof p.pawn.faction === 'string') ? p.pawn.faction
+      : (typeof p.faction === 'string' ? p.faction : null);
+    return !f || f === 'home';
+  }
+  function embodyHostile(person, x, y){
+    if(!person) return null;
+    var C = CFG.humanlikeRaid || {};
+    var hp = C.hp != null ? C.hp : 36;
+    var fac = {
+      id: person.faction || 'hostile',
+      name: person.name,
+      behavior: 'melee_swarm',
+      speed: C.speed != null ? C.speed : 96,
+      dmg: C.dmg != null ? C.dmg : 8,
+      hp: hp,
+      gene: { hue: 18, sides: 4, limbs: 4, size: 1, spikes: 0, eyes: 2 }
+    };
+    return {
+      id: person.id,
+      type: (CFG.entType && CFG.entType.ENEMY) || 'enemy',
+      humanlike: true,
+      name: person.name,
+      pawn: person,
+      x: x || 0, y: y || 0,
+      hp: hp, maxHp: hp,
+      faction: fac,
+      state: 'idle',
+      wanderA: 0,
+      atkCd: 0,
+      walkPh: 0
+    };
+  }
+  function embodySoldier(person, x, y){
+    if(!person) return null;
+    person.faction = 'home';
+    person.humanlike = true;
+    person.prisoner = false;
+    person.drafted = true;
+    var C = CFG.soldier || {};
+    var hp = C.hp != null ? C.hp : 40;
+    return {
+      id: person.id,
+      rid: person.id,
+      type: (CFG.entType && CFG.entType.RESIDENT) || 'resident',
+      humanlike: true,
+      isSoldier: true,
+      drafted: true,
+      name: person.name,
+      pawn: person,
+      faction: { speed: C.speed != null ? C.speed : 120, dmg: C.dmg != null ? C.dmg : 6, hp: hp, nightBoost: 1, behavior: 'melee' },
+      x: x || 0, y: y || 0,
+      hp: hp, maxHp: hp,
+      state: 'idle',
+      walkPh: 0
     };
   }
 
@@ -2303,6 +2413,8 @@ APH.Res = (function(){
     moodFromThoughts:moodFromThoughts,
     ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
     makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
-    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner,
+    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner, recruitPrisoner:recruitPrisoner,
+    hostilePawn:hostilePawn, isHumanlike:isHumanlike, isPlayerFaction:isPlayerFaction,
+    embodyHostile:embodyHostile, embodySoldier:embodySoldier,
   };
 })();

@@ -1641,11 +1641,14 @@ APH.Colony = (function(){
     var sickAt=(CFG.residents&&CFG.residents.sickSkipAt!=null)?CFG.residents.sickSkipAt:60;
     (residents||[]).forEach(function(r){
       if(!r.jobLocked) return;
+      if(window.APH.Res && APH.Res.isPlayerFaction && !APH.Res.isPlayerFaction(r)) return;
       out[r.id]=r.job||null;                     // 手动锁岗不动
       if(r.job && slots[r.job]!=null) slots[r.job]--;
     });
     (residents||[]).forEach(function(r){
       if(out[r.id]!==undefined) return;
+      if(window.APH.Res && APH.Res.isPlayerFaction && !APH.Res.isPlayerFaction(r)){ out[r.id]=null; return; }
+      if(r.drafted){ out[r.id]=null; return; }
       if(r.downed || r.isSleeping || r.medLying){ out[r.id]=null; return; } // 击倒/睡眠/医疗舱俯卧缺勤 (Survival #15, #17, #69)
       if(broken(r)){ out[r.id]=null; return; }   // 崩溃者缺勤
       if((r.illness||0)>sickAt){ out[r.id]=null; return; }  // 重病跳过

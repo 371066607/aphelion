@@ -200,6 +200,13 @@ APH.CFG = {
     perBarracks: 2,      // 每级兵营+2兵
   },
 
+  /* ADR-47: 人型袭击者是小人，战斗数值走这张表，不是基因团 */
+  humanlikeRaid: {
+    hp: 36,
+    speed: 96,
+    dmg: 8
+  },
+
   /* 战斗 */
   combat: {
     plasmaDmg: 13,

@@ -1741,6 +1741,24 @@ APH.UI = (function(){
       return h;
     }
 
+    if(target.type === 'enemy'){
+      var ee = target.entity || target;
+      var pawn = ee.pawn;
+      if(pawn && APH.Res && APH.Res.isHumanlike && APH.Res.isHumanlike(ee)){
+        var nm = pawn.name || ee.name || '袭击者';
+        var trait = pawn.trait || '';
+        var mood = Math.round(pawn.mood != null ? pawn.mood : 70);
+        var food = Math.round(pawn.food != null ? pawn.food : 80);
+        var rest = Math.round(pawn.rest != null ? pawn.rest : 80);
+        var rec = Math.round(pawn.recreation != null ? pawn.recreation : 80);
+        var hh2 = inspHead('⚔', nm, (trait ? trait + ' · ' : '') + '敌对阵营', '#ff6d6d', '');
+        hh2 += needBarsHtml(food, rest, rec, mood);
+        hh2 += '<div class="insp-body">';
+        hh2 += thoughtsHtml(pawn, {}, pawn.thoughts);
+        hh2 += '</div>';
+        return hh2;
+      }
+    }
     if(target.type === 'flora'){
       /* 3. 自然树木/矿石 */
       var fe = target.entity || target;

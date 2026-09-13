@@ -532,14 +532,13 @@ APH.Combat = (function(){
 
     var alive = 0;
     s.entities.forEach(function(en){
-      if(en.type !== T.ENEMY || en.dead || en.downed) return;
-      alive++;
-
-      /* 驻守士兵: 打袭击敌人, 永不打玩家, 不因离玩家过远回收 */
+      if(en.dead || en.downed || en.captured) return;
       if(en.isSoldier){
         stepSoldier(en, dt, night);
         return;
       }
+      if(en.type !== T.ENEMY) return;
+      alive++;
 
       /* 阶段E: 溃退者——背向家园撤离, 越界消失 */
       if(en.retreat){
@@ -1185,17 +1184,25 @@ APH.Combat = (function(){
     var n = soldierCount(barracks);
 
     for(var i = 0; i < n; i++){
-      var sf = (window.APH.Planet && APH.Planet.pickRaidFaction)
-        ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
-        : null;
-      var sol = (window.APH.Ent && APH.Ent.makeEnemy)
-        ? APH.Ent.makeEnemy(sf, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60))
-        : { type: T.ENEMY, x: CFG.HAB.x, y: CFG.HAB.y };
-      sol.isSoldier = true;
-      sol.hp = CFG.soldier.hp;
-      sol.maxHp = CFG.soldier.hp;
-      sol.faction = Object.assign({}, sf || {}, { speed: CFG.soldier.speed, dmg: CFG.soldier.dmg });
-      sol.state = 'idle';
+      var sol;
+      if(window.APH.Res && APH.Res.embodySoldier && APH.Res.generate){
+        var taken=((s.meta&&s.meta.residents)||[]).map(function(r){return r&&r.name;});
+        var person=APH.Res.generate('sol'+(s.meta&&s.meta.residentSeq||0)+'_'+i, (((s.seed||7)*41)+i*913)>>>0, taken);
+        if(s.meta){ s.meta.residentSeq=(s.meta.residentSeq||0)+1; s.meta.residents=s.meta.residents||[]; s.meta.residents.push(person); }
+        sol=APH.Res.embodySoldier(person, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60));
+      } else {
+        var sf = (window.APH.Planet && APH.Planet.pickRaidFaction)
+          ? APH.Planet.pickRaidFaction(s.lastExpedition, s.seed)
+          : null;
+        sol = (window.APH.Ent && APH.Ent.makeEnemy)
+          ? APH.Ent.makeEnemy(sf, CFG.HAB.x + U.rr(-80, 80), CFG.HAB.y + U.rr(-60, 60))
+          : { type: T.ENEMY, x: CFG.HAB.x, y: CFG.HAB.y };
+        sol.isSoldier = true;
+        sol.hp = CFG.soldier.hp;
+        sol.maxHp = CFG.soldier.hp;
+        sol.faction = Object.assign({}, sf || {}, { speed: CFG.soldier.speed, dmg: CFG.soldier.dmg });
+        sol.state = 'idle';
+      }
       if(s.entities) s.entities.push(sol);
     }
 
@@ -1277,7 +1284,7 @@ APH.Combat = (function(){
     // 炮塔射击
     var raidFoes = [];
     (s.entities || []).forEach(function(e2){
-      if(e2.type === T.ENEMY && !e2.dead && !e2.isSoldier) raidFoes.push(e2);
+      if(e2.type === T.ENEMY && !e2.dead && !e2.isSoldier && !e2.captured) raidFoes.push(e2);
     });
 
     var buildings = (s.colony && s.colony.buildings) || [];
@@ -1314,7 +1321,7 @@ APH.Combat = (function(){
     s.war.raidSpawnT = (s.war.raidSpawnT || 0) - dt;
     var aliveEnemies = 0;
     (s.entities || []).forEach(function(e){
-      if(e.type === T.ENEMY && !e.dead && !e.isSoldier) aliveEnemies++;
+      if(e.type === T.ENEMY && !e.dead && !e.isSoldier && !e.captured) aliveEnemies++;
     });
 
     var waveCount = (s.war.wave && s.war.wave.count) || 4;
@@ -1341,7 +1348,17 @@ APH.Combat = (function(){
         ey = U.clamp(CFG.HAB.y + Math.sin(ang) * d, 40, CFG.WORLD - 40);
       }
 
-      var en = (window.APH.Ent && APH.Ent.makeEnemy) ? APH.Ent.makeEnemy(f, ex, ey) : { type: T.ENEMY, x: ex, y: ey };
+      var en;
+      if(window.APH.Res && APH.Res.hostilePawn && APH.Res.embodyHostile){
+        var taken=((s.meta&&s.meta.residents)||[]).map(function(r){return r&&r.name;});
+        (s.entities||[]).forEach(function(exEnt){ if(exEnt&&exEnt.name) taken.push(exEnt.name); });
+        var person=APH.Res.hostilePawn((((s.seed||7)*31)+((s.war.spawned||0)*917))>>>0, taken, {
+          faction:(s.war&&s.war.rivalId)||'hostile'
+        });
+        en=APH.Res.embodyHostile(person, ex, ey);
+      } else {
+        en = (window.APH.Ent && APH.Ent.makeEnemy) ? APH.Ent.makeEnemy(f, ex, ey) : { type: T.ENEMY, x: ex, y: ey };
+      }
       if(camping){
         en.sieging = true; en.campX = s.war.siege.cx; en.campY = s.war.siege.cy;
         en.state = 'idle';
@@ -1366,7 +1383,7 @@ APH.Combat = (function(){
     if(!s.war.betweenWaves && (s.war.spawned || 0) >= waveCount){
       var left = 0;
       (s.entities || []).forEach(function(e){
-        if(e.type === T.ENEMY && !e.dead && !e.isSoldier) left++;
+        if(e.type === T.ENEMY && !e.dead && !e.isSoldier && !e.captured) left++;
       });
       if(left === 0){
         if(!s.war.routed && (s.war.wavesLeft || 0) > 0){

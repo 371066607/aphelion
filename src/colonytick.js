@@ -70,6 +70,13 @@ APH.ColonyTick = (function(){
       var ctx = rEnt ? APH.Res.thoughtCtxAt(rEnt.x, rEnt.y, thEnv) : { raid: !!(s.war&&s.war.raidActive) };
       APH.Res.needsTick(r, false, ctx);
     });
+    /* ADR-47: 人型袭击者与殖民者同一套念头，但不走吃饭/上岗。 */
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.isSoldier || !APH.Res.isHumanlike || !APH.Res.isHumanlike(e) || !e.pawn) return;
+      var hCtx = e.x != null && APH.Res.thoughtCtxAt ? APH.Res.thoughtCtxAt(e.x, e.y, thEnv) : { raid: true };
+      hCtx.raid = true;
+      APH.Res.moodFromThoughts(e.pawn, hCtx);
+    });
     m.residents.forEach(function(r){
       var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
       var rTemp = ambT;
