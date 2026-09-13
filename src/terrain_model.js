@@ -15,14 +15,10 @@ APH.TerrainModel = (function(){
 
   /* 128×128 格的六个明确区域。landing 与 woodland 的前 20 格共享边界，
      是两块连续的保底建地；它们不是第七种“settlement”区域。 */
-  var REGIONS = [
-    { id:'landing',   fertility:.45, moveCost:1,    color:'#334a3b' },
-    { id:'woodland',  fertility:.64, moveCost:1.18, color:'#254b35' },
-    { id:'lakeshore', fertility:.72, moveCost:1.12, color:'#315a61' },
-    { id:'ridge',     fertility:.16, moveCost:1.36, color:'#60574a' },
-    { id:'alien',     fertility:.58, moveCost:1.08, color:'#5a4c70' },
-    { id:'wreckage',  fertility:.28, moveCost:1.05, color:'#625149' }
-  ];
+  var REGIONS = ['landing','woodland','lakeshore','ridge','alien','wreckage'].map(function(id){
+    var semantics=CFG.observe.tileSemantics[id];
+    return {id:id,fertility:semantics.fertility,moveCost:semantics.moveCost,color:semantics.color};
+  });
 
   function n(v, fallback){ return typeof v==='number' && isFinite(v) ? v : fallback; }
   function u32(v){ return (v >>> 0); }
@@ -41,8 +37,29 @@ APH.TerrainModel = (function(){
     return { v:1, width:LEGACY_SIZE, height:LEGACY_SIZE, grid:GRID,
       seed:u32(n(seed, 7)), kind:kind||'home', generation:LEGACY_GENERATION };
   }
+  function hasObservation(scene){
+    var o=scene&&scene.observation;
+    if(!o) return false;
+    if(o.v===1&&o.widthCells>0&&o.heightCells>0&&Array.isArray(o.ground))
+      return o.ground.length===o.widthCells*o.heightCells;
+    return Array.isArray(o.grid)&&o.grid.length>0&&Array.isArray(o.grid[0])&&o.grid[0].length>0;
+  }
+  function observed(scene){
+    var d={},key,o=scene.observation,grid=n(scene.grid,GRID);
+    for(key in scene) if(scene.hasOwnProperty(key)) d[key]=scene[key];
+    d.v=n(scene.v,1);
+    d.grid=grid;
+    d.width=n(scene.width,o.widthCells*grid);
+    d.height=n(scene.height,o.heightCells*grid);
+    d.seed=u32(n(scene.seed,7));
+    d.kind=scene.kind||'planet';
+    d.generation=HOME_GENERATION;
+    return d;
+  }
   function normalize(scene){
-    if(!scene || scene.generation===0 || scene.width===LEGACY_SIZE) return legacy(scene&&scene.seed, scene&&scene.kind);
+    if(!scene || scene.generation===0) return legacy(scene&&scene.seed, scene&&scene.kind);
+    if(hasObservation(scene)) return observed(scene);
+    if(scene.width===LEGACY_SIZE) return legacy(scene.seed,scene.kind);
     if(scene.kind==='home' && scene.generation===HOME_GENERATION && scene.width===HOME_SIZE && scene.height===HOME_SIZE){var d=home(scene.seed);d.resourceVersion=scene.resourceVersion===2?2:1;return d;}
     return legacy(scene&&scene.seed, scene&&scene.kind);
   }
@@ -78,6 +95,12 @@ APH.TerrainModel = (function(){
     if(d.generation===LEGACY_GENERATION){
       return { region:'legacy', walkable:true, buildable:true, fertility:.5, moveCost:1 };
     }
+    if(d.observation&&APH.Observe&&APH.Observe.cellAt){
+      var observedCell=APH.Observe.cellAt(d.observation,gx,gy);
+      if(!observedCell) return {region:'void',walkable:false,buildable:false,fertility:0,moveCost:Infinity};
+      return {region:observedCell.water?'water':observedCell.region,walkable:observedCell.walkable,
+        buildable:observedCell.buildable,fertility:observedCell.fertility,moveCost:observedCell.moveCost};
+    }
     var r=regionAtGrid(d,gx,gy);
     var water=waterCell(d,gx,gy);
     return { region:water?'water':r.id, walkable:!water, buildable:!water,
@@ -94,6 +117,7 @@ APH.TerrainModel = (function(){
   function landmarks(scene){
     var d=normalize(scene);
     if(d.generation===LEGACY_GENERATION) return { hab:{x:1100,y:1100,r:92}, lake:{x:1660,y:1560,r:148} };
+    if(d.observation) return {hab:{x:1100,y:1100,r:92},lake:{x:0,y:0,r:0}};
     return { hab:{x:1100,y:1100,r:92}, lake:{x:GRID*84,y:GRID*(58+d.seed%5),r:GRID*8} };
   }
   function resource(uid, kind, gx, gy, amount, extra){
@@ -105,18 +129,30 @@ APH.TerrainModel = (function(){
     var d=normalize(scene), gone=depleted||{}, out=[];
     if(d.generation===LEGACY_GENERATION) return out;
     var prefix='tm_'+d.seed+'_g'+d.generation+'_', used={};
-    function yieldOf(kind){ return kind==='tree'?4:(kind==='rock_iron'?3:(kind==='rock_stone'?4:(kind==='bush_berry'?3:2))); }
-    function itemOf(kind){ return kind==='tree'?'it_wood':(kind==='rock_iron'?'it_iron':(kind==='rock_stone'?'it_stone':(kind==='bush_berry'?'it_berry':'it_herb'))); }
-    function add(kind,gx,gy,extra){
+    function resourceRule(kind){ return CFG.observe.resourceSemantics[kind]||{}; }
+    function yieldOf(kind){ var amount=resourceRule(kind).amount;return typeof amount==='number'?amount:0; }
+    function itemOf(kind){ return resourceRule(kind).yieldItemId||null; }
+    function add(kind,gx,gy,extra,explicitUid){
       var key=gx+','+gy, c=cellAt(d,(gx+.5)*GRID,(gy+.5)*GRID);
       if(used[key] || !c.walkable) return false;
       used[key]=true;
-      var uid=prefix+'flora_'+kind+'_'+gx+'_'+gy, mineral=kind.indexOf('rock')===0;
+      var uid=explicitUid||prefix+'flora_'+kind+'_'+gx+'_'+gy, mineral=resourceRule(kind).mineral===true;
       var flags={ yieldItemId:itemOf(kind), depleted:mineral&&!!gone[uid], mineralRemains:mineral&&!!gone[uid] };
       if(extra) Object.keys(extra).forEach(function(k){ flags[k]=extra[k]; });
+      if(mineral&&gone[uid]){flags.depleted=true;flags.mineralRemains=true;}
       if(flags.depleted)flags.amount=0;
       out.push(resource(uid,kind,gx,gy,flags.depleted?0:yieldOf(kind),flags));
       return true;
+    }
+    if(d.observation){
+      var observedResources=Array.isArray(d.observation.resources)?d.observation.resources:[];
+      for(var oi=0;oi<observedResources.length;oi++){
+        var source=observedResources[oi],extra={},sourceKey;
+        if(!source||!source.kind) continue;
+        for(sourceKey in source) if(source.hasOwnProperty(sourceKey)&&sourceKey!=='gx'&&sourceKey!=='gy'&&sourceKey!=='kind'&&sourceKey!=='uid') extra[sourceKey]=source[sourceKey];
+        add(source.kind,source.gx,source.gy,extra,source.uid||('obs_'+d.seed+'_'+source.kind+'_'+source.gx+'_'+source.gy));
+      }
+      return out;
     }
     /* 首夜保障放在旧 HAB 的 300–500px 环内，不等玩家走半张图才拿到木石。 */
     for(var i=0;i<24;i++){

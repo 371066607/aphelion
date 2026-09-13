@@ -2213,3 +2213,14 @@ console:  (无)
 ### 2026-09-13 01:25 +08 · #190 工作表/征召只认玩家阵营（工作区）
 
 - `isPlayerFaction`；`assignByPriority` 跳过敌对、俘虏、征召中。士兵 `embodySoldier` 为居民实体并入名册。1003 单元绿。ADR-47 三张示踪票均在工作区，未关 GitHub、未拆分提交。
+
+### 2026-09-14 01:19 +08 · #198 复合地图观测扩展缝
+
+- 新增纯数据模块 `APH.Observe`：相同 seed/群系/尺寸稳定生成 `Observation v1`，保存行优先 `ground` 与独立 `resources`；家园 20×20 `landing` 核心和 300–500px 木石环在同次观测中分层成立。五张群系砖表声明地面邻接和资源—地面兼容关系，资源自带产物 ID/数量，同格去重并过滤越界、未知种类和水上树矿。
+- `TerrainModel` 可同时读取 observed、未观测 generation 1 和 generation 0；observed 资源只来自 Observation，不再执行第二套随机散布，也不从 landmarks 补固定圆湖。新模块已进入 build 与 unit/scenario/perf/boss/season soak 加载顺序；`game.html` 由 `build.py` 重建。
+- 双轴初审发现并修复：未知群系曾被静默改成 landing 且污染全局 CFG、被 pin 的 lakeshore 可残留在零水地图、成功求解路径未校验资源格、Observation 版本未写入 ADR、TerrainModel 重复保存地形/资源数值。相关用例先得到 4 个预期失败，再转为 22/22 聚焦通过。
+- 验证：`python3 build.py` 成功（game.html 40923KB）；1015 单元、122 scenario、5 perf、7 boss 全绿。DOM 性能桩记录 128 格、20 居民、2000 对象，模拟 P50=2ms/P95=4ms、20 次寻路 56ms、存档 667674 字节；它不代表浏览器实际帧率。本票只建立 expand 兼容缝，尚未让新档写入 Observation，也未进行人工游玩；下一步 #199 接入新家园创建与只迁一次的存档路径。
+
+### 2026-09-14 01:25 +08 · #198 最终复审修订
+
+- Standards 二审补出两个输入边界：表外 Ground pin/fallback 曾能写入 v1，资源 pin 曾能伪造 `yieldItemId`/`amount`。新增失败用例后，在 Observe 边界统一规范化：非法地面约束进入 degraded 且 fallback 输出按群系表清洗，资源产物由 `CFG.observe.resourceSemantics` 强制给定。旧条目的 22/22、1015 是二审前证据，最终聚焦为 23/23，全量为 1016 单元、122 scenario、5 perf、7 boss，重建 game.html 40924KB；最终 Spec 与 Standards 代码复审均无剩余 blocker。

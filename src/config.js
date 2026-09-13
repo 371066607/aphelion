@@ -14,6 +14,121 @@ APH.CFG = {
   GRID: 48,                    // ADR-4 逻辑格网
   LAKE: { x: 1660, y: 1560, r: 148 },
   HAB: { x: 1100, y: 1100, r: 92 },
+  observe: {
+    retries: 8,
+    retrySalt: 0x9e3779b9,
+    sameNeighborWeight: 2.4,
+    habCells: 20,
+    starterWood: 24,
+    starterStone: 18,
+    starterWoodRing: 8,
+    starterStoneRing: 9,
+    starterStoneAngle: .19,
+    tileSemantics: {
+      landing:   {fertility:.45,moveCost:1,color:'#334a3b'},
+      woodland:  {fertility:.64,moveCost:1.18,color:'#254b35'},
+      lakeshore: {fertility:.72,moveCost:1.12,color:'#315a61',shore:true},
+      ridge:     {fertility:.16,moveCost:1.36,color:'#60574a'},
+      alien:     {fertility:.58,moveCost:1.08,color:'#5a4c70'},
+      wreckage:  {fertility:.28,moveCost:1.05,color:'#625149'},
+      water:     {fertility:0,moveCost:null,color:'#173f50',water:true},
+      spore_moss:  {fertility:.68,moveCost:1.12,color:'#455b43'},
+      spore_grove: {fertility:.54,moveCost:1.34,color:'#263f31'},
+      spore_water: {fertility:0,moveCost:null,color:'#264c50',water:true},
+      silica:       {fertility:.18,moveCost:1.06,color:'#706c78'},
+      spire:        {fertility:.08,moveCost:1.42,color:'#534e69'},
+      crystal_water:{fertility:0,moveCost:null,color:'#274a63',water:true},
+      peat:       {fertility:.66,moveCost:1.2,color:'#4d4a35'},
+      bog:        {fertility:.78,moveCost:1.58,color:'#364b37'},
+      acid_pool:  {fertility:0,moveCost:null,color:'#556824',water:true},
+      permafrost: {fertility:.2,moveCost:1.24,color:'#69777d'},
+      snowfield:  {fertility:.14,moveCost:1.4,color:'#aab7bb'},
+      pack_ice:   {fertility:.04,moveCost:1.08,color:'#8aa9b3'},
+    },
+    resourceSemantics: {
+      tree:          {yieldItemId:'it_wood',amount:4},
+      rock_stone:    {yieldItemId:'it_stone',amount:4,mineral:true},
+      rock_iron:     {yieldItemId:'it_iron',amount:3,mineral:true},
+      bush_berry:    {yieldItemId:'it_berry',amount:3},
+      bush_herb:     {yieldItemId:'it_herb',amount:2},
+      bush_alien:    {yieldItemId:'specimen_dew',amount:1},
+      rock_wreckage: {yieldItemId:'it_alloy',amount:2,mineral:true},
+    },
+    biomes: {
+      biome_landing: {
+        dryTile: 'woodland',
+        resourceGround: {
+          tree:['landing','woodland','lakeshore','alien','wreckage'],
+          rock_stone:['landing','ridge','wreckage'],
+          rock_iron:['ridge','wreckage'],
+          bush_berry:['lakeshore','alien'],
+          bush_herb:['woodland','lakeshore'],
+          bush_alien:['alien'],
+          rock_wreckage:['landing','wreckage'],
+        },
+        tiles: [
+          {id:'landing',weight:3}, {id:'woodland',weight:8},
+          {id:'lakeshore',weight:4}, {id:'ridge',weight:3},
+          {id:'alien',weight:3}, {id:'wreckage',weight:3},
+          {id:'water',weight:3},
+        ],
+        bonds: [
+          ['landing','woodland','lakeshore','ridge','alien','wreckage'],
+          ['water','water'],
+          ['water','lakeshore'],
+        ],
+      },
+      biome_spore_forest: {
+        resourceGround: {
+          tree:['spore_grove'], bush_herb:['spore_moss'], bush_alien:['spore_moss','spore_grove'],
+        },
+        tiles: [
+          {id:'spore_moss',weight:8}, {id:'spore_grove',weight:5},
+          {id:'spore_water',weight:3},
+        ],
+        bonds: [
+          ['spore_moss','spore_grove'],
+          ['spore_moss','spore_water'],
+          ['spore_water','spore_water'],
+        ],
+      },
+      biome_crystal_wasteland: {
+        resourceGround: {
+          rock_stone:['silica','spire'], rock_iron:['silica','spire'], bush_alien:['silica'],
+        },
+        tiles: [
+          {id:'silica',weight:8}, {id:'spire',weight:4},
+          {id:'crystal_water',weight:2},
+        ],
+        bonds: [['silica','spire','crystal_water']],
+        forbid: [['crystal_water','crystal_water']],
+      },
+      biome_acid_marsh: {
+        resourceGround: {
+          bush_herb:['peat','bog'], bush_alien:['bog'], rock_stone:['peat'],
+        },
+        tiles: [
+          {id:'peat',weight:7}, {id:'bog',weight:5},
+          {id:'acid_pool',weight:3},
+        ],
+        bonds: [
+          ['peat','bog'],
+          ['bog','acid_pool'],
+        ],
+        forbid: [['acid_pool','acid_pool']],
+      },
+      biome_cryo_tundra: {
+        resourceGround: {
+          bush_herb:['permafrost','snowfield'], rock_stone:['permafrost'], rock_iron:['permafrost'],
+        },
+        tiles: [
+          {id:'permafrost',weight:8}, {id:'snowfield',weight:5},
+          {id:'pack_ice',weight:3},
+        ],
+        bonds: [['permafrost','snowfield','pack_ice']],
+      },
+    },
+  },
   DAY_LEN: 3600,               // 一天 60 分钟（ADR-30 / #166）
   time: {
     defaultScale: 1,

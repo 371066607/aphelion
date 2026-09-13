@@ -2,7 +2,7 @@
 
 已通过（Accepted）· 2026-09-13
 
-远征「每次的地图」不是摄像机看见才变成地，也不是每出发重铺一张。它是对一颗星的**第一次着陆观测**：从该星的群系砖表里选出一张确定的格网，写入 `planet_<id>`，再登陆读旧图。家园是第五张群系（迫降点），新档迫降观测一次后写入殖民地存档。游戏词表里的「坍缩」只留给累塌。
+远征「每次的地图」不是摄像机看见才变成地，也不是每出发重铺一张。它是对一颗星的**第一次着陆观测**：从该星的群系砖表里选出一张确定的复合格网，写入 `planet_<id>`，再登陆读旧图。家园是第五张群系（迫降点），新档迫降观测一次后写入殖民地存档。游戏词表里的「坍缩」只留给累塌。
 
 ## 没采用的
 
@@ -20,14 +20,14 @@
 | 有的 | 没有的 |
 |---|---|
 | 五种群系、五张砖表（四张远征 + 迫降点） | 一颗星一张邻接表 |
-| 砖 = 地面或初局自然实体 | 建筑占地、划区当砖 |
+| 观测格 = 一个 Ground Tile + 可选初局自然资源 | 树矿覆盖地面、建筑占地或划区当砖 |
 | 砍光后同格同种再生 | 再生时重跑观测 |
 | 家园新档观测一次；旧档不跑 | 读档重铺家 |
 | 未知新星着陆才抽群系并第一次观测 | 不选星就发射 |
 | 出发面板选已知星或未知新星 | 图鉴里起飞 |
 | 求解器失败则降级 | 失败改群系、卡在着陆 |
 
-迫降点地面砖沿用 landing / woodland / lakeshore / ridge / alien / wreckage。钉子只有 HAB 核心与第一夜木石环。
+迫降点 Ground Tile 沿用 landing / woodland / lakeshore / ridge / alien / wreckage。HAB 20×20 核心只钉 `landing` 地面；第一夜木石环是同次观测的资源占用 pin，不参与地面邻接，也不覆盖核心地面。
 
 「每次的地图」= 每颗星的第一次观测，不是每走一格，也不是每次出发。
 
@@ -39,3 +39,19 @@
 - ADR-9：群系继续 `biome_`。第五张是迫降点，不是六个家园分区六个群系。
 - ADR-16：家园仍是末舰迫降点；观测发生在新档迫降，不把家变成另一颗远征星。
 - ADR-35：远征仍是补给副本；持久的是那颗星的地，不是把家搬到星上。
+
+## 2026-09-14 修订：复合观测格与统一查询缝（#198）
+
+原文“一格一种，砖是地面或初局自然实体”会让 300–500px 木石环覆盖 20×20 `landing` 核心；默认 pins 因此与邻接约束矛盾，正常家园只能走 degraded。修订后，格网保存两个由同一次 Observation 决定的部分：
+
+- `ground` 是稳定的行优先 Ground Tile；唯一决定水体、通行、移动代价、肥力与建设能力。
+- `resources` 是可选的初局自然资源占用物；只决定资源种类、位置和产物语义，不改写 ground。
+- `APH.Observe.observe` 是纯 seeded 观测入口，接受尺寸、群系、ground pins、resource pins 和可注入 fallback；有限重试后返回 `degraded:true`，不改群系、不阻塞落地。
+- `APH.TerrainModel` 是运行系统的唯一地形查询缝。它兼容新的行优先 observation、已合入版本的二维 `observation.grid`、未观测 generation 1，以及不读取 Observation 的 generation 0。
+- 水格为零时不保留无来源的 lakeshore。湖仍不是保证存在的地标。
+
+Observation 的持久化版本从 `v: 1` 开始，归属家园或某颗星球的场景描述；只在该场景第一次观测时创建。`v`、`widthCells`、`heightCells`、`biomeId`、`degraded`、行优先 `ground` 与 `resources` 是 v1 字段。每条 resource 至少包含 `gx`、`gy`、`kind`、`yieldItemId` 和 `amount`；同格最多一条，越界、未知种类或与 Ground Tile 不兼容的记录不进入结果。版本演进只增字段，持久化迁移仍统一走 `save.js`。
+
+资源产物由 `CFG.observe.resourceSemantics` 定义；调用方传入的产物 ID 或数量不能覆盖这张表。每张群系砖表的 `resourceGround` 再声明该资源允许占用哪些 Ground Tile。求解时 resource pin 会限制所在格的地面候选，但不会把资源种类写进 `ground`。Ground pin 与 fallback 输出都要经过当前群系砖表校验；非法约束进入确定性 degraded 路径，表外地面不会写进 Observation。未知群系 ID 原样保留并进入确定性 degraded 路径，`Observe` 不修改全局配置或把它伪装成迫降点群系。Observed 场景也不再从 `landmarks` 补一座固定圆湖；水体只来自 `ground`。
+
+本修订先做 expand：新旧路径并存，后续票逐个迁移存档、渲染、碰撞、寻路、肥力、生态与总览；所有消费者迁完前不删除 legacy 分支。
