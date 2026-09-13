@@ -13,6 +13,17 @@ APH.ColonyTick = (function(){
   'use strict';
   var U = APH.U, CFG = APH.CFG, T = CFG.entType;
 
+  function isRepairCrew(r, s){
+    if(!r) return false;
+    if(s && s.colony && s.colony.rulesVersion===1){
+      if(r.downed || r.isSleeping || r.medLying) return false;
+      if(r.job && r.job!=='blueprint') return false;
+      var wp=s.meta && s.meta.workPrio && s.meta.workPrio[r.id];
+      if(wp && wp.sk_build===0) return false;
+      return true;
+    }
+    return !!(r.job==='blueprint' || (r.skills && r.skills.sk_build>=3));
+  }
   function founded(m){
     var need = (CFG.colony && CFG.colony.foundedAtResidents != null) ? CFG.colony.foundedAtResidents : 1;
     if(!m) return false;
@@ -20,8 +31,8 @@ APH.ColonyTick = (function(){
     if((m.residents || []).length >= need){ m.colonyFounded = true; return true; }
     return false;
   }
-  function checkFall(){
-    var s = APH.state, m = s.meta;
+  function checkFall(context){
+    var s = context || APH.state, m = s.meta;
     if(!m || s.mode !== 'running' || s.scene !== 'home') return false;
     if(!founded(m)) return false;                 // 还没立过, 谈不上覆灭
     if((m.residents || []).length > 0) return false;    // 还有人活着
@@ -38,16 +49,74 @@ APH.ColonyTick = (function(){
     return true;
   }
 
-  function run(){
-    var s=APH.state, m=s.meta;
+  /* rulesVersion=1 才启用“人在合法工位才产出”。老档沿用既有的名册岗位
+     语义，避免一次版本升级把所有旧存档的经济链冻死。 */
+  function modernWorkRules(s){ return !!(s && s.colony && s.colony.rulesVersion===1); }
+  function contextWorldId(s){ return (s && s.id) || ((s && s.scene)==='home' ? 'home' : ((s && s.scene)||'home')); }
+  function residentWorldId(r){ return (r && r.worldId) || 'home'; }
+  function residentsInContext(s, m){
+    var worldId=contextWorldId(s);
+    return (m.residents||[]).filter(function(r){ return residentWorldId(r)===worldId; });
+  }
+  function residentEntity(s, resident){
+    var worldId=contextWorldId(s);
+    return (s.entities||[]).find(function(e){
+      return e && e.type===T.RESIDENT && (e.rid===resident.id || e.id===resident.id) &&
+        ((!e.worldId && worldId==='home') || e.worldId===worldId);
+    }) || null;
+  }
+  function workPool(residents){
+    var out={};
+    (residents||[]).forEach(function(r){
+      if(!r || !r.job) return;
+      (out[r.job]||(out[r.job]=[])).push(r);
+    });
+    return out;
+  }
+  function facilityUid(b){ return (b&&b.uid) || [(b&& (b.bid||b.id))||'building',b&&b.gx!=null?b.gx:b&&b.x,b&&b.gy!=null?b.gy:b&&b.y].join('@'); }
+  function terrainFertilityMul(s, b){
+    var scene=s&&s.colony&&s.colony.scene, TM=window.APH&&APH.TerrainModel;
+    if(!scene || !TM || !TM.fertilityMultiplier || !b || !isFinite(b.x) || !isFinite(b.y)) return 1;
+    var mul=TM.fertilityMultiplier(scene,b&&b.x,b&&b.y);
+    return isFinite(mul) ? mul : 1;
+  }
+  function farmGrowthMul(s, b, lawMul, weatherMul, powerMul, seasonMul){
+    return lawMul*weatherMul*powerMul*seasonMul*terrainFertilityMul(s,b);
+  }
+  function takeWorkerAt(s, b, job, pools, bound){
+    if(b && b.powered===false){ b.workReason='断电'; return null; }
+    var pool=(pools&&pools[job])||[], sawBlocked=false, sawAway=false;
+    for(var i=0;i<pool.length;i++){
+      var r=pool[i], e=residentEntity(s,r);
+      if(bound && bound[r.id]) continue;
+      if(residentWorldId(r)!==contextWorldId(s)) continue;
+      if(!e || e.dead || r.dead || e.hp<=0 || r.hp<=0 || e.drafted || r.drafted || e.isSleeping || r.isSleeping || e.downed || r.downed) continue;
+      var spot=(APH.Construction&&APH.Construction.spot) ? APH.Construction.spot(s,b,e) : null;
+      if(!spot){ sawBlocked=true; continue; }
+      if(U.dst(e.x,e.y,spot.x,spot.y)>8){ sawAway=true; continue; }
+      pool.splice(i,1);
+      if(bound) bound[r.id]=facilityUid(b);
+      e.workFacilityUid=facilityUid(b);
+      b.workReason=null;
+      return r;
+    }
+    b.workReason=sawBlocked?'入口堵塞':(sawAway?'工人未到工位':'缺少在场工人');
+    return null;
+  }
+
+  function run(context){
+    var s=context||APH.state, m=s.meta;
+    if(!s || !m || s.scene!=='home') return false;
+    var residents=residentsInContext(s,m);
+    var modernWork=modernWorkRules(s);
     /* W3 天气效果: 当前天气 id(读 meta.weather, 老档兜底 wx_clear); 极端清单以 exposureGain>0 为准 */
     var wxId=(window.APH.Weather&&APH.Weather.currentId)?APH.Weather.currentId(m):'wx_clear';
     var wxFx=(window.APH.Weather&&APH.Weather.weatherEffects)?APH.Weather.weatherEffects(wxId):{};
     var wxExtreme=((wxFx.exposureGain)||0)>0;
     /* T9 无顶房间: 生产跳重算房间(墙/门围合), 供暴露免疫+卧室心情 */
-    var T9_rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf(s.colony.buildings):[];
+    var T9_rooms=(window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf(s.colony.buildings,s.colony.scene):[];
     /* 深度生存: 床位分配 (Survival #15) */
-    APH.Res.assignBeds(s.colony.buildings, m.residents);
+    APH.Res.assignBeds(s.colony.buildings, residents, {modern:!!s.colony.rulesVersion});
 
     /* ADR-25 温度与体温失调结算 (念头上下文也要用, 故先算) */
     var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
@@ -64,13 +133,20 @@ APH.ColonyTick = (function(){
 
     /* U4 需求结算: 生产跳只掉饱食; 吃饭要走到仓库或粮堆
        ADR-31: 带上念头上下文 —— 心情由 collectThoughts 结算, 检查器同源。 */
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       var rEnt = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
-      thEnv.self = r; thEnv.residents = m.residents; thEnv.bonds = m.bonds;
+      thEnv.self = r; thEnv.residents = residents; thEnv.bonds = m.bonds;
       var ctx = rEnt ? APH.Res.thoughtCtxAt(rEnt.x, rEnt.y, thEnv) : { raid: !!(s.war&&s.war.raidActive) };
       APH.Res.needsTick(r, false, ctx);
     });
-    m.residents.forEach(function(r){
+    /* ADR-47: 人型袭击者与殖民者同一套念头，但不走吃饭/上岗。 */
+    (s.entities||[]).forEach(function(e){
+      if(!e || e.dead || e.isSoldier || !APH.Res.isHumanlike || !APH.Res.isHumanlike(e) || !e.pawn) return;
+      var hCtx = e.x != null && APH.Res.thoughtCtxAt ? APH.Res.thoughtCtxAt(e.x, e.y, thEnv) : { raid: true };
+      hCtx.raid = true;
+      APH.Res.moodFromThoughts(e.pawn, hCtx);
+    });
+    residents.forEach(function(r){
       var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
       var rTemp = ambT;
       if(ent && window.APH.Nav && APH.Nav.roomAt){
@@ -92,13 +168,13 @@ APH.ColonyTick = (function(){
 
     /* D: 工作优先级调度(人×技能 0~3 表; 替代逐岗 autoAssign) */
     m.workPrio=m.workPrio||{};
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       if(!m.workPrio[r.id]) m.workPrio[r.id]=APH.Res.defaultPrio(r);
     });
     var hasQAssign=(s.colony.buildQueue||[]).length>0;
-    var assign=APH.Colony.assignByPriority(m.residents, s.colony.buildings,
+    var assign=APH.Colony.assignByPriority(residents, s.colony.buildings,
                                            m.workPrio, hasQAssign);
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       if(r.jobLocked) return;
       var nj=(assign[r.id]!==undefined)?assign[r.id]:null;
       if(r.job!==nj){
@@ -111,14 +187,14 @@ APH.ColonyTick = (function(){
       return b.id==='bl_clinic' && APH.Colony.clinicPowered(b);
     });
     var medicSkill=0;
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       if(APH.Res.isBroken && APH.Res.isBroken(r)) return;    // 崩溃的医生缺勤
       if(r.job==='bl_clinic') medicSkill=Math.max(medicSkill, (r.skills&&r.skills.sk_social)||0);
     });
     var tickSeed=((s.seed||7)*1009 + Math.floor(s.clock||0)*17 + (m.residentSeq||0)*13)>>>0;
     var sickRng=U.makeRng(tickSeed);
     var clinicR=(CFG.residents&&CFG.residents.clinicNearR!=null)?CFG.residents.clinicNearR:80;
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       var ent=null;
       s.entities.forEach(function(e){
         if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) ent=e;
@@ -132,9 +208,13 @@ APH.ColonyTick = (function(){
       APH.Res.clinicTick(r, {hasClinic:hasClinic, inClinic:inClinic, medicSkill:medicSkill, rng:sickRng});
       /* W3 天气暴露接线(本票核心): 极端天气室外累积/房间内免疫 (Survival #19 桩复活; T9 房间覆盖)
          sheltered: 房间内=true; 房间外回退 isSheltered(建筑半径); 实体缺位兜底按室内(不误积累) */
+      var alienExposure=modernWork&&ent&&APH.Ecology&&APH.Ecology.exposedAt(s,ent);
+      if(alienExposure&& !r._alienExposure && !s._background)
+        U.emit('notice',{text:r.name+' 接近刺激性异星植物，离开植物丛或穿防护服可降低暴露',color:'#ffc857'});
+      r._alienExposure=!!alienExposure;
       APH.Res.exposureTick(r,
         ent ? APH.Res.shelteredFor({x:ent.x, y:ent.y}, s.colony.buildings, T9_rooms) : true,
-        wxExtreme, wxId);
+        wxExtreme||alienExposure, alienExposure?'wx_acid':wxId);
       /* ADR-31: 房间品质(T9)与同室死敌(ADR-22)已并入念头, 见 thoughtCtxAt。 */
       /* #69 医疗舱被拆: 躺舱者起身 (病情回落起身由 needsTick wake gate 负责) */
       if(r.medLying && !hasClinic) r.medLying = false;
@@ -145,6 +225,14 @@ APH.ColonyTick = (function(){
       if(r.downed){
         var rr=APH.Res.rescueTick([r], s.colony.buildings, 30, hasClinic && APH.Colony.haveStock('med')>0, {inClinic:inClinic});
         if(rr.medUsed){
+          var helper=residents.find(function(person){
+            if(person===r||person.downed||person.job!=='bl_clinic')return false;
+            var pe=residentEntity(s,person);
+            return pe&&ent&&U.dst(pe.x,pe.y,ent.x,ent.y)<clinicR;
+          });
+          if(helper)APH.Res.rememberShared(m,[r.id,helper.id],{
+            id:'rescue:'+r.id+':'+s.clock,kind:'rescue',clock:s.clock,
+            text:helper.name+' 在病房救助了 '+r.name});
           APH.Colony.takeStock(m.res, s.entities, 'med', 1);
           U.emit('notice', {text:r.name+' 被紧急救治', color:'#7dffab'});
         }
@@ -153,6 +241,11 @@ APH.ColonyTick = (function(){
           /* 殖民地优先 T1: 居民之死要被记住 —— 覆灭结算页要说出代价 */
           if(m.stats) m.stats.colonistsLost = (m.stats.colonistsLost||0) + 1;
           var entDead=s.entities.filter(function(en){ return en && (en.rid||en.id)===r.id; })[0];
+          Object.keys(r.gear||{}).forEach(function(slot){
+            var gear=r.gear[slot];if(!gear)return;
+            APH.Combat.spawnDrop(entDead?entDead.x:CFG.HAB.x,entDead?entDead.y:CFG.HAB.y,gear,1,{stock:true,jitter:0});
+            r.gear[slot]=null;
+          });
           if(APH.Res.makeCorpse){
             s.entities.push(APH.Res.makeCorpse(r, entDead?entDead.x:s.px, entDead?entDead.y:s.py));
           }
@@ -161,20 +254,22 @@ APH.ColonyTick = (function(){
         }
       }
     });
+    /* canonical 名册只删死者；本世界工作集同步收缩，绝不把远征名册覆盖掉。 */
+    residents=residents.filter(function(r){ return (m.residents||[]).indexOf(r)>=0; });
     /* 殖民地优先 T1: 殖民地覆灭判定。
        立过殖民地(名册到过 foundedAtResidents 人)之后又归零 = 本局结束。
        新档开局本来就是 0 人, 所以必须先立过, 否则开局即覆灭。 */
-    checkFall();
+    checkFall(s);
 
     /* B: 心情崩溃状态机(seeded) + 崩溃行为落地 */
     var breakRng=U.makeRng((tickSeed^0x5EED2B)>>>0);
     var CB=CFG.residents||{};
-    m.residents.forEach(function(r){
+    residents.forEach(function(r){
       var b=APH.Res.breakTick(r, breakRng);
       if(b.started){
         U.emit('notice', {text:'💢 '+r.name+' 崩溃了: '+APH.Res.BREAK_NAMES[b.started], color:'#ff9a9a'});
         if(b.started==='brawl'){
-          var mate=APH.Res.lowestBondMate(r, m.residents, m.bonds||{});
+          var mate=APH.Res.lowestBondMate(r, residents, m.bonds||{});
           if(mate){
             var ill=CB.brawlIll!=null?CB.brawlIll:8;
             APH.Res.hurtResident(mate, ill, 'wound', {mood: CB.brawlMoodHit!=null?CB.brawlMoodHit:15});
@@ -190,7 +285,7 @@ APH.ColonyTick = (function(){
           s.entities.forEach(function(e){
             if(e.type===T.RESIDENT && (e.rid===r.id||e.id===r.id)) meE=e;
           });
-          m.residents.forEach(function(o){
+          residents.forEach(function(o){
             if(o===r || !meE) return;
             var oe=null;
             s.entities.forEach(function(e){
@@ -210,10 +305,10 @@ APH.ColonyTick = (function(){
       }
     });
     /* 崩溃者本跳不参与任何生产 */
-    var workers=m.residents.filter(function(r){ return !APH.Res.isBroken(r); });
+    var workers=residents.filter(function(r){ return !APH.Res.isBroken(r); });
     if(hasClinic && APH.Colony.haveStock('med')>0){
       var sickest=null, bestScore=-1;
-      m.residents.forEach(function(r){
+      residents.forEach(function(r){
         if((r.illness||0)<=0) return;
         if(r.downed) return;                       /* #69: 击倒者由 rescueTick 用薬, 不双扣 */
         /* F: 疫病患者优先用药(药是唯一根治手段) */
@@ -229,6 +324,8 @@ APH.ColonyTick = (function(){
     }
 
     /* U3/U5 农场/种植槽与岗位产出 (异星奇幻作物) */
+    var workerPools=modernWork?workPool(workers):null;
+    var workBound=modernWork?{}:null;
     var farmers=workers.filter(function(r){return r.job==='bl_farm'||r.job==='bl_crop_plot';});
     var ranchers=workers.filter(function(r){return r.job==='bl_pasture';});
     var farms=s.colony.buildings.filter(function(b){return b.id==='bl_farm'||b.id==='bl_crop_plot';});
@@ -245,18 +342,27 @@ APH.ColonyTick = (function(){
         b.crop='crop_glow_shroom';
       }
       if(APH.Colony.ALIEN_CROPS[b.crop] && !APH.Colony.canPlantCrop(b.crop, m.analyzedFlora)) return;
-      var bestFarmer=farmers.reduce(function(acc,r){
+      var bestFarmer=modernWork ? takeWorkerAt(s,b,b.id,workerPools,workBound) : farmers.reduce(function(acc,r){
         return (acc===null||(r.skills.sk_farm>(acc.skills.sk_farm||0)))?r:acc;
       },null);
+      if(modernWork && !bestFarmer) return;
       var farmMul=((s.meta.tech&&s.meta.tech.te_radar)||0)*0.15;
       var farmEff=bestFarmer?APH.Res.efficiency(bestFarmer):1;
       var farmSk=bestFarmer?(bestFarmer.skills.sk_farm||0):0;
+      /* v1 家园由 TerrainModel 提供土壤；generation 0 回传 1，旧地图节奏不动。 */
+      var soilMul=terrainFertilityMul(s,b);
+      if(modernWork) b.soilFertility=soilMul;
       /* T7: 无电农场减产 (powered===false 时×0.5; 未激活默认通电) */
       var powMul=APH.Colony.farmPowerMul(b.powered);
-      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff, lawFarm*farmWx*powMul*seasonGrow, b.crop);
+      b.plot=APH.Colony.cropPlotTick(b.plot, farmSk, farmEff,
+        farmGrowthMul(s,b,lawFarm,farmWx,powMul,seasonGrow), b.crop);
       if((b.plot.stage||0) >= 3){
         var h=APH.Colony.harvestAlienCrop(b.crop, farmSk);
         if(h.dropItemId && h.dropCount>0){
+          if(APH.Colony.ALIEN_CROPS[b.crop]){
+            m.alienHarvests=m.alienHarvests||{};
+            m.alienHarvests[b.crop]=(m.alienHarvests[b.crop]||0)+h.dropCount;
+          }
           APH.Combat.spawnDrop(b.x+14, b.y+18, h.dropItemId, h.dropCount, {stock:true});
           if(h.extraItemId && h.extraCount>0){
             APH.Combat.spawnDrop(b.x-10, b.y+18, h.extraItemId, h.extraCount, {stock:true});
@@ -272,7 +378,7 @@ APH.ColonyTick = (function(){
       if(APH.Colony.ensureBuildingHp) APH.Colony.ensureBuildingHp(b);
       if(APH.Colony.decayBuilding) APH.Colony.decayBuilding(b, 0.04);
     });
-    var buildersNear=(m.residents||[]).filter(function(r){ return r && (r.job==='blueprint' || (r.skills && r.skills.sk_build>=3)); });
+    var buildersNear=residents.filter(function(r){ return isRepairCrew(r, s); });
     if(buildersNear.length){
       (s.colony.buildings||[]).forEach(function(b){
         if(b && b.hp!=null && b.maxHp && b.hp<b.maxHp) APH.Colony.repairBuilding(b, 1.2);
@@ -304,13 +410,14 @@ APH.ColonyTick = (function(){
     }
     /* U6 畜牧: 羊群自然增长, 产肉/皮(纯函数 ranchTick, 每牧场一调) */
     var pastures=s.colony.buildings.filter(function(b){return b.id==='bl_pasture';});
-    var bestRancher=ranchers.reduce(function(acc,r){
-      return (acc===null||(r.skills.sk_ranch>(acc.skills.sk_ranch||0)))?r:acc;
-    },null);
-    var rSk=bestRancher?(bestRancher.skills.sk_ranch||0):0;
-    var ranchEff=bestRancher?APH.Res.efficiency(bestRancher):1;
     var ranchRng=U.makeRng(((s.seed||7)*2017 + Math.floor(s.clock||0)*31 + pastures.length)>>>0);
     pastures.forEach(function(b){
+      var bestRancher=modernWork ? takeWorkerAt(s,b,'bl_pasture',workerPools,workBound) : ranchers.reduce(function(acc,r){
+        return (acc===null||(r.skills.sk_ranch>(acc.skills.sk_ranch||0)))?r:acc;
+      },null);
+      if(modernWork && !bestRancher) return;
+      var rSk=bestRancher?(bestRancher.skills.sk_ranch||0):0;
+      var ranchEff=bestRancher?APH.Res.efficiency(bestRancher):1;
       if(b.herd===undefined) b.herd=1;           // 新牧场自带1只
       var out=APH.Colony.ranchTick(b, rSk, m.res, ranchRng, ranchEff);
       if(out.foodGain>0)
@@ -324,16 +431,17 @@ APH.ColonyTick = (function(){
         U.emit('notice', {text:'🐑 畜牧产出堆在地上 +'+out.foodGain+' 食物', color:'#c8e89a'});
     });
 
+    if(modernWork&&APH.ProductionJobs)APH.ProductionJobs.prepare(s);
     var labs=s.colony.buildings.filter(function(b){return b.id==='bl_lab';});
     var scholars=workers.filter(function(r){return r.job==='bl_lab';});
     labs.forEach(function(b){
-      var w=scholars.shift();
+      var w=modernWork ? takeWorkerAt(s,b,'bl_lab',workerPools,workBound) : scholars.shift();
       if(!w) return;
       var target=b.analysisTarget || 'specimen_flora_glow';
-      if(APH.Colony.ensureStock) APH.Colony.ensureStock(m.res, s.entities, target, 1);
+      if(!modernWork&&APH.Colony.ensureStock) APH.Colony.ensureStock(m.res, s.entities, target, 1);
       var loreSk=(w.skills&&w.skills.sk_lore)||0;
       var loreEff=APH.Res.efficiency(w);
-      var labOut=APH.Colony.labAnalysisTick(b, loreSk, loreEff, m.res, 1);
+      var labOut=modernWork&&APH.ProductionJobs?APH.ProductionJobs.tick(s,b,loreSk,loreEff,1):APH.Colony.labAnalysisTick(b, loreSk, loreEff, m.res, 1);
       s.entities.forEach(function(e){
         if(e.type===T.BUILDING && e.bid==='bl_lab' &&
            Math.abs((e.x||0)-(b.x||0))<2 && Math.abs((e.y||0)-(b.y||0))<2){
@@ -360,14 +468,18 @@ APH.ColonyTick = (function(){
       }
     });
 
+    if(modernWork&&APH.ProductionJobs)APH.ProductionJobs.prepare(s);
     var shops=s.colony.buildings.filter(function(b){return b.id==='bl_workshop';});
     var crafters=workers.filter(function(r){return r.job==='bl_workshop';});
     shops.forEach(function(b){
-      var w=crafters.shift();
+      var w=modernWork ? takeWorkerAt(s,b,'bl_workshop',workerPools,workBound) : crafters.shift();
       if(!w) return;
       var cEff=APH.Res.efficiency(w);
       var cSk=(w.skills&&w.skills.sk_craft)||0;
-      if(b.recipe && APH.Colony.CRAFT_RECIPES[b.recipe]){
+      if(modernWork&&APH.ProductionJobs){
+        var produced=APH.ProductionJobs.tick(s,b,cSk,cEff,1);
+        if(produced.done&&produced.producedItemId){APH.Combat.spawnDrop(b.x+16,b.y+14,produced.producedItemId,produced.count||1,{stock:true});U.emit('notice',{text:'工坊已完成加工，成品等待搬运',color:'#7dffab'});}
+      }else if(b.recipe && APH.Colony.CRAFT_RECIPES[b.recipe]){
         var out=APH.Colony.workshopCraftTick(b, cSk, cEff, m.res, m.tech, 1);
         if(out.done && out.producedItemId){
           APH.Combat.spawnDrop(b.x+16, b.y+14, out.producedItemId, out.count||1, {stock:true});
@@ -389,10 +501,11 @@ APH.ColonyTick = (function(){
     var kitchens=s.colony.buildings.filter(function(b){ return b.id==='bl_kitchen'||b.id==='bl_campfire'; });
     var chefs=workers.filter(function(r){ return r.job==='bl_kitchen'; });
     kitchens.forEach(function(b){
-      var w = (b.id==='bl_kitchen') ? chefs.shift() : null;
+      var w = modernWork ? takeWorkerAt(s,b,'bl_kitchen',workerPools,workBound) : ((b.id==='bl_kitchen') ? chefs.shift() : null);
+      if(modernWork && !w) return;
       var cSk = w ? ((w.skills&&w.skills.sk_farm)||0) : 0;
       var cEff = w ? APH.Res.efficiency(w) : 1;
-      var out = APH.Colony.cookingTick(b, cSk, cEff, m.res, m.tech, 1);
+      var out = modernWork&&APH.ProductionJobs?APH.ProductionJobs.tick(s,b,cSk,cEff,1):APH.Colony.cookingTick(b, cSk, cEff, m.res, m.tech, 1);
       if(out && out.done && out.producedItemId){
         APH.Combat.spawnDrop(b.x+14, b.y+16, out.producedItemId, out.count||1, {stock:true});
         var pName = (CFG.items[out.producedItemId]&&CFG.items[out.producedItemId].name)||out.producedItemId;
@@ -403,7 +516,7 @@ APH.ColonyTick = (function(){
     /* 篝火身心光环与围炉社交结算 (Cooking #49) */
     var campfires=s.colony.buildings.filter(function(b){ return b.id==='bl_campfire'; });
     if(campfires.length > 0 && APH.Res.campfireAuraTick){
-      var fireRes = APH.Res.campfireAuraTick(m.residents, campfires, { meta: m });
+      var fireRes = APH.Res.campfireAuraTick(residents, campfires, { meta: m });
       if(fireRes && fireRes.gatheredCount > 0){
         U.emit('notice', {text:'🔥 居民们在篝火旁围炉夜话 (+羁绊 +心情)', color:'#ffc857'});
       }
@@ -414,19 +527,19 @@ APH.ColonyTick = (function(){
     s.entities=APH.Ent.sweepDead(s.entities);
 
     /* V1 全局专长加成 */
-    var gb=APH.Res.globalBonuses(m.residents);
+    var gb=APH.Res.globalBonuses(residents);
     if(gb.lorePerTick>0){
       m.research+=Math.round(gb.lorePerTick);
     }
     if(gb.moodBoost>0){
-      m.residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
+      residents.forEach(function(r){ r.mood=Math.min(100,r.mood+gb.moodBoost); });
     }
     /* V3 随机社交事件(有≥2居民时; seeded, ADR-5) */
     var socialRng=U.makeRng((tickSeed^0xA5A5A5A5)>>>0);
-    if(m.residents.length>=2 && socialRng()<0.4){
-      var ia=Math.floor(socialRng()*m.residents.length);
-      var ib=(ia+1+Math.floor(socialRng()*(m.residents.length-1)))%m.residents.length;
-      var ra=m.residents[ia], rb=m.residents[ib];
+    if(residents.length>=2 && socialRng()<0.4){
+      var ia=Math.floor(socialRng()*residents.length);
+      var ib=(ia+1+Math.floor(socialRng()*(residents.length-1)))%residents.length;
+      var ra=residents[ia], rb=residents[ib];
       var positive = socialRng()<0.6;
       if(!positive && (ra.trait==='暴脾气'||rb.trait==='暴脾气')) positive=false;
       else if(ra.mood<35||rb.mood<35) positive=socialRng()<0.3;   // 低心情易冲突
@@ -443,9 +556,9 @@ APH.ColonyTick = (function(){
 
     /* U7 社交 */
     var pairs=[];
-    for(var i=0;i<m.residents.length;i++)
-      for(var j=i+1;j<m.residents.length;j++){
-        var a=m.residents[i], b=m.residents[j];
+    for(var i=0;i<residents.length;i++)
+      for(var j=i+1;j<residents.length;j++){
+        var a=residents[i], b=residents[j];
         pairs.push({a:a,b:b,sameJob:!!(a.job&&a.job===b.job)});
       }
     if(!m.bonds) m.bonds={};
@@ -460,5 +573,7 @@ APH.ColonyTick = (function(){
     U.emit('productionTick', {});
   }
 
-  return { run:run, checkFall:checkFall, founded:founded };
+  return { run:run, checkFall:checkFall, founded:founded, isRepairCrew:isRepairCrew,
+    takeWorkerAt:takeWorkerAt, modernWorkRules:modernWorkRules, facilityUid:facilityUid,
+    terrainFertilityMul:terrainFertilityMul, farmGrowthMul:farmGrowthMul };
 })();

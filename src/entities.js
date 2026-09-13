@@ -9,7 +9,12 @@ APH.Ent = (function(){
   'use strict';
   var U = APH.U, CFG = APH.CFG, T = CFG.entType;
   var idSeq = 0;
-  function nid(prefix){ return prefix + '_' + (++idSeq); }
+  function nid(prefix){
+    var state=APH.state||{},lists=[state.entities||[]],worlds=state.worlds||{},id;
+    Object.keys(worlds).forEach(function(k){if(worlds[k]&&worlds[k].entities)lists.push(worlds[k].entities);});
+    do{id=prefix+'_'+(++idSeq);}while(lists.some(function(list){return list.some(function(e){return e&&e.id===id;});}));
+    return id;
+  }
   /* 渲染上下文延迟绑定(main.boot 时注入) */
   var ctx = null;
   function bindCtx(c){ ctx = c; }
@@ -85,7 +90,7 @@ APH.Ent = (function(){
       ctx.arc(0, 0, s + 6, 0, U.TAU);
       ctx.stroke();
     }
-    if (e.isSoldier && window.APH.Humanoid) {
+    if ((e.isSoldier || e.humanlike) && window.APH.Humanoid) {
       /* #1: 士兵仍是程序化小人，缩放到与玩家 drawH 等高 */
       s = (CFG.humanoid && CFG.humanoid.chibiBodyR) || 21.5;
       ctx.scale(APH.Humanoid.chibiScale(), APH.Humanoid.chibiScale());
@@ -98,7 +103,7 @@ APH.Ent = (function(){
     /* N2: 敌人8帧序列帧(idle/move/attack/hurt/death), 士兵不适用 */
     var factionSheet = {fx_maw:'enemy_lighteater', fx_spit:'enemy_acidsplitter',
                         fx_bulwark:'enemy_siloshell', fx_automaton:'enemy_automaton'}[e.faction.id]||'';
-    var sheetName = e.isSoldier ? '' : factionSheet;
+    var sheetName = (e.isSoldier || e.humanlike) ? '' : factionSheet;
     if (!e.isSoldier && window.APH.Sprites && APH.Sprites.isReady(sheetName)){
       var st;
       if (e.dead)                    st=7;                       // death
@@ -434,9 +439,49 @@ APH.Ent = (function(){
     bl_storage_shelf:'#a17a4a',
     bl_heater:'#ff8c42', bl_cooler:'#4fc3f7', bl_heavy_turret:'#b71c1c', bl_ancient_generator:'#00e5ff',
   };
+  function geometryScene(){
+    return (APH.state && APH.state.colony && APH.state.colony.scene) || {width:CFG.WORLD,height:CFG.WORLD,grid:CFG.GRID};
+  }
+  function isGeometry(e){ return !!(e && e.geometryVersion===1 && window.APH.BuildGrid); }
+  function geometryRect(e){ return APH.BuildGrid.rectOf(e, APH.Colony&&APH.Colony.list&&APH.Colony.list(), geometryScene()); }
+  function geometryCenter(rect){ return {x:rect.x+rect.w/2,y:rect.y+rect.h/2}; }
+  function geometryBaseSize(e){
+    var cells=e.cells||((APH.Colony&&APH.Colony.get&&APH.Colony.get(e.bid||e.id)||{}).cells)||[1,1], g=CFG.GRID;
+    return {w:(cells[0]||1)*g,h:(cells[1]||1)*g};
+  }
+  function drawGeometryFurniture(e, time, blueprint){
+    var rect=geometryRect(e), center=geometryCenter(rect), base=geometryBaseSize(e), rot=((e.rotation||0)%4+4)%4;
+    ctx.save();
+    if(!blueprint){
+      ctx.fillStyle='rgba(53,38,24,.25)';ctx.beginPath();ctx.ellipse(center.x+3,center.y+rect.h*.22,rect.w*.39,Math.max(5,rect.h*.16),0,0,U.TAU);ctx.fill();
+    }
+    ctx.translate(center.x,center.y);ctx.rotate(rot*Math.PI/2);
+    if(blueprint){
+      ctx.fillStyle='rgba(255,194,107,.18)';ctx.fillRect(-base.w/2+2,-base.h/2+2,base.w-4,base.h-4);
+      ctx.strokeStyle='#f7d28a';ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.lineDashOffset=-(time||0)*12;ctx.strokeRect(-base.w/2+3,-base.h/2+3,base.w-6,base.h-6);ctx.setLineDash([]);
+    }else{
+      var drew=false;
+      if(window.APH.BuildArt&&APH.BuildArt.drawSprite) drew=APH.BuildArt.drawSprite(ctx,e.bid||e.id,-base.w/2,-base.h/2,base.w,base.h)===true;
+      if(!drew){
+        ctx.fillStyle=BLD_COLORS[e.bid||e.id]||'#b8895c';ctx.fillRect(-base.w/2+5,-base.h/2+5,base.w-10,base.h-10);
+        ctx.strokeStyle='#5f4531';ctx.lineWidth=2;ctx.strokeRect(-base.w/2+5,-base.h/2+5,base.w-10,base.h-10);
+        ctx.fillStyle='rgba(255,238,194,.32)';ctx.fillRect(-base.w/2+9,-base.h/2+9,base.w-18,5);
+      }
+    }
+    ctx.restore();
+    if(blueprint){
+      var bp=e.progress||0;
+      if(bp>0){ctx.save();ctx.strokeStyle='#59d9ff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(center.x,rect.y-16,10,-Math.PI/2,-Math.PI/2+bp*U.TAU);ctx.stroke();ctx.restore();}
+    }
+  }
+  function hitBuilding(e, x, y){
+    if(!isGeometry(e)) return U.dst(e.x,e.y,x,y)<=40;
+    var r=geometryRect(e);return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;
+  }
   function drawBuilding(e,time){
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
     if(e.type===T.BLUEPRINT){
+      if(isGeometry(e)){ drawGeometryFurniture(e,time,true); return; }
       var bp=e.progress||0;
       var bc=(window.APH.Colony&&APH.Colony.get(e.bid)||{});
       var bcell=bc.cells||[1,1];
@@ -463,6 +508,9 @@ APH.Ent = (function(){
       ctx.restore();
       ctx.restore();
       return;
+    }
+    if(isGeometry(e) && e.bid!=='bl_wall' && e.bid!=='bl_gate' && e.layer!=='floor' && e.layer!=='conduit'){
+      drawGeometryFurniture(e,time,false); return;
     }
     if(e.bid==='bl_rival_base'){
       /* 敌对基地: 暗红堡垒+血条 */
@@ -1216,7 +1264,12 @@ APH.Ent = (function(){
   function drawResident(e,time){
     if(!ctx) return;
     ctx.save();
-    ctx.translate(e.x, e.y);
+    /* New beds keep the pawn's logical position on the reachable interaction
+       cell.  While asleep only, render the prone body over the bed centre;
+       waking immediately falls back to the real entity position. */
+    var anchor=(e.isSleeping && e.sleepAnchor && e.sleepAnchor.x!=null && e.sleepAnchor.y!=null)
+      ? e.sleepAnchor : e;
+    ctx.translate(anchor.x, anchor.y);
     var walking=!!e.walking;
     if(drawNpcSprite(e, time, 'resident', false)){
       var top=-(CFG.humanoid&&CFG.humanoid.drawH||78);
@@ -1304,6 +1357,11 @@ APH.Ent = (function(){
       ctx.beginPath(); ctx.arc(0, -20, 16, 0, U.TAU); ctx.fill();
       ctx.fillStyle='#4caf50';
       ctx.beginPath(); ctx.arc(-4, -24, 11, 0, U.TAU); ctx.fill();
+    }else if(e.kind === 'rock_wreckage'){
+      ctx.fillStyle='#dbcaa9';ctx.fillRect(-18,-14,34,20);ctx.fillStyle='#527d76';ctx.fillRect(-13,-11,15,12);ctx.strokeStyle='#725e4c';ctx.lineWidth=2;ctx.strokeRect(-18,-14,34,20);ctx.beginPath();ctx.moveTo(6,-14);ctx.lineTo(2,-4);ctx.lineTo(11,6);ctx.stroke();
+      if(e.repairable){ctx.fillStyle='#ffe099';ctx.fillRect(9,-10,4,4);}
+    }else if(e.kind === 'bush_alien'){
+      ctx.fillStyle='#7e88ad';ctx.beginPath();ctx.ellipse(0,-8,14,12,0,0,U.TAU);ctx.fill();ctx.fillStyle='#a5e5d4';ctx.beginPath();ctx.ellipse(-5,-16,5,9,-.5,0,U.TAU);ctx.ellipse(6,-17,5,10,.5,0,U.TAU);ctx.fill();ctx.fillStyle='#f5daa6';ctx.beginPath();ctx.arc(0,-8,3,0,U.TAU);ctx.fill();
     }else if(e.kind === 'rock_iron'){
       ctx.fillStyle='#455a64';
       ctx.beginPath();
@@ -1347,25 +1405,27 @@ APH.Ent = (function(){
   function drawWalls(time){
     var s=APH.state;
     var bs=(s.colony && s.colony.buildings)||[];
-    var walls=[], gates=[], traps=[], bags=[];
+    var walls=[], gates=[], traps=[], bags=[], floors=[], conduits=[];
     bs.forEach(function(b){
       if(b.id==='bl_wall') walls.push(b);
       else if(b.id==='bl_gate') gates.push(b);
       else if(b.id==='bl_spike_trap') traps.push(b);
       else if(b.id==='bl_sandbag') bags.push(b);
+      else if(b.geometryVersion===1&&b.id==='bl_floor') floors.push(b);
+      else if(b.geometryVersion===1&&b.id==='bl_conduit') conduits.push(b);
     });
     var sc=0.92;
     var grid=CFG.GRID||48, half=grid/2, wallMap={}, wallTiles=[];
     function wallKey(x,y){ return x+','+y; }
-    function addWallTile(b, gate){
-      var k=wallKey(b.x,b.y);
-      var tile={ b:b, gate:!!gate, x:b.x, y:b.y };
+    function addWallTile(b, gate, x, y){
+      var tx=x==null?b.x:x, ty=y==null?b.y:y, k=wallKey(tx,ty);
+      var tile={ b:b, gate:!!gate, x:tx, y:ty };
       /* 正常建造不会同格；脏档若墙门重叠，门作为可通行构件优先显示。 */
       if(wallMap[k]){
         if(gate && !wallMap[k].gate){
           wallMap[k]=tile;
           for(var ri=0;ri<wallTiles.length;ri++){
-            if(wallTiles[ri].x===b.x && wallTiles[ri].y===b.y){ wallTiles[ri]=tile; break; }
+            if(wallTiles[ri].x===tx && wallTiles[ri].y===ty){ wallTiles[ri]=tile; break; }
           }
         }
         return;
@@ -1373,8 +1433,25 @@ APH.Ent = (function(){
       wallMap[k]=tile;
       wallTiles.push(tile);
     }
-    walls.forEach(function(w){ addWallTile(w,false); });
-    gates.forEach(function(g){ addWallTile(g,true); });
+    function addTiles(records, gate){
+      records.forEach(function(b){
+        if(b.geometryVersion===1&&window.APH.BuildGrid){
+          APH.BuildGrid.cellsOf(b,APH.Colony&&APH.Colony.list&&APH.Colony.list(),geometryScene()).forEach(function(c){addWallTile(b,gate,(c.gx+.5)*grid,(c.gy+.5)*grid);});
+        }else addWallTile(b,gate);
+      });
+    }
+    /* New floor/conduit live in their own layers below the shared wall outline. */
+    floors.forEach(function(f){
+      APH.BuildGrid.cellsOf(f,APH.Colony&&APH.Colony.list&&APH.Colony.list(),geometryScene()).forEach(function(c){
+        var x=c.gx*grid,y=c.gy*grid;ctx.fillStyle='#9a805e';ctx.fillRect(x+1,y+1,grid-2,grid-2);ctx.strokeStyle='rgba(255,234,190,.34)';ctx.lineWidth=1;ctx.strokeRect(x+2.5,y+2.5,grid-5,grid-5);
+      });
+    });
+    conduits.forEach(function(co){
+      APH.BuildGrid.cellsOf(co,APH.Colony&&APH.Colony.list&&APH.Colony.list(),geometryScene()).forEach(function(c){
+        var x=(c.gx+.5)*grid,y=(c.gy+.5)*grid;ctx.strokeStyle='#d8a84d';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,4,0,U.TAU);ctx.stroke();
+      });
+    });
+    addTiles(walls,false); addTiles(gates,true);
     /* 只认真实中心恰好相差一格；渲染层绝不替旧存档吸格或迁坐标。 */
     function hasWall(x,y){ return !!wallMap[wallKey(x,y)]; }
 
@@ -1455,8 +1532,9 @@ APH.Ent = (function(){
       });
 
       /* T4 破墙: 裂纹随损伤加深；原耐久条语义与颜色保留。 */
-      walls.forEach(function(w){
-        var wx=w.x, wy=w.y;
+      wallTiles.forEach(function(t){
+        if(t.gate) return;
+        var w=t.b, wx=t.x, wy=t.y;
         var wMax=(CFG.wall&&CFG.wall.hp!=null)?CFG.wall.hp:60;
         var wHp=(w.hp!=null)?w.hp:wMax;
         if(wHp < wMax){
@@ -1508,6 +1586,15 @@ APH.Ent = (function(){
     var list = getEntitiesList(entities);
     var best = null;
     var bestDist = (maxRadius != null && maxRadius > 0) ? maxRadius : Infinity;
+    var indexed=window.APH.EntityIndex&&APH.EntityIndex.queryCircle?
+      APH.EntityIndex.queryCircle(list,x,y,bestDist,type,predicate):null;
+    if(indexed){
+      for(var ii=0;ii<indexed.length;ii++){
+        var ie=indexed[ii],id=U.dst(x,y,ie.x,ie.y);
+        if(id<bestDist){bestDist=id;best=ie;}
+      }
+      return best;
+    }
 
     for(var i = 0; i < list.length; i++){
       var e = list[i];
@@ -1650,7 +1737,7 @@ APH.Ent = (function(){
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
-    drawBuilding:drawBuilding, drawFlora:drawFlora,
+    drawBuilding:drawBuilding, drawFlora:drawFlora, hitBuilding:hitBuilding,
     drawWalls:drawWalls,
     updatePlayer:updatePlayer, findPlayer:findPlayer,
     findNearest:findNearest,

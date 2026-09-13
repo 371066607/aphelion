@@ -155,7 +155,7 @@ test('tech_and_buildings: 烹饪科技树与设施蓝图契约完整', function(
   // 2. 建筑定义
   var bCamp = APH.Colony.get('bl_campfire');
   var bKit = APH.Colony.get('bl_kitchen');
-  if (!bCamp || bCamp.reqTech !== 'te_stonecutting') throw new Error('bl_campfire 配置异常');
+  if (!bCamp || bCamp.reqTech) throw new Error('bl_campfire 配置异常');
   if (!bKit || bKit.reqTech !== 'te_alien_culinary') throw new Error('bl_kitchen 配置异常');
 
   // 3. 建造权限校验

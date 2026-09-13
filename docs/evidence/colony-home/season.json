@@ -1,0 +1,141 @@
+{
+  "passed": true,
+  "fixtureSeed": 9301,
+  "generatedAt": "2026-09-12T08:47:41.649Z",
+  "scope": "Automated six-day soak of a legal prebuilt colony with one season of initial fuel stock; normal gather, return, civilian draft/movement and capture commands provide intervention, and destroyed raid walls are rebuilt through construction when any are lost. This is not a fresh-save manual playthrough. Resource expedition enemy encounters are isolated; home raids remain active.",
+  "exitReady": true,
+  "clock": 21600.000000022552,
+  "steps": 144000,
+  "dt": 0.05,
+  "timeScale": 3,
+  "days": 6,
+  "harvested": true,
+  "mined": true,
+  "returned": true,
+  "physicalIronAtReturn": 5,
+  "expeditionSeconds": 300.00000000000017,
+  "foodWarning": {
+    "seen": true,
+    "recovered": true
+  },
+  "raid": {
+    "warned": true,
+    "seen": true,
+    "resolved": true,
+    "captures": 151,
+    "defenseOrders": 42,
+    "destroyedWalls": 0,
+    "rebuildRequired": false,
+    "rebuildRecovered": true
+  },
+  "fuel": {
+    "initialStock": 6221,
+    "finalStock": 541,
+    "initialGeneratorFuel": 32,
+    "finalGeneratorFuel": 12,
+    "refillEvents": 708,
+    "refilledUnitsObserved": 5661
+  },
+  "rooms": [
+    {
+      "id": "room_13_16",
+      "temp": 10.3
+    },
+    {
+      "id": "room_15_18",
+      "temp": 21
+    }
+  ],
+  "residents": [
+    {
+      "id": "soak_a",
+      "food": 83.35000000000278,
+      "rest": 95.79999999999998,
+      "exposure": 0,
+      "hypothermia": 0,
+      "heatstroke": 0,
+      "illness": 0,
+      "downed": false,
+      "worldId": "home",
+      "parts": {
+        "head": 1,
+        "torso": 1,
+        "armL": 1,
+        "armR": 1,
+        "legL": 1,
+        "legR": 1
+      },
+      "capacities": {
+        "moving": 1,
+        "manipulation": 1,
+        "consciousness": 1
+      },
+      "ailments": [],
+      "pos": {
+        "x": 1176,
+        "y": 1176
+      },
+      "room": "room_15_18"
+    },
+    {
+      "id": "soak_b",
+      "food": 83.35000000000284,
+      "rest": 77.31999999999991,
+      "exposure": 0,
+      "hypothermia": 0,
+      "heatstroke": 0,
+      "illness": 0,
+      "downed": false,
+      "worldId": "home",
+      "parts": {
+        "head": 1,
+        "torso": 1,
+        "armL": 1,
+        "armR": 1,
+        "legL": 1,
+        "legR": 1
+      },
+      "capacities": {
+        "moving": 1,
+        "manipulation": 1,
+        "consciousness": 1
+      },
+      "ailments": [],
+      "pos": {
+        "x": 955.2528139391194,
+        "y": 1272
+      },
+      "room": "room_15_18"
+    },
+    {
+      "id": "soak_c",
+      "food": 83.35000000000278,
+      "rest": 95.79999999999998,
+      "exposure": 0,
+      "hypothermia": 0,
+      "heatstroke": 0,
+      "illness": 0,
+      "downed": false,
+      "worldId": "home",
+      "parts": {
+        "head": 1,
+        "torso": 1,
+        "armL": 1,
+        "armR": 1,
+        "legL": 1,
+        "legR": 1
+      },
+      "capacities": {
+        "moving": 1,
+        "manipulation": 1,
+        "consciousness": 1
+      },
+      "ailments": [],
+      "pos": {
+        "x": 777.4095535106735,
+        "y": 1176
+      },
+      "room": "room_15_18"
+    }
+  ]
+}

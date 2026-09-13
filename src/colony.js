@@ -15,6 +15,8 @@ APH.Colony = (function(){
      dispH: 目标显示内容高px(管线实测内容高→比例缩放, 治"建筑比人物矮")
      cells: 占位格[宽,高]×48px格网(ADR-4), 非全部1x1——大建筑占2x2 */
   var BUILDINGS = {
+    bl_bed: {name:'床',cost:0,costMineral:0,costRes:{wood:8},size:48,max:40,buildTime:8,cells:[1,2],dispH:72,desc:'一张独立床，提供一个床位。床边必须能走到。'},
+    bl_floor: {name:'舱板地板',cost:0,costMineral:0,costRes:{wood:1},size:48,max:16000,buildTime:2,cells:[1,1],dispH:48,desc:'可与墙、家具、导线叠放的地面。'},
     bl_landing_pad: { name:'发射台', cost:0, costMineral:0, costRes:{}, size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
     bl_warehouse:   { name:'仓库',   cost:0, costMineral:20, costRes:{ wood:20, iron:15 }, size:52, max:3, buildTime:12,
@@ -25,7 +27,7 @@ APH.Colony = (function(){
       desc:'有矿工时每30秒产出矿料。需先研发机械锻造。',
       upg:{ effectPerLv:2, maxLv:3, cost:45 } },
     bl_lab:         { name:'科研站', cost:0, costMineral:40, costRes:{ wood:20, iron:25 }, size:48, max:2, buildTime:25,
-      dispH:113, cells:[2,2],
+      dispH:113, cells:[2,1],
       desc:'学者在此做理论攻坚，并把远征标本上台化验。+1×等级 研究点/跳。',
       upg:{ effectPerLv:1, maxLv:2, cost:60 } },
     bl_barracks:    { name:'兵营', cost:0, costMineral:50, reqTech:'te_ballistics', costRes:{ iron:30, stone:20 }, size:56, max:2, buildTime:30,
@@ -49,22 +51,22 @@ APH.Colony = (function(){
       desc:'饲养星绵羊产肉和皮革。',
       upg:{ maxLv:2, costRes:'leather', cost:55 } },
     bl_workshop:    { name:'工坊', cost:0, costMineral:25, costRes:{ wood:15, iron:20, stone:10 }, size:48, max:2, buildTime:18,
-      dispH:110, cells:[2,2],
+      dispH:110, cells:[2,1],
       desc:'有工匠时将草药提炼成药品。' },
     bl_crop_plot:   { name:'外星种植圃', cost:0, costMineral:0, costRes:{ wood:10, stone:5 }, size:48, max:12, buildTime:8,
       dispH:48, cells:[1,1],
       desc:'培育外星奇幻作物的轻量田圃。需先在科研站化验对应活体标本才能种植。' },
-    bl_campfire:    { name:'石料篝火', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ wood:10, stone:15 }, size:36, max:4, buildTime:8,
+    bl_campfire:    { name:'石料篝火', cost:0, costMineral:0, costRes:{ wood:10, stone:15 }, size:36, max:4, buildTime:8,
       dispH:48, cells:[1,1],
       desc:'温暖夜间照明、驱寒保暖、休闲娱乐与基础烘烤。' },
     bl_kitchen:     { name:'烹饪灶台', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:20, stone:20, iron:15 }, size:52, max:2, buildTime:20,
-      dispH:110, cells:[2,2],
+      dispH:110, cells:[2,1],
       desc:'高级菜肴烹制与厨师岗位。需研发异星烹饪保鲜。' },
     /* T8 餐桌与餐椅 (#81): 居民吃饭时到最近空椅坐吃 (坐姿=站姿不播入座动画) */
-    bl_dining_table: { name:'餐桌', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:15, stone:5 }, size:48, max:8, buildTime:10,
-      dispH:155, cells:[1,1],
+    bl_dining_table: { name:'餐桌', cost:0, costMineral:0, costRes:{ wood:15, stone:5 }, size:48, max:8, buildTime:10,
+      dispH:155, cells:[2,2],
       desc:'居民吃饭的场所：有餐桌+空椅才「在餐桌用餐」得心情增益；无桌吃有心情惩罚。' },
-    bl_dining_chair:{ name:'餐椅', cost:0, costMineral:0, reqTech:'te_alien_culinary', costRes:{ wood:6 }, size:48, max:16, buildTime:6,
+    bl_dining_chair:{ name:'餐椅', cost:0, costMineral:0, costRes:{ wood:6 }, size:48, max:16, buildTime:6,
       dispH:180, cells:[1,1],
       desc:'餐位一座一人。须放在餐桌旁（60px 内）才算可用餐位；居民自动走向最近空椅坐吃。' },
     /* P3 生活家具 (#97): 房间内摆放给心情增益 (科技机械锻造) */
@@ -88,10 +90,10 @@ APH.Colony = (function(){
     bl_heater: { name:'电暖器', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:15, wood:5 }, size:48, max:16, buildTime:6, cells:[1,1], dispH:52, desc:'消耗 40W 电力供热：自动将所在房间加热保温至 21°C。' },
     bl_cooler: { name:'制冷空调', cost:0, costMineral:0, reqTech:'te_machining', costRes:{ iron:20, alloy:3 }, size:48, max:16, buildTime:8, cells:[1,1], dispH:56, desc:'消耗 50W 电力制冷：可按 [E] 切换避暑（20°C）或冷库（-5°C）模式。' },
     /* T2 墙与闸门 (ADR-13: 格上静态物, 1x1格; 渲染走格层) */
-    bl_wall:  { name:'石墙', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:5 }, size:48, max:2000,
+    bl_wall:  { name:'石墙', cost:0, costMineral:0, costRes:{ stone:5 }, size:48, max:2000,
       cells:[1,1], buildTime:6, dispH:96,
       desc:'阻挡所有单位移动的墙体。袭击者会拆墙。' },
-    bl_gate:  { name:'闸门', cost:0, costMineral:0, reqTech:'te_stonecutting', costRes:{ stone:3, wood:5 }, size:48, max:500,
+    bl_gate:  { name:'闸门', cost:0, costMineral:0, costRes:{ stone:3, wood:5 }, size:48, max:500,
       cells:[1,1], buildTime:8, dispH:98,
       desc:'可通行的门：己方秒开，袭击者开门有延迟。' },
     /* T10 阵地设备 (issue #83): 格上静态物 (与墙同清单/渲染/建造交互) */
@@ -111,13 +113,11 @@ APH.Colony = (function(){
     bl_solar_panel: { name:'太阳能板', cost:0, costMineral:25, reqTech:'te_machining', costRes:{ iron:25, stone:10 }, size:52, max:6, buildTime:22,
       dispH:74, cells:[1,1],
       desc:'白天发电，功率随天气打折(雨/雷暴/暴雪/雾)。需接入导线。' },
-    /* 殖民地优先 T5: 终局超级工程。
-       这是整局唯一「把财富一次性花光」的去处 —— 攒东西终于有了意义。
-       造好 + 通电 → 走过去按 E 呼叫救援, 通关。 */
-    bl_transmitter: { name:'深空发射器', cost:0, costMineral:200, reqTech:'te_deep_signal',
+    /* ADR-46: 保留 bl_transmitter ID。语义是通信灯塔/扎根里程碑, 不是逃离通关。 */
+    bl_transmitter: { name:'通信灯塔', cost:0, costMineral:200, reqTech:'te_deep_signal',
       costRes:{ iron:180, stone:120, wood:80 }, size:64, max:1, buildTime:120,
       dispH:150, cells:[3,3], power:true,
-      desc:'终局工程：呼叫救援离开这颗星球。造价高昂且必须通电。' },
+      desc:'恢复深空通信，记录异星家园的扎根进展。必须通电。' },
     bl_battery: { name:'蓄电池', cost:0, costMineral:15, reqTech:'te_machining', costRes:{ iron:15, wood:8 }, size:44, max:4, buildTime:18,
       dispH:84, cells:[1,1],
       desc:'存储富余电力；停电时兜底供电。需接入导线。' },
@@ -151,10 +151,12 @@ APH.Colony = (function(){
   function labOutput(lv){ return (lv||1); }
 
   /* ---------- Task5: 住宅容量与拆除退款(纯函数) ---------- */
-  function housingCapacity(buildings){
-    var cap = 2;   // 居住舱本体基础席位
-    buildings.forEach(function(b){
+  function housingCapacity(buildings, colony){
+    var cap = colony && colony.rulesVersion===1 ? 0 : 2;   // 居住舱本体基础席位
+    (buildings||[]).forEach(function(b){
+      if(!b || b.dead) return;
       if (b.id==='bl_house') cap += 3*(b.lv||1);
+      if (b.id==='bl_bed' && !b.dead) cap += 1;
       if (b.id==='bl_clinic') cap += 1;
     });
     return cap;
@@ -198,6 +200,7 @@ APH.Colony = (function(){
      居住核心在中心, 发射台在南侧, 其余空地用于建造。 */
   function buildColonyWorld(seed){
     var s = APH.state;
+    seed=s.colony.scene&&s.colony.scene.seed||seed;
     var rng = U.makeRng((seed ^ 0xC010) >>> 0 || 7);
 
     /* 殖民地调色板(固定, 与星球区分) */
@@ -229,7 +232,6 @@ APH.Colony = (function(){
       var x = rng()*(CFG.WORLD-160)+80, y = rng()*(CFG.WORLD-160)+80;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 260) continue;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y+240) < 140) continue;   // 发射台区
-      if(window.APH.Observe && APH.Observe.scatterFree && !APH.Observe.scatterFree(s.colony, x, y)) continue;
       s.entities.push(APH.Ent.makeRock(x,y,rng));
       placed++;
     }
@@ -238,23 +240,31 @@ APH.Colony = (function(){
     s.colony.buildings.forEach(function(b){ placeBuildingEntity(b.id, b.x, b.y, b.lv); });
     /* 施工队列的蓝图实体再实体化(实体不落盘而队列落盘, 重载后蓝图不可见) */
     (s.colony.buildQueue||[]).forEach(function(q){
-      s.entities.push({id:'bp_'+q.bid+'_'+q.x+'_'+q.y,
+      s.entities.push(Object.assign({},q,{id:q.uid||('bp_'+q.bid+'_'+q.x+'_'+q.y),
         type:T.BLUEPRINT, bid:q.bid, x:q.x, y:q.y,
-        progress:q.progress||0, building:false});
+        progress:q.progress||0, building:false}));
     });
     (s.colony.ground||[]).forEach(function(g, i){
       if(!g || !g.itemId || !g.n) return;
       s.entities.push({
         id:'dp_g_'+i+'_'+g.itemId, type:T.DROPPED,
-        x:g.x, y:g.y, itemId:g.itemId, n:g.n, bobA:i*0.7, stock:true
+        x:g.x, y:g.y, itemId:g.itemId, n:g.n, containerId:g.containerId,storageX:g.storageX,storageY:g.storageY,decayHp:g.decayHp,bobA:i*0.7, stock:true
       });
     });
     /* 程序化生成自然资源生态实体(树木/矿脉/灌木) */
-    if(window.APH.Observe && s.colony && !APH.Observe.gridOf(s.colony) && !(s.colony.buildings||[]).length){
-      APH.Observe.ensureHome(s.colony, { seed: seed });
-    }
-    var flora = generateFlora(seed, s.colony);
-    flora.forEach(function(f){ s.entities.push(f); });
+    var modern=s.colony.scene&&s.colony.scene.generation===1;
+    var flora=modern?APH.TerrainModel.resources(s.colony.scene,s.colony.depleted).filter(function(f){return !f.depleted;}).map(function(f){
+      var hp=f.kind==='tree'?30:f.kind==='rock_iron'?40:f.kind==='rock_stone'?35:f.kind==='bush_berry'?15:20;
+      return Object.assign({},f,{id:f.uid,hp:hp,maxHp:hp});
+    }):generateFlora(seed);
+    flora.forEach(function(f){
+      var saved=(s.colony.floraState||{})[f.id];
+      if(saved&&saved.dead)return;
+      if(saved&&saved.hp!=null)f.hp=saved.hp;
+      if(saved&&saved.pendingRepair)f.pendingRepair=saved.pendingRepair;
+      s.entities.push(f);
+    });
+    s.floraRespawn=s.colony.floraRespawn||[];
     ensurePad();
   }
 
@@ -279,6 +289,10 @@ APH.Colony = (function(){
       analysisProgress: rec && rec.analysisProgress,
       herd: rec && rec.herd,
     };
+    if(rec){
+      ['uid','gx','gy','rotation','cells','geometryVersion','legacyFootprint','layer','solid','interaction'].forEach(function(k){if(rec[k]!=null)ent[k]=rec[k];});
+      if(rec.uid)ent.id=rec.uid;
+    }
     if(s.entities) s.entities.push(ent);
     return ent;
   }
@@ -298,10 +312,18 @@ APH.Colony = (function(){
   var GRID_STATICS = { bl_wall:1, bl_gate:1, bl_conduit:1, bl_spike_trap:1, bl_sandbag:1 };
 
   /* ---------- 建造逻辑(纯函数部分) ---------- */
-  /* 占位格: cells×48px格网(ADR-4), 中心对齐 */
-  function footprintOf(bid){
+  /* 占位格: cells×48px格网(ADR-4), 中心对齐。
+     无 geometryVersion 的旧实例保留当时目录格, 避免读档后桌子/工位突然胀缩。 */
+  var LEGACY_CELLS = { bl_dining_table:[1,1], bl_workshop:[2,2], bl_kitchen:[2,2], bl_lab:[2,2] };
+  function cellsOf(bid, rec){
+    if(rec && rec.geometryVersion===1)
+      return (rec.cells || (BUILDINGS[bid]||{}).cells || [1,1]).slice();
+    if(rec && LEGACY_CELLS[bid]) return LEGACY_CELLS[bid].slice();
     var def = BUILDINGS[bid]||{};
-    var c = def.cells||[1,1];
+    return (def.cells||[1,1]).slice();
+  }
+  function footprintOf(bid, rec){
+    var c = cellsOf(bid, rec);
     return { w: c[0]*CFG.GRID, h: c[1]*CFG.GRID };
   }
   /* 可否建造: 科技已解锁 + 物理材料充足 + 数量未满 + 位置合法 */
@@ -348,7 +370,7 @@ APH.Colony = (function(){
     if(!isGrid && !isFurniture && U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 130) return { ok:false, why:'离居住核心太近' };
     for(var i=0;i<colonyBuildings.length;i++){
       var b = colonyBuildings[i];
-      var of = footprintOf(b.id), ohw = of.w/2, ohh = of.h/2;
+      var of = footprintOf(b.id, b), ohw = of.w/2, ohh = of.h/2;
       /* 格上静态物互相相邻视为占同一格线(允许拼接: 墙上补门/过线), 但不叠放 */
       if(isGrid && GRID_STATICS[b.id]){
         /* 完全同格: 拒(不叠放); 邻格: 允许 */
@@ -430,6 +452,7 @@ APH.Colony = (function(){
   }
   /* 建筑占位格: 中心格取 floor(x/GRID) (与 Nav 障碍格同规); cells 宽高扩展 */
   function powerCells(b){
+    if(b.geometryVersion===1&&APH.BuildGrid)return APH.BuildGrid.cellsOf(b,BUILDINGS).map(function(c){return [c.gx,c.gy];});
     var def = BUILDINGS[b.id] || { cells:[1,1] };
     var w = (def.cells && def.cells[0]) || 1, h = (def.cells && def.cells[1]) || 1;
     var cx = Math.floor((b.x || 0) / GRID), cy = Math.floor((b.y || 0) / GRID);
@@ -451,8 +474,10 @@ APH.Colony = (function(){
       if(kind){
         nodes.push({ b:b, kind:kind, cells:powerCells(b) });
       } else if(b.id === 'bl_conduit'){
-        var cx = Math.round((b.x || 0) / GRID), cy = Math.round((b.y || 0) / GRID);
-        cellsMap[cx + ',' + cy] = true;
+        var wireCells=(b.geometryVersion===1&&APH.BuildGrid)
+          ? APH.BuildGrid.cellsOf(b,BUILDINGS)
+          : [{gx:Math.round((b.x || 0) / GRID),gy:Math.round((b.y || 0) / GRID)}];
+        wireCells.forEach(function(c){cellsMap[c.gx+','+c.gy]=true;});
       }
     });
     /* 导线格连通分量 (BFS, 4邻接) */
@@ -480,6 +505,7 @@ APH.Colony = (function(){
       var attached = null;
       n.cells.some(function(cell){
         var cands = [[cell[0]+1,cell[1]],[cell[0]-1,cell[1]],[cell[0],cell[1]+1],[cell[0],cell[1]-1]];
+        if(n.b.geometryVersion===1)cands.unshift([cell[0],cell[1]]);
         for(var i=0; i<cands.length; i++){
           var id = comp[cands[i][0] + ',' + cands[i][1]];
           if(id != null){ attached = id; return true; }
@@ -505,21 +531,23 @@ APH.Colony = (function(){
     return base * m;
   }
   /* 木柴发电机: 每 burnSec 秒烧 1 木材, 有木才产电; 无木时计时器冻结在即燃点 */
-  function powerWoodOutput(b, res, dt){
+  function powerWoodOutput(b, res, dt, modern){
     var cfg = (CFG.power && CFG.power.wood) || {};
     var base = cfg.watts != null ? cfg.watts : 14;
     var burnSec = cfg.burnSec != null ? cfg.burnSec : 15;
     if(!b) return 0;
     if(b.burnT == null) b.burnT = 0;
     b.burnT += (dt || 0);
-    var wood = res ? ((res.wood != null ? res.wood : res.it_wood) || 0) : 0;
+    var wood = modern ? Math.max(0,Number(b.fuelWood)||0)
+      : (res ? ((res.wood != null ? res.wood : res.it_wood) || 0) : 0);
     var fueled = wood >= 1;
     var guard = 0;
     while(wood >= 1 && b.burnT >= burnSec && guard++ < 64){
       b.burnT -= burnSec;
       wood -= 1;
     }
-    if(res){
+    if(modern)b.fuelWood=wood;
+    else if(res){
       if(res.wood != null) res.wood = wood;
       else if(res.it_wood != null) res.it_wood = wood;
     }
@@ -608,7 +636,7 @@ APH.Colony = (function(){
       var rec = { grid: g.gens.length > 0, prod:0, load:0 };
       var prod = 0, load = 0;
       g.gens.forEach(function(b){
-        if(b.id === 'bl_wood_generator') prod += powerWoodOutput(b, res, dtS);
+        if(b.id === 'bl_wood_generator') prod += powerWoodOutput(b, res, dtS, !!(opts&&opts.rulesVersion===1));
         else if(b.id === 'bl_solar_panel') prod += powerSolarOutput(b, isDay, solarMul);
         else if(b.id === 'bl_ancient_generator') prod += 200;
       });
@@ -775,13 +803,12 @@ APH.Colony = (function(){
   }
 
   /* 法则→收成修正(纯函数): 夜间酸雨减农; 磁暴窗停实验室 */
-  function harvestMods(laws, clock, night, env){
+  function harvestMods(laws, clock, night){
     var C=CFG.laws||{};
     var has={};
     (laws||[]).forEach(function(l){ if(l&&l.id) has[l.id]=true; });
     var farmMul=1, labMul=1, acid=false, storm=false;
-    var dry = env && window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(env) && APH.Observe.hasWater && !APH.Observe.hasWater(env);
-    if(has.lw_night_acid && night && !dry){
+    if(has.lw_night_acid && night){
       farmMul=C.acidFarmMul!=null?C.acidFarmMul:0.5;
       acid=true;
     }
@@ -852,16 +879,18 @@ APH.Colony = (function(){
   }
 
   /* ---------- 生产 tick (每30游戏秒一跳) ---------- */
-  function productionTick(meta, buildings, residents, mods){
+  function productionTick(meta, buildings, residents, mods, context, workerAt){
     var out = { mineral:0, research:0, piles:[] };
     var labM=(mods&&mods.labMul!=null)?mods.labMul:1;
     var miners = (residents||[]).filter(function(r){ return r.job==='bl_mine'; });
     var labs = (residents||[]).filter(function(r){ return r.job==='bl_lab'; });
     var mi=0, li=0;
+    var onsite=context && context.colony && context.colony.rulesVersion===1;
+    var pools={bl_mine:miners.slice(),bl_lab:labs.slice()}, bound={};
     (buildings||[]).forEach(function(b){
       if((b.offlineT||0)>0) return;
       if(b.id==='bl_mine'){
-        var w=miners[mi++];
+        var w=onsite?(workerAt?workerAt(context,b,'bl_mine',pools,bound):null):miners[mi++];
         if(!w) return;
         var craftB=1+((w.skills&&w.skills.sk_craft)||0)*0.1;
         var eff = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w) : 1;
@@ -871,7 +900,7 @@ APH.Colony = (function(){
         if(amt>0) out.piles.push({ x:b.x||0, y:b.y||0, itemId:'it_mineral', n:amt });
       }
       if(b.id==='bl_lab'){
-        var w2=labs[li++];
+        var w2=onsite?(workerAt?workerAt(context,b,'bl_lab',pools,bound):null):labs[li++];
         if(!w2) return;
         var eff2 = (APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(w2) : 1;
         var syn2 = (APH.Res && APH.Res.workSynergyOf) ? APH.Res.workSynergyOf(w2, labs, meta && meta.bonds) : 1;
@@ -1080,7 +1109,7 @@ APH.Colony = (function(){
     }
     return storageFilterMatches(zone.filter, itemId);
   }
-  function addGrowZone(zones, cells, cropType){
+  function addGrowZone(zones, cells, cropType, scene){
     zones = (zones || []).slice();
     var crops = ALIEN_CROPS || {};
     var crop = cropType && crops[cropType] ? cropType : 'crop_dew_fruit';
@@ -1090,7 +1119,7 @@ APH.Colony = (function(){
     var z = {
       id: 'zn_grow_' + (zones.length + 1),
       type: 'grow',
-      cells: (cells || []).map(function(c){ return { x:c.x, y:c.y, plant:null }; }),
+      cells: (cells || []).map(function(c){ return { x:c.x, y:c.y, plant:null, fertility:scene&&scene.generation===1?APH.TerrainModel.fertilityMultiplier(scene,c.x,c.y):1, terrainFertility:!!(scene&&scene.generation===1) }; }),
       cropType: crop
     };
     zones.push(z);
@@ -1109,7 +1138,7 @@ APH.Colony = (function(){
           harvested.push({ x:c.x, y:c.y, drop:h, cropType:z.cropType });
           c.plant = { stage:1, t:0 };
         } else {
-          c.plant = cropPlotTick(c.plant, farmerSkill, eff, (seasonMul == null ? 1 : seasonMul), z.cropType);
+          c.plant = cropPlotTick(c.plant, farmerSkill, eff, (seasonMul == null ? 1 : seasonMul)*(c.terrainFertility?c.fertility:1), z.cropType);
         }
       });
     });
@@ -1372,9 +1401,16 @@ APH.Colony = (function(){
   }
 
   /* ADR-43: 从一堆地上物资里拿走 n 份, 拿空就标记 dead。原先住在 main.js。 */
-  function nibblePile(drop, n){
+  function nibblePile(drop, n, context){
     if(!drop) return 0;
-    var take=Math.min(drop.n||1, n||1);
+    var world=context&&context.state?context.state:(context&&context.colony?context:null);
+    if(!world&&context&&context.rulesVersion!=null)world={colony:context};
+    if(!world){var active=(window.APH&&APH.state)||null;if(active&&active.entities&&active.entities.indexOf(drop)>=0)world=active;}
+    var free=drop.n||1;
+    if(world&&world.colony&&world.colony.rulesVersion===1&&APH.Logistics&&APH.Logistics.availableDrop)
+      free=APH.Logistics.availableDrop(world.colony,drop);
+    var take=Math.min(free, n||1);
+    if(take<=0)return 0;
     drop.n=(drop.n||1)-take;
     if((drop.n||0)<=0) drop.dead=true;
     return take;
@@ -1386,10 +1422,27 @@ APH.Colony = (function(){
   function nearestMeal(e, rMax){
     var s=(window.APH&&APH.state)||null;
     if(!s) return null;
+    if(s.colony&&s.colony.rulesVersion===1&&APH.Nav&&APH.Logistics){
+      var meals=[],nav=APH.Nav.gridOf(s.colony.buildings||[],s.colony.scene);
+      (s.entities||[]).forEach(function(p){
+        if(!p||p.dead||p.type!==T.DROPPED||APH.Logistics.availableDrop(s.colony,p)<=0)return;
+        var it=CFG.items[p.itemId],dist=U.dst(e.x,e.y,p.x,p.y);
+        if(it&&it.store==='food'&&dist<rMax)meals.push({kind:'pile',drop:p,x:p.x,y:p.y,itemId:p.itemId,isCooked:!!it.isCooked,dist:dist});
+      });
+      if(APH.Logistics.available(s.colony,s.meta.res,[],'food')>0){
+        var pos={x:CFG.HAB.x,y:CFG.HAB.y+140},dist=U.dst(e.x,e.y,pos.x,pos.y);
+        if(dist<rMax)meals.push({kind:'stock',x:pos.x,y:pos.y,dist:dist});
+      }
+      meals.sort(function(a,b){return Number(!!b.isCooked)-Number(!!a.isCooked)||a.dist-b.dist;});
+      for(var mi=0;mi<meals.length;mi++)if(APH.Nav.astar(nav,e,meals[mi]))return meals[mi];
+      return null;
+    }
     var best=null, bd=rMax;
     var bestCooked=null, bestCookedDist=rMax;
     (s.entities||[]).forEach(function(p){
       if(!p || p.dead || p.type!==T.DROPPED) return;
+      if(s.colony&&s.colony.rulesVersion===1&&APH.Logistics&&APH.Logistics.availableDrop&&
+         APH.Logistics.availableDrop(s.colony,p)<=0)return;
       var it = CFG.items && CFG.items[p.itemId];
       if(!it || it.store!=='food') return;
       var dist=U.dst(e.x,e.y,p.x,p.y);
@@ -1405,17 +1458,24 @@ APH.Colony = (function(){
     if(bestCooked) return bestCooked;
     /* ADR-23 就近货架取料: 优先检测 120px 范围内的食物货架 */
     var nearFoodShelf = findNearbySourcedItem('food', e, (CFG.storage&&CFG.storage.sourcingRadius)||120, s.colony && s.colony.buildings, s.entities);
-    if(nearFoodShelf && nearFoodShelf.found && nearFoodShelf.drop){
+    if(nearFoodShelf && nearFoodShelf.found && nearFoodShelf.drop &&
+       (!(s.colony&&s.colony.rulesVersion===1&&APH.Logistics&&APH.Logistics.availableDrop)||
+        APH.Logistics.availableDrop(s.colony,nearFoodShelf.drop)>0)){
       var dropIt = CFG.items && CFG.items[nearFoodShelf.drop.itemId];
       return { kind:'pile', drop:nearFoodShelf.drop, x:nearFoodShelf.drop.x, y:nearFoodShelf.drop.y, itemId:nearFoodShelf.drop.itemId, isCooked:!!(dropIt&&dropIt.isCooked) };
     }
-    if((s.meta.res&&s.meta.res.food||0)>0){
-      var st=stockpileSpot(s.colony&&s.colony.buildings);
-      (s.entities||[]).forEach(function(b){
-        if(b && !b.dead && b.type===T.BUILDING && b.bid==='bl_warehouse'){
-          st = { x:b.x, y:(b.y||0)+18 };
-        }
-      });
+    var modern=!!(s.colony&&s.colony.rulesVersion===1&&APH.Logistics&&APH.Logistics.available);
+    var stockFood=modern?APH.Logistics.available(s.colony,s.meta.res,[],'food'):(s.meta.res&&s.meta.res.food||0);
+    if(stockFood>0){
+      var st;
+      if(modern){
+        var hab=CFG.HAB||{x:1100,y:1100};st={x:hab.x,y:hab.y+140};
+      }else{
+        st=stockpileSpot(s.colony&&s.colony.buildings);
+        (s.entities||[]).forEach(function(b){
+          if(b && !b.dead && b.type===T.BUILDING && b.bid==='bl_warehouse')st={x:b.x,y:(b.y||0)+18};
+        });
+      }
       var d=U.dst(e.x,e.y,st.x,st.y);
       if(d<bd){ bd=d; best={ kind:'stock', x:st.x, y:st.y }; }
     }
@@ -1439,8 +1499,23 @@ APH.Colony = (function(){
      原先住在 main.js, 于是 ui 每次改动殖民地都要反向调 APH.Main.saveColony。 */
   function persist(){
     var s = (window.APH && APH.state) || null;
-    if(!s || !s.colony) return;
+    if(!s || !s.colony || (s.scene&&s.scene!=='home')) return;
+    U.emit('beforeColonySnapshot',s);
+    if(s.meta)s.colony.stock=s.meta.res;
+    s.colony.stockLocation={id:"landing_cargo",x:CFG.HAB.x,y:CFG.HAB.y+140};
+    s.colony.clock=s.clock||0;
+    s.colony.power=s.power;
+    s.colony.war=s.war;
     s.colony.ground = serializeGround(s.entities);
+    if(APH.WorldRuntime)s.colony.wildlife=APH.WorldRuntime.serializable({entities:(s.entities||[]).filter(function(e){return e&&e.wild;})}).entities;
+    s.colony.floraState=s.colony.floraState||{};
+    s.colony.depleted=s.colony.depleted||{};
+    (s.entities||[]).forEach(function(e){if(e&&e.type===T.FLORA){
+      s.colony.floraState[e.id]={hp:e.hp,dead:!!e.dead};
+      if(e.pendingRepair)s.colony.floraState[e.id].pendingRepair=e.pendingRepair;
+      if(e.dead&&e.kind&&e.kind.indexOf('rock')===0)s.colony.depleted[e.uid||e.id]=true;
+    }});
+    s.colony.floraRespawn=s.floraRespawn||[];
     APH.Save.saveColony(s.colony);
   }
 
@@ -1449,9 +1524,9 @@ APH.Colony = (function(){
     (entities||[]).forEach(function(e){
       if(!e || e.dead) return;
       if(e.type===T.DROPPED && e.itemId)
-        g.push({ itemId:e.itemId, n:e.n||1, x:e.x, y:e.y });
-      if(e.type===T.RESIDENT && e.haulCarry && e.haulCarry.itemId)
-        g.push({ itemId:e.haulCarry.itemId, n:e.haulCarry.n||1, x:e.x, y:e.y });
+        g.push({ itemId:e.itemId, n:e.n||1, x:e.x, y:e.y,containerId:e.containerId,storageX:e.storageX,storageY:e.storageY,decayHp:e.decayHp });
+      if(e.type===T.RESIDENT && e.haulCarry)
+        (Array.isArray(e.haulCarry)?e.haulCarry:[e.haulCarry]).forEach(function(c){if(c&&c.itemId)g.push({itemId:c.itemId,n:c.n||1,x:e.x,y:e.y});});
     });
     return g;
   }
@@ -1482,21 +1557,75 @@ APH.Colony = (function(){
       leather:groundCount(entities,'leather')
     };
   }
-  function stockOf(res, entities, key){
+  function inventoryContext(res,entities,context){
+    var world=context&&context.state?context.state:context;
+    if(world&&world.rulesVersion!=null&&!world.colony)world={colony:world,entities:entities,meta:{res:res}};
+    if(!world){
+      var active=(window.APH&&APH.state)||null;
+      if(active&&((entities&&active.entities===entities)||(res&&active.meta&&active.meta.res===res)))world=active;
+    }
+    if(!world||!world.colony||world.colony.rulesVersion!==1||!APH.Logistics)return null;
+    return {colony:world.colony,res:res||(world.meta&&world.meta.res)||{},entities:entities||world.entities||[]};
+  }
+
+  function stockOf(res, entities, key, context){
+    var ctx=inventoryContext(res,entities,context);
+    if(ctx&&APH.Logistics.available)return APH.Logistics.available(ctx.colony,ctx.res,ctx.entities,key);
     return ((res&&res[key])||0)+groundCount(entities, key);
   }
 
   /* ADR-39: 「当前局面下我有多少 key」—— 仓 + 地上堆, 从 APH.state 自取。
      此前 main 与 ui 各有一份(ui 那份漏了地上堆), 现在只有这一份。 */
-  function haveStock(key){
-    var s=(window.APH&&APH.state)||null;
+  function haveStock(key,context){
+    var s=context&&context.state?context.state:(context&&context.colony?context:null);
+    if(!s)s=(window.APH&&APH.state)||null;
     if(!s||!s.meta) return 0;
-    return stockOf(s.meta.res, s.entities, key);
+    return stockOf(s.meta.res, s.entities, key, s);
+  }
+
+  function pileRequirementUnits(e,key){
+    if(!e||!e.itemId)return 0;
+    if(e.itemId===key||e.itemId==='it_'+key)return 1;
+    var it=(CFG.items&&CFG.items[e.itemId])||{};
+    return it.store===key?(it.storeN||1):0;
+  }
+
+  function groundPlan(ctx,key,n,overshoot){
+    var left=Math.max(0,Number(n)||0),candidates=[],removed=0;
+    (ctx.entities||[]).forEach(function(e){
+      if(!e||e.dead||e.type!==T.DROPPED)return;
+      var units=pileRequirementUnits(e,key);if(!units)return;
+      var free=APH.Logistics.availableDrop?APH.Logistics.availableDrop(ctx.colony,e):(e.n||1);
+      if(free>0)candidates.push({entity:e,units:units,free:free,take:0});
+    });
+    candidates.sort(function(a,b){return a.units-b.units;});
+    candidates.forEach(function(c){
+      if(left<=0)return;
+      var count=c.units>1?(overshoot?Math.ceil(left/c.units):Math.floor(left/c.units)):left;
+      c.take=Math.min(c.free,Math.max(0,count));
+      var got=c.take*c.units;removed+=got;left-=got;
+    });
+    return {ok:left<=0,left:left,removed:removed,surplus:Math.max(0,-left),entries:candidates};
+  }
+
+  function applyGroundPlan(plan){
+    (plan.entries||[]).forEach(function(entry){
+      if(!entry.take)return;
+      entry.entity.n=(entry.entity.n==null?1:entry.entity.n)-entry.take;
+      if(entry.entity.n<=0)entry.entity.dead=true;
+    });
   }
 
   /* 从地上堆扣 store 单位. 先扣 storeN=1 的堆; 合金整件扣.
      overshoot: 不够一整件时仍拿走(ensureStock 把多的补进仓). */
-  function takeFromGround(entities, key, n, overshoot){
+  function takeFromGround(entities, key, n, overshoot, context){
+    var modern=inventoryContext(null,entities,context);
+    if(modern){
+      var planned=groundPlan(modern,key,n,overshoot);
+      if(!planned.ok)return 0;
+      applyGroundPlan(planned);
+      return planned.removed;
+    }
     var left=n||0;
     if(left<=0) return 0;
     function pass(baseOnly){
@@ -1531,7 +1660,14 @@ APH.Colony = (function(){
     });
     return n;
   }
-  function takeDropped(entities, itemId, n){
+  function takeDropped(entities, itemId, n, context){
+    var modern=inventoryContext(null,entities,context);
+    if(modern){
+      var planned=groundPlan(modern,itemId,n,false);
+      if(!planned.ok)return 0;
+      applyGroundPlan(planned);
+      return Math.max(0,Number(n)||0);
+    }
     var left=n||0;
     if(left<=0) return 0;
     (entities||[]).forEach(function(e){
@@ -1545,10 +1681,24 @@ APH.Colony = (function(){
   }
 
   /* 先仓后堆. 不把地上 magically 搬进仓, 堆会缩小. */
-  function takeStock(res, entities, key, n){
+  function takeStock(res, entities, key, n, context){
     res=res||{};
     var need=n||0;
     if(need<=0) return { ok:true, taken:0, fromRes:0, fromGround:0 };
+    var modern=inventoryContext(res,entities,context);
+    if(modern&&APH.Logistics.available){
+      var total=APH.Logistics.available(modern.colony,res,entities,key);
+      if(total<need)return {ok:false,taken:0,fromRes:0,fromGround:0};
+      var freeRes=APH.Logistics.available(modern.colony,res,[],key);
+      var fromRes=Math.min(need,freeRes),left=need-fromRes;
+      var planned=groundPlan(modern,key,left,true);
+      if(!planned.ok)return {ok:false,taken:0,fromRes:0,fromGround:0};
+      res[key]=(res[key]||0)-fromRes;
+      applyGroundPlan(planned);
+      if(planned.surplus>0)res[key]=(res[key]||0)+planned.surplus;
+      return {ok:true,taken:need,fromRes:fromRes,fromGround:left,
+        groundRemoved:planned.removed,surplus:planned.surplus};
+    }
     var fromRes=Math.min(need, res[key]||0);
     res[key]=(res[key]||0)-fromRes;
     var left=need-fromRes;
@@ -1558,8 +1708,18 @@ APH.Colony = (function(){
   }
 
   /* 仓不够时把地上补进仓(工坊/请客等仍走仓扣费的旧函数) */
-  function ensureStock(res, entities, key, n){
+  function ensureStock(res, entities, key, n, context){
     res=res||{};
+    var modern=inventoryContext(res,entities,context);
+    if(modern&&APH.Logistics.available){
+      var freeRes=APH.Logistics.available(modern.colony,res,[],key);
+      if(freeRes>=n)return true;
+      var planned=groundPlan(modern,key,n-freeRes,true);
+      if(!planned.ok)return false;
+      applyGroundPlan(planned);
+      res[key]=(res[key]||0)+planned.removed;
+      return APH.Logistics.available(modern.colony,res,[],key)>=n;
+    }
     var have=res[key]||0;
     if(have>=n) return true;
     var got=takeFromGround(entities, key, n-have, true);
@@ -1589,11 +1749,11 @@ APH.Colony = (function(){
     /* T4: 远征只带回研究点与独有物, 不再产出散装粮食/矿材 ——
        所以缺粮缺矿的出路是「回家种/回家挖」, 不是「出门搜刮」。
        任务简报必须说实话, 否则等于把玩家往错误解法上推。 */
-    var mission = '此行目标：研究与遗物（粮食矿材带不回来）';
+    var mission = '此行目标：按家园需要搜集物资，返航后卸货入库';
     if(food < Math.max(warnF, pop*warnF)){
-      text = '食物将尽 — 该种田了（远征带不回粮食）';
+      text = '食物将尽 — 先采集浆果，再种田和烹饪';
     }else if(mineral < warnM){
-      text = '矿材不足 — 派人采矿或造采矿机（远征带不回矿材）';
+      text = '矿材不足 — 派人采矿，或安排资源远征';
     }else if(sick && med<=0){
       text = '有人在生病 — 工坊把矿做成药';
     }
@@ -1604,7 +1764,7 @@ APH.Colony = (function(){
     var opts = [null];
     JOB_CYCLE.forEach(function(id){
       if(!id) return;
-      if((buildings||[]).some(function(b){ return b.id===id; })) opts.push(id);
+      if((buildings||[]).some(function(b){ return b.id===id||(id==='bl_kitchen'&&b.id==='bl_campfire'); })) opts.push(id);
     });
     var i = opts.indexOf(resident.job);
     if(i<0) i=0;
@@ -1636,7 +1796,7 @@ APH.Colony = (function(){
     var SLOTS=(CFG.jobs&&CFG.jobs.slots)||JOB_SLOTS;
     var slots={};
     Object.keys(SLOTS).forEach(function(bid){
-      var n=(buildings||[]).filter(function(b){ return b.id===bid; }).length;
+      var n=(buildings||[]).filter(function(b){ return b.id===bid||(bid==='bl_kitchen'&&b.id==='bl_campfire'); }).length;
       if(n>0) slots[bid]=n*SLOTS[bid];
     });
     var out={};
@@ -1646,11 +1806,14 @@ APH.Colony = (function(){
     var sickAt=(CFG.residents&&CFG.residents.sickSkipAt!=null)?CFG.residents.sickSkipAt:60;
     (residents||[]).forEach(function(r){
       if(!r.jobLocked) return;
+      if(window.APH.Res && APH.Res.isPlayerFaction && !APH.Res.isPlayerFaction(r)) return;
       out[r.id]=r.job||null;                     // 手动锁岗不动
       if(r.job && slots[r.job]!=null) slots[r.job]--;
     });
     (residents||[]).forEach(function(r){
       if(out[r.id]!==undefined) return;
+      if(window.APH.Res && APH.Res.isPlayerFaction && !APH.Res.isPlayerFaction(r)){ out[r.id]=null; return; }
+      if(r.drafted){ out[r.id]=null; return; }
       if(r.downed || r.isSleeping || r.medLying){ out[r.id]=null; return; } // 击倒/睡眠/医疗舱俯卧缺勤 (Survival #15, #17, #69)
       if(broken(r)){ out[r.id]=null; return; }   // 崩溃者缺勤
       if((r.illness||0)>sickAt){ out[r.id]=null; return; }  // 重病跳过
@@ -1688,7 +1851,7 @@ APH.Colony = (function(){
   }
 
   /* 蓝图施工: nearPos 为 {x,y} 或坐标数组(玩家+建造岗居民) */
-  function queueTick(queue, dt, nearPos, builderBonus){
+  function queueTick(queue, dt, nearPos, builderBonus, materialsReady, canComplete){
     var bonus = 1 + (builderBonus||0);
     var positions = Array.isArray(nearPos) ? nearPos
       : (nearPos && nearPos.x!=null ? [nearPos] : []);
@@ -1696,18 +1859,28 @@ APH.Colony = (function(){
     var done = [];
     queue.forEach(function(item){
       item = Object.assign({}, item);
+      var workCells=item.geometryVersion===1&&APH.BuildGrid?APH.BuildGrid.interactionCells(item,BUILDINGS):null;
       var near = positions.some(function(p){
-        return p && U.dst(p.x, p.y, item.x, item.y) < 90;
+        if(!p)return false;
+        if(workCells)return workCells.some(function(c){return U.dst(p.x,p.y,(c.gx+.5)*CFG.GRID,(c.gy+.5)*CFG.GRID)<=8;});
+        return U.dst(p.x, p.y, item.x, item.y) < 90;
       });
-      if (near){
+      /* 老档的蓝图已经在放置时付清材料；正式物流蓝图显式写
+         materialsPaid:false，必须等材料实际送抵 task 才能施工。 */
+      var ready = item.materialsPaid !== false ||
+        (typeof materialsReady === 'function' && materialsReady(item));
+      item.materialState = ready ? 'ready' : 'missing';
+      if (near && ready){
 
         item.progress = Math.min(1, (item.progress||0) + dt*bonus/item.total);
         item.building = true;
       }else{
         item.building = false;
       }
-      if ((item.progress||0) >= 1) done.push({bid:item.bid,x:item.x,y:item.y});
-      else out.push(item);
+      if ((item.progress||0) >= 1){
+        if(typeof canComplete !== 'function' || canComplete(item)) done.push(Object.assign({}, item));
+        else { item.progress=.999; item.building=false; out.push(item); }
+      }else out.push(item);
     });
     return { queue: out, done: done };
   }
@@ -1760,7 +1933,7 @@ APH.Colony = (function(){
     /* 殖民地优先 T5: 终局科技 —— 攒下来的一切最后花在这里 */
     te_deep_signal:     { name:'深空信标阵列', cost:400, max:1,
                           requires:['te_deep_drilling', 'te_plasma_grid'],
-                          desc:'解锁深空发射器：造好并通电即可呼叫救援，离开这颗星球。' },
+                          desc:'解锁通信灯塔：维持稳定生活与深空通信，在异星扎根。' },
     te_heavy_plasma:    { name:'等离子重炮与史前能源', cost:100, max:1, requires:['te_ballistics'],
                           desc:'史前遗迹科技：解锁等离子重炮与史前永恒发电机' },
 
@@ -2140,7 +2313,7 @@ APH.Colony = (function(){
 
   /* ---------- 烹饪加工配方表 (Cooking #49) ---------- */
   var COOK_RECIPES = {
-    it_roasted_meat: { name:'炙烤异星肉排', costRes:{ food:2, wood:1 }, cookTime:8, reqTech:'te_stonecutting', bldgs:['bl_campfire','bl_kitchen'], bldg:['bl_campfire','bl_kitchen'] },
+    it_roasted_meat: { name:'炙烤异星肉排', costRes:{ food:2, wood:1 }, cookTime:8, reqTech:null, bldgs:['bl_campfire','bl_kitchen'], bldg:['bl_campfire','bl_kitchen'] },
     it_berry_stew:   { name:'晶核浆果浓汤', costRes:{ it_berry:2, it_crystal_berry:1, wood:1 }, cookTime:10, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
     it_dew_pudding:  { name:'清甜露果布丁', costRes:{ it_dew_fruit:2, it_berry:1 }, cookTime:10, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
     it_glow_fondue:  { name:'荧光温热浓汤', costRes:{ it_glow_fluid:2, food:1, wood:1 }, cookTime:12, reqTech:'te_alien_culinary', bldgs:['bl_kitchen'], bldg:['bl_kitchen'] },
@@ -2325,10 +2498,7 @@ APH.Colony = (function(){
   }
 
   /* ---------- 自然生态生成(纯函数) ---------- */
-  function generateFlora(seed, holder){
-    if(holder && window.APH.Observe && APH.Observe.gridOf && APH.Observe.gridOf(holder) && APH.Observe.floraFrom){
-      return APH.Observe.floraFrom(holder);
-    }
+  function generateFlora(seed){
     var rng = U.makeRng((seed ^ 0xF108A) >>> 0 || 17);
     var out = [];
     var H = CFG.HAB || { x:1100, y:1100 };
@@ -2364,6 +2534,7 @@ APH.Colony = (function(){
   /* 居民在自然实体上工作推进(纯函数) */
   function workOnFlora(target, resident, dt){
     if(!target || target.hp <= 0) return { done:true, dropItemId:null, dropCount:0 };
+    if(target.pendingRepair)return {done:false,dropItemId:null,dropCount:0,locked:true};
     var eff = (window.APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(resident) : 1;
     if(!isFinite(eff) || eff <= 0) eff = 1;
     var sk = (resident && resident.skills) ? ((target.kind==='tree'||target.kind.startsWith('bush')) ? (resident.skills.sk_farm||0) : (resident.skills.sk_craft||0)) : 0;
@@ -2373,12 +2544,22 @@ APH.Colony = (function(){
     if(target.hp <= 0){
       target.hp = 0;
       target.dead = true;
+      var active=APH.state;
+      if(active&&active.scene==='home'&&active.colony&&(active.entities||[]).indexOf(target)>=0){
+        active.colony.floraState=active.colony.floraState||{};active.colony.floraState[target.id]={hp:0,dead:true};
+        if(target.kind.indexOf('rock')===0){active.colony.depleted=active.colony.depleted||{};active.colony.depleted[target.uid||target.id]=true;}
+        else if(!target._queued){
+          target._queued=true;active.floraRespawn=active.floraRespawn||[];
+          active.floraRespawn.push({sourceId:target.id,kind:target.kind,x:target.x,y:target.y,ticksLeft:(CFG.gathering.regenTicks||{})[target.kind]||8,yieldItemId:target.yieldItemId,seedItem:target.seedItem,amount:target.amount,exposureRisk:target.exposureRisk});
+        }
+      }
       var dropId = 'it_wood', dropN = 4;
       if(target.kind === 'tree'){ dropId = 'it_wood'; dropN = 4; }
       else if(target.kind === 'rock_iron'){ dropId = 'it_iron'; dropN = 3; }
       else if(target.kind === 'rock_stone'){ dropId = 'it_stone'; dropN = 4; }
       else if(target.kind === 'bush_berry'){ dropId = 'it_berry'; dropN = 3; }
       else if(target.kind === 'bush_herb'){ dropId = 'it_herb'; dropN = 2; }
+      if(target.yieldItemId&&CFG.items[target.yieldItemId]){dropId=target.yieldItemId;dropN=target.amount||dropN;}
       return { done:true, dropItemId:dropId, dropCount:dropN };
     }
     return { done:false, dropItemId:null, dropCount:0 };
@@ -2393,27 +2574,26 @@ APH.Colony = (function(){
     var spawned = [];
 
     for(var i = queue.length - 1; i >= 0; i--){
+      if(s.colony&&s.colony.scene&&s.colony.scene.generation===1&&(queue[i].kind||'').indexOf('rock')===0){queue.splice(i,1);continue;}
       queue[i].ticksLeft--;
       if(queue[i].ticksLeft <= 0){
         var rng = U.makeRng(((s.seed || 7) * 31 + i * 917 + Math.floor((s.clock || 0))) >>> 0);
-        var observed = window.APH.Observe && ((s.colony && APH.Observe.gridOf(s.colony)) || (s.spec && APH.Observe.gridOf(s.spec)));
-        var nx, ny;
-        if(observed){
-          nx = queue[i].x; ny = queue[i].y;
-        } else {
-          nx = queue[i].x + Math.floor((rng() - 0.5) * zoneR * 2);
-          ny = queue[i].y + Math.floor((rng() - 0.5) * zoneR * 2);
-          nx = U.clamp(nx, 100, CFG.WORLD - 100);
-          ny = U.clamp(ny, 100, CFG.WORLD - 100);
-        }
+        var nx = queue[i].x + Math.floor((rng() - 0.5) * zoneR * 2);
+        var ny = queue[i].y + Math.floor((rng() - 0.5) * zoneR * 2);
+        var clamped = (window.APH.Scene && APH.Scene.clampPoint)
+          ? APH.Scene.clampPoint(nx, ny, s.colony && s.colony.scene, 100)
+          : {x:U.clamp(nx, 100, CFG.WORLD - 100), y:U.clamp(ny, 100, CFG.WORLD - 100)};
+        nx = clamped.x; ny = clamped.y;
         var kind = queue[i].kind;
+        if(queue[i].sourceId){nx=queue[i].x;ny=queue[i].y;}
         var hp = kind === 'tree' ? 30 : (kind === 'rock_iron' ? 40 : (kind === 'rock_stone' ? 35 : (kind === 'bush_berry' ? 15 : 20)));
         spawned.push({
-          id: 'flora_regen_' + i + '_' + Math.floor(rng() * 9999),
+          id: queue[i].sourceId||('flora_regen_' + i + '_' + Math.floor(rng() * 9999)),
           type: 'flora', kind: kind,
           x: nx, y: ny,
-          hp: hp, maxHp: hp
+          hp: hp, maxHp: hp,yieldItemId:queue[i].yieldItemId,seedItem:queue[i].seedItem,amount:queue[i].amount,exposureRisk:queue[i].exposureRisk
         });
+        if(queue[i].sourceId&&s.colony&&s.colony.floraState)delete s.colony.floraState[queue[i].sourceId];
         queue.splice(i, 1);
       }
     }
@@ -2423,27 +2603,70 @@ APH.Colony = (function(){
   /* ================= 建造推进高阶接缝 (ADR-21) ================= */
   function tickConstruction(s, dt){
     if(!s || !s.colony || !s.colony.buildQueue || !s.colony.buildQueue.length) return;
-    var bb = builderBonusOf((s.meta && s.meta.residents) || []);
-    var near = [{ x: s.px, y: s.py }];
+    var bb = builderBonusOf(((s.meta && s.meta.residents) || []).filter(function(r){return !r.worldId||r.worldId==='home';}));
+    /* ADR-45 已无玩家化身；不得再拿遗留 s.px/s.py 当幽灵施工者。 */
+    var near = [];
     var builders = {};
+    var availableResidents = {};
     var wpB = (s.meta && s.meta.workPrio) || {};
-    var residents = (s.meta && s.meta.residents) || [];
+    var residents = ((s.meta && s.meta.residents) || []).filter(function(r){return !r.worldId||r.worldId==='home';});
 
     residents.forEach(function(r){
-      if(!isBuilder(r)) return;
-      if(r.job && r.job !== 'blueprint') return;
+      if(!r || r.downed || r.isSleeping || r.medLying) return;
       if(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r)) return;
+      availableResidents[r.id] = true;
+      // 新家园允许所有启用建造工作的居民施工；技能影响效率，不是隐藏准入门槛。
+      if(!s.colony.rulesVersion&&!isBuilder(r)) return;
+      if(r.job && r.job !== 'blueprint') return;
       if(wpB[r.id] && wpB[r.id].sk_build === 0) return;
       builders[r.id] = true;
     });
 
     (s.entities || []).forEach(function(en){
-      if(!en || en.dead) return;
-      if(en.type === T.RESIDENT && builders[en.rid || en.id]) near.push({ x: en.x, y: en.y });
-      else if(en.userOrder && en.userOrder.type==='build') near.push({ x: en.x, y: en.y });
+      if(!en || en.dead || en.type !== T.RESIDENT || en.drafted || en.downed || en.isSleeping) return;
+      var rid=en.rid || en.id;
+      var forced=en.userOrder && en.userOrder.type==='build';
+      if(builders[rid] || (forced && availableResidents[rid])) near.push({ x: en.x, y: en.y });
     });
 
-    var qr = queueTick(s.colony.buildQueue, dt, near, bb);
+    /* 给新蓝图补稳定物流任务。旧蓝图 materialsPaid 缺省=true，不强行迁移，
+       避免玩家已经付过的材料在读档后被再扣一次。 */
+    s.colony.buildQueue.forEach(function(q){
+      if(!q || q.materialsPaid !== false || !window.APH.Logistics) return;
+      var targetId=q.uid || ('bp_'+q.bid+'_'+q.x+'_'+q.y);
+      var task=APH.Logistics.ensureTask(s.colony, {
+        id:q.taskId,
+        kind:'construction', targetId:targetId, x:q.x, y:q.y,
+        need:q.need || APH.Construction.materialNeed(get(q.bid),1)
+      });
+      q.taskId=task.id;
+    });
+    var blockedRecovery={};
+    if(window.APH.Recovery){
+      var recoveryState=APH.Recovery.reconcile(s);
+      (recoveryState.errors||[]).forEach(function(issue){
+        if(issue.q&&issue.q.uid)blockedRecovery[issue.q.uid]=true;
+      });
+    }
+    function footprintClear(q){
+      if(q&&q.repairSourceId&&blockedRecovery[q.uid])return false;
+      var rect;
+      if(window.APH.BuildGrid && q.geometryVersion===1){
+        rect=APH.BuildGrid.rectOf(q, BUILDINGS, s.colony.scene);
+      }else{
+        var fp=footprintOf(q.bid);
+        rect={x:q.x-fp.w/2,y:q.y-fp.h/2,w:fp.w,h:fp.h};
+      }
+      return !(s.entities||[]).some(function(en){
+        if(!en||en.dead) return false;
+        var pawn=en.type===T.RESIDENT || en.type==='player' || en.isSoldier;
+        return pawn && en.x>=rect.x && en.x<rect.x+rect.w && en.y>=rect.y && en.y<rect.y+rect.h;
+      });
+    }
+    var qr = queueTick(s.colony.buildQueue, dt, near, bb, function(q){
+      if(!window.APH.Logistics || !q.taskId) return false;
+      return APH.Logistics.taskState(s.colony, q.taskId).ready;
+    }, footprintClear);
     s.colony.buildQueue = qr.queue;
 
     /* 施工粒子: 正在施工的蓝图冒尘 */
@@ -2467,10 +2690,23 @@ APH.Colony = (function(){
     });
 
     qr.done.forEach(function(d){
-      var b = { id: d.bid, x: d.x, y: d.y, lv: 1 };
+      if(d.repairSourceId&&window.APH.Recovery){
+        var recovered=APH.Recovery.complete(s,d);
+        if(!recovered.ok){s.colony.buildQueue.push(d);return;}
+      }
+      /* construction.js 的唯一 record 要贯穿蓝图→成品，不能在这里退化成 bid/x/y。 */
+      var b = Object.assign({}, d, { id:d.bid, bid:d.bid, lv:d.lv||1 });
+      if(d.geometryVersion===1)b.materialsSpent=Object.assign({},d.need||{});
+      delete b.total; delete b.progress; delete b.building;
+      delete b.materialState; delete b.materialsPaid; delete b.need; delete b.taskId;
+      delete b.repairSourceId;
       if(d.bid==='bl_kitchen'||d.bid==='bl_workshop'||d.bid==='bl_campfire') b.bills=[];
       if(d.bid === 'bl_wall' && CFG.wall && CFG.wall.hp != null) b.hp = CFG.wall.hp;
       s.colony.buildings.push(b);
+      if(d.taskId && window.APH.Logistics){
+        var completed=APH.Logistics.completeTask(s.colony,d.taskId);
+        s.colony.pendingGround=(s.colony.pendingGround||[]).concat(completed.drops||[]);
+      }
 
       /* 移除对应蓝图实体 */
       (s.entities || []).forEach(function(en){
@@ -2513,7 +2749,7 @@ APH.Colony = (function(){
      colony 在 MODULE_ORDER 里排在 main 之前, 那是一条反向依赖,
      使整个模拟循环没有唯一的归属者(main → colony → main)。
      现在编排权归还给 main.js, 本函数不再向上调用。 */
-  function tickProduction(s, dt){
+  function tickProduction(s, dt, workerAt){
     if(!s) return false;
     s.prodT = (s.prodT || 0) + dt;
     if(s.prodT < 30) return false;
@@ -2526,7 +2762,8 @@ APH.Colony = (function(){
     var isDay = (window.APH.World && APH.World.daylight) ? APH.World.daylight() >= .5 : true;
     var powRes = powerSettle(s.colony && s.colony.buildings || [], s.meta && s.meta.res, s.power || (s.power = {}), 30, {
       solarMul: powerSolarMulOf(s.meta),
-      isDay: isDay
+      isDay: isDay,
+      rulesVersion:s.colony&&s.colony.rulesVersion
     });
     var powState = applyPowerState(s.colony && s.colony.buildings || [], powRes.status);
     (s.colony && s.colony.buildings || []).forEach(function(b){
@@ -2538,11 +2775,11 @@ APH.Colony = (function(){
     s.powerStatus = powRes;
 
     var nightP = !isDay;
-    var hmods = harvestMods(s.spec && s.spec.laws, s.clock, nightP, s.colony);
+    var hmods = harvestMods(s.spec && s.spec.laws, s.clock, nightP);
     var prodWorkers = ((s.meta && s.meta.residents) || []).filter(function(r){
-      return !(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r));
+      return (!r.worldId||r.worldId==='home') && !(window.APH.Res && APH.Res.isBroken && APH.Res.isBroken(r));
     });
-    var out = productionTick(s.meta, s.colony && s.colony.buildings || [], prodWorkers, hmods);
+    var out = productionTick(s.meta, s.colony && s.colony.buildings || [], prodWorkers, hmods, s, workerAt);
     (out.piles || []).forEach(function(p){
       if(window.APH.Combat && APH.Combat.spawnDrop){
         APH.Combat.spawnDrop(p.x + 16, p.y + 14, p.itemId, p.n, { stock: true });
@@ -2560,12 +2797,11 @@ APH.Colony = (function(){
     var ambT = (window.APH.Weather && APH.Weather.ambientTemperatureOf)
       ? APH.Weather.ambientTemperatureOf(wxId, isDay, seasonC && seasonC.id) : 22;
     var allBlds = s.colony && s.colony.buildings || [];
-    var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(allBlds) : [];
+    var rooms = (window.APH.Nav && APH.Nav.roomsOf) ? APH.Nav.roomsOf(allBlds,s.colony&&s.colony.scene) : [];
     rooms.forEach(function(rm){
       var appliances = allBlds.filter(function(b){
         return b && (b.id === 'bl_heater' || b.id === 'bl_cooler') &&
-               b.x >= rm.minX * 48 && b.x <= rm.maxX * 48 &&
-               b.y >= rm.minY * 48 && b.y <= rm.maxY * 48;
+               APH.Nav.roomAt(b,rooms)===rm;
       });
       roomTemperatureTick(rm, ambT, 30, appliances);
     });
@@ -2577,7 +2813,7 @@ APH.Colony = (function(){
     (s.entities || []).forEach(function(e){
       if(!e || e.dead || e.type !== T.DROPPED) return;
       var isSheltered = false;
-      var curRoom = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:e.x, y:e.y}, rooms) : null;
+      var curRoom = (window.APH.Nav && APH.Nav.roomAt) ? APH.Nav.roomAt({x:e.storageX!=null?e.storageX:e.x,y:e.storageY!=null?e.storageY:e.y}, rooms) : null;
       if(curRoom){
         isSheltered = true;
       } else {
@@ -2613,9 +2849,10 @@ APH.Colony = (function(){
     (s.entities || []).forEach(function(en){
       if(!en || en.type !== T.FLORA || !en.dead || en._queued) return;
       en._queued = true;
+      if(en.kind&&en.kind.indexOf('rock')===0)return;
       var ticks = regenCfg[en.kind] || 8;
       if(!s.floraRespawn) s.floraRespawn = [];
-      s.floraRespawn.push({ kind: en.kind, x: en.x, y: en.y, ticksLeft: ticks });
+      s.floraRespawn.push({ sourceId:en.id,kind: en.kind, x: en.x, y: en.y, ticksLeft: ticks,yieldItemId:en.yieldItemId,seedItem:en.seedItem,amount:en.amount,exposureRisk:en.exposureRisk });
     });
 
     /* ADR-38: 敌对/叙事/居民三跳的编排已上移到 main.js —— 见 simHome。 */
@@ -2648,6 +2885,7 @@ APH.Colony = (function(){
      纯函数, 不碰 DOM, node 直测。 */
   function colonyGoal(meta, buildings){
     meta = meta || {};
+    if(APH.HomeProgress&&meta.rooting)return APH.HomeProgress.describe(meta.rooting);
     buildings = buildings || [];
     var C = (CFG.colony) || {};
     var TXT = C.goalTexts || {};
@@ -2674,13 +2912,13 @@ APH.Colony = (function(){
       return { id:'defense', text: TXT.defense || '立起防线' };
     if(!has('bl_clinic'))
       return { id:'clinic', text: TXT.clinic || '建医疗舱' };
-    /* T5: 终局。分三步说清楚 —— 研发 → 建造 → 通电起飞 */
+    /* ADR-46: 灯塔三级 —— 研发 → 建造 → 维持扎根, 永不结束沙盒 */
     var tech = meta.tech || {};
     if(!tech.te_deep_signal)
-      return { id:'endtech', text: TXT.endtech || '研发「深空信标阵列」，那是回家的路' };
+      return { id:'endtech', text: TXT.endtech || '研发「深空信标阵列」——恢复深空通信' };
     if(!has('bl_transmitter'))
-      return { id:'endbuild', text: TXT.endbuild || '建造深空发射器（终局工程）' };
-    return { id:'endgame', text: TXT.endgame || '给发射器通电，走过去呼叫救援' };
+      return { id:'endbuild', text: TXT.endbuild || '建造通信灯塔，建立长期联络' };
+    return { id:'endgame', text: TXT.endgame || '维持通信和稳定生活，在异星扎根' };
   }
 
   function boxSelectEntities(entities, x0, y0, x1, y1){
@@ -2783,6 +3021,8 @@ APH.Colony = (function(){
     }
     return entities;
   }
+
+  U.on('metaWillSave',function(meta){var s=APH.state;if(s&&s.meta===meta&&s.scene==='home'&&s._worldReady)persist();});
 
   return {
     list:list, get:get,

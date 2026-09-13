@@ -30,7 +30,7 @@ APH.UI = (function(){
     /* ADR-45: 氧气/生命/饱食/精力/病情/击倒 六条都是「主角这个人」的状态。
        没有主角之后, HUD 顶部改报殖民地本身: 人口 / 住房上限。 */
     var pop=(s.meta&&s.meta.residents||[]).length;
-    var cap=(APH.Colony&&APH.Colony.housingCapacity)?APH.Colony.housingCapacity(s.colony&&s.colony.buildings):0;
+    var cap=(APH.Colony&&APH.Colony.housingCapacity)?APH.Colony.housingCapacity(s.colony&&s.colony.buildings,s.colony):0;
     var bPop=$('bPop'), vPop=$('vPop');
     if(bPop) bPop.style.width = U.clamp(cap?pop/cap*100:0,0,100)+'%';
     if(vPop) vPop.textContent = pop + (cap? '/'+cap : '');
@@ -522,7 +522,9 @@ APH.UI = (function(){
 
     if(def.render && s) def.render(s, opts);
     if(def.onOpen) def.onOpen(opts);
-    if(window.APH && window.APH.Input && window.APH.Input.pushContext){
+    /* 只有全屏 overlay 才占 modal 上下文。命令/建造抽屉必须让 POINTER_DOWN
+       到达画布，否则选了砍伐/仓储后无法拉框。 */
+    if(def.isOverlay && window.APH && window.APH.Input && window.APH.Input.pushContext){
       window.APH.Input.pushContext('modal:' + id);
     }
     el.style.display = '';
@@ -1275,8 +1277,8 @@ APH.UI = (function(){
       var nBuilt = s.colony.buildings.filter(function(b){ return b.id === bid; }).length;
       var nQueued = (s.colony.buildQueue || []).filter(function(q){ return q.bid === bid; }).length;
       var n = nBuilt + nQueued;
-      var check = APH.Colony.canPlace(s.colony.buildings, s.meta.tech, bid, s.px, s.py, s.meta.res, free);
-      var ok = free || (check.ok && n < def.max);
+      var unlocked = !def.reqTech || (s.meta.tech||{})[def.reqTech] || (APH.Construction && APH.Construction.isBasic(bid));
+      var ok = free || (unlocked && n < (def.max||99));
       var costRes = def.costRes || {};
       var costPills = free
         ? '<span style="display:inline-block;background:#794f27;color:#ffc857;border-radius:50px;padding:1px 7px;font-size:10px">免费</span>'
@@ -1301,10 +1303,13 @@ APH.UI = (function(){
         ((def.cells && def.cells[0] > 1) ? '<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;' +
           'border-radius:50px;padding:1px 7px;font-size:10px;margin-left:3px">' + def.cells[0] + '×' + def.cells[1] + '</span>' : '');
       if(ok){
+        card.tabIndex=0; card.setAttribute('role','button');
+        card.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();card.click();}});
         card.addEventListener('click', function(){
           s.buildMode = bid;
           close('buildCatalog');
-          setHint('建造: ' + def.name + ' — 点击空地放置');
+          s.buildRotation=0;
+          setHint('建造: ' + def.name + ' · 点击规划，R旋转，Esc取消；缺料也可规划');
         });
         card.addEventListener('mouseover', function(){ card.style.transform = 'translateY(-2px)'; });
         card.addEventListener('mouseout', function(){ card.style.transform = ''; });
@@ -1536,7 +1541,7 @@ APH.UI = (function(){
   function housingCap(){
     var s = window.APH && window.APH.state;
     if(!s || !s.colony || !s.colony.buildings) return 2;
-    return (APH.Colony && APH.Colony.housingCapacity) ? APH.Colony.housingCapacity(s.colony.buildings) : 2;
+    return (APH.Colony && APH.Colony.housingCapacity) ? APH.Colony.housingCapacity(s.colony.buildings,s.colony) : 2;
   }
 
   function renderResPanel(){
@@ -1672,6 +1677,20 @@ APH.UI = (function(){
     }
     return h;
   }
+  function memoriesHtml(pawn, clock){
+    var now=clock==null?Infinity:clock;
+    var list=(pawn&&pawn.memories||[]).filter(function(memory){
+      return (memory.clock||0)<=now&&(memory.until==null||memory.until>now);
+    }).slice().sort(function(a,b){return (b.clock||0)-(a.clock||0);}).slice(0,3);
+    if(!list.length)return '';
+    var h='<div style="margin-top:7px;font-size:9px;color:#8fa3cc;letter-spacing:1px">最近记忆</div>';
+    list.forEach(function(memory){
+      var mood=Number(memory.mood)||0,col=mood>=0?'#7dffab':'#ff9a9a';
+      h+='<div style="font-size:10px;color:#c5e3f6;margin-top:1px">'+esc(memory.text)+
+        (mood?' <span style="color:'+col+'">'+(mood>0?'+':'')+mood+'</span>':'')+'</div>';
+    });
+    return h;
+  }
   /* ADR-37: 检查器与模拟共用同一个念头上下文构造器。
      此前 ui.js 自留一份 thoughtCtxOf, 少了美观/房间/同室三项 ——
      指挥官面板显示的理由和真正驱动他心情的理由对不上。 */
@@ -1721,7 +1740,7 @@ APH.UI = (function(){
       var m0 = s.meta || {};
       var pop = (m0.residents || []).length;
       var capH = (APH.Colony && APH.Colony.housingCapacity)
-        ? APH.Colony.housingCapacity(s.colony && s.colony.buildings) : 0;
+        ? APH.Colony.housingCapacity(s.colony && s.colony.buildings,s.colony) : 0;
       var goal = (APH.Colony && APH.Colony.colonyGoal)
         ? APH.Colony.colonyGoal(m0, (s.colony && s.colony.buildings) || []) : null;
       var hh = inspHead('🏠', '新曙光殖民地',
@@ -1746,6 +1765,7 @@ APH.UI = (function(){
       var rest = Math.round((r && r.rest != null) ? r.rest : (ent.rest || 80));
       var rec = Math.round((r && r.recreation != null) ? r.recreation : (ent.recreation != null ? ent.recreation : 80));
       var action = ent.userOrder ? (ent.userOrder.type === 'move' ? '战术行军中' : (ent.userOrder.type === 'gather' ? '执行开采指令' : '执行搬运指令')) : (ent.drafted ? '战备戒备中' : (ent.gathering ? '正在采集中' : (ent.walking ? (ent.job ? '工位巡视劳作' : '基地漫步闲逛') : (ent.job ? '工位作业中' : '休闲散步中'))));
+      if(ent.workReason)action=ent.workReason;
       var tab = s.inspTab || 'needs';
       var cmds = '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'toggleSelectedDraft\')">'+(ent.drafted?'解除征召':'征召')+'</button>';
       var h = inspHead('👤', name, trait + ' · ' + action + ' · ' + job, ent.drafted ? '#ff6d6d' : '#b8a888', cmds);
@@ -1754,6 +1774,7 @@ APH.UI = (function(){
       h += '<div class="insp-body">';
       if(tab==='thoughts'){
         h += thoughtsHtml(r || { food:food, rest:rest, recreation:ent.recreation }, thoughtCtxOf(s), r && r.thoughts);
+        h += memoriesHtml(r, s.clock);
       } else if(tab==='health'){
         if(r && r.parts){
           Object.keys(r.parts).forEach(function(p){
@@ -1765,15 +1786,44 @@ APH.UI = (function(){
         h += scheduleRowHtml(r && r.schedule, s);
       } else {
         h += '<div style="color:#9a8c70">' + action + '</div>';
+        h += memoriesHtml(r, s.clock);
+        if(r&&s.scene==='home'){
+          h+='<div style="margin-top:8px;color:#9a8c70">装备（到物资旁取用）</div>';
+          Object.keys(CFG.items).forEach(function(itemId){
+            var item=CFG.items[itemId];if(!item.slot)return;
+            var worn=r.gear&&r.gear[item.slot]===itemId;
+            var available=(s.entities||[]).some(function(p){return p.itemId===itemId&&APH.Logistics.availableDrop(s.colony,p)>0;});
+            if(!worn&&!available)return;
+            h+='<button type="button" class="insp-cmd" '+(worn?'disabled':'')+' onclick="APH.UI.cmd(\'equipSelected\',\''+itemId+'\')">'+(worn?'已装备 · ':'取用 · ')+item.name+'</button>';
+          });
+        }
       }
       h += '</div>';
       return h;
     }
 
+    if(target.type === 'enemy'){
+      var ee = target.entity || target;
+      var pawn = ee.pawn;
+      if(pawn && APH.Res && APH.Res.isHumanlike && APH.Res.isHumanlike(ee)){
+        var nm = pawn.name || ee.name || '袭击者';
+        var trait = pawn.trait || '';
+        var mood = Math.round(pawn.mood != null ? pawn.mood : 70);
+        var food = Math.round(pawn.food != null ? pawn.food : 80);
+        var rest = Math.round(pawn.rest != null ? pawn.rest : 80);
+        var rec = Math.round(pawn.recreation != null ? pawn.recreation : 80);
+        var hh2 = inspHead('⚔', nm, (trait ? trait + ' · ' : '') + '敌对阵营', '#ff6d6d', '');
+        hh2 += needBarsHtml(food, rest, rec, mood);
+        hh2 += '<div class="insp-body">';
+        hh2 += thoughtsHtml(pawn, {}, pawn.thoughts);
+        hh2 += '</div>';
+        return hh2;
+      }
+    }
     if(target.type === 'flora'){
       /* 3. 自然树木/矿石 */
       var fe = target.entity || target;
-      var kindName = fe.kind === 'tree' ? '高大红树' : (fe.kind === 'rock_stone' ? '花岗岩石' : (fe.kind === 'rock_iron' ? '富铁矿脉' : (fe.kind === 'bush_berry' ? '浆果丛' : '野生灌木')));
+      var kindName = fe.coreWreckage?'新曙光核心残骸':fe.kind==='bush_alien'?'异星样本植物':fe.kind === 'tree' ? '高大红树' : (fe.kind === 'rock_stone' ? '花岗岩石' : (fe.kind === 'rock_iron' ? '富铁矿脉' : (fe.kind === 'rock_wreckage' ? '可回收机械残骸' : (fe.kind === 'bush_berry' ? '浆果丛' : '野生灌木'))));
       var icon = fe.kind === 'tree' ? '🌲' : (fe.kind && fe.kind.startsWith('rock') ? '🪨' : '🌿');
       var hp = Math.round(fe.hp || 0);
       var maxHp = Math.round(fe.maxHp || 30);
@@ -1784,6 +1834,13 @@ APH.UI = (function(){
       var h = inspHead(icon, kindName, desTxt + ' · ' + hp + '/' + maxHp, desCol, '');
       var pct = maxHp ? Math.round(hp/maxHp*100) : 0;
       h += '<div style="padding:6px 10px 10px"><div class="insp-need"><span class="insp-need-lab">耐久</span><div class="insp-need-track"><div class="insp-need-fill" style="width:'+pct+'%;background:#6bcf8e"></div></div><span class="insp-need-val">'+hp+'</span></div></div>';
+      if(fe.kind==='rock_wreckage'&&fe.repairable){
+        var yieldDef=CFG.items&&CFG.items[fe.yieldItemId],yieldName=yieldDef&&yieldDef.name||'合金';
+        h+='<div class="insp-body"><div style="font-size:10px;color:#8fa3cc">直接拆解：'+yieldName+' ×'+(fe.amount||2)+'；修复则保留设备且不产出材料。</div>';
+        if(fe.pendingRepair)h+='<div style="margin-top:5px;color:#ffc857;font-size:10px">修复蓝图已排定</div>';
+        else h+='<button type="button" class="insp-cmd" onclick="APH.UI.cmd(\'repairWreckage\')" style="margin-top:6px">保留并修复(半价材料)</button>';
+        h+='</div>';
+      }
       return h;
     }
 
@@ -1791,7 +1848,13 @@ APH.UI = (function(){
       /* 4. 建筑 */
       var be = target.entity || target;
       var bid = be.bid || be.id;
-      var bName = (CFG.buildings && CFG.buildings[bid] && CFG.buildings[bid].name) || bid || '建筑';
+      var bName = (APH.Colony.get(bid)||{}).name || bid || '建筑';
+      if(be.type===CFG.entType.BLUEPRINT){
+        var q=(s.colony.buildQueue||[]).find(function(x){return x.uid===be.uid;})||be;
+        var st=q.taskId?APH.Logistics.taskState(s.colony,q.taskId):{missing:q.need||{},ready:q.materialsPaid!==false};
+        var waiting=st.ready?'材料已到，等待施工':Object.keys(st.missing||{}).length?'缺少材料：'+Object.keys(st.missing).map(function(k){return k+' '+st.missing[k];}).join('、'):'材料正在运送';
+        return inspHead('🛠',bName+' · 蓝图',waiting,'#ffc857','')+'<div class="insp-body"><button type="button" class="insp-cmd" onclick="APH.UI.cmd(\'cancelConstruction\')">取消施工，保留材料</button></div>';
+      }
       var lv = be.lv || 1;
       var rec = null;
       ((s.colony && s.colony.buildings) || []).forEach(function(b){
@@ -1800,7 +1863,7 @@ APH.UI = (function(){
       var hp = rec && rec.hp != null ? rec.hp : (be.hp != null ? be.hp : 80);
       var maxHp = rec && rec.maxHp != null ? rec.maxHp : (be.maxHp != null ? be.maxHp : 80);
       var pct = maxHp ? Math.round(hp/maxHp*100) : 100;
-      var h = inspHead('🏛️', bName, 'Lv.'+lv+' · 运转正常', '#7dffab', '');
+      var h = inspHead('🏛️', bName, 'Lv.'+lv+' · '+((rec&&rec.workReason)||(rec&&rec.powered===false?'断电':'已建成')), '#7dffab', '');
       h += '<div style="padding:6px 10px"><div class="insp-need"><span class="insp-need-lab">耐久</span><div class="insp-need-track"><div class="insp-need-fill" style="width:'+pct+'%;background:#6bcf8e"></div></div><span class="insp-need-val">'+Math.round(hp)+'</span></div></div>';
       if(bid==='bl_kitchen'||bid==='bl_campfire'||bid==='bl_workshop'){
         h += '<div class="insp-body">' + billsHtml(rec || be, bid) + '</div>';
@@ -1814,7 +1877,7 @@ APH.UI = (function(){
           h += '<button type="button" onclick="APH.UI.cmd(\'callRescue\')" ' +
                'style="font-size:12px;padding:6px 12px;border-radius:8px;border:1px solid rgba(125,255,171,.6);' +
                'background:rgba(125,255,171,.15);color:#c8ffd8;cursor:pointer;font-weight:700">' +
-               '📡 呼叫救援 · 离开这颗星球</button>';
+               '📡 查看家园扎根进展</button>';
         }else{
           h += '<div style="color:#ff9a9a;font-size:11px">未通电 —— 接入导线并保证发电充足</div>';
         }
@@ -1876,7 +1939,7 @@ APH.UI = (function(){
       : 18;
     var roomLine = '室外露天';
     if(window.APH.Nav && APH.Nav.roomsOf && APH.Nav.roomAt){
-      var rooms = APH.Nav.roomsOf((s.colony && s.colony.buildings) || []);
+      var rooms = APH.Nav.roomsOf((s.colony && s.colony.buildings) || [],s.colony&&s.colony.scene);
       var rm = APH.Nav.roomAt({ x:wx, y:wy }, rooms);
       if(rm && APH.Nav.roomRoleOf){
         var role = APH.Nav.roomRoleOf(rm, (s.colony && s.colony.buildings) || []);
@@ -1896,7 +1959,7 @@ APH.UI = (function(){
   function colonistBarHtml(residents, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var m = s.meta || {};
-    var list = residents || m.residents || [];
+    var list = residents || (m.residents || []).filter(function(r){return s.scene==='expedition'?(s.squad||[]).indexOf(r.id)>=0:(!r.worldId||r.worldId==='home');});
     var curSel = s.selectedTarget || { type: 'player' };
     var curRid = s.selectedRid;
     var h = '';
@@ -1954,7 +2017,7 @@ APH.UI = (function(){
     var bar = document.getElementById('colonistBar');
     var s = (window.APH && window.APH.state);
     if(bar && s){
-      if(s.mode === 'running' && s.scene === 'home'){
+      if(s.mode === 'running'){
         bar.style.display = 'flex';
         bar.innerHTML = colonistBarHtml(null, s);
       } else {

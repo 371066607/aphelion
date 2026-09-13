@@ -194,15 +194,31 @@ test('canPlace: 占位矩形碰撞——贴邻拒绝/隔空可放/1x1与2x2混�
   r=Colony.canPlace([{id:'bl_warehouse',x:600,y:600}], 999, 'bl_turret', 700, 600);
   if(!r.ok) throw new Error('1x1距100>72 应可放: '+(r&&r.why));
 });
-test('建筑目录: 大建筑2x2/小建筑1x1 且带dispH', () => {
+test('建筑目录: 大建筑2x2/工位2x1/小建筑1x1 且带dispH', () => {
   const L=Colony.list();
-  ['bl_warehouse','bl_barracks','bl_lab','bl_farm','bl_pasture','bl_house','bl_clinic','bl_workshop'].forEach(id=>{
-    if(!L[id].cells || L[id].cells[0]!==2) throw new Error(id+' 应2x2');
+  ['bl_warehouse','bl_barracks','bl_farm','bl_pasture','bl_house','bl_clinic','bl_dining_table'].forEach(id=>{
+    if(!L[id].cells || L[id].cells[0]!==2 || L[id].cells[1]!==2) throw new Error(id+' 应2x2');
+    if(!L[id].dispH) throw new Error(id+' 缺dispH');
+  });
+  ['bl_lab','bl_kitchen','bl_workshop'].forEach(id=>{
+    if(!L[id].cells || L[id].cells[0]!==2 || L[id].cells[1]!==1) throw new Error(id+' 应2x1');
     if(!L[id].dispH) throw new Error(id+' 缺dispH');
   });
   ['bl_mine','bl_turret'].forEach(id=>{
     if(!L[id].cells || L[id].cells[0]!==1) throw new Error(id+' 应1x1');
   });
+});
+test('footprintOf: 新几何用目录格, 旧工坊/餐桌保留原占格', () => {
+  const table=Colony.footprintOf('bl_dining_table');
+  if(table.w!==96||table.h!==96) throw new Error('新餐桌应2x2: '+JSON.stringify(table));
+  const shop=Colony.footprintOf('bl_workshop');
+  if(shop.w!==96||shop.h!==48) throw new Error('新工坊应2x1: '+JSON.stringify(shop));
+  const oldTable=Colony.footprintOf('bl_dining_table', {id:'bl_dining_table',x:500,y:500});
+  if(oldTable.w!==48||oldTable.h!==48) throw new Error('旧餐桌应仍1x1: '+JSON.stringify(oldTable));
+  const oldShop=Colony.footprintOf('bl_workshop', {id:'bl_workshop',x:500,y:500});
+  if(oldShop.w!==96||oldShop.h!==96) throw new Error('旧工坊应仍2x2: '+JSON.stringify(oldShop));
+  const modern=Colony.footprintOf('bl_workshop', {id:'bl_workshop',geometryVersion:1,cells:[2,1]});
+  if(modern.w!==96||modern.h!==48) throw new Error('新纪录应按自身格: '+JSON.stringify(modern));
 });
 
 /* ---- U6 畜牧群增长(2026-08-26): herd自然增长+产肉/皮 ---- */
@@ -490,14 +506,17 @@ test('T2 goal: 阶梯逐级推进, 且永不枯竭', () => {
   if (G(meta, b).id !== 'clinic') throw new Error('有防线应要医疗舱, got ' + G(meta, b).id);
 
   b.push({ id: 'bl_clinic' });
-  /* T5: 终局三级 —— 研发 → 建造 → 通电起飞 */
+  /* ADR-46: 灯塔是扎根通信, 不是逃离通关 */
   if (G(meta, b).id !== 'endtech') throw new Error('医疗舱后应指向终局科技, got ' + G(meta, b).id);
   meta.tech = { te_deep_signal: 1 };
-  if (G(meta, b).id !== 'endbuild') throw new Error('研发后应指向建造发射器, got ' + G(meta, b).id);
+  if (G(meta, b).id !== 'endbuild') throw new Error('研发后应指向建造灯塔, got ' + G(meta, b).id);
   b.push({ id: 'bl_transmitter' });
   const last = G(meta, b);
-  if (last.id !== 'endgame') throw new Error('建成后应指向起飞, got ' + last.id);
+  if (last.id !== 'endgame') throw new Error('建成后应指向扎根, got ' + last.id);
   if (!last.text) throw new Error('终局目标也必须有文案 —— 阶梯永不返回空');
+  if (last.text.indexOf('扎根') < 0) throw new Error('终局文案应是扎根而非逃离: ' + last.text);
+  if (last.text.indexOf('救援') >= 0 || last.text.indexOf('起飞') >= 0)
+    throw new Error('终局文案不得再承诺逃离: ' + last.text);
 });
 
 test('T2 goal: 死亡建筑不算数, 太阳能也能满足通电', () => {

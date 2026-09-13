@@ -37,28 +37,64 @@ APH.Save = (function(){
   /* 未来版本存档: 旧构建读不懂, 但绝不能把版本号偷偷改回来 ——
      那会让日后真正的新构建以为迁移已经做过, 跳过 v(n)→VERSION 全链。
      宁可在这里明确失败, 也不要静默改坏玩家的档 (见文件头契约)。 */
-  function isFutureSave(save){
-    return !!(save && typeof save.v === 'number' && save.v > CFG.save.VERSION);
+  function versionFor(save, kind){
+    return kind === 'colony' || (save && Array.isArray(save.buildings))
+      ? CFG.save.COLONY_VERSION : CFG.save.VERSION;
   }
-  function migrate(save){
+  function isFutureSave(save, kind){
+    return !!(save && typeof save.v === 'number' && save.v > versionFor(save, kind));
+  }
+  /* Colony v2 is a separate envelope: PlanetSpec remains v1 (ADR-1). */
+  function legacyColony(save){
+    var two = {bl_warehouse:1,bl_lab:1,bl_barracks:1,bl_clinic:1,
+      bl_farm:1,bl_house:1,bl_pasture:1,bl_workshop:1,bl_kitchen:1};
+    if(!save.scene) save.scene = {v:1,kind:'home',width:2200,height:2200,grid:48,generation:0,seed:save.seed||0};
+    var used = {};
+    (save.buildings||[]).concat(save.buildQueue||[]).forEach(function(b){ if(b.uid) used[b.uid]=true; });
+    function stamp(b, i, queued){
+      if(!b || typeof b !== 'object') return;
+      if(!b.uid){
+        var base=(queued?'q_legacy_':'b_legacy_')+i, uid=base, n=0;
+        while(used[uid]) uid=base+'_'+(++n);
+        b.uid=uid; used[uid]=true;
+      }
+      if(b.geometryVersion == null){
+        b.geometryVersion=0;
+        var id=b.bid||b.id;
+        b.legacyFootprint=Array.isArray(b.cells)?b.cells.slice():
+          (id==='bl_transmitter'?[3,3]:(two[id]?[2,2]:[1,1]));
+      }
+      if(b.rotation == null) b.rotation=0;
+      if(queued && b.materialsPaid == null) b.materialsPaid=true;
+    }
+    (save.buildings||[]).forEach(function(b,i){stamp(b,i,false);});
+    (save.buildQueue||[]).forEach(function(b,i){stamp(b,i,true);});
+    if(!save.depleted) save.depleted={};
+    if(!save.logistics) save.logistics={v:1,nextTask:1,nextReservation:1,tasks:[],reservations:[]};
+    return save;
+  }
+  function migrate(save, kind){
     if(save === null || typeof save !== 'object' || Array.isArray(save)){
       /* 合法 JSON 但不是存档对象(数字/字符串/数组/null): 当损坏处理。
          注意严格模式下给原始值赋属性会抛 TypeError, 不能放任它往下走。 */
       return null;
     }
-    if(isFutureSave(save)){
+    var version=versionFor(save, kind);
+    if(isFutureSave(save, kind)){
       var err = new Error('存档版本 v' + save.v + ' 高于当前构建支持的 v' +
-        CFG.save.VERSION + ' —— 请用较新版本打开, 本次不会改写存档。');
+        version + ' —— 请用较新版本打开, 本次不会改写存档。');
       err.aphSaveVersion = save.v;
       throw err;
     }
     var v = save.v || 0;
-    while(v < CFG.save.VERSION){
+    while(v < version){
       v++;
-      if(migrations[v]) save = migrations[v](save);
+      if(v === 2 && (kind === 'colony' || Array.isArray(save.buildings))) save=legacyColony(save);
+      else if(migrations[v]) save = migrations[v](save);
       else save.v = v;                 // 无显式迁移 = 仅推进版本号
     }
-    save.v = CFG.save.VERSION;
+    if(kind === 'colony' || Array.isArray(save.buildings)) legacyColony(save);
+    save.v = version;
     return save;
   }
 
@@ -69,10 +105,11 @@ APH.Save = (function(){
     var obj;
     try{ obj = JSON.parse(txt); }
     catch(e){ return null; }           // 损坏存档视为不存在, 不抛错
-    return migrate(obj);               // migrate 对非存档对象返回 null; 未来版本抛错
+    return migrate(obj, key === CFG.save.KEY_COLONY ? 'colony' : null);               // migrate 对非存档对象返回 null; 未来版本抛错
   }
   function write(key, obj){
-    obj.v = CFG.save.VERSION;
+    if(key === CFG.save.KEY_COLONY) obj = migrate(obj, 'colony');
+    obj.v = versionFor(obj, key === CFG.save.KEY_COLONY ? 'colony' : null);
     rawSet(key, JSON.stringify(obj));
   }
   function remove(key){ rawDel(key); }
@@ -80,6 +117,10 @@ APH.Save = (function(){
   /* ---------- 三层接口 ---------- */
   function loadMeta(){
     var m = read(CFG.save.KEY_META);
+    /* v2 的家园快照把名册/库存与地面/在途材料存于同一个原子 JSON。
+       meta key 保留兼容，但不能覆盖更新的整份家园快照。 */
+    var homeSnapshot=read(CFG.save.KEY_COLONY);
+    if(homeSnapshot&&homeSnapshot.metaSnapshot)m=homeSnapshot.metaSnapshot;
     var existed = !!m;
     if(!m){
       m = {
@@ -177,7 +218,16 @@ APH.Save = (function(){
     }
     return m;
   }
-  function saveMeta(m){ write(CFG.save.KEY_META, m); }
+  function saveMeta(m){
+    var s=APH.state;
+    if(s&&s.meta===m&&s._worldReady){
+      U.emit('metaWillSave',m);
+    }else{
+      var home=read(CFG.save.KEY_COLONY);
+      if(home&&home.metaSnapshot){home.metaSnapshot=m;home.stock=m.res;write(CFG.save.KEY_COLONY,home);}
+    }
+    write(CFG.save.KEY_META, m);
+  }
 
   function loadPlanet(id){ return read(CFG.save.KEY_PLANET + id); }
   function savePlanet(id, spec){ write(CFG.save.KEY_PLANET + id, spec); }
@@ -202,10 +252,17 @@ APH.Save = (function(){
       v.buildings.forEach(function(b){ b.lv = b.lv || 1; });
       return v;
     }
-    return { buildings:[], builtAt:Date.now(), ground:[] };
+    return { v:CFG.save.COLONY_VERSION, rulesVersion:1, buildings:[], buildQueue:[], builtAt:Date.now(), ground:[],
+      scene:APH.TerrainModel.home(Date.now()%100000),
+      depleted:{}, logistics:{v:1,nextTask:1,nextReservation:1,tasks:[],reservations:[]} };
   }
   function saveColony(colony){
     if(!colony) return;
+    var s=APH.state;
+    if(s&&s.colony===colony&&s.meta&&s.scene==='home'&&s._worldReady){
+      colony.metaSnapshot=JSON.parse(JSON.stringify(s.meta));
+      colony.stock=colony.metaSnapshot.res;
+    }
     try{ write(CFG.save.KEY_COLONY, colony); }catch(e){}
   }
 

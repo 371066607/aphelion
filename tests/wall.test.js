@@ -14,7 +14,7 @@ test('BUILDINGS: bl_wall/bl_gate 注册, cells=[1,1], 有 costRes', () => {
   if (c[0] !== 1 || c[1] !== 1) throw new Error('墙应1x1格: '+JSON.stringify(c));
   if (!w.costRes || !w.costRes.stone) throw new Error('墙应耗石料: '+JSON.stringify(w.costRes));
   if (!g.costRes) throw new Error('闸门应有建材: '+JSON.stringify(g.costRes));
-  if (!w.reqTech) throw new Error('墙应有科技挂靠: '+w.reqTech);
+  if (w.reqTech) throw new Error('基础墙应开局可用');
 });
 
 /* ---------- canPlace 墙/闸门特殊规则 ---------- */

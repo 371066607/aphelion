@@ -33,9 +33,9 @@ const SRC=path.join(__dirname,'..','src');
    opening.js —— showOpening 要真实 <video>, 装了 boot 就炸;
    input.js   —— 性能跑分不派输入事件。 */
 const SKIP_MODULES = ['opening.js', 'input.js'];
-for(const f of ['config.js','utils.js','observe.js','building_art_data.js','building_art.js','humanoid.js','save.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','nav.js','weather.js','residents.js','alerts.js','combat.js',
-                'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
+for(const f of ['config.js','utils.js','entity_index.js', 'world_runtime.js','build_grid.js','terrain_model.js','scene.js','camera.js','building_art_data.js','building_art.js','humanoid.js','save.js','planet.js','llm.js',
+                'colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js','residents.js','ecology.js', 'expedition_state.js','alerts.js','combat.js',
+                'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js', 'expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 
@@ -100,6 +100,27 @@ test('perf: 完整殖民地 updateResidents 240帧 < 3000ms (P1-P3 叠加后每�
     S.scene=oldScene; S.colony.buildings=oldBuildings; S.entities=oldEntities;
     S.war=oldWar; S.meta.residents=oldResidents;
   }
+});
+
+test('perf: 128格、20居民、2000自然对象的模拟与寻路记录',()=>{
+  const S=APH.state, snapshot=Object.assign({},S), oldResidents=S.meta.residents;
+  try{
+    S.colony={rulesVersion:1,buildings:[],buildQueue:[],scene:APH.TerrainModel.home(77),ground:[]};S.scene='home';S.war={raidActive:false};S.clock=0;S.selectedRid=null;S.selectedPawns=[];S.designations={};
+    S.meta.residents=[];
+    for(let i=0;i<20;i++){const r=APH.Res.generate('perf_large_'+i,77+i,[]);r.job=null;r.food=100;r.rest=100;r.recreation=100;r.illness=0;S.meta.residents.push(r);}
+    S.entities=APH.TerrainModel.resources(S.colony.scene,{}).slice(0,2000).map(f=>Object.assign({},f,{id:f.uid,hp:30,maxHp:30}));
+    M.syncResidents();
+    const times=[];
+    for(let i=0;i<180;i++){const t=performance.now();M.updateResidents(1/60);times.push(performance.now()-t);}
+    times.sort((a,b)=>a-b);
+    const grid=APH.Nav.gridOf(S.colony.buildings,S.colony.scene),nt=performance.now();
+    for(let i=0;i<20;i++)A(APH.Nav.astar(grid,{x:1100,y:1100},{x:4000+i*48,y:4000}),'跨区目标应可达');
+    M.saveColony();
+    const metrics={worldCells:128,residents:S.meta.residents.length,worldObjects:2000,simulationP50Ms:times[90],simulationP95Ms:times[171],navigation20Ms:performance.now()-nt,saveBytes:Buffer.byteLength(JSON.stringify(S.colony)),renderer:'DOM stub; browser measurement required separately'};
+    console.log('LARGE_MAP_METRICS '+JSON.stringify(metrics));
+    A(metrics.simulationP95Ms<50,'模拟P95超过50ms: '+metrics.simulationP95Ms);
+    A(metrics.saveBytes<5*1024*1024,'存档超过5MB');
+  }finally{S.meta.residents=oldResidents;Object.assign(S,snapshot);}
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败`);

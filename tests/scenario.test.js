@@ -103,9 +103,9 @@ ASSET_IDS.forEach(function(id){
   if(!line) throw new Error('#84 sprite_data 缺键: '+id);
   new Function(line)();
 });
-for(const f of ['config.js','utils.js','observe.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
-                'colony.js','rivals.js','events.js','weather.js','nav.js','residents.js','alerts.js','combat.js',
-                'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
+for(const f of ['config.js','utils.js','entity_index.js', 'world_runtime.js','build_grid.js','terrain_model.js','scene.js','camera.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js','opening_data.js','planet.js','llm.js',
+                'colony.js','construction.js','recovery.js','home_progress.js','logistics.js','production_jobs.js','storage.js','rivals.js','events.js','weather.js','nav.js','residents.js','ecology.js', 'expedition_state.js','alerts.js','combat.js',
+                'world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js','sprites.js','ui.js', 'expedition_ui.js','map_ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js']){
   new Function(fs.readFileSync(path.join(SRC,f),'utf-8'))();
 }
 
@@ -337,19 +337,21 @@ test('returnHome: 真正空手仍显示空手而归', () => {
   A(msgs.some(t=>t.indexOf('空手而归')>=0), '空手应提示空手而归: '+msgs.join('|'));
 });
 
-test('home: 袭击结束后地上掉落仍可拾取', () => {
-  if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
-  A(S.scene==='home', '应在殖民地');
+test('home: 袭击结束后战利品由合法居民搬入仓储', () => {
+  const haulers=cmdHomeSetup(), hauler=haulers[0];
   S.war.raidActive=false;
   S.war.raidWarn=0;
-  S.carry={};
-  const min0=(S.meta.res&&S.meta.res.mineral)||0;
-  S.entities.push({ id:'dp_raid_loot', type:T.DROPPED, x:S.px+2, y:S.py+2,
-    itemId:'it_mineral', n:1, bobA:0, stock:true });
-  M.updateHome(0.016);
-  A((S.carry.it_mineral||0)===0, '家园拾取不应进背包, got '+JSON.stringify(S.carry));
-  A(((S.meta.res&&S.meta.res.mineral)||0)===min0+1, '应入库, got '+(S.meta.res&&S.meta.res.mineral));
-  A(!S.entities.some(e=>e.id==='dp_raid_loot' && !e.dead), '应捡走');
+  const sx=S.px+64, sy=S.py+64;
+  S.colony.buildings.push({id:'bl_storage_shelf',uid:'raid_shelf',filter:'materials',x:sx+18,y:sy});
+  hauler.x=sx;hauler.y=sy;hauler.drafted=false;hauler.haulCarry=null;
+  const loot={ id:'dp_raid_loot', type:T.DROPPED, x:sx, y:sy,
+    itemId:'it_mineral', n:1, bobA:0, stock:true };
+  S.entities.push(loot);
+  hauler.userOrder={type:'haul',pile:loot};
+  M.updateHome(.2); M.updateHome(.2);
+  A(!S.entities.some(e=>e.id==='dp_raid_loot'&&!e.dead),'居民应实际抓取地面战利品');
+  const stored=S.entities.find(e=>e.type===T.DROPPED&&!e.dead&&e.itemId==='it_mineral'&&e.containerId==='raid_shelf');
+  A(stored&&stored.n===1,'居民应将战利品存进兼容货架');
 });
 
 test('O2 死亡: showDeath 传入 runLoot 与 survived', () => {
@@ -2037,6 +2039,7 @@ function cmdHomeSetup(){
   if(S.scene!=='home'){ S.nearPad=true; M.debugPressE(); }
   A(S.scene==='home', '应在殖民地');
   S.mode='running';
+  S.paused=false; S.timeScale=1;
   S.orderTool=null; S.selectedPawns=[]; S.selectedRid=null;
   S.war = S.war || {}; S.war.raidActive=false; S.war.raidWarn=0;
   S.meta.residents = [
@@ -2049,6 +2052,8 @@ function cmdHomeSetup(){
     {id:'bl_farm', x:S.px+300, y:S.py, lv:1},
     {id:'bl_house', x:S.px-240, y:S.py, lv:1}
   );
+  /* rulesVersion=1 的家园只承认显式床位分配；fixture 也必须走真契约。 */
+  APH.Res.assignBeds(S.colony.buildings, S.meta.residents, {modern:true});
   S.entities = S.entities.filter(e=>e.type!=='resident' && e.type!=='visitor' && e.type!=='flora' && e.type!=='dropped' && e.type!=='enemy');
   if(!S.entities.some(e=>e.type===T.BUILDING&&e.pad)){
     S.entities.push({ id:'be_pad_cmd', type:T.BUILDING, bid:'bl_landing_pad', pad:true, x:1100, y:1340 });
@@ -2400,27 +2405,47 @@ test('#162 squad: 鼠标拉框多选编队、批量征召、散兵线战术集�
 });
 
 test('#163 right_click: 全局右键交互（出航、开箱、破译、送医、返航）与远征 RTS', () => {
+  /* 用干净 canonical 存档建双世界，不能借前序场景残留的 worlds/run。 */
+  APH.Save.wipeAll();
+  S.meta=APH.Save.loadMeta();
+  S.colony=APH.Save.loadColony();
+  delete S.worlds;
+  S.scene='home'; S.entities=[]; S.parts=[]; S.squad=[]; S.carry={}; S.clock=0;
   cmdHomeSetup();
   const pad = S.entities.find(e => e.type === T.BUILDING && e.pad);
   A(!!pad, '家园应有发射台');
   M.cmd.rightClick(pad.x, pad.y);
-  A(S.scene === 'expedition', '右键点击发射台应出发远征');
+  A(S.scene === 'home', '右键点击发射台应打开编组面板而非直接出发');
+  const launch=APH.UI.cmd('beginExpedition',{memberIds:['rs_cmd1'],supply:{food:0},objective:'resources'});
+  if(APH.ExpeditionUI) APH.ExpeditionUI.close();
+  A(launch&&launch.ok&&S.scene === 'expedition', '编组确认后才应出发远征');
 
   // 2. 远征场景：右键点击远古遗物箱 → 开箱并喷出古代蓝图与核心
-  const vault = { id: 'ancient_vault_rts', type: T.BUILDING, bid: 'ancient_vault', x: S.px + 120, y: S.py, opened: false };
+  const leader = S.entities.find(e => e.type === T.RESIDENT);
+  A(!!leader, '远征队应生成可移动的居民实体');
+  const vault = { id: 'ancient_vault_rts', type: T.BUILDING, bid: 'ancient_vault', x: leader.x, y: leader.y, opened: false };
   S.entities.push(vault);
+  S.selectedPawns=[]; S.selectedRid='rs_cmd1';
   M.cmd.rightClick(vault.x, vault.y);
-  A(vault.opened === true, '右键点击遗物箱应成功开启');
+  A(S.entities.find(e=>e.rid==='rs_cmd1').userOrder.type === 'interact', '右键遗物箱应下达到场交互命令');
+  for(let i=0; i<60 && !S.entities.find(e => e.id === vault.id).opened; i++) M.simStep(0.1);
+  A(S.entities.find(e => e.id === vault.id).opened === true, '居民到场后应成功开启遗物箱');
   const drops = S.entities.filter(e => e && e.type === T.DROPPED);
-  A(drops.some(d => d.itemId === 'it_ancient_blueprint'), '箱内必定喷出古代蓝图残卷');
-  A(drops.some(d => d.itemId === 'it_ancient_core'), '箱内必定喷出史前高能核心');
+  A((S.carry.it_ancient_blueprint||0)>0 || drops.some(d => d.itemId === 'it_ancient_blueprint'), '箱内蓝图应掉落或被队员立即拾取');
+  A((S.carry.it_ancient_core||0)>0 || drops.some(d => d.itemId === 'it_ancient_core'), '箱内核心应掉落或被队员立即拾取');
+  S.entities.find(e=>e.id===vault.id).dead=true;
 
   // 3. 远征场景：右键点击古代终端 → 破译
-  const term = { id: 'ancient_terminal_rts', type: T.BUILDING, bid: 'ancient_terminal', x: S.px + 180, y: S.py, hacked: false };
+  const liveLeader=S.entities.find(e=>e.rid==='rs_cmd1');
+  const term = { id: 'ancient_terminal_rts', type: T.BUILDING, bid: 'ancient_terminal', x: liveLeader.x, y: liveLeader.y, hacked: false };
   S.entities.push(term);
   S._hackRng = () => 0.1;
+  S.selectedPawns=[]; S.selectedRid='rs_cmd1';
   M.cmd.rightClick(term.x, term.y);
-  A(term.hacked === true, '右键点击古代终端应成功破译');
+  A(S.entities.find(e=>e.rid==='rs_cmd1').userOrder.type === 'interact', '右键终端应下达到场交互命令');
+  for(let i=0; i<60 && !S.entities.find(e => e.id === term.id).hacked; i++) M.simStep(0.1);
+  A(S.entities.find(e => e.id === term.id).hacked === true, '居民到场后应成功破译');
+  S.entities.find(e=>e.id===term.id).dead=true;
 
   // 4. 远征场景：右键点击返回舱 → 登机返航
   const retPad = S.entities.find(e => e.type === T.BUILDING && e.pad);
@@ -2437,6 +2462,84 @@ test('#163 right_click: 全局右键交互（出航、开箱、破译、送医�
   M.cmd.rightClick(ally.x, ally.y);
   A(ally.downed === false, '送医后倒地标志应清除');
   A(ally.medLying === true, '送医后应处于医疗舱躺卧治疗态');
+});
+
+
+test('双世界: 单人出征，两个世界各结算一次并可切换、暂停和幂等返航', () => {
+  APH.Save.wipeAll();
+  S.meta=APH.Save.loadMeta(); S.colony=APH.Save.loadColony();
+  delete S.worlds;
+  S.scene='home'; S.entities=[]; S.parts=[]; S.squad=[]; S.carry={}; S.clock=0; S.mode='running'; S.paused=false; S.timeScale=1;
+  cmdHomeSetup();
+  S.meta.residents.push({ id:'rs_cmd3', name:'留守丙', job:null, jobLocked:true, skills:{sk_build:2,sk_farm:2}, mood:80, food:90, rest:90 });
+  const farm=S.colony.buildings.find(b=>b.id==='bl_farm');
+  farm.plot={stage:3,t:0}; farm.crop='crop_glow_shroom';
+  S.meta.analyzedFlora={crop_glow_shroom:true};
+  APH.Res.assignBeds(S.colony.buildings, S.meta.residents, {modern:true});
+  M.syncResidents();
+  const farmer=S.entities.find(e=>e.rid==='rs_cmd2');
+  const farmSpot=APH.Construction.spot(S,farm,farmer);
+  if(farmSpot){farmer.x=farmSpot.x; farmer.y=farmSpot.y;}
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources'});
+  A(launch&&launch.ok,'应只派指定一人出征');
+  const run=APH.ExpeditionState.active(S.colony);
+  A(run.memberIds.length===1&&run.memberIds[0]==='rs_cmd1','run 只能包含一名队员');
+  A(S.meta.residents.filter(r=>!r.worldId||r.worldId==='home').length===2,'两名居民必须留守家园');
+  const homeFood=S.worlds.home.meta.residents.find(r=>r.id==='rs_cmd2').food;
+  const expeditioner=S.meta.residents.find(r=>r.id==='rs_cmd1');
+  const jobBefore=expeditioner.job;
+  for(let i=0;i<10;i++) M.simStep(30);
+  A(S.worlds.home.clock===300&&S.worlds.expedition.clock===300,'300 秒应让家园和远征各结算一次时钟');
+  A(expeditioner.worldId===run.id&&expeditioner.job===jobBefore,'出征者不能被家园岗位重分配');
+  A(S.worlds.home.meta.residents.find(r=>r.id==='rs_cmd2').food<homeFood,'留守居民需求应在家园推进');
+  A(S.worlds.home.entities.some(e=>e.type===T.DROPPED&&e.itemId==='it_glow_fluid'),'留守农民必须完成实际收获，而非只转时钟');
+  const homeIds=S.worlds.home.entities.map(e=>e.id).sort().join(',');
+  const expIds=S.entities.map(e=>e.id).sort().join(',');
+  A(M.switchWorld('home')&&S.entities.map(e=>e.id).sort().join(',')===homeIds,'切回家园不能丢失其实体');
+  A(M.switchWorld('expedition')&&S.entities.map(e=>e.id).sort().join(',')===expIds,'切回远征不能丢失其实体');
+  const hc=S.worlds.home.clock, ec=S.worlds.expedition.clock;
+  S.paused=true; M.simStep(30);
+  A(S.worlds.home.clock===hc&&S.worlds.expedition.clock===ec,'暂停不能推进任一世界');
+  S.paused=false; S.timeScale=3; M.simStep(10); S.timeScale=1;
+  A(S.worlds.home.clock===hc+30&&S.worlds.expedition.clock===ec+30,'三倍速应同时作用两世界');
+  M.checkpointWorlds(S);
+  const restore=M.restoreWorldSession(S);
+  A(restore.run&&restore.run.id===run.id,'checkpoint/restore 应恢复同一远征 run');
+  M.switchWorld('expedition');
+  const returned=M.returnHome();
+  const research=S.meta.research;
+  A(returned&&returned.ok&&S.scene==='home'&&!APH.ExpeditionState.active(S.colony),'返航只结算并清除一次 active run');
+  M.returnHome();
+  A(S.meta.research===research,'重复返航不得二次结算');
+});
+
+
+test('双世界恢复: 无效远征 runtime 返航一次，pendingGround 不重放且 meta 快照同步', () => {
+  APH.Save.wipeAll();
+  S.meta=APH.Save.loadMeta(); S.colony=APH.Save.loadColony();
+  delete S.worlds;
+  S.scene='home'; S.entities=[]; S.parts=[]; S.clock=0; S.mode='running'; S._worldReady=true;
+  const runId='ex_701';
+  S.meta.residents=[{id:'rs_restore',name:'恢复员',worldId:runId,food:90,rest:90,mood:80,skills:{}}];
+  S.meta.res={food:0,wood:0,stone:0,iron:0,mineral:0,med:0};
+  S.colony.pendingGround=[{itemId:'it_stone',n:1,x:1100,y:1170}];
+  S.colony.expedition={v:1,sequence:702,settled:{},active:{
+    id:runId,status:'active',memberIds:['rs_restore'],roster:[{id:'rs_restore',name:'恢复员'}],
+    supply:{food:2},cargo:{it_wood:1},runtime:{},objective:{kind:'resources',itemIds:['it_wood'],target:1,progress:0,complete:false}
+  }};
+  const first=M.restoreWorldSession(S);
+  A(first.recovered&&first.recovered.ok&&!APH.ExpeditionState.active(S.colony),'无效 runtime 必须回收 active run');
+  A(!!S.colony.expedition.settled[runId]&&S.meta.residents[0].worldId==='home','返航 receipt 与居民归属必须持久化');
+  A((S.colony.pendingGround||[]).length===0,'pendingGround 必须在恢复时一次性清空');
+  const drops=function(){return S.entities.filter(e=>e.type===T.DROPPED).reduce(function(out,e){out[e.itemId]=(out[e.itemId]||0)+(e.n||0);return out;},{});};
+  const firstDrops=drops();
+  A(firstDrops.it_stone===1&&firstDrops.it_wood===1&&firstDrops.it_food===2,'恢复应只落石材、货物与剩余补给各一次');
+  M.restoreWorldSession(S);
+  A(JSON.stringify(drops())===JSON.stringify(firstDrops),'重复 restore 不得重复落地');
+  APH.Save.saveColony(S.colony);
+  S.meta.res.food=7;
+  APH.Save.saveMeta(S.meta);
+  A(APH.Save.loadColony().metaSnapshot.res.food===7,'home 场景改 meta 后 colony metaSnapshot 必须同步');
 });
 
 test('#164 idle: 闲置居民在无规划任务时自主漫步休闲与工位作业动效', () => {
@@ -2517,7 +2620,8 @@ test('#168 rest: 困了的居民走去居住舱再睡，不原地瞬睡', () => 
   const d0 = Math.hypot(p.x - house.x, p.y - house.y);
   for(let i=0; i<800 && !S.meta.residents[0].isSleeping; i++) M.updateHome(0.016);
   A(S.meta.residents[0].isSleeping === true, '困倦居民应走到居住舱入睡');
-  const d1 = Math.hypot(p.x - house.x, p.y - house.y);
+  const live = S.entities.find(e => e.rid === p.rid);
+  const d1 = Math.hypot(live.x - house.x, live.y - house.y);
   A(d1 < d0 - 10 || d1 < 50, '应靠近居住舱, d0='+d0.toFixed(0)+' d1='+d1.toFixed(0));
 });
 
@@ -2546,30 +2650,35 @@ test('#169 right_click: 右键蓝图下达优先建造', () => {
   A(S.playerOrder && S.playerOrder.type==='build', '右键蓝图应下达优先建造, 实际: '+JSON.stringify(S.playerOrder));
 });
 
-test('#169 build: 走到蓝图 90px 内工期推进', () => {
+test('#169 build: 镜头不是施工者，真实居民到场才推进', () => {
   commanderSoloSetup();
   S.px = 1400; S.py = 1170;
   S.playerDrafted = false;
   S.playerOrder = { type:'build', x:1450, y:1170 };
   S.colony.buildQueue = [{ bid:'bl_house', x:1450, y:1170, progress:0.1, total:12, building:false }];
   const p0 = S.colony.buildQueue[0].progress;
-  M.updateHome(0.5);
+  APH.Colony.tickConstruction(S,0.5);
+  A(S.colony.buildQueue[0].progress===p0,'镜头不能施工');
+  S.meta.residents=[{id:'builder_real',job:'blueprint',skills:{sk_build:3}}];
+  S.entities.push({id:'builder_real',rid:'builder_real',type:T.RESIDENT,x:1400,y:1170});
+  APH.Colony.tickConstruction(S,0.5);
   A(S.colony.buildQueue[0] && S.colony.buildQueue[0].building === true, '90px 内应施工');
   A(S.colony.buildQueue[0].progress > p0, '工期应推进, 实际: '+S.colony.buildQueue[0].progress);
 });
 
 test('征召后点地面走路（笔记本无右键）', () => {
-  commanderSoloSetup();
-  S.playerDrafted = true;
-  S.selectedPawns = [];
-  S.selectedRid = null;
+  const residents = cmdHomeSetup();
+  const pawn = residents[0];
+  pawn.drafted = true;
+  S.playerDrafted = false;
+  S.selectedPawns = [pawn];
+  S.selectedRid = pawn.rid;
   S.target = null;
-  const gx = S.px + 90, gy = S.py + 50;
+  const gx = pawn.x + 90, gy = pawn.y + 50;
   A(typeof M.tacticalMoveTo === 'function', '应导出 tacticalMoveTo');
-  A(M.tacticalMoveTo(gx, gy), '征召后点地应走路');
-  A(S.target && Math.abs(S.target.x-gx)<2 && Math.abs(S.target.y-gy)<2, '应走到点击处');
+  A(M.tacticalMoveTo(gx, gy), '征召后的真实居民应接收移动令');
+  A(pawn.userOrder && pawn.userOrder.type==='move' && Math.abs(pawn.userOrder.x-gx)<2 && Math.abs(pawn.userOrder.y-gy)<2, '应把移动令写到真实居民实体');
 });
-
 
 test('#170 schedule: 检查器循环作息格', () => {
   commanderSoloSetup();
@@ -2582,12 +2691,14 @@ test('#170 schedule: 检查器循环作息格', () => {
   A(S.meta.playerSchedule[h] === APH.Res.cycleScheduleSlot(before), '点击应循环该格');
 });
 
-test('#169 right_click: 发射台右键仍是出航', () => {
+test('#169 right_click: 发射台右键打开编组，不抢建造命令', () => {
   commanderSoloSetup();
   S.playerDrafted = false;
   const pad = (S.colony.buildings||[]).find(b=>b.id==='bl_landing_pad') || { x:1100, y:1340 };
   M.cmd.rightClick(pad.x, pad.y);
+  A(S.scene==='home', '发射台右键不应绕过编组直接出航');
   A(!S.playerOrder || S.playerOrder.type!=='build', '发射台右键不应被建造抢走');
+  if(APH.ExpeditionUI) APH.ExpeditionUI.close();
 });
 
 test('#173 pause: 暂停时钟停、倍速加速、暂停时镜头可平移 (#165)', () => {
@@ -2727,18 +2838,15 @@ test('#T1 commander: 指挥官有心情, 且由念头驱动', () => {
 
 
 /* ---------- 殖民地优先 T5: 发射器终局 ---------- */
-test('#T5 win: 通电发射器 → 呼叫救援通关', () => {
-  S.scene='home'; S.mode='running';
-  S.meta.colonyWon=false;
-  S.meta.stats = S.meta.stats || {};
-  const before = S.meta.stats.won || 0;
-  const ok = M.launchRescue();
-  A(ok === true, '应通关');
-  A(S.mode === 'won', '通关后 mode 应为 won, got ' + S.mode);
-  A(S.meta.colonyWon === true, '应写入通关标记');
-  A((S.meta.stats.won || 0) === before + 1, '应记一次通关');
-  A(M.launchRescue() === false, '已通关不应重复结算');
-  S.mode='running'; S.meta.colonyWon=false;
+test('#T5 rooting: 灯塔查看进度不会提前结束经营', () => {
+  S.scene='home'; S.mode='running'; S.meta.rooting={seconds:0,achieved:false};
+  S.colony.buildings=[];
+  const ok=M.launchRescue();
+  A(ok===false,'条件不足不能达成扎根');
+  A(S.mode==='running','不能结束家园模拟');
+  S.meta.rooting.achieved=true;
+  A(M.launchRescue()===true,'已扎根继续显示进度');
+  A(S.mode==='running','扎根后继续沙盒');
 });
 
 test('#T5 win: 发射器是唯一胜利出口, 且需通电', () => {
@@ -2751,6 +2859,266 @@ test('#T5 win: 发射器是唯一胜利出口, 且需通电', () => {
   A(con.load > 0, '发射器应有实际电力负荷');
   const tech = APH.Colony.TECH ? APH.Colony.TECH.te_deep_signal : null;
   if (tech) A(tech.cost >= 200, '终局科技应昂贵, got ' + tech.cost);
+});
+
+test('formal home: 两棵指定树→取料→运料→施工→独立床，普通主流程',()=>{
+  const snapshot=Object.assign({},S);
+  try{
+    APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.meta.res.wood=0;
+    const r=APH.Res.generate('formal_worker',33,[]);
+    r.skills.sk_build=3;r.skills.sk_farm=3;r.job=null;r.food=100;r.rest=100;r.recreation=100;r.illness=0;r.schedule=new Array(24).fill('work');
+    S.meta.residents=[r];S.meta.workPrio={[r.id]:{sk_build:3,sk_gather:3,sk_haul:3}};
+    S.colony={v:2,rulesVersion:1,buildings:[],buildQueue:[],ground:[],scene:APH.TerrainModel.home(33)};
+    S.scene='home';S.mode='running';S.clock=0;S.war={raidActive:false};S.entities=[];S.selectedRid=null;S.selectedPawns=[];S.selectedTarget=null;S.devFreeBuild=false;S.parts=[];S.designations={};S.buildRotation=1;
+    for(let i=0;i<2;i++){
+      const tree={id:'formal_tree_'+i,type:T.FLORA,kind:'tree',x:1160+i*70,y:1220,hp:30,maxHp:30};
+      S.entities.push(tree);S.designations[tree.id]={type:'chop',entityId:tree.id};
+    }
+    M.syncResidents();
+    M.tryPlace('bl_bed',1320,1320);
+    A(S.colony.buildQueue.length===1,'缺料仍应规划');
+    A(S.meta.res.wood===0,'规划不能隔空扣料');
+    const uid=S.colony.buildQueue[0].uid, woodNeeded=S.colony.buildQueue[0].need.wood;
+    for(let i=0;i<2200&&!S.colony.buildings.length;i++){
+      S.clock+=.2;M.updateResidents(.2);APH.Colony.tickConstruction(S,.2);
+    }
+    A(S.colony.buildings.length===1,'居民应完成采集运输施工: '+JSON.stringify({q:S.colony.buildQueue,log:S.colony.logistics,p:S.entities.filter(e=>e.type===T.RESIDENT).map(e=>({x:e.x,y:e.y,job:e.job,reason:e.workReason,carry:e.haulCarry,order:e.userOrder,walking:e.walking,sleep:e.isSleeping})),drops:S.entities.filter(e=>e.type===T.DROPPED)}));
+    A(S.colony.buildings[0].uid===uid&&S.colony.buildings[0].rotation===1,'完成后保持UID和旋转');
+    A(S.entities.filter(e=>e.type===T.FLORA).every(e=>e.dead),'两棵树应采完');
+    const wood=(S.meta.res.wood||0)+APH.Colony.groundCount(S.entities,'wood');
+    A(wood===8-woodNeeded,'产出8木材，按角色实际造价只消耗一次: '+wood);
+    APH.Res.assignBeds(S.colony.buildings,S.meta.residents,{modern:true});
+    A(!!r.bedId,'独立床分配居民');
+    r.rest=5;r.wantSleep=true;
+    for(let i=0;i<600&&!r.isSleeping;i++){S.clock+=.2;M.updateResidents(.2);}
+    const sleeper=S.entities.find(e=>e.type===T.RESIDENT);
+    A(r.isSleeping&&sleeper.sleepAnchor,'居民应走到床边并以床内睡姿入住');
+    const bedRect=APH.BuildGrid.rectOf(S.colony.buildings[0]);
+    A(sleeper.sleepAnchor.x===bedRect.x+bedRect.w/2,'睡姿锚点在真实床内');
+    M.saveColony();const saved=APH.Save.loadColony();
+    A(saved.buildings[0].uid===uid&&saved.stock.wood===S.meta.res.wood,'存档保持几何和守恒库存');
+  }finally{Object.assign(S,snapshot);}
+});
+
+
+function productionScenarioState(building, resident, drops){
+  APH.Save.wipeAll();
+  S.meta=APH.Save.loadMeta();
+  S.meta.res={food:0,wood:0,mineral:0,med:0};
+  S.meta.residents=[resident];
+  S.meta.workPrio={[resident.id]:{sk_build:0,sk_gather:0,sk_haul:3}};
+  S.colony={v:2,rulesVersion:1,buildings:[building],buildQueue:[],ground:[],scene:APH.TerrainModel.home(211)};
+  S.scene='home';S.mode='running';S.clock=0;S.war={raidActive:false};S.entities=[];S.parts=[];S.selectedRid=null;S.selectedPawns=[];S.selectedTarget=null;S.devFreeBuild=false;S.designations={};S.buildRotation=0;S._worldReady=true;
+  (drops||[]).forEach(function(d){S.entities.push(d);});
+  M.syncResidents();
+}
+function advanceProduction(seconds, building, done){
+  for(let i=0;i<seconds*5&&!done();i++){
+    S.clock+=.2;M.updateResidents(.2);
+    if(i%150===0) APH.ColonyTick.run(S);
+  }
+}
+
+test('modern production: 厨师实际取送地面食材后才在篝火完成肉排工单',()=>{
+  const fire=APH.Construction.record('bl_campfire',1344,1152,0);
+  fire.uid='cook_fire';
+  const chef=APH.Res.generate('chef_real',21,[]);
+  chef.job='bl_kitchen';chef.jobLocked=true;chef.skills.sk_farm=8;chef.food=100;chef.rest=100;chef.recreation=100;chef.illness=0;
+  productionScenarioState(fire,chef,[
+    {id:'cook_food',type:T.DROPPED,itemId:'it_food',n:2,x:1100,y:1100},
+    {id:'cook_wood',type:T.DROPPED,itemId:'it_wood',n:1,x:1148,y:1100}
+  ]);
+  APH.Colony.addBill(fire,'it_roasted_meat',1);
+  APH.ColonyTick.run(S);
+  const task=APH.Logistics.taskFor(S.colony,fire.productionTaskId);
+  A(task&&task.productionJob,'篝火应建立真实生产物流任务');
+  A((fire.cookProgress||0)===0&&S.meta.res.food===0&&S.meta.res.wood===0,'材料未送达前不得隔空扣库存或推进烹饪');
+  advanceProduction(150,fire,()=>fire.bills[0].done===1);
+  A(fire.bills[0].done===1,'厨师应走取料、运到篝火并完成一份肉排');
+  A(S.entities.some(e=>e.type===T.DROPPED&&e.itemId==='it_roasted_meat'&&e.n===1),'成品肉排应作为真实地面掉落出现');
+  A(!APH.Logistics.taskFor(S.colony,task.id),'完成后生产物流任务应被一次性结算');
+});
+
+test('modern production: 在途材料取消工单后读档恢复守恒，不凭空吞食材',()=>{
+  const fire=APH.Construction.record('bl_campfire',1344,1152,0);fire.uid='cancel_fire';
+  const chef=APH.Res.generate('chef_cancel',22,[]);
+  chef.job='bl_kitchen';chef.jobLocked=true;chef.skills.sk_farm=6;chef.food=100;chef.rest=100;chef.recreation=100;chef.illness=0;
+  productionScenarioState(fire,chef,[{id:'cancel_food',type:T.DROPPED,itemId:'it_food',n:2,x:1100,y:1100},{id:'cancel_wood',type:T.DROPPED,itemId:'it_wood',n:1,x:1148,y:1100}]);
+  APH.Colony.addBill(fire,'it_roasted_meat',1);APH.ColonyTick.run(S);
+  let carrying=false;
+  for(let i=0;i<350&&!carrying;i++){
+    S.clock+=.2;M.updateResidents(.2);
+    const held=APH.Logistics.reservationForCarrier(S.colony,chef.id);
+    carrying=!!(held&&held.phase==='carrying');
+  }
+  A(carrying,'取消前厨师应已真实取走在途材料');
+  const expected={it_food:2,it_wood:1};
+  function add(map,itemId,n){
+    if(!itemId)return;
+    n=Math.max(0,Math.floor(Number(n)||0));
+    if(n)map[itemId]=(map[itemId]||0)+n;
+  }
+  function tallyOwners(state){
+    const got={};
+    (state.entities||[]).forEach(function(e){if(e&&e.type===T.DROPPED&&!e.dead)add(got,e.itemId,e.n);});
+    const colony=state.colony||{};
+    (colony.pendingGround||[]).forEach(function(p){add(got,p.itemId,p.n||p.itemCount);});
+    const logistics=colony.logistics||{};
+    (logistics.reservations||[]).forEach(function(r){
+      if(r&&r.phase==='carrying'&&r.cargo)add(got,r.cargo.itemId,r.cargo.itemCount);
+    });
+    (logistics.tasks||[]).forEach(function(task){
+      (task&&task.deliveredLots||[]).forEach(function(lot){add(got,lot.itemId,lot.itemCount||lot.n);});
+    });
+    return got;
+  }
+  function sameItems(actual,where){
+    const normalize=function(map){const out={};Object.keys(map).sort().forEach(function(k){out[k]=map[k];});return out;};
+    A(JSON.stringify(normalize(actual))===JSON.stringify(normalize(expected)),where+': '+JSON.stringify(actual));
+  }
+  fire.bills=[];APH.ProductionJobs.prepare(S);
+  sameItems(tallyOwners(S),'取消后每份物料必须只由一个实时所有者持有');
+  M.saveColony();
+  const saved=APH.Save.loadColony();
+  const canonical={};
+  /* Save 的 homeRuntime 是同一地面状态的镜像；这里只数持久 canonical
+     ground/pendingGround，避免双计后掩盖复制 bug。 */
+  (saved.ground||[]).forEach(function(p){add(canonical,p.itemId,p.n||p.itemCount);});
+  (saved.pendingGround||[]).forEach(function(p){add(canonical,p.itemId,p.n||p.itemCount);});
+  sameItems(canonical,'取消后的 canonical 存档物料必须逐项守恒');
+});
+
+test('modern production: 学者实际运送露果标本后化验，解锁作物并吐出种荚',()=>{
+  const lab=APH.Construction.record('bl_lab',1344,1152,0);lab.uid='dew_lab';lab.analysisTarget='specimen_dew';
+  const scholar=APH.Res.generate('scholar_real',23,[]);
+  scholar.job='bl_lab';scholar.jobLocked=true;scholar.skills.sk_lore=10;scholar.food=100;scholar.rest=100;scholar.recreation=100;scholar.illness=0;
+  productionScenarioState(lab,scholar,[{id:'dew_specimen',type:T.DROPPED,itemId:'specimen_dew',n:1,x:1100,y:1100}]);
+  APH.ColonyTick.run(S);
+  const task=APH.Logistics.taskFor(S.colony,lab.productionTaskId);
+  A(task&&task.productionJob&&(lab.analysisProgress||0)===0,'标本没送达前实验室不得隔空推进');
+  advanceProduction(180,lab,()=>!!S.meta.analyzedFlora.crop_dew_fruit);
+  A(!!S.meta.analyzedFlora.crop_dew_fruit,'学者应通过真实送达的露果标本解锁作物');
+  A(S.entities.some(e=>e.type===T.DROPPED&&e.itemId==='it_seed_dew'&&e.n===3),'化验完成应掉落三枚露果种荚');
+  A(!APH.Logistics.taskFor(S.colony,task.id),'化验任务应在消费送达标本后结算');
+});
+
+test('season boundary and rooting-condition recovery fixture',()=>{
+  cmdHomeSetup();
+  const third=APH.Res.generate('rs_root3',31,[]);
+  third.id='rs_root3';
+  third.food=100;third.rest=100;third.recreation=100;third.illness=0;
+  S.meta.residents.push(third);S.meta.analyzedFlora={crop_dew_fruit:true};S.meta.alienHarvests={};
+  const ox=480,oy=480, buildings=[];
+  for(let x=0;x<7;x++)for(let y=0;y<7;y++)if(x===0||y===0||x===6||y===6)
+    buildings.push(APH.Construction.record('bl_wall',ox+x*48,oy+y*48,0));
+  const beds=[0,1,2].map(function(i){return {id:'bl_bed',uid:'root_bed'+i,x:ox+72+i*36,y:oy+72};});
+  beds.forEach(function(b){buildings.push(b);});
+  const farm={id:'bl_crop_plot',uid:'root_crop',crop:'crop_dew_fruit',plot:{stage:3,t:0},x:ox+168,y:oy+168};
+  buildings.push({id:'bl_landing_pad',uid:'root_pad',x:1100,y:1340},{id:'bl_farm',x:ox+96,y:oy+168},farm,
+    {id:'bl_cooler',uid:'root_cooler',x:ox+120,y:oy+120,powered:true,grid:true},
+    {id:'bl_storage_shelf',uid:'root_cold_shelf',filter:'food',x:ox+144,y:oy+144},
+    {id:'bl_battery',x:ox+192,y:oy+120},
+    {id:'bl_transmitter',x:ox+192,y:oy+192,powered:true,grid:true});
+  S.colony.buildings=buildings;S.colony.rulesVersion=1;S.colony.scene=APH.TerrainModel.home(77);
+  S.power={charge:{[Math.round(ox+192)+','+Math.round(oy+120)]:10}};
+  S.meta.residents.forEach(function(r,i){r.bedId='root_bed'+i+':0';r.worldId='home';r.downed=false;r.isSleeping=false;r.job='bl_farm';r.jobLocked=true;});
+  S.entities=[];M.syncResidents();
+  const farmer=S.entities.find(function(e){return e.rid==='rs_cmd1';});
+  const farmerMeta=S.meta.residents.find(function(r){return r.id==='rs_cmd1';});
+  farmerMeta.job='bl_crop_plot';farmer.job='bl_crop_plot';
+  const farmSpot=APH.Construction.spot(S,farm,farmer);farmer.x=farmSpot.x;farmer.y=farmSpot.y;
+  S.entities.push({id:'root_food',type:T.DROPPED,itemId:'it_food',n:100,decayHp:10,x:ox+144,y:oy+144,
+    containerId:'root_cold_shelf',storageX:ox+144,storageY:oy+144,stock:true});
+  const rooms=APH.Nav.roomsOf(buildings,S.colony.scene);A(rooms.length===1,'扎根冷库必须在封闭房间');rooms[0].temp=-2;
+  APH.ColonyTick.run(S);
+  A((S.meta.alienHarvests.crop_dew_fruit||0)>0,'扎根不能只看已化验：必须由真实田圃完成一次收获');
+
+  const seasonIds=[];
+  const seasonDays=APH.CFG.seasons.daysPerSeason*4;
+  for(let day=0;day<seasonDays;day++){
+    M.simStep(APH.CFG.DAY_LEN);
+    seasonIds.push(APH.Weather.seasonAt(S.clock,APH.CFG.DAY_LEN).id);
+  }
+  A(new Set(seasonIds).size===4&&seasonIds.indexOf('winter')>=0,'固定日步进应走完春夏秋冬一整季');
+  rooms[0].temp=-2;
+  const coldFood=S.entities.find(function(e){return e.id==='root_food';});
+  if(coldFood)coldFood.decayHp=10;
+  else S.entities.push({id:'root_food_after_winter',type:T.DROPPED,itemId:'it_food',n:100,decayHp:10,x:ox+144,y:oy+144,
+    containerId:'root_cold_shelf',storageX:ox+144,storageY:oy+144,stock:true});
+  const repairedCooler=buildings.find(function(b){return b.uid==='root_cooler';});repairedCooler.powered=true;repairedCooler.grid=true;
+  const repairedBeacon=buildings.find(function(b){return b.id==='bl_transmitter';});repairedBeacon.powered=true;repairedBeacon.grid=true;
+  const beforeRoot=APH.HomeProgress.checks(S);A(beforeRoot.every(function(c){return c.ok;}),'季节结束后可恢复基础条件缺失: '+JSON.stringify(beforeRoot));
+
+  /* 扎根本身由 30 秒生产跳结算；这里固定步进该真实子系统，避免把
+     一整季压进单帧后又把无发电机 fixture 的电网副作用混进断言。 */
+  const stepHome=function(seconds){for(let t=0;t<seconds;t+=30)APH.HomeProgress.tick(S,30);};
+  stepHome(APH.CFG.DAY_LEN);
+  A(S.meta.rooting.seconds>=APH.CFG.DAY_LEN,'合格第一天应开始累计');
+  const cooler=buildings.find(function(b){return b.uid==='root_cooler';});
+  cooler.powered=false;APH.HomeProgress.tick(S,30);
+  A(S.meta.rooting.seconds===0,'坏天气/断电导致冷库失效时连续扎根必须中断，可修复而非锁死');
+  cooler.powered=true;rooms[0].temp=-2;
+
+  const launched=M.launchExpedition({memberIds:['rs_root3'],supply:{food:0},objective:'resources'});
+  A(launched&&launched.ok,'第三名居民应能实际出征: '+JSON.stringify(launched));
+  M.simStep(30);const returned=M.returnHome();
+  A(returned&&returned.ok&&!APH.ExpeditionState.active(S.colony),'远征返航应自动回流家园名册');
+  A(S.meta.residents.find(function(r){return r.id==='rs_root3';}).worldId==='home','返航居民应回到 home context');
+  const postRooms=APH.Nav.roomsOf(S.colony.buildings,S.colony.scene);postRooms[0].temp=-2;
+  const postCooler=S.colony.buildings.find(function(b){return b.uid==='root_cooler';});postCooler.powered=true;postCooler.grid=true;
+  const postBeacon=S.colony.buildings.find(function(b){return b.id==='bl_transmitter';});postBeacon.powered=true;postBeacon.grid=true;
+  if(!S.entities.some(function(e){return e&&e.itemId==='it_food'&&e.containerId==='root_cold_shelf'&&!e.dead;}))
+    S.entities.push({id:'root_food_after_return',type:T.DROPPED,itemId:'it_food',n:100,decayHp:10,x:ox+144,y:oy+144,
+      containerId:'root_cold_shelf',storageX:ox+144,storageY:oy+144,stock:true});
+  A(APH.HomeProgress.checks(S).every(function(c){return c.ok;}),'返航后应恢复可扎根的家园条件');
+  stepHome(APH.CFG.DAY_LEN*3);
+  A(S.meta.rooting.achieved===true,'冷库修复和远征回流后连续三天应自动达成扎根');
+});
+
+test('modern equip: 两名居民争抢一件装备只会消费一次',()=>{
+  const pawns=cmdHomeSetup(), first=pawns[0], second=pawns[1];
+  const pile={id:'dp_one_pickaxe',type:T.DROPPED,itemId:'it_pickaxe',n:1,x:S.px+32,y:S.py,stock:true};
+  first.x=pile.x;first.y=pile.y;second.x=pile.x;second.y=pile.y;
+  S.entities.push(pile);
+  M.cmd.select(first);A(APH.UI.cmd('equipSelected','it_pickaxe')===true,'面板命令应给首位居民下达真实取装令');
+  M.cmd.select(second);A(APH.UI.cmd('equipSelected','it_pickaxe')===true,'第二位在物品尚未被消费前可尝试取装');
+  M.updateHome(.2);
+  const wearers=S.meta.residents.filter(function(r){return r.gear&&r.gear.tool==='it_pickaxe';});
+  const left=S.entities.filter(function(e){return e&&e.type===T.DROPPED&&!e.dead&&e.itemId==='it_pickaxe';}).reduce(function(n,e){return n+(e.n||1);},0);
+  A(wearers.length===1&&left===0,'一件装备只能有一名穿戴者，不能复制');
+  A((wearers.length+left)===1,'装备前后逐件守恒');
+});
+
+test('modern haul: 普通搬运不会抢走已被生产工单预订的地面份额',()=>{
+  const pawn=cmdHomeSetup()[0];pawn.x=S.px+32;pawn.y=S.py;
+  const pile={id:'dp_reserved_mineral',type:T.DROPPED,itemId:'it_mineral',n:2,x:pawn.x,y:pawn.y,stock:true};S.entities.push(pile);
+  const task=APH.Logistics.ensureTask(S.colony,{kind:'construction',targetId:'reserved_target',need:{mineral:1},x:pile.x,y:pile.y});
+  const reserved=APH.Logistics.reserveForTask(S.colony,S.meta.res,S.entities,task,'production_carrier',{from:pile});
+  A(reserved.ok&&APH.Logistics.availableDrop(S.colony,pile)===1,'工单应先锁住一份地面矿物');
+  M.cmd.select(pawn);M.cmd.orderHaul();M.updateHome(.2);
+  A(pawn.haulCarry&&pawn.haulCarry.n===1,'普通搬运只能拿未预订的一份');
+  A((pile.n||0)===1&&!pile.dead,'预订份额必须仍留在原地');
+  A(APH.Logistics.availableDrop(S.colony,pile)===0,'预订与已搬走合计后不可再被普通搬运重复拿取');
+});
+
+test('modern dining: 餐位离食物货架超过 200px 时先取一份再走回用餐',()=>{
+  const pawns=cmdHomeSetup(), diner=pawns[0], other=pawns[1];
+  const shelf={id:'bl_storage_shelf',uid:'far_food_shelf',filter:'food',x:620,y:900};
+  const table={id:'bl_dining_table',x:980,y:900}, chair={id:'bl_dining_chair',x:932,y:900};
+  S.colony.buildings.push(shelf,table,chair);S.meta.res.food=0;
+  const resident=S.meta.residents.find(function(r){return r.id===diner.rid;});resident.food=10;resident.rest=100;resident.recreation=100;resident.isSleeping=false;
+  const otherResident=S.meta.residents.find(function(r){return r.id===other.rid;});otherResident.food=100;otherResident.rest=100;otherResident.recreation=100;
+  diner.x=chair.x+8;diner.y=chair.y-2;other.x=1100;other.y=1050;diner.haulCarry=null;other.haulCarry=null;
+  const food={id:'dp_far_meal',type:T.DROPPED,itemId:'it_food',n:2,x:shelf.x,y:shelf.y,containerId:'far_food_shelf',storageX:shelf.x,storageY:shelf.y,stock:true};S.entities.push(food);
+  let carried=false;
+  for(let i=0;i<600&&resident.food<=10;i++){
+    M.updateResidents(.1);
+    carried=carried||!!(diner.haulCarry&&((Array.isArray(diner.haulCarry)?diner.haulCarry:[diner.haulCarry]).some(function(p){return p.itemId==='it_food';})));
+  }
+  A(Math.hypot(shelf.x-chair.x,shelf.y-chair.y)>200,'fixture 必须是远仓与餐位');
+  A(carried,'居民必须先在远处货架取得实际一份食物: '+JSON.stringify({x:diner.x,y:diner.y,food:resident.food,reason:diner.workReason,order:diner.userOrder,carry:diner.haulCarry}));
+  A(resident.food>10,'居民应带回合法餐位并吃掉该份食物');
+  A(food.n===1&&!food.dead,'取餐用餐只能消耗一份，剩余食物不能被重复扣除');
 });
 
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);

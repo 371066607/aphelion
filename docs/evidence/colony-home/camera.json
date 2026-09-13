@@ -1,0 +1,65 @@
+{
+  "baseline": {
+    "mode": "running",
+    "scene": "home",
+    "width": 6144,
+    "residents": 3,
+    "buildings": 0,
+    "objects": 2101,
+    "bedCapacity": 0
+  },
+  "fixture": [
+    {
+      "spec": {
+        "zoom": 0.5,
+        "x": 1392,
+        "y": 1392,
+        "rotation": 1
+      },
+      "placed": {
+        "count": 1,
+        "x": 1440,
+        "y": 1416,
+        "rotation": 1,
+        "hit": {
+          "x": 1392,
+          "y": 1392,
+          "w": 96,
+          "h": 48
+        }
+      }
+    },
+    {
+      "spec": {
+        "zoom": 2,
+        "x": 1344,
+        "y": 1296,
+        "rotation": 3
+      },
+      "placed": {
+        "count": 2,
+        "x": 1392,
+        "y": 1320,
+        "rotation": 3,
+        "hit": {
+          "x": 1344,
+          "y": 1296,
+          "w": 96,
+          "h": 48
+        }
+      }
+    }
+  ],
+  "map": {
+    "mode": "running",
+    "x": 4602.9375,
+    "y": 4608,
+    "expected": {
+      "x": 4602.9375,
+      "y": 4608
+    },
+    "pawnsUnchanged": true
+  },
+  "runtimeErrors": [],
+  "scope": "Headless Chrome; real pointer placement at 50% and 200%, overview focus. Construction uses explicit free-build fixture."
+}

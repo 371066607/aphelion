@@ -4,7 +4,7 @@
    语义契约:
      A. 无墙(全通矩阵/无 grid) → 直线退化, 与 walkToward 逐帧一致 (path 缓存清空);
      B. 有墙 & 直线被挡 → A* 绕行, 路径不穿墙、终点精确、能到达;
-     C. 寻路失败(封闭) → 退化直线, 不卡死;
+     C. 寻路失败(封闭) → 停下，不能穿墙;
      D. 缓存: 目标未变沿用 e.path; 目标变更/到段才重算 (e.pathGoal 见证);
      E. 闸门=可通行 (ADR-13), 唯一开口时路径经门格;
      F. 睡者/医疗舱俯卧者守卫同 walkToward (#68/#69), 并清路径缓存。
@@ -83,7 +83,7 @@ test('T3 walkAround: 一堵墙+缺口→绕缺口(不穿墙/终点精确/能到�
 });
 
 /* ---------- C: 寻路失败 → 退化直线不卡死 ---------- */
-test('T3 walkAround: 封闭围栏无路→退化直线(不卡死)', () => {
+test('T3 walkAround: 封闭围栏无路→停下并报告不可达', () => {
   /* 3×3 围栏(内格(1,1)空), 目标在围栏外 (4,1) */
   const walls = [];
   for (let x=0;x<=2;x++){ walls.push({ id:'bl_wall', x:48*x, y:0 }); walls.push({ id:'bl_wall', x:48*x, y:48*2 }); }
@@ -92,11 +92,11 @@ test('T3 walkAround: 封闭围栏无路→退化直线(不卡死)', () => {
   const e = { x:48, y:48, walkPh:0 };
   const tgt = { x:192, y:48 };
   Res.walkAround(e, tgt, 1, 40, g);
-  if (e.path!==null || e.pathGoal!==null) throw new Error('失败应退化直线(清缓存): '+JSON.stringify(e.path));
-  if (e.x!==88 || e.y!==48 || e.walking!==true) throw new Error('应直线走40px: '+JSON.stringify(e));
-  if (e.face!==0 || !(e.walkPh>0)) throw new Error('直线走应设face/推进walkPh');
-  Res.walkAround(e, tgt, 1, 40, g);
-  if (e.x!==128 || e.walking!==true) throw new Error('第二帧继续走不卡死: '+JSON.stringify(e));
+  if(e.path!==null||e.pathGoal!==null)throw new Error('失败应清理旧路径');
+  if(e.x!==48||e.y!==48||e.walking)throw new Error('不可穿墙');
+  if(e.workReason!=='目的地不可达')throw new Error('需解释等待原因');
+  Res.walkAround(e,tgt,1,40,g);
+  if(e.x!==48||e.y!==48)throw new Error('持续堵塞不得穿墙');
 });
 
 /* ---------- D: 缓存语义 ---------- */
@@ -152,7 +152,7 @@ test('T3 walkAround: 围栏唯一开口=闸门→路径经门格并到达', () =
   const e2 = { x:48, y:48 };
   Res.walkAround(e2, tgt, 1, 40, g2);
   if (e2.path!==null) throw new Error('无门封闭应退化直线');
-  if (e2.x!==88 || e2.y!==48 || !e2.walking) throw new Error('应直线走: '+JSON.stringify(e2));
+  if (e2.x!==48 || e2.y!==48 || e2.walking) throw new Error('关门后不能穿墙: '+JSON.stringify(e2));
 });
 
 /* ---------- F: 守卫 (#68/#69) + 缓存清理 ---------- */

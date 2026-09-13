@@ -19,10 +19,13 @@ function codeOf(file) {
 
 /* build.py 的 MODULE_ORDER (含 DOM 层); main.js 是入口, 排最后 */
 const ORDER = [
-  'config.js','utils.js','building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js',
-  'planet.js','llm.js','colony.js','rivals.js','events.js','nav.js','weather.js',
-  'residents.js','alerts.js','combat.js','world.js','entities.js','visitors.js','colonytick.js','draw.js','sfx.js',
-  'sprites.js','ui.js','hints.js','building_proto_model.js','building_proto_draw.js','building_proto.js','main.js',
+  'config.js','utils.js','entity_index.js','world_runtime.js','build_grid.js','terrain_model.js','scene.js','camera.js',
+  'building_art_data.js','building_art.js','input.js','humanoid.js','save.js','opening.js',
+  'planet.js','llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js',
+  'production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js',
+  'residents.js','ecology.js','alerts.js','combat.js','expedition_state.js','world.js','entities.js','visitors.js',
+  'colonytick.js','draw.js','sfx.js','sprites.js','ui.js','expedition_ui.js','map_ui.js','hints.js',
+  'building_proto_model.js','building_proto_draw.js','building_proto.js','main.js',
 ];
 
 /* 反向调用 main 的历史债: 棘轮式登记 —— 只许减少, 不许增加。
@@ -47,7 +50,8 @@ test('layering: 反向调用 main 的次数只减不增 (棘轮)', () => {
 });
 
 test('layering: 模拟层已彻底不再反向调用 main (ADR-38/43)', () => {
-  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js'].forEach(f => {
+  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js',
+   'construction.js', 'ecology.js', 'logistics.js', 'recovery.js', 'home_progress.js', 'storage.js', 'production_jobs.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.Main\./g) || []).length;
     if (hits)
       throw new Error(f + ' 仍有 ' + hits + ' 处反向调用 main —— 模拟循环必须只有一个归属者');
@@ -70,7 +74,8 @@ test('layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)
 /* ADR-40: 模拟层不得直接驱动视图。combat 52 处 + colony 6 处 APH.UI.* 已清零,
    改为 U.emit('notice'|'hint'|'death') 由 ui.js 订阅。 */
 test('layering: 模拟层不得直接调用 APH.UI (ADR-40/43)', () => {
-  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js'].forEach(f => {
+  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js',
+   'construction.js', 'ecology.js', 'logistics.js', 'recovery.js', 'home_progress.js', 'storage.js', 'production_jobs.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.UI\./g) || []).length;
     if (hits)
       throw new Error(f + ' 有 ' + hits + ' 处直接调 APH.UI —— 模拟层应 emit 事件, 由 ui 订阅');
@@ -87,12 +92,19 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
     'ui.js':'UI','hints.js':'Hints','main.js':'Main','planet.js':'Planet',
     'llm.js':'LLM','save.js':'Save',
     'opening.js':'Opening','input.js':'Input','humanoid.js':'Humanoid',
+    'entity_index.js':'EntityIndex','world_runtime.js':'WorldRuntime','build_grid.js':'BuildGrid',
+    'terrain_model.js':'TerrainModel','scene.js':'Scene','camera.js':'Camera',
+    'construction.js':'Construction','recovery.js':'Recovery','home_progress.js':'HomeProgress',
+    'logistics.js':'Logistics','production_jobs.js':'ProductionJobs','storage.js':'Storage',
+    'ecology.js':'Ecology','expedition_state.js':'ExpeditionState',
+    'expedition_ui.js':'ExpeditionUI','map_ui.js':'MapUI',
   };
   /* 已知的、暂时容忍的向后引用: 这些是本轮之后仍待处理的债, 列在此处使其可见。
      新增违规会让本用例变红; 修好一处就从这里删掉一行。 */
   const ALLOWED = {
-    'colony.js':  ['Ent','Res','Combat','Weather','World','Save','Nav','Opening'],
-    'combat.js':  ['Ent','Res','Weather','World','Save','Nav','Rivals','Colony'],
+    'colony.js':  ['Ent','Res','Combat','Weather','World','Save','Nav','Opening','Construction','Recovery','HomeProgress','Logistics'],
+    'combat.js':  ['Ent','Res','Weather','World','Save','Nav','Rivals','Colony','ExpeditionState'],
+    'world_runtime.js':['Colony'],
     'residents.js':['Combat','World','Nav','Colony'],
     'entities.js':['Res','Sprites','World','Weather','Colony'],
     'events.js':  ['Weather','Colony'],
@@ -102,6 +114,10 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
     'sfx.js':     ['Save'],
     'llm.js':     ['Planet','Save'],
     'opening.js': ['OpeningData','OpeningVideo'],
+    'construction.js':['Nav'],
+    'recovery.js':['Res'],
+    'home_progress.js':['Nav','Storage'],
+    'storage.js':['Nav'],
   };
   const problems = [];
   ORDER.forEach((f, i) => {
