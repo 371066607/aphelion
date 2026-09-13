@@ -1,0 +1,87 @@
+{
+  "baseline": {
+    "mode": "running",
+    "scene": "home",
+    "width": 6144,
+    "residents": 3,
+    "buildings": 0,
+    "objects": 2062,
+    "bedCapacity": 0
+  },
+  "fixture": {
+    "scene": "expedition",
+    "mode": "running",
+    "away": 1,
+    "home": 2,
+    "planetId": "P9CE27A80",
+    "visits": 1
+  },
+  "movement": {
+    "distance": 67.5518927533782,
+    "id": "rs_start1"
+  },
+  "restored": {
+    "scene": "expedition",
+    "carry": 2,
+    "away": 1,
+    "home": 2
+  },
+  "returned": {
+    "scene": "home",
+    "residents": 3,
+    "pawns": 3,
+    "first": 2,
+    "again": 2
+  },
+  "keyboardOpen": {
+    "shown": true,
+    "focusText": "出发"
+  },
+  "destinationFocus": {
+    "id": "expeditionDestination",
+    "value": "",
+    "known": [
+      "planet:P9CE27A80"
+    ]
+  },
+  "selectedKnown": {
+    "id": "expeditionDestination",
+    "value": "planet:P9CE27A80"
+  },
+  "focusTrace": [
+    {
+      "tag": "SELECT",
+      "id": "expeditionObjective",
+      "text": "资源搜集 · 回收晶体矿与可用材料，为家园建设补给。植物取样 · 采集异星植物标本，带回实验室化验。遗迹设备 · 搜查遗迹，回收遗件与古代部件。",
+      "inside": true
+    },
+    {
+      "tag": "BUTTON",
+      "id": "",
+      "text": "取消",
+      "inside": true
+    },
+    {
+      "tag": "BUTTON",
+      "id": "",
+      "text": "出发",
+      "inside": true
+    }
+  ],
+  "keyboard": {
+    "scene": "expedition",
+    "runId": "ex_2",
+    "planetId": "P9CE27A80",
+    "stored": true,
+    "visits": 2,
+    "observed": true
+  },
+  "reselect": {
+    "shown": true,
+    "value": "",
+    "known": 1
+  },
+  "planetSpecBytesPreserved": true,
+  "runtimeErrors": [],
+  "scope": "Headless Chrome; real planner DOM submission and pure-keyboard known-planet revisit, squad movement, reload, idempotent return, and required destination reselect. The first submit uses DOM click(), while movement and cargo are explicit fixtures; this is not mouse-input proof or a season survival playthrough."
+}

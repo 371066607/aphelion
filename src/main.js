@@ -107,6 +107,11 @@ window.APH = window.APH || {};
     restoreLaunchState(s,before.state);
     return diskOk;
   }
+  function expeditionTitle(spec){
+    var title=(spec&&spec.name)||'未知星球';
+    if(spec&&spec.paletteName)title+=' · '+spec.paletteName;
+    return title+' (远征)';
+  }
   function switchWorld(kind){
     var s=APH.state;
     if(!s.worlds||!s.worlds[kind])return false;
@@ -115,7 +120,7 @@ window.APH = window.APH || {};
     APH.WorldRuntime.install(s,s.worlds[kind]);
     s._background=false;s.selectedRid=null;s.selectedPawns=[];s.selectedTarget=null;
     APH.World.buildTerrain();
-    document.getElementById('planetTitle').textContent=kind==='home'?'新曙光殖民地 · 家园':s.spec.name+' · 远征';
+    document.getElementById('planetTitle').textContent=kind==='home'?'新曙光殖民地 · 家园':expeditionTitle(s.spec);
     checkpointWorlds(s);
     return true;
   }
@@ -437,7 +442,7 @@ window.APH = window.APH || {};
     if(APH.Planet.hasLaw(s.spec,'lw_spore_light')) lawBits.push('孢子趋光：光会开路');
     if(APH.Planet.hasLaw(s.spec,'lw_night_acid')) lawBits.push('夜间勿近湖');
     if(lawBits.length) APH.UI.floatText('法则 · '+lawBits.join(' / '),'#c39bff');
-    document.getElementById('planetTitle').textContent=planet.name+' · '+planet.paletteName+' (远征)';
+    document.getElementById('planetTitle').textContent=expeditionTitle(planet);
     APH.World.buildTerrain();
     U.emit('launched',{});
     if(isNew&&APH.LLM.enabled())APH.LLM.enrichPlanet(planet).then(function(rich){
@@ -447,8 +452,12 @@ window.APH = window.APH || {};
         var entry=APH.Atlas.find(s.meta,planet.id);
         checkpointWorlds(s);
         if(APH.Save.savePlanetDiscovery(s.meta,rich,entry&&entry.discoveredAt).ok){
-          planet.name=rich.name||planet.name;planet.lore=rich.lore||planet.lore;
-          if(s.spec&&s.spec.id===planet.id){s.spec.name=planet.name;s.spec.lore=planet.lore;}
+          planet.name=rich.name||planet.name;planet.paletteName=rich.paletteName||planet.paletteName;
+          planet.lore=rich.lore||planet.lore;
+          if(s.spec&&s.spec.id===planet.id){
+            s.spec.name=planet.name;s.spec.paletteName=planet.paletteName;s.spec.lore=planet.lore;
+            if(s.scene==='expedition')document.getElementById('planetTitle').textContent=expeditionTitle(s.spec);
+          }
         }
       }
     });

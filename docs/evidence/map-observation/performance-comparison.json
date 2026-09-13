@@ -1,0 +1,166 @@
+{
+  "generatedAt": "2026-09-13T22:29:41.606611+00:00",
+  "baselineFile": "docs/evidence/colony-home/performance.json",
+  "currentFiles": [
+    "docs/evidence/map-observation/performance.json",
+    "docs/evidence/map-observation/performance-repeat-1.json",
+    "docs/evidence/map-observation/performance-repeat-2.json"
+  ],
+  "comparisonContract": {
+    "fixedHomeSeed": 58098,
+    "worldCells": 128,
+    "residents": 20,
+    "worldObjectTarget": 2000,
+    "worldObjectTolerance": 300,
+    "chromeMajor": 152,
+    "viewport": {
+      "width": 1280,
+      "height": 657
+    }
+  },
+  "fixture": {
+    "baselineWorldObjects": 2144,
+    "currentWorldObjects": [
+      2059,
+      2059,
+      2059
+    ],
+    "baselineNavigationPathCells": 1504,
+    "currentNavigationPathCells": [
+      1582,
+      1582,
+      1582
+    ],
+    "canonicalPathLengthDeltaPercent": 5.19
+  },
+  "metrics": {
+    "frameCpuP95Ms": {
+      "baseline": 5.9,
+      "canonical": 7.4,
+      "allFinalRuns": [
+        7.4,
+        6.2,
+        6.5
+      ],
+      "finalRunRange": [
+        6.2,
+        7.4
+      ],
+      "canonicalDeltaPercent": 25.42
+    },
+    "frameIntervalP95Ms": {
+      "baseline": 16.7,
+      "canonical": 16.7,
+      "allFinalRuns": [
+        16.7,
+        16.7,
+        16.8
+      ],
+      "finalRunRange": [
+        16.7,
+        16.8
+      ],
+      "canonicalDeltaPercent": 0.0
+    },
+    "navigation20TotalMs": {
+      "baseline": 52.6,
+      "canonical": 73.5,
+      "allFinalRuns": [
+        73.5,
+        71.7,
+        71.1
+      ],
+      "finalRunRange": [
+        71.1,
+        73.5
+      ],
+      "canonicalDeltaPercent": 39.73
+    },
+    "navigationMeanPerPathMs": {
+      "baseline": 2.63,
+      "canonical": 3.675,
+      "allFinalRuns": [
+        3.675,
+        3.585,
+        3.555
+      ],
+      "finalRunRange": [
+        3.555,
+        3.675
+      ],
+      "canonicalDeltaPercent": 39.73
+    },
+    "persistMs": {
+      "baseline": 3.3,
+      "canonical": 8.4,
+      "allFinalRuns": [
+        8.4,
+        8.8,
+        9.4
+      ],
+      "finalRunRange": [
+        8.4,
+        9.4
+      ],
+      "canonicalDeltaPercent": 154.55
+    },
+    "stringifyMs": {
+      "baseline": 1.2,
+      "canonical": 3,
+      "allFinalRuns": [
+        3,
+        2.9,
+        3
+      ],
+      "finalRunRange": [
+        2.9,
+        3
+      ],
+      "canonicalDeltaPercent": 150.0
+    },
+    "saveBytes": {
+      "baseline": 743481,
+      "canonical": 1090398,
+      "allFinalRuns": [
+        1090398,
+        1090508,
+        1090193
+      ],
+      "finalRunRange": [
+        1090193,
+        1090508
+      ],
+      "canonicalDeltaPercent": 46.66
+    },
+    "runtimeBytes": {
+      "baseline": 595711,
+      "canonical": 568912,
+      "allFinalRuns": [
+        568912,
+        569028,
+        568700
+      ],
+      "finalRunRange": [
+        568700,
+        569028
+      ],
+      "canonicalDeltaPercent": -4.5
+    }
+  },
+  "observationStorageBoundary": {
+    "canonicalSceneObservationBytes": 398193,
+    "canonicalObservationEnvelopeDeltaBytes": 398208,
+    "canonicalSaveWithoutObservationBytes": 692190,
+    "saveWithoutObservationVsBaselinePercent": -6.9,
+    "runtimeHasWorldDescriptor": false,
+    "runtimeWorldDescriptorBytes": 0,
+    "runtimeObservationBytes": 0
+  },
+  "decision": {
+    "accepted": true,
+    "frameCpuP95Below16_7MsInEveryFinalRun": true,
+    "gridIdentityCachedInEveryFinalRun": true,
+    "runtimeErrorsInFinalRuns": 0,
+    "reason": "The three final runs keep frame CPU p95 at 6.2-7.4 ms. Navigation is slower than the historical map on routes that are 5.19% longer, but remains 3.555-3.675 ms per path with a reused 128x128 grid. The 46.66% save growth is the durable Observation; removing its exact envelope delta makes the current save 6.90% smaller than the baseline, and homeRuntime contains no second Observation copy."
+  }
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/* Chrome/CDP runtime smoke: fresh ordinary home, then labelled construction fixture.
-   node tests/home_live_probe.js [output directory]
+/* Chrome/CDP runtime smoke: fresh ordinary home, then dual-world lifecycle fixture.
+   node tests/dual_world_live_probe.js [output directory]
    Requires local Google Chrome; no dependency installation and no user profile access. */
 'use strict';
 const fs=require('fs'),path=require('path'),os=require('os'),{spawn}=require('child_process'),{pathToFileURL}=require('url');
@@ -79,7 +79,7 @@ async function rawKey(keyName,code,keyCode,modifiers=0){const args={key:keyName,
     if(!reselect.shown||reselect.value!==''||reselect.known!==1)throw Error('planner retained previous destination '+JSON.stringify(reselect));
     await evaluate(`APH.ExpeditionUI.close()`);
     if(errors.length)throw Error('runtime errors: '+JSON.stringify(errors));
-    const report={baseline,fixture,movement,restored,returned,keyboardOpen,destinationFocus,selectedKnown,focusTrace,keyboard,reselect,planetSpecBytesPreserved:revisitPlanetRaw===firstPlanetRaw,runtimeErrors:errors,scope:'Headless Chrome; real planner DOM with mouse discovery and pure-keyboard known-planet revisit, squad movement, reload, idempotent return, and required destination reselect. Movement and cargo are explicit fixtures; not a season survival playthrough.'};
+    const report={baseline,fixture,movement,restored,returned,keyboardOpen,destinationFocus,selectedKnown,focusTrace,keyboard,reselect,planetSpecBytesPreserved:revisitPlanetRaw===firstPlanetRaw,runtimeErrors:errors,scope:'Headless Chrome; real planner DOM submission and pure-keyboard known-planet revisit, squad movement, reload, idempotent return, and required destination reselect. The first submit uses DOM click(), while movement and cargo are explicit fixtures; this is not mouse-input proof or a season survival playthrough.'};
     fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
   }finally{if(ws)ws.close();chrome.kill();await sleep(250);fs.rmSync(profile,{recursive:true,force:true});}
 })().catch(e=>{console.error(e.stack);process.exitCode=1;});

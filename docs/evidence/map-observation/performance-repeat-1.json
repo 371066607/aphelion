@@ -1,0 +1,152 @@
+{
+  "generatedAt": "2026-09-13T22:28:41.468Z",
+  "target": {
+    "worldCells": 128,
+    "residents": 20,
+    "worldObjectsApprox": 2000,
+    "worldObjectTolerance": 300,
+    "fixedHomeSeed": 58098
+  },
+  "fixture": {
+    "before": {
+      "scene": "home",
+      "width": 6144,
+      "cells": 128,
+      "residents": 3,
+      "entities": 2062
+    },
+    "residents": 20,
+    "worldObjects": 2059,
+    "totalEntities": 2079,
+    "descriptor": {
+      "v": 1,
+      "width": 6144,
+      "height": 6144,
+      "grid": 48,
+      "seed": 58098,
+      "kind": "home",
+      "generation": 1,
+      "resourceVersion": 2,
+      "observation": {
+        "v": 1,
+        "widthCells": 128,
+        "heightCells": 128,
+        "biomeId": "biome_landing",
+        "degraded": false,
+        "groundCells": 16384,
+        "resources": 2046
+      }
+    },
+    "terrainBefore": {
+      "cacheSize": 0,
+      "cacheLimit": 36,
+      "hits": 0,
+      "misses": 0,
+      "chunksPerAxis": 12,
+      "chunksX": 12,
+      "chunksY": 12,
+      "width": 6144,
+      "height": 6144
+    }
+  },
+  "frameCostMs": {
+    "samples": 120,
+    "median": 5.5,
+    "p95": 6.2,
+    "max": 10.1
+  },
+  "frameIntervalMs": {
+    "samples": 120,
+    "median": 16.7,
+    "p95": 16.7,
+    "max": 16.8
+  },
+  "gameFramesAdvanced": 131,
+  "simulationSecondsAdvanced": 2.217,
+  "navigation": {
+    "requested": 20,
+    "completed": 20,
+    "totalMs": 71.70000004768372,
+    "pathLengths": [
+      127,
+      117,
+      111,
+      105,
+      99,
+      93,
+      87,
+      81,
+      80,
+      95,
+      62,
+      107,
+      75,
+      52,
+      37,
+      31,
+      25,
+      41,
+      65,
+      92
+    ],
+    "gridBuildMs": 0,
+    "gridCacheHitMs": 0,
+    "gridIdentityCached": true,
+    "gridRows": 128,
+    "gridCols": 128
+  },
+  "terrainCache": {
+    "cacheSize": 8,
+    "cacheLimit": 36,
+    "hits": 1064,
+    "misses": 8,
+    "chunksPerAxis": 12,
+    "chunksX": 12,
+    "chunksY": 12,
+    "width": 6144,
+    "height": 6144
+  },
+  "entityIndex": {
+    "ready": true,
+    "staticBuckets": 903,
+    "dynamic": 32,
+    "cell": 192
+  },
+  "persistence": {
+    "persistMs": 8.800000190734863,
+    "stringifyMs": 2.9000000953674316,
+    "saveBytes": 1090508,
+    "inMemoryBytes": 1090508,
+    "runtimeBytes": 569028,
+    "breakdown": {
+      "colonyCoreBytes": 123142,
+      "sceneBytes": 398314,
+      "sceneObservationBytes": 398193,
+      "runtimeWorldDescriptorBytes": 0,
+      "runtimeObservationBytes": 0,
+      "runtimeSpecBytes": 468,
+      "runtimeHasWorldDescriptor": false,
+      "withoutObservationBytes": 692300,
+      "observationEnvelopeDeltaBytes": 398208,
+      "sameObservation": null
+    }
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "viewport": {
+      "width": 1280,
+      "height": 657
+    },
+    "devicePixelRatio": 1,
+    "scene": "home",
+    "mode": "running",
+    "residentsAfter": 20,
+    "worldObjectsAfter": 2059
+  },
+  "errors": {
+    "runtimeExceptions": [],
+    "consoleErrors": [],
+    "logErrors": []
+  },
+  "methodology": "Isolated temporary Chrome profile; actual game requestAnimationFrame callback CPU duration and rAF timestamps measured with performance.now while simulation and Canvas rendering remain active."
+}

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /* Large-home live performance evidence.
-   node tests/colony_perf_live_probe.js
+   node tests/colony_perf_live_probe.js [output directory]
 
    Opens the built game in an isolated temporary Chrome profile, keeps the
    fresh 128x128 home and its generated resources, expands the roster to 20,
-   then measures the real game requestAnimationFrame callback. No user Chrome
-   profile or simulated Date.now clock is used. */
+   then measures the real game requestAnimationFrame callback. It never uses the
+   user Chrome profile. Date.now is overridden only while creating the fixed-seed
+   save, then restored before reload and every timed measurement. */
 'use strict';
 
 const fs=require('fs');
@@ -14,8 +15,11 @@ const path=require('path');
 const {spawn}=require('child_process');
 const {pathToFileURL}=require('url');
 
-const OUT='/tmp/aphelion-large-live';
+const OUT=process.argv[2]||'/tmp/aphelion-large-live';
 const CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const FIXED_HOME_SEED=58098;
+const WORLD_OBJECT_TARGET=2000;
+const WORLD_OBJECT_TOLERANCE=300;
 const profile=fs.mkdtempSync(path.join(os.tmpdir(),'aph-large-live-'));
 const gameUrl=pathToFileURL(path.resolve(__dirname,'../game.html')).href+'?autostart=1';
 fs.mkdirSync(OUT,{recursive:true});
@@ -131,6 +135,28 @@ function describeRemoteArg(arg){
     }
     if(!ready)throw new Error('fresh game did not reach running home');
 
+    /* 基线证据的家园 seed 是 58098。先用正式 Save 入口在隔离 profile
+       建立同 seed 新档，再重载正式游戏，避免随机新档让对象数和地形偏置对比。 */
+    const prepared=await evaluate(`(()=>{
+      APH.Save.wipeAll();
+      const nativeNow=Date.now;
+      Date.now=()=>1700000058098;
+      const colony=APH.Save.loadColony();
+      Date.now=nativeNow;
+      return {seed:colony.scene&&colony.scene.seed};
+    })()`);
+    if(prepared.seed!==FIXED_HOME_SEED)throw new Error('fixed home seed setup failed: '+JSON.stringify(prepared));
+    await cdp('Page.reload');
+    ready=false;
+    for(let i=0;i<150;i++){
+      await sleep(100);
+      try{
+        ready=await evaluate("!!(window.APH&&APH.Main&&APH.state&&APH.state.mode==='running'&&APH.state.scene==='home'&&APH.state._worldReady&&APH.state.colony&&APH.state.colony.scene&&APH.state.colony.scene.seed==="+FIXED_HOME_SEED+")");
+      }catch{}
+      if(ready)break;
+    }
+    if(!ready)throw new Error('fixed-seed fresh game did not reach running home');
+
     const fixture=await evaluate(`(()=>{
       const s=APH.state,C=APH.CFG;
       const before={scene:s.scene,width:s.colony.scene&&s.colony.scene.width,
@@ -150,14 +176,24 @@ function describeRemoteArg(arg){
       APH.World.buildTerrain();
       const residents=s.entities.filter(e=>e.type===C.entType.RESIDENT&&!e.dead).length;
       const worldObjects=s.entities.filter(e=>e.type!==C.entType.RESIDENT&&!e.dead).length;
+      const scene=s.colony.scene,observation=scene&&scene.observation;
+      const terrain=APH.World.stats();
       return {before,residents,worldObjects,totalEntities:s.entities.filter(e=>!e.dead).length,
-        descriptor:s.colony.scene,terrainBefore:APH.World.stats()};
+        descriptor:{v:scene.v,width:scene.width,height:scene.height,grid:scene.grid,seed:scene.seed,
+          kind:scene.kind,generation:scene.generation,resourceVersion:scene.resourceVersion,
+          observation:observation?{v:observation.v,widthCells:observation.widthCells,
+            heightCells:observation.heightCells,biomeId:observation.biomeId,degraded:observation.degraded,
+            groundCells:observation.ground.length,resources:observation.resources.length}:null},
+        terrainBefore:{cacheSize:terrain.cacheSize,cacheLimit:terrain.cacheLimit,hits:terrain.hits,
+          misses:terrain.misses,chunksPerAxis:terrain.chunksPerAxis,chunksX:terrain.chunksX,
+          chunksY:terrain.chunksY,width:terrain.width,height:terrain.height}};
     })()`);
 
     if(fixture.before.scene!=='home'||fixture.before.cells!==128)throw new Error('fresh 128-cell home contract failed: '+JSON.stringify(fixture));
     if(fixture.before.residents!==3)throw new Error('temporary profile was not a fresh three-resident save: '+JSON.stringify(fixture.before));
     if(fixture.residents!==20)throw new Error('20-resident fixture failed: '+JSON.stringify(fixture));
-    if(fixture.worldObjects<2000)throw new Error('large home lost generated world objects: '+JSON.stringify(fixture));
+    if(Math.abs(fixture.worldObjects-WORLD_OBJECT_TARGET)>WORLD_OBJECT_TOLERANCE)
+      throw new Error('large home is outside the approximately 2000-object fixture: '+JSON.stringify({worldObjects:fixture.worldObjects,target:WORLD_OBJECT_TARGET,tolerance:WORLD_OBJECT_TOLERANCE,seed:fixture.descriptor.seed}));
 
     const navigation=await evaluate(`(()=>{
       const s=APH.state,scene=s.colony.scene;
@@ -233,19 +269,38 @@ function describeRemoteArg(arg){
       const stringifyStart=performance.now();
       const json=JSON.stringify(s.colony);
       const stringifyMs=performance.now()-stringifyStart;
+      const bytes=value=>value===undefined?0:new TextEncoder().encode(JSON.stringify(value)).length;
+      const scene=s.colony.scene||{},runtime=s.colony.homeRuntime||{};
+      const core=Object.assign({},s.colony);delete core.scene;delete core.homeRuntime;
+      const sceneWithoutObservation=Object.assign({},scene);delete sceneWithoutObservation.observation;
+      const colonyWithoutObservation=Object.assign({},s.colony,{scene:sceneWithoutObservation});
+      const withoutObservationBytes=bytes(colonyWithoutObservation);
       return {persistMs,stringifyMs,saveBytes:new TextEncoder().encode(raw).length,
         inMemoryBytes:new TextEncoder().encode(json).length,
-        runtimeBytes:new TextEncoder().encode(JSON.stringify(s.colony.homeRuntime||{})).length};
+        runtimeBytes:bytes(runtime),breakdown:{colonyCoreBytes:bytes(core),sceneBytes:bytes(scene),
+          sceneObservationBytes:bytes(scene.observation),runtimeWorldDescriptorBytes:bytes(runtime.worldDescriptor),
+          runtimeObservationBytes:bytes(runtime.worldDescriptor&&runtime.worldDescriptor.observation),
+          runtimeSpecBytes:bytes(runtime.spec),runtimeHasWorldDescriptor:runtime.worldDescriptor!==undefined,
+          withoutObservationBytes,
+          observationEnvelopeDeltaBytes:bytes(s.colony)-withoutObservationBytes,
+          sameObservation:runtime.worldDescriptor&&runtime.worldDescriptor.observation?
+            JSON.stringify(scene.observation)===JSON.stringify(runtime.worldDescriptor.observation):null}};
     })()`);
 
-    const environment=await evaluate(`({userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight},
-      devicePixelRatio:window.devicePixelRatio,terrainAfter:APH.World.stats(),entityIndex:APH.EntityIndex.stats(APH.state.entities),scene:APH.state.scene,
+    const environment=await evaluate(`(()=>{const terrain=APH.World.stats();return {
+      userAgent:navigator.userAgent,viewport:{width:innerWidth,height:innerHeight},
+      devicePixelRatio:window.devicePixelRatio,terrainAfter:{cacheSize:terrain.cacheSize,
+        cacheLimit:terrain.cacheLimit,hits:terrain.hits,misses:terrain.misses,
+        chunksPerAxis:terrain.chunksPerAxis,chunksX:terrain.chunksX,chunksY:terrain.chunksY,
+        width:terrain.width,height:terrain.height},entityIndex:APH.EntityIndex.stats(APH.state.entities),scene:APH.state.scene,
       mode:APH.state.mode,clock:APH.state.clock,
       residentsAfter:APH.state.entities.filter(e=>e.type===APH.CFG.entType.RESIDENT&&!e.dead).length,
-      worldObjectsAfter:APH.state.entities.filter(e=>e.type!==APH.CFG.entType.RESIDENT&&!e.dead).length})`);
+      worldObjectsAfter:APH.state.entities.filter(e=>e.type!==APH.CFG.entType.RESIDENT&&!e.dead).length};})()`);
 
     report={
       generatedAt:new Date().toISOString(),
+      target:{worldCells:128,residents:20,worldObjectsApprox:WORLD_OBJECT_TARGET,
+        worldObjectTolerance:WORLD_OBJECT_TOLERANCE,fixedHomeSeed:FIXED_HOME_SEED},
       fixture,
       frameCostMs:stats(frameEvidence.costs),
       frameIntervalMs:stats(frameEvidence.intervals),
@@ -266,7 +321,7 @@ function describeRemoteArg(arg){
     if(runtimeExceptions.length||consoleErrors.length||logErrors.length)
       throw new Error('browser runtime errors were captured; inspect '+path.join(OUT,'report.json'));
     if(!navigation.gridIdentityCached)throw new Error('navigation grid cache did not reuse the grid');
-    if(environment.residentsAfter!==20||environment.worldObjectsAfter<2000)
+    if(environment.residentsAfter!==20||Math.abs(environment.worldObjectsAfter-WORLD_OBJECT_TARGET)>WORLD_OBJECT_TOLERANCE)
       throw new Error('large fixture did not remain intact through measurement: '+JSON.stringify(environment));
     if(!(report.terrainCache.hits>0)||report.terrainCache.cacheSize>report.terrainCache.cacheLimit)
       throw new Error('terrain cache evidence invalid: '+JSON.stringify(report.terrainCache));

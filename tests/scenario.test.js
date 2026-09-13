@@ -2706,6 +2706,38 @@ test('#201 restore: 持久 PlanetSpec 深层数组损坏时启动不崩并安全
     '深层数组损坏的持久 PlanetSpec 应安全返航');
 });
 
+test('#204 LLM enrichment: 当前远征标题与刷新后的持久星球身份一致', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();
+  const enabled=APH.LLM.enabled,enrich=APH.LLM.enrichPlanet;
+  let launch;
+  try{
+    APH.LLM.enabled=function(){return true;};
+    APH.LLM.enrichPlanet=function(spec){
+      const rich=JSON.parse(JSON.stringify(spec));
+      rich.name='静潮星';rich.paletteName='镜砂平原';rich.lore='持久富化测试档案';
+      return {then:function(resolve){resolve(rich);return Promise.resolve(rich);}};
+    };
+    launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+      destination:{kind:'unknown',seed:0x20410}});
+  }finally{APH.LLM.enabled=enabled;APH.LLM.enrichPlanet=enrich;}
+  A(launch&&launch.ok,'LLM 富化夹具应先成功着陆: '+JSON.stringify(launch));
+  const run=APH.ExpeditionState.active(S.colony),stored=APH.Save.loadPlanet(run.destination.planetId);
+  const expected='静潮星 · 镜砂平原 (远征)';
+  A(stored&&stored.name==='静潮星'&&stored.paletteName==='镜砂平原','富化名称和群系没有一起持久化');
+  A(S.spec.name===stored.name&&S.spec.paletteName===stored.paletteName,
+    '当前远征没有同步持久 PlanetSpec 的名称和群系');
+  A(document.getElementById('planetTitle').textContent===expected,'富化后当前标题没有即时更新');
+  M.checkpointWorlds(S);
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&document.getElementById('planetTitle').textContent===expected,
+    '刷新恢复后的标题与富化成功时不一致');
+  A(M.returnHome().ok,'LLM 富化标题用例清理返航失败');
+});
+
 test('#202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后返航仍幂等', () => {
   APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
   S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
@@ -2716,6 +2748,8 @@ test('#202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后
   const firstRun=APH.ExpeditionState.active(S.colony),planetId=firstRun.destination.planetId;
   const planetKey=APH.CFG.save.KEY_PLANET+planetId,planetRaw=localStorage.getItem(planetKey);
   const stored=APH.Save.loadPlanet(planetId),observationRaw=JSON.stringify(stored.observation);
+  const expectedTitle=stored.name+' · '+stored.paletteName+' (远征)';
+  A(document.getElementById('planetTitle').textContent===expectedTitle,'首次着陆标题缺少持久星球群系');
   M.checkpointWorlds(S);
 
   /* 模拟整页刷新：只重载 meta/colony，当前远征必须从 Active Run.runtime
@@ -2727,6 +2761,7 @@ test('#202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后
     '首次远征刷新后没有恢复正确 Active Run');
   A(JSON.stringify(S.spec)===JSON.stringify(stored)&&JSON.stringify(S.worldDescriptor.observation)===observationRaw,
     '首次刷新恢复没有安装持久 PlanetSpec/Observation');
+  A(document.getElementById('planetTitle').textContent===expectedTitle,'刷新恢复标题没有保留同一持久星球群系');
   A(M.returnHome().ok,'首次远征返航失败');
 
   const generate=APH.Planet.newObservedPlanet;
