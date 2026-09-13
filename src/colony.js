@@ -2531,9 +2531,45 @@ APH.Colony = (function(){
     return out;
   }
 
+  function floraRule(target){
+    var base=target&&CFG.observe&&CFG.observe.resourceSemantics&&CFG.observe.resourceSemantics[target.kind];
+    var variant=target&&(target.variantId||target.variant)&&base&&base.variants&&base.variants[target.variantId||target.variant];
+    if(!base||((target.variantId||target.variant)&&!variant))return null;
+    var out={},key;
+    for(key in base)if(base.hasOwnProperty(key)&&key!=='variants')out[key]=base[key];
+    if(variant)for(key in variant)if(variant.hasOwnProperty(key))out[key]=variant[key];
+    return out;
+  }
+  function floraHarvestError(target,rule){
+    if(!target||!rule)return 'unknown-resource-kind:'+String(target&&target.kind||'');
+    var itemId=Object.prototype.hasOwnProperty.call(target,'yieldItemId')?target.yieldItemId:rule.yieldItemId;
+    var amount=target.amount!=null?target.amount:rule.amount;
+    if(typeof itemId!=='string'||!CFG.items||!CFG.items[itemId])return 'invalid-resource-yield:'+String(itemId||'');
+    if(!(amount>0)||!isFinite(amount))return 'invalid-resource-amount';
+    if(!(target.hp>=0)||!isFinite(target.hp))return 'invalid-resource-hp';
+    return null;
+  }
+  function queueFloraRespawn(s,target,rule){
+    if(!s||!target||target._queued)return false;
+    var renewable=typeof target.renewable==='boolean'?target.renewable:rule&&rule.renewable===true;
+    target._queued=true;
+    if(!renewable)return false;
+    var ticks=Math.max(1,Math.floor(Number(target.regenTicks!=null?target.regenTicks:(rule&&rule.regenTicks))||1));
+    var hp=Math.max(1,Number(target.maxHp||target.hp||(rule&&rule.hp))||1);
+    s.floraRespawn=s.floraRespawn||[];
+    s.floraRespawn.push({sourceId:target.id||target.uid,uid:target.uid||target.id,kind:target.kind,
+      visualKind:target.visualKind||(rule&&rule.visualKind)||target.kind,x:target.x,y:target.y,
+      ticksLeft:ticks,regenTicks:ticks,hp:hp,yieldItemId:target.yieldItemId||(rule&&rule.yieldItemId),
+      seedItem:target.seedItem||(rule&&rule.seedItem),amount:target.amount!=null?target.amount:rule.amount,
+      exposureRisk:target.exposureRisk===true,seed:target.seed,renewable:true});
+    return true;
+  }
+
   /* 居民在自然实体上工作推进(纯函数) */
   function workOnFlora(target, resident, dt){
-    if(!target || target.hp <= 0) return { done:true, dropItemId:null, dropCount:0 };
+    var rule=floraRule(target),error=floraHarvestError(target,rule);
+    if(error)return {done:false,dropItemId:null,dropCount:0,error:error};
+    if(target.hp <= 0) return { done:true, dropItemId:null, dropCount:0 };
     if(target.pendingRepair)return {done:false,dropItemId:null,dropCount:0,locked:true};
     var eff = (window.APH.Res && APH.Res.efficiency) ? APH.Res.efficiency(resident) : 1;
     if(!isFinite(eff) || eff <= 0) eff = 1;
@@ -2544,22 +2580,17 @@ APH.Colony = (function(){
     if(target.hp <= 0){
       target.hp = 0;
       target.dead = true;
+      target.depleted = true;
       var active=APH.state;
-      if(active&&active.scene==='home'&&active.colony&&(active.entities||[]).indexOf(target)>=0){
-        active.colony.floraState=active.colony.floraState||{};active.colony.floraState[target.id]={hp:0,dead:true};
-        if(target.kind.indexOf('rock')===0){active.colony.depleted=active.colony.depleted||{};active.colony.depleted[target.uid||target.id]=true;}
-        else if(!target._queued){
-          target._queued=true;active.floraRespawn=active.floraRespawn||[];
-          active.floraRespawn.push({sourceId:target.id,kind:target.kind,x:target.x,y:target.y,ticksLeft:(CFG.gathering.regenTicks||{})[target.kind]||8,yieldItemId:target.yieldItemId,seedItem:target.seedItem,amount:target.amount,exposureRisk:target.exposureRisk});
+      if(active&&(active.entities||[]).indexOf(target)>=0){
+        if(active.scene==='home'&&active.colony){
+          active.colony.floraState=active.colony.floraState||{};active.colony.floraState[target.id]={hp:0,dead:true};
+          if(rule.mineral){active.colony.depleted=active.colony.depleted||{};active.colony.depleted[target.uid||target.id]=true;}
         }
+        queueFloraRespawn(active,target,rule);
       }
-      var dropId = 'it_wood', dropN = 4;
-      if(target.kind === 'tree'){ dropId = 'it_wood'; dropN = 4; }
-      else if(target.kind === 'rock_iron'){ dropId = 'it_iron'; dropN = 3; }
-      else if(target.kind === 'rock_stone'){ dropId = 'it_stone'; dropN = 4; }
-      else if(target.kind === 'bush_berry'){ dropId = 'it_berry'; dropN = 3; }
-      else if(target.kind === 'bush_herb'){ dropId = 'it_herb'; dropN = 2; }
-      if(target.yieldItemId&&CFG.items[target.yieldItemId]){dropId=target.yieldItemId;dropN=target.amount||dropN;}
+      var dropId=target.yieldItemId||rule.yieldItemId;
+      var dropN=target.amount!=null?target.amount:rule.amount;
       return { done:true, dropItemId:dropId, dropCount:dropN };
     }
     return { done:false, dropItemId:null, dropCount:0 };
@@ -2569,12 +2600,17 @@ APH.Colony = (function(){
   function floraRespawnTick(s){
     var queue = (s && s.floraRespawn) || (s.floraRespawn = []);
     var G = (CFG.gathering) || {};
-    var regenCfg = G.regenTicks || { tree:8, rock_iron:12, rock_stone:10, bush_berry:6, bush_herb:6 };
     var zoneR = G.regenZoneR != null ? G.regenZoneR : 200;
-    var spawned = [];
+    var spawned = [],errors=[];
+    Object.defineProperty(spawned,'errors',{value:errors,enumerable:false});
 
     for(var i = queue.length - 1; i >= 0; i--){
-      if(s.colony&&s.colony.scene&&s.colony.scene.generation===1&&(queue[i].kind||'').indexOf('rock')===0){queue.splice(i,1);continue;}
+      var rule=floraRule(queue[i]);
+      if(!rule){errors.push({sourceId:queue[i]&&queue[i].sourceId,error:'unknown-resource-kind'});queue.splice(i,1);continue;}
+      var legacyRenewal=typeof queue[i].renewable!=='boolean';
+      if(legacyRenewal&&rule.mineral&&s.colony&&s.colony.scene&&s.colony.scene.generation===1){queue.splice(i,1);continue;}
+      var renewable=legacyRenewal?true:queue[i].renewable;
+      if(!renewable){queue.splice(i,1);continue;}
       queue[i].ticksLeft--;
       if(queue[i].ticksLeft <= 0){
         var rng = U.makeRng(((s.seed || 7) * 31 + i * 917 + Math.floor((s.clock || 0))) >>> 0);
@@ -2586,12 +2622,15 @@ APH.Colony = (function(){
         nx = clamped.x; ny = clamped.y;
         var kind = queue[i].kind;
         if(queue[i].sourceId){nx=queue[i].x;ny=queue[i].y;}
-        var hp = kind === 'tree' ? 30 : (kind === 'rock_iron' ? 40 : (kind === 'rock_stone' ? 35 : (kind === 'bush_berry' ? 15 : 20)));
+        var hp = Math.max(1,Number(queue[i].hp||rule.hp)||1);
         spawned.push({
           id: queue[i].sourceId||('flora_regen_' + i + '_' + Math.floor(rng() * 9999)),
-          type: 'flora', kind: kind,
+          uid:queue[i].uid||queue[i].sourceId,type: 'flora', kind: kind,visualKind:queue[i].visualKind||rule.visualKind||kind,
           x: nx, y: ny,
-          hp: hp, maxHp: hp,yieldItemId:queue[i].yieldItemId,seedItem:queue[i].seedItem,amount:queue[i].amount,exposureRisk:queue[i].exposureRisk
+          hp: hp,maxHp:hp,yieldItemId:queue[i].yieldItemId||rule.yieldItemId,
+          seedItem:queue[i].seedItem||rule.seedItem,amount:queue[i].amount!=null?queue[i].amount:rule.amount,
+          exposureRisk:queue[i].exposureRisk===true,seed:queue[i].seed,renewable:true,
+          regenTicks:Math.max(1,Math.floor(Number(queue[i].regenTicks||rule.regenTicks)||1)),depleted:false
         });
         if(queue[i].sourceId&&s.colony&&s.colony.floraState)delete s.colony.floraState[queue[i].sourceId];
         queue.splice(i, 1);
@@ -2839,7 +2878,6 @@ APH.Colony = (function(){
     });
 
     /* ADR-28: 推进自然资源再生队列 */
-    var regenCfg = (CFG.gathering && CFG.gathering.regenTicks) || { tree:8, rock_iron:12, rock_stone:10, bush_berry:6, bush_herb:6 };
     var newFlora = floraRespawnTick(s);
     newFlora.forEach(function(f){
       if(s.entities) s.entities.push(f);
@@ -2848,11 +2886,7 @@ APH.Colony = (function(){
     /* ADR-28: 将刚死亡的自然实体加入再生队列 */
     (s.entities || []).forEach(function(en){
       if(!en || en.type !== T.FLORA || !en.dead || en._queued) return;
-      en._queued = true;
-      if(en.kind&&en.kind.indexOf('rock')===0)return;
-      var ticks = regenCfg[en.kind] || 8;
-      if(!s.floraRespawn) s.floraRespawn = [];
-      s.floraRespawn.push({ sourceId:en.id,kind: en.kind, x: en.x, y: en.y, ticksLeft: ticks,yieldItemId:en.yieldItemId,seedItem:en.seedItem,amount:en.amount,exposureRisk:en.exposureRisk });
+      queueFloraRespawn(s,en,floraRule(en));
     });
 
     /* ADR-38: 敌对/叙事/居民三跳的编排已上移到 main.js —— 见 simHome。 */

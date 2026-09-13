@@ -22,7 +22,7 @@ APH.WorldRuntime = (function(){
     'px','py','vx','vy','face','walkPh','moving','run','downed','o2','hp','cry',
     'found','totalBeacons','carry','runLoot','squad','group','selectedPawns',
     'selectedRid','selectedTarget','playerDrafted','entities','parts','spores',
-    'ruins','war','rivalStates','power','floraRespawn','designations',
+    'ruins','war','rivalStates','power','floraRespawn','expeditionRegenT','overlayFailures','designations',
     'orderTool','orderDrag','orderFrom','orderTo','pawnDrag','pawnDragStart',
     'pawnDragEnd','fireCd','iFrameT','hurtFlash','noiseT','acidT','spawnT','prodT',
     'camX','camY','camZoom','camFollow','strictCam','shake','target','nearBeacon','nearPad',
@@ -35,6 +35,11 @@ APH.WorldRuntime = (function(){
   ];
 
   function own(obj, key){ return Object.prototype.hasOwnProperty.call(obj, key); }
+  function normalizedExpeditionRegenT(value){
+    var period=Number(APH.CFG&&APH.CFG.time&&APH.CFG.time.prodTick)||30;
+    if(!(period>0)||!isFinite(period)||typeof value!=='number'||!isFinite(value)||value<0)return 0;
+    return value%period;
+  }
 
   /* Deliberately shallow: a captured world keeps ownership of its live entity
      objects and caches while the facade is switched to another world. */
@@ -170,6 +175,7 @@ APH.WorldRuntime = (function(){
         var id = entityId(world[key]);
         if(id != null) out[key+'Id'] = id;
       }
+      else if(key==='expeditionRegenT') out[key]=normalizedExpeditionRegenT(world[key]);
       else {
         var value = plainClone(world[key]);
         if(value !== undefined) out[key] = value;
@@ -202,6 +208,7 @@ APH.WorldRuntime = (function(){
     if(base && own(base,'colony')) world.colony = base.colony;
     else delete world.colony;
     delete world.runtimeVersion;
+    if(own(world,'expeditionRegenT'))world.expeditionRegenT=normalizedExpeditionRegenT(world.expeditionRegenT);
     var entities = Array.isArray(world.entities) ? world.entities : [];
     var byId = {};
     entities.forEach(function(entity){
@@ -257,7 +264,7 @@ APH.WorldRuntime = (function(){
     /* These are mutable world-owned records. meta/colony stay shared canonical
        outer state; runtime snapshots never duplicate either object graph. */
     ['carry','scene','spec','war','rivalStates','power','ruins',
-      'floraRespawn','designations','runLoot','nav','navGrid','navCache','pathCache','task'].forEach(function(key){
+      'floraRespawn','overlayFailures','designations','runLoot','nav','navGrid','navCache','pathCache','task'].forEach(function(key){
       if(out[key] && typeof out[key] === 'object') out[key] = plainClone(out[key]);
     });
     return out;

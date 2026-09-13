@@ -1361,6 +1361,7 @@ APH.Ent = (function(){
   /* 自然资源实体绘制(树木/铁矿/岩石/灌木) */
   function drawFlora(e, time){
     if(!ctx || !e) return;
+    var kind=e.visualKind||e.kind;
     ctx.save();
     var shake = 0;
     if(e.chopAt != null && time != null && (time - e.chopAt) >= 0 && (time - e.chopAt) < 0.14){
@@ -1369,19 +1370,33 @@ APH.Ent = (function(){
     ctx.translate(e.x + shake, e.y);
     ctx.fillStyle='rgba(0,0,0,.22)';
     ctx.beginPath(); ctx.ellipse(0,4,12,6,0,0,U.TAU); ctx.fill();
-    if(e.kind === 'tree'){
+    if(kind === 'tree'){
       ctx.fillStyle='#6d4c41';
       ctx.fillRect(-3, -12, 6, 14);
       ctx.fillStyle='#388e3c';
       ctx.beginPath(); ctx.arc(0, -20, 16, 0, U.TAU); ctx.fill();
       ctx.fillStyle='#4caf50';
       ctx.beginPath(); ctx.arc(-4, -24, 11, 0, U.TAU); ctx.fill();
-    }else if(e.kind === 'rock_wreckage'){
+    }else if(kind === 'rock_wreckage'){
       ctx.fillStyle='#dbcaa9';ctx.fillRect(-18,-14,34,20);ctx.fillStyle='#527d76';ctx.fillRect(-13,-11,15,12);ctx.strokeStyle='#725e4c';ctx.lineWidth=2;ctx.strokeRect(-18,-14,34,20);ctx.beginPath();ctx.moveTo(6,-14);ctx.lineTo(2,-4);ctx.lineTo(11,6);ctx.stroke();
       if(e.repairable){ctx.fillStyle='#ffe099';ctx.fillRect(9,-10,4,4);}
-    }else if(e.kind === 'bush_alien'){
+    }else if(kind === 'bush_alien'){
       ctx.fillStyle='#7e88ad';ctx.beginPath();ctx.ellipse(0,-8,14,12,0,0,U.TAU);ctx.fill();ctx.fillStyle='#a5e5d4';ctx.beginPath();ctx.ellipse(-5,-16,5,9,-.5,0,U.TAU);ctx.ellipse(6,-17,5,10,.5,0,U.TAU);ctx.fill();ctx.fillStyle='#f5daa6';ctx.beginPath();ctx.arc(0,-8,3,0,U.TAU);ctx.fill();
-    }else if(e.kind === 'rock_iron'){
+    }else if(kind === 'flora_glow'){
+      ctx.fillStyle='#2f6859';ctx.beginPath();ctx.ellipse(0,-5,12,9,0,0,U.TAU);ctx.fill();
+      ctx.fillStyle='#59d9ff';ctx.beginPath();ctx.arc(-6,-13,5,0,U.TAU);ctx.arc(3,-16,7,0,U.TAU);ctx.arc(8,-9,4,0,U.TAU);ctx.fill();
+      ctx.fillStyle='rgba(125,255,171,.7)';ctx.beginPath();ctx.arc(2,-15,3,0,U.TAU);ctx.fill();
+    }else if(kind === 'flora_crystal'){
+      ctx.fillStyle='#704564';ctx.fillRect(-2,-8,4,11);ctx.fillStyle='#ff9ad0';
+      [-7,0,7].forEach(function(x){ctx.beginPath();ctx.moveTo(x,-5);ctx.lineTo(x+4,-22-Math.abs(x)/2);ctx.lineTo(x+8,-5);ctx.closePath();ctx.fill();});
+    }else if(kind === 'flora_dew'){
+      ctx.fillStyle='#4d7b4f';ctx.beginPath();ctx.ellipse(-5,-7,8,13,-.55,0,U.TAU);ctx.ellipse(6,-8,8,13,.55,0,U.TAU);ctx.fill();
+      ctx.fillStyle='#b8e986';ctx.beginPath();ctx.arc(0,-14,5,0,U.TAU);ctx.fill();ctx.fillStyle='#d4ff7d';ctx.beginPath();ctx.arc(-1,-16,2,0,U.TAU);ctx.fill();
+    }else if(kind === 'flora_star'){
+      ctx.fillStyle='#71889a';ctx.beginPath();ctx.arc(0,-7,10,0,U.TAU);ctx.fill();ctx.strokeStyle='#e0f7fa';ctx.lineWidth=3;
+      for(var si=0;si<6;si++){var sa=si*U.TAU/6;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(Math.cos(sa)*13,-8+Math.sin(sa)*13);ctx.stroke();}
+      ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(0,-8,4,0,U.TAU);ctx.fill();
+    }else if(kind === 'rock_iron'){
       ctx.fillStyle='#455a64';
       ctx.beginPath();
       ctx.moveTo(-10, 4); ctx.lineTo(-6, -10); ctx.lineTo(6, -12); ctx.lineTo(12, 0); ctx.lineTo(6, 6);
@@ -1389,21 +1404,21 @@ APH.Ent = (function(){
       ctx.fillStyle='#78909c';
       ctx.beginPath(); ctx.arc(0, -3, 5, 0, U.TAU); ctx.fill();
       ctx.fillStyle='#80d8ff'; ctx.fillRect(-2, -5, 2, 2);
-    }else if(e.kind === 'rock_stone'){
+    }else if(kind === 'rock_stone'){
       ctx.fillStyle='#757575';
       ctx.beginPath();
       ctx.moveTo(-8, 5); ctx.lineTo(-10, -6); ctx.lineTo(0, -10); ctx.lineTo(9, -4); ctx.lineTo(7, 6);
       ctx.closePath(); ctx.fill();
       ctx.fillStyle='#9e9e9e';
       ctx.beginPath(); ctx.arc(1, -2, 4, 0, U.TAU); ctx.fill();
-    }else if(e.kind === 'bush_berry'){
+    }else if(kind === 'bush_berry'){
       ctx.fillStyle='#2e7d32';
       ctx.beginPath(); ctx.arc(0, -4, 10, 0, U.TAU); ctx.fill();
       ctx.fillStyle='#e53935';
       ctx.beginPath(); ctx.arc(-3, -6, 2.5, 0, U.TAU); ctx.fill();
       ctx.beginPath(); ctx.arc(4, -4, 2.5, 0, U.TAU); ctx.fill();
       ctx.beginPath(); ctx.arc(0, -1, 2.5, 0, U.TAU); ctx.fill();
-    }else if(e.kind === 'bush_herb'){
+    }else if(kind === 'bush_herb'){
       ctx.fillStyle='#00897b';
       ctx.beginPath(); ctx.arc(0, -4, 9, 0, U.TAU); ctx.fill();
       ctx.fillStyle='#80cbc4';

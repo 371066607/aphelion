@@ -2759,6 +2759,116 @@ test('#202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后
     '重复返航改变了家园或重复结算 run '+runId);
 });
 
+test('#203 expedition resources: 着陆采集、刷新恢复、返航结算与新 Run 重置闭环', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=3;
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20310}});
+  A(launch&&launch.ok,'#203 资源远征启动失败: '+JSON.stringify(launch));
+  const run=APH.ExpeditionState.active(S.colony),planetId=run.destination.planetId;
+  const planetKey=APH.CFG.save.KEY_PLANET+planetId,planetRaw=localStorage.getItem(planetKey);
+  const expectedNatural=S.spec.observation.resources.map(function(resource){return resource.uid;}).sort();
+  const natural=S.entities.filter(function(entity){return entity.type===T.FLORA&&!entity.expeditionResource;})
+    .map(function(resource){return resource.uid;}).sort();
+  A(JSON.stringify(natural)===JSON.stringify(expectedNatural),'运行世界自然资源没有逐项来自 Observation');
+  A(!S.entities.some(function(entity){return entity.type===T.ROCK||entity.type===T.CRYSTAL;}),
+    'observed 远征仍叠加旧 rock/crystal scatter');
+  const deposit=S.entities.find(function(entity){return entity.type===T.FLORA&&entity.expeditionResource;});
+  const leader=S.entities.find(function(entity){return entity.type===T.RESIDENT&&entity.rid==='rs_cmd1';});
+  A(deposit&&leader,'#203 场景缺少任务矿点或远征居民');
+  const depositId=deposit.id,itemId=deposit.yieldItemId,amount=deposit.amount;
+  leader.x=deposit.x;leader.y=deposit.y;deposit.hp=.01;leader.userOrder={type:'gather',flora:deposit};
+  M.simStep(.1);
+  A(!S.entities.some(function(entity){return entity.id===depositId&&!entity.dead;}),'采空任务矿点仍存活');
+  A((S.carry[itemId]||0)===amount,'实际采集物没有进入 Active Run cargo: '+JSON.stringify(S.carry));
+  A(!(S.floraRespawn||[]).some(function(entry){return entry.sourceId===depositId;}),'有限任务矿点被加入再生队列');
+  A(M.checkpointWorlds(S),'采集后 checkpoint 失败');
+
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const restored=M.restoreWorldSession(S);
+  A(restored.run&&S.scene==='expedition'&&restored.run.id===run.id,'刷新后没有恢复同一 Active Run');
+  A(!S.entities.some(function(entity){return entity.id===depositId&&!entity.dead;}),'刷新让已采空矿点复活');
+  A((S.carry[itemId]||0)===amount,'刷新丢失已采集 cargo');
+  A(localStorage.getItem(planetKey)===planetRaw,'运行时采集改写了不可变 PlanetSpec');
+  const returned=M.returnHome();
+  A(returned&&returned.ok&&returned.receipt&&returned.receipt.cargo[itemId]===amount,'返航没有按实际 cargo 结算');
+  A(S.scene==='home'&&!APH.ExpeditionState.active(S.colony),'返航没有清除 Active Run');
+
+  const revisit=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'planet',planetId:planetId,seed:0x20310}});
+  A(revisit&&revisit.ok,'新 Active Run 重访失败');
+  const resetDeposit=S.entities.find(function(entity){return entity.id===depositId;});
+  A(resetDeposit&&!resetDeposit.dead&&resetDeposit.hp===resetDeposit.maxHp,'新 Active Run 没有从初始任务资源重置');
+  A(JSON.stringify(S.spec.observation.resources.map(function(resource){return resource.uid;}).sort())===JSON.stringify(expectedNatural),
+    '重访偷换了 Observation 自然资源');
+  A(M.checkpointWorlds(S),'损坏再生时钟夹具 checkpoint 失败');
+  const corruptColony=JSON.parse(localStorage.getItem(APH.CFG.save.KEY_COLONY));
+  corruptColony.expedition.active.runtime.expeditionRegenT=1e12;
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,JSON.stringify(corruptColony));
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const rejected=M.restoreWorldSession(S);
+  A(!rejected.run&&rejected.recovered&&rejected.recovered.ok&&S.scene==='home',
+    '损坏的巨大再生时钟未被有限拒绝并安全召回');
+});
+
+test('#203 restore: 旧 observed runtime 的第二套自然资源安全返航而不重新装入', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=2;
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20311}});
+  A(launch&&launch.ok&&M.checkpointWorlds(S),'旧 observed runtime 夹具启动或保存失败');
+  const saved=JSON.parse(localStorage.getItem(APH.CFG.save.KEY_COLONY));
+  const runtime=saved.expedition.active.runtime;
+  delete runtime.expeditionRegenT;delete runtime.overlayFailures;
+  runtime.entities.push({id:'old_rock',type:T.ROCK,x:200,y:200});
+  runtime.entities.push({id:'old_crystal',type:T.CRYSTAL,x:250,y:250});
+  runtime.entities.push({id:'exp_flora_0',type:T.FLORA,kind:'flora_glow',seedItem:'specimen_flora_glow',x:300,y:300,hp:1,maxHp:1});
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,JSON.stringify(saved));
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const restored=M.restoreWorldSession(S);
+  A(!restored.run&&restored.recovered&&restored.recovered.ok&&S.scene==='home',
+    'pre-#203 observed runtime 应安全返航');
+  A(!S.entities.some(function(entity){return entity.id==='old_rock'||entity.id==='old_crystal'||entity.id==='exp_flora_0';}),
+    '旧第二套自然资源被装入当前世界');
+});
+
+test('#203 restore: Observation 资源冒充覆盖物实体时拒绝恢复并安全返航', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();S.meta.res.food=2;
+  const launch=M.launchExpedition({memberIds:['rs_cmd1'],supply:{food:0},objective:'resources',
+    destination:{kind:'unknown',seed:0x20312}});
+  const run=APH.ExpeditionState.active(S.colony),flora=S.entities.find(function(entity){
+    return entity.type===T.FLORA&&!entity.expeditionResource;
+  }),pawn=S.entities.find(function(entity){return entity.type===T.RESIDENT&&entity.rid==='rs_cmd1';});
+  A(launch&&launch.ok&&run&&flora&&pawn,'保留实体 uid 恢复夹具启动失败');
+  pawn.userOrder={type:'gather',flora:flora};
+  A(M.checkpointWorlds(S),'保留实体 uid 恢复夹具保存失败');
+
+  const stored=APH.Save.loadPlanet(run.destination.planetId);
+  const storedResource=stored.observation.resources.find(function(resource){return resource.uid===flora.uid;});
+  storedResource.uid='rw_0';
+  APH.Save.savePlanet(stored.id,stored);
+  const saved=JSON.parse(localStorage.getItem(APH.CFG.save.KEY_COLONY)),runtime=saved.expedition.active.runtime;
+  const runtimeResource=runtime.entities.find(function(entity){return entity.id===flora.id;});
+  const runtimePawn=runtime.entities.find(function(entity){return entity.rid==='rs_cmd1';});
+  runtimeResource.id='rw_0';runtimeResource.uid='rw_0';runtimePawn.userOrder.floraId='rw_0';
+  localStorage.setItem(APH.CFG.save.KEY_COLONY,JSON.stringify(saved));
+
+  S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.spores=[];
+  const restored=M.restoreWorldSession(S);
+  A(!restored.run&&restored.recovered&&restored.recovered.ok&&S.scene==='home',
+    '资源 uid 与覆盖物冲突的远征不应安装');
+  A(!S.entities.some(function(entity){return entity.id==='rw_0';}),
+    '冲突实体在安全返航后泄漏到家园');
+});
+
 test('#202 revisit: 访问记录保存失败时不扣补给、不切世界且 PlanetSpec 不变', () => {
   APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
   S.scene='home';S.entities=[];S.parts=[];S.spores=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
@@ -2870,6 +2980,22 @@ test('#202 legacy revisit: 旧短 ID 星球保持 generation 0，刷新不会静
     '旧星球不得被重命名或静默升级为 observed generation 1');
   A(!!APH.World.legacyLake(S.worldDescriptor,S.spec),'旧星球必须保留 generation 0 固定湖兼容表现');
   A(localStorage.getItem(APH.CFG.save.KEY_PLANET+legacy.id)===planetRaw,'旧 PlanetSpec 原始字节不得改写');
+  const sample=S.entities.find(function(entity){return entity.type===T.FLORA&&entity.seedItem;});
+  const leader=S.entities.find(function(entity){return entity.type===T.RESIDENT&&entity.rid==='rs_cmd1';});
+  A(sample&&leader,'旧地图缺少一次性标本或远征居民');
+  const sampleHp=sample.hp,beforeQueue=(S.floraRespawn||[]).length,beforeCargo=S.carry[sample.seedItem]||0;
+  const beforeDrops=S.entities.filter(function(entity){return entity.type===T.DROPPED&&!entity.dead&&entity.itemId===sample.seedItem;})
+    .reduce(function(total,entity){return total+(entity.n||1);},0);
+  leader.x=sample.x;leader.y=sample.y;leader.userOrder={type:'gather',flora:sample};
+  M.simStep(.01);
+  const afterDrops=S.entities.filter(function(entity){return entity.type===T.DROPPED&&!entity.dead&&entity.itemId===sample.seedItem;})
+    .reduce(function(total,entity){return total+(entity.n||1);},0);
+  A(sample.dead&&sample.hp===sampleHp,'旧地图标本必须保持一次点击采走的既有语义');
+  A((S.carry[sample.seedItem]||0)-beforeCargo+afterDrops-beforeDrops===1,'旧地图标本掉落数量改变');
+  A((S.floraRespawn||[]).length===beforeQueue,'旧地图一次性标本不得进入新再生队列');
+  const oldClock=APH.CFG.time.prodTick-.005;S.expeditionRegenT=oldClock;
+  M.simStep(.01);
+  A(S.expeditionRegenT===oldClock,'generation 0 不得启动 observed 资源再生时钟');
   M.checkpointWorlds(S);
   S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
   S.scene='home';S.entities=[];S.parts=[];S.spores=[];

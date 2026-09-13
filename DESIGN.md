@@ -299,3 +299,13 @@ Atlas 中的新发现从实际首次着陆起记 `visits:1` 和 `lastVisitedAt`�
 Atlas 出现前已经落盘的 `P` 前缀 PlanetSpec，由 `Save.loadMeta` 在内存中按实际存储 key 回填索引：key 必须与 spec 内部 ID 相同且完整校验通过；旧短 ID 不改名，碰撞过而未能同时落盘的历史数据也不臆造恢复。无 Observation 的旧 PlanetSpec 继续使用 generation 0、2200×2200 和固定湖语义；刷新只在持久 spec 无 Observation、runtime 同为 generation 0 且身份与尺寸吻合时恢复。所有新未知星仍必须创建 generation 1 Observation。带 Observation 的已知星仍要求 runtime 与持久 Observation 完全相同。两种恢复路径都以持久 PlanetSpec 为事实源，损坏或身份冲突时沿幂等返航回收队员。
 
 #201 已写入的 `visits:0` 且没有 `lastVisitedAt` 的条目可唯一识别为已经着陆的旧发现，加载回填时归一为首访，下一次重访记为 2；显式带访问时间的 0 不猜测。PlanetSpec 校验拒绝越界 tier、负数/越界地形密度、无效敌人夜间倍率和未归一权重，但继续接受早期缺 tier 的 v1 legacy 档并按既有默认 tier 1 运行。若 colony 中权威 `metaSnapshot` 来自未来版本，必须在 envelope 迁移写回、Atlas 扫描、`metaWillSave` checkpoint 或任何 colony 写入之前检查磁盘与会话兜底，随后抛错或拒绝，原始存档字节保持不变；合法 JSON 但不是存档对象的损坏快照回退独立 meta，本次加载不写回 colony。
+
+### ADR-48 修订：远征资源与覆盖物闭环（2026-09-14，#203）
+
+新生成的 observed PlanetSpec 在第一次观测时把自然资源和地面一起冻结。每条新资源记录使用稳定 `uid + gx/gy + kind`，并保存可见类别、合法产物、数量、耐久、初始耗尽态、确定性种子和是否/何时再生；数值来源仍是 `CFG.observe.resourceSemantics`。资源 `uid` 固定为 `obs_<worldSeed>_<kind>_<gx>_<gy>`，旧 v1 最小记录可缺省后补，显式身份则必须精确匹配，避免在统一实体索引中冒充遗迹或建筑。早期 v1 最小记录缺少新增字段时由 `TerrainModel.resources` 按同一 seed/坐标补齐，显式存在但与规范冲突的字段和重复 uid 则拒绝。该入口是唯一实体化入口：observed 远征不得再运行岩石、氧气晶体或异星 flora 的旧散布器；generation 0 继续原行为。未知 kind 或不合法产物不回退木材，PlanetSpec 校验明确拒绝，运行时采集也原样返回错误而不损坏实体。
+
+Observation 只保存初始事实，当前远征中的耐久、死亡、地上产物和再生队列归 Active Run 的 WorldRuntime。有限矿物耗尽后不再生；可再生植物按自己的 `regenTicks` 在原观测格恢复，并沿队列保留原 `uid`、可见类别、产物、数量和种子语义。checkpoint/restore 直接保存这组实体和队列，因此刷新不重新实体化或重掷；结束一次 Active Run 后的再次着陆从持久 Observation 初始化新一轮副本。
+
+#203 之前保存的 observed Active Run 不具备资源闭环版本标记，可能仍携带第二套随机自然资源与旧覆盖物。恢复时不猜测迁移局内实体，而是沿既有幂等返航路径带回已有货物和队员；generation 0 保持原恢复规则。#203 observed runtime 必须同时带有限再生相位和覆盖物失败表才可安装。
+
+任务矿藏、远古遗迹和敌方基地不是 Ground 或 Initial Natural Resource，继续作为运行时覆盖物。它们统一经 `TerrainModel.findOverlayPlacement` 以完整格网占地校验边界、每格通行、着陆安全区和已占关键格；候选来自各自 seed salt，随机尝试有固定上限，随后按同一 seed 从有限格表确定性扫描。成功结果声明全部占格；没有合法位置则返回带 kind/reason 的显式 failure，调用方不在水上或越界强放。后放覆盖物必须避开 Observation 资源、信标和先前覆盖物；基地守军也用独立 salt 在基地附近登记 1×1 空格。远征再生相位在存取边界限制为一个生产周期内的有限非负数，恢复拒绝危险值，帧循环限制补算次数。

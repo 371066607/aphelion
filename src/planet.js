@@ -254,8 +254,9 @@ APH.Planet = (function(){
     seed=seed>>>0;
     var spec=fallbackPlanet(seed,{id:idForSeed(seed)}),grid=CFG.GRID;
     var widthCells=Math.ceil(CFG.WORLD/grid),heightCells=Math.ceil(CFG.WORLD/grid);
-    spec.observation=APH.Observe.observe({seed:seed,biomeId:spec.biome.id,
+    spec.observation=APH.TerrainModel.planetObservation({seed:seed,biomeId:spec.biome.id,
       widthCells:widthCells,heightCells:heightCells,
+      reservedCells:spec.beacons.map(function(beacon){return {gx:Math.floor(beacon.x/grid),gy:Math.floor(beacon.y/grid)};}),
       groundPins:landingGroundPins(spec.biome.id,widthCells,heightCells)});
     return spec;
   }
@@ -328,8 +329,28 @@ APH.Planet = (function(){
     }
     if(spec.observation){
       var descriptor={v:1,kind:'expedition',generation:1,seed:spec.seed,grid:CFG.GRID,observation:spec.observation};
+      var resourceIds=Object.create(null),resourceCells=Object.create(null);
       if(!APH.TerrainModel||!APH.TerrainModel.hasObservation(descriptor)) errors.push('invalid observation');
       if(!spec.biome||spec.observation.biomeId!==spec.biome.id) errors.push('observation biome mismatch');
+      if(Array.isArray(spec.observation.resources))spec.observation.resources.forEach(function(resource,i){
+        var error=APH.TerrainModel&&APH.TerrainModel.resourceError&&APH.TerrainModel.resourceError(resource,true,spec.seed,
+          {allowMissingDerived:true,requireObservationUid:true});
+        var profile=CFG.observe&&CFG.observe.biomes&&CFG.observe.biomes[spec.observation.biomeId];
+        var cell=APH.Observe&&APH.Observe.cellAt&&APH.Observe.cellAt(spec.observation,resource&&resource.gx,resource&&resource.gy);
+        var allowed=profile&&profile.resourceGround&&resource&&profile.resourceGround[resource.kind];
+        if(resource&&typeof resource.uid==='string'&&resource.uid){
+          if(resourceIds[resource.uid])errors.push('observation resource['+i+'] duplicate-resource-uid');
+          resourceIds[resource.uid]=true;
+        }
+        if(resource&&resource.gx===(resource.gx|0)&&resource.gy===(resource.gy|0)){
+          var resourceCell=resource.gx+','+resource.gy;
+          if(resourceCells[resourceCell])errors.push('observation resource['+i+'] duplicate-resource-cell');
+          resourceCells[resourceCell]=true;
+        }
+        if(error)errors.push('observation resource['+i+'] '+error);
+        else if(!cell||!cell.walkable||!Array.isArray(allowed)||allowed.indexOf(cell.tile)<0)
+          errors.push('observation resource['+i+'] invalid-ground');
+      });
     }
     return errors.length ? { ok:false, errors:errors } : { ok:true, spec:spec };
   }
@@ -433,7 +454,7 @@ APH.Planet = (function(){
   }
 
   /* ---------- ADR-24: 远征古代遗迹确定性生成 ---------- */
-  function generateAncientRuins(spec, seed){
+  function generateAncientRuins(spec, seed, placement){
     var s = seed != null ? seed : ((spec && spec.seed) || 1234);
     var tier = (spec && spec.tier != null) ? spec.tier : 1;
     var rng = U.makeRng((s ^ 0xA5C3) >>> 0);
@@ -443,8 +464,8 @@ APH.Planet = (function(){
 
     var G = CFG.GRID || 48;
     // 遗迹中心点放置在 [400, 1800] 区域内，远离中心着陆点 (1100, 1100) 至少 300px
-    var cx = 0, cy = 0, tries = 0;
-    while(tries++ < 50){
+    var cx = placement&&placement.ok?placement.x:0, cy = placement&&placement.ok?placement.y:0, tries = 0;
+    while(!placement&&tries++ < 50){
       cx = Math.floor(400 + rng() * 1400);
       cy = Math.floor(400 + rng() * 1400);
       cx = Math.floor(cx / G) * G;
@@ -480,7 +501,7 @@ APH.Planet = (function(){
       sentries.push({ x: sx, y: sy, factionId: 'fx_automaton' });
     }
 
-    return {
+    var result={
       cx: cx,
       cy: cy,
       w: 5 * G,
@@ -492,6 +513,72 @@ APH.Planet = (function(){
       sentries: sentries,
       revealed: false
     };
+    if(placement)result.placement=placement;
+    return result;
+  }
+
+  function expeditionOverlays(spec,objectiveKind){
+    var TM=APH.TerrainModel,cfg=CFG.expedition||{},scene=TM.planet(spec),G=CFG.GRID;
+    var occupied={},failures=[],deposits=[],guards=[],ruins=null,rivalBase=null;
+    function reservePoint(x,y,label){
+      TM.reserveCells(occupied,[{gx:Math.floor(x/G),gy:Math.floor(y/G)}],label);
+    }
+    ((spec.observation&&spec.observation.resources)||[]).forEach(function(resource){
+      TM.reserveCells(occupied,[{gx:resource.gx,gy:resource.gy}],'resource:'+resource.uid);
+    });
+    (spec.beacons||[]).forEach(function(beacon){reservePoint(beacon.x,beacon.y,'beacon:'+beacon.id);});
+    function place(kind,index,origin){
+      var footprint=cfg.overlayFootprints&&cfg.overlayFootprints[kind]||[1,1];
+      var range=cfg.overlayDistanceCells&&cfg.overlayDistanceCells[kind]||[0,Infinity];
+      var salt=((cfg.overlaySalt&&cfg.overlaySalt[kind])||0)+index*0x101;
+      var result=TM.findOverlayPlacement(scene,{seed:spec.seed,salt:salt,footprint:footprint,
+        occupied:occupied,minDistance:range[0],maxDistance:range[1],safeRadius:cfg.overlaySafeRadiusCells,
+        origin:origin});
+      if(!result.ok){failures.push({kind:kind,index:index,why:result.why,attempts:result.attempts});return null;}
+      TM.reserveCells(occupied,result.cells,kind+':'+index);return result;
+    }
+    var ruinRoll=U.makeRng(((spec.seed>>>0)^((cfg.overlaySalt&&cfg.overlaySalt.ruin)||0xA5C3))>>>0)();
+    if((spec.tier||1)>=2||ruinRoll<=.30){
+      var ruinPlacement=place('ruin',0);
+      if(ruinPlacement)ruins=generateAncientRuins(spec,spec.seed,ruinPlacement);
+    }
+    if(objectiveKind==='resources'){
+      (cfg.resourceDeposits||[]).forEach(function(def,i){
+        var placement=place('deposit',i);
+        if(!placement)return;
+        var uid='exp_ore_'+(spec.seed>>>0)+'_'+i;
+        var record=TM.resourceRecord(spec.seed,def.kind,placement.gx,placement.gy,
+          {yieldItemId:def.itemId,amount:def.amount,hp:def.hp,renewable:false,regenTicks:0,
+            depleted:false,mineral:true,expeditionResource:true},uid);
+        var error=TM.resourceError(record,true,spec.seed,{allowTunedAmountHp:true});
+        if(error){failures.push({kind:'deposit',index:i,why:error});return;}
+        deposits.push({id:uid,uid:uid,type:'flora',kind:record.kind,visualKind:record.visualKind,
+          x:placement.x,y:placement.y,hp:record.hp,maxHp:record.hp,amount:record.amount,
+          yieldItemId:record.yieldItemId,depleted:false,seed:record.seed,renewable:false,
+          regenTicks:0,mineral:true,expeditionResource:true,placement:placement});
+      });
+    }
+    if(spec.rivals&&spec.rivals.length){
+      var rivalRng=U.makeRng(((spec.seed>>>0)^((cfg.overlaySalt&&cfg.overlaySalt.rivalBase)||0x51A7))>>>0);
+      var rival=spec.rivals[Math.floor(rivalRng()*spec.rivals.length)];
+      var rivalPlacement=place('rivalBase',0);
+      if(rivalPlacement){
+        rivalBase={id:'rv_base_'+rival.id,type:CFG.entType.BUILDING,bid:'bl_rival_base',
+          x:rivalPlacement.x,y:rivalPlacement.y,rivalId:rival.id,rivalName:rival.name,
+          hp:60,maxHp:60,def:{name:rival.name+' 基地',size:70},placement:rivalPlacement};
+        var baseOrigin={gx:rivalPlacement.gx+(rivalPlacement.w-1)/2,
+          gy:rivalPlacement.gy+(rivalPlacement.h-1)/2};
+        for(var gi=0;gi<3;gi++){
+          var faction=spec.enemies&&spec.enemies.factions&&spec.enemies.factions[gi%spec.enemies.factions.length];
+          if(faction){
+            var guardPlacement=place('guard',gi,baseOrigin);
+            if(guardPlacement)guards.push({faction:faction,x:guardPlacement.x,y:guardPlacement.y,
+              placement:guardPlacement});
+          }
+        }
+      }
+    }
+    return {ruins:ruins,deposits:deposits,rivalBase:rivalBase,guards:guards,failures:failures,occupied:occupied};
   }
 
   function damageAncientGate(gate, dmg){
@@ -522,6 +609,7 @@ APH.Planet = (function(){
            validate:validate, tierOf:tierOf,
            pickRaidFaction:pickRaidFaction, hasLaw:hasLaw, sporeNudge:sporeNudge,
            generateExpeditionFlora:generateExpeditionFlora, expeditionDeposits:expeditionDeposits,
+           expeditionOverlays:expeditionOverlays,
            generateAncientRuins:generateAncientRuins, damageAncientGate:damageAncientGate,
            openArtifactVault:openArtifactVault,
            AUTOMATON_FACTION:AUTOMATON_FACTION,

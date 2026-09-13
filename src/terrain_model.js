@@ -7,7 +7,7 @@ window.APH = window.APH || {};
 APH.TerrainModel = (function(){
   'use strict';
 
-  var CFG = APH.CFG;
+  var CFG = APH.CFG, U = APH.U;
   var GRID = CFG.GRID;
   var HOME_SIZE = (CFG.homeMap && CFG.homeMap.cells || 128) * GRID;
   var LEGACY_SIZE = CFG.WORLD;
@@ -28,6 +28,99 @@ APH.TerrainModel = (function(){
     return u32(h);
   }
   function rand(seed, a, b){ return hash(seed,a,b)/4294967296; }
+  function stringSalt(value){
+    var h=2166136261,s=String(value||'');
+    for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+    return u32(h);
+  }
+  function resolvedResourceRule(kind,variantId){
+    var base=CFG.observe&&CFG.observe.resourceSemantics&&CFG.observe.resourceSemantics[kind];
+    var variant=variantId&&base&&base.variants&&base.variants[variantId],out={},key;
+    if(!base||(variantId&&!variant))return null;
+    for(key in base)if(base.hasOwnProperty(key)&&key!=='variants')out[key]=base[key];
+    if(variant)for(key in variant)if(variant.hasOwnProperty(key))out[key]=variant[key];
+    return out;
+  }
+  function resourceRecord(seed,kind,gx,gy,extra,uid,variantId){
+    var rule=resolvedResourceRule(kind,variantId),record,key,yieldItemId;
+    if(!rule)return null;
+    yieldItemId=rule.yieldItemId;
+    if(Array.isArray(rule.yieldItemIds)&&rule.yieldItemIds.length)
+      yieldItemId=rule.yieldItemIds[hash(seed,gx+(rule.yieldSalt||0),gy)%rule.yieldItemIds.length];
+    record={
+      uid:uid||('obs_'+u32(seed)+'_'+kind+'_'+gx+'_'+gy),gx:gx,gy:gy,kind:kind,
+      visualKind:rule.visualKind||kind,yieldItemId:yieldItemId,amount:rule.amount,
+      hp:rule.hp,depleted:false,seed:hash(seed^stringSalt(kind),gx,gy),
+      renewable:rule.renewable===true,regenTicks:rule.renewable===true?(rule.regenTicks||1):0
+    };
+    if(rule.seedItemFromYield)record.seedItem=yieldItemId;
+    else if(rule.seedItem)record.seedItem=rule.seedItem;
+    if(rule.exposureRisk)record.exposureRisk=true;
+    if(rule.mineral)record.mineral=true;
+    if(extra)for(key in extra)if(extra.hasOwnProperty(key))record[key]=extra[key];
+    return record;
+  }
+  function observationResourceUid(seed,kind,gx,gy){
+    return 'obs_'+u32(seed)+'_'+kind+'_'+gx+'_'+gy;
+  }
+  function resourceError(record,strict,worldSeed,options){
+    if(!record||typeof record!=='object')return 'invalid-resource';
+    var rule=resolvedResourceRule(record.kind,record.variantId||record.variant);
+    var item=Object.prototype.hasOwnProperty.call(record,'yieldItemId')?record.yieldItemId:(rule&&rule.yieldItemId);
+    if(!rule)return 'unknown-resource-kind:'+String(record.kind||'');
+    if(typeof item!=='string'||!CFG.items||!CFG.items[item])return 'invalid-resource-yield:'+String(item||'');
+    if(record.amount!=null&&(!(record.amount>0)||!isFinite(record.amount)))return 'invalid-resource-amount';
+    if(strict){
+      options=options||{};
+      var allowMissing=options.allowMissingDerived===true;
+      var hasUid=Object.prototype.hasOwnProperty.call(record,'uid');
+      if(!allowMissing&&!hasUid)return 'invalid-resource-uid';
+      if(hasUid&&(typeof record.uid!=='string'||!record.uid))return 'invalid-resource-uid';
+      if(record.gx!==(record.gx|0)||record.gy!==(record.gy|0))return 'invalid-resource-position';
+      if(typeof worldSeed!=='number'||!isFinite(worldSeed)||worldSeed!==(worldSeed>>>0))return 'invalid-resource-world-seed';
+      /* Observation 的自然资源会直接进入统一实体表。显式 uid 必须等于
+         seed + kind + 格坐标推导出的独立身份，不能冒充遗迹/建筑等实体。 */
+      if(options.requireObservationUid&&hasUid&&
+        record.uid!==observationResourceUid(worldSeed,record.kind,record.gx,record.gy))return 'invalid-resource-uid';
+      if(typeof record.yieldItemId!=='string'||!record.yieldItemId)return 'invalid-resource-yield';
+      if(!(record.amount>0)||!isFinite(record.amount))return 'invalid-resource-amount';
+      if((!allowMissing||Object.prototype.hasOwnProperty.call(record,'hp'))&&
+        (!(record.hp>0)||!isFinite(record.hp)))return 'invalid-resource-hp';
+      if((!allowMissing||Object.prototype.hasOwnProperty.call(record,'seed'))&&
+        (typeof record.seed!=='number'||!isFinite(record.seed)||record.seed!==(record.seed>>>0)))return 'invalid-resource-seed';
+      if((!allowMissing||Object.prototype.hasOwnProperty.call(record,'regenTicks'))&&
+        (!isFinite(record.regenTicks)||record.regenTicks!==(record.regenTicks|0)||record.regenTicks<0))return 'invalid-resource-regen';
+      /* PlanetSpec 里的自然资源是 seed + 坐标推导出的不可变事实，不能只做类型检查。
+         任务矿点只允许显式调节耐久和产量，其余身份字段仍必须与共享语义一致。 */
+      var canonical=resourceRecord(worldSeed,record.kind,record.gx,record.gy,null,record.uid,record.variantId||record.variant);
+      if(!canonical)return 'unknown-resource-kind:'+String(record.kind||'');
+      function differs(key){return (!allowMissing||Object.prototype.hasOwnProperty.call(record,key))&&record[key]!==canonical[key];}
+      if(record.yieldItemId!==canonical.yieldItemId)return 'invalid-resource-yield:'+record.yieldItemId;
+      if(!options.allowTunedAmountHp&&record.amount!==canonical.amount)return 'invalid-resource-amount';
+      if(differs('visualKind'))return 'invalid-resource-visual';
+      if(!options.allowTunedAmountHp&&differs('hp'))return 'invalid-resource-hp';
+      if(differs('depleted'))return 'invalid-resource-depleted';
+      if(differs('seed'))return 'invalid-resource-seed';
+      if(differs('renewable'))return 'invalid-resource-renewable';
+      if(differs('regenTicks'))return 'invalid-resource-regen';
+      var hasSeedItem=Object.prototype.hasOwnProperty.call(record,'seedItem');
+      if((!allowMissing||hasSeedItem)&&(hasSeedItem!==Object.prototype.hasOwnProperty.call(canonical,'seedItem')||
+        record.seedItem!==canonical.seedItem))return 'invalid-resource-seed-item';
+      if((!allowMissing||Object.prototype.hasOwnProperty.call(record,'exposureRisk'))&&
+        (record.exposureRisk===true)!==(canonical.exposureRisk===true))return 'invalid-resource-flags';
+      if((!allowMissing||Object.prototype.hasOwnProperty.call(record,'mineral'))&&
+        (record.mineral===true)!==(canonical.mineral===true))return 'invalid-resource-flags';
+    }
+    return null;
+  }
+
+  function landingCell(){
+    return {gx:Math.floor(CFG.HAB.x/GRID),gy:Math.floor(CFG.HAB.y/GRID)};
+  }
+  function inLandingSafeZone(gx,gy,radius){
+    var landing=landingCell();
+    return Math.abs(gx-landing.gx)<=radius&&Math.abs(gy-landing.gy)<=radius;
+  }
 
   function home(seed){
     return { v:1, width:HOME_SIZE, height:HOME_SIZE, grid:GRID,
@@ -44,15 +137,16 @@ APH.TerrainModel = (function(){
       o.heightCells<=0||o.heightCells!==(o.heightCells|0)||
       typeof o.biomeId!=='string'||!o.biomeId||typeof o.degraded!=='boolean'||
       !Array.isArray(o.ground)||o.ground.length!==o.widthCells*o.heightCells||!Array.isArray(o.resources)) return false;
-    var i,resource,seen={};
+    var i,resource,seen=Object.create(null),seenUid=Object.create(null);
     for(i=0;i<o.ground.length;i++) if(typeof o.ground[i]!=='string'||!o.ground[i]) return false;
     for(i=0;i<o.resources.length;i++){
       resource=o.resources[i];
       if(!resource||resource.gx!==(resource.gx|0)||resource.gy!==(resource.gy|0)||
         resource.gx<0||resource.gy<0||resource.gx>=o.widthCells||resource.gy>=o.heightCells||
         typeof resource.kind!=='string'||!resource.kind||typeof resource.yieldItemId!=='string'||!resource.yieldItemId||
+        (resource.uid!=null&&(typeof resource.uid!=='string'||!resource.uid||seenUid[resource.uid]))||
         typeof resource.amount!=='number'||!isFinite(resource.amount)||resource.amount<0||seen[resource.gx+','+resource.gy]) return false;
-      seen[resource.gx+','+resource.gy]=true;
+      seen[resource.gx+','+resource.gy]=true;if(resource.uid!=null)seenUid[resource.uid]=true;
     }
     return true;
   }
@@ -133,6 +227,52 @@ APH.TerrainModel = (function(){
       for(var ci=0;ci<choices.length;ci++) if(roll<choices[ci].max){kind=choices[ci].kind;break;}
       if(kind) add(kind,gx,gy);
     }
+    observation.resources=resources;
+    return observation;
+  }
+
+  /* 远征 Observation 在第一次发现时一次性冻结自然资源。之后的着陆、刷新、
+     重访都只实体化这份清单，不再运行第二套 flora/rock scatter。 */
+  function planetObservation(opts){
+    opts=opts||{};
+    var seed=u32(n(opts.seed,7)),biomeId=opts.biomeId;
+    var widthCells=Math.max(1,Math.floor(n(opts.widthCells,Math.ceil(LEGACY_SIZE/GRID))));
+    var heightCells=Math.max(1,Math.floor(n(opts.heightCells,Math.ceil(LEGACY_SIZE/GRID))));
+    var observation=APH.Observe.observe({seed:seed,biomeId:biomeId,widthCells:widthCells,
+      heightCells:heightCells,groundPins:opts.groundPins||[],allowWater:opts.allowWater});
+    var profile=CFG.observe.biomes&&CFG.observe.biomes[biomeId];
+    var scatter=CFG.observe.expeditionResourceScatter&&CFG.observe.expeditionResourceScatter[biomeId]||{};
+    var minimums=CFG.observe.expeditionResourceMinimums&&CFG.observe.expeditionResourceMinimums[biomeId]||[];
+    var safeRadius=Math.max(0,Math.floor(n(opts.safeRadius,CFG.expedition.landingSafeRadiusCells||0)));
+    var resources=[],used={},counts={},reserved={};
+    (opts.reservedCells||[]).forEach(function(cell){
+      if(cell&&cell.gx===(cell.gx|0)&&cell.gy===(cell.gy|0))reserved[cell.gx+','+cell.gy]=true;
+    });
+    function add(kind,gx,gy,extra){
+      var key=gx+','+gy,cell=APH.Observe.cellAt(observation,gx,gy),allowed=profile&&profile.resourceGround&&profile.resourceGround[kind];
+      if(used[key]||reserved[key]||inLandingSafeZone(gx,gy,safeRadius)||!cell||!cell.walkable||
+        !Array.isArray(allowed)||allowed.indexOf(cell.tile)<0)return false;
+      var record=resourceRecord(seed,kind,gx,gy,extra);
+      if(!record||resourceError(record,true,seed))return false;
+      used[key]=true;resources.push(record);counts[kind]=(counts[kind]||0)+1;return true;
+    }
+    for(var gy=0;gy<heightCells;gy++)for(var gx=0;gx<widthCells;gx++){
+      var cell=APH.Observe.cellAt(observation,gx,gy),choices=cell&&scatter[cell.tile]||[];
+      var roll=rand(seed^stringSalt(biomeId),gx,gy),kind=null;
+      for(var ci=0;ci<choices.length;ci++)if(roll<choices[ci].max){kind=choices[ci].kind;break;}
+      if(kind)add(kind,gx,gy);
+    }
+    /* 密集水域也必须有限结束：从 seed 起点遍历整张有限格表，能补则补；
+       若群系已没有合法格，返回现有事实而不是无限重试。 */
+    var total=widthCells*heightCells;
+    minimums.forEach(function(minimum,mi){
+      var need=Math.max(0,Math.floor(n(minimum&&minimum.count,0)))-(counts[minimum&&minimum.kind]||0);
+      var start=total?hash(seed^stringSalt(minimum&&minimum.kind),mi,total)%total:0;
+      for(var scan=0;need>0&&scan<total;scan++){
+        var index=(start+scan)%total;
+        if(add(minimum.kind,index%widthCells,Math.floor(index/widthCells)))need--;
+      }
+    });
     observation.resources=resources;
     return observation;
   }
@@ -265,34 +405,52 @@ APH.TerrainModel = (function(){
   }
   function resource(uid, kind, gx, gy, amount, extra, grid){
     grid=grid||GRID;
-    var o={uid:uid, type:'flora', kind:kind, x:(gx+.5)*grid, y:(gy+.5)*grid, amount:amount};
+    var o={id:uid,uid:uid, type:'flora', kind:kind, x:(gx+.5)*grid, y:(gy+.5)*grid, amount:amount};
     if(extra) Object.keys(extra).forEach(function(k){ o[k]=extra[k]; });
     return o;
   }
   function resources(scene, depleted){
-    var d=normalize(scene), gone=depleted||{}, out=[];
+    var gone=depleted||{}, out=[],errors=[];
+    Object.defineProperty(out,'errors',{value:errors,enumerable:false});
+    if(scene&&scene.generation!==LEGACY_GENERATION&&scene.observation&&!hasObservation(scene)){
+      errors.push({error:'invalid-observation'});return out;
+    }
+    var d=normalize(scene);
     if(d.generation===LEGACY_GENERATION) return out;
-    var prefix='tm_'+d.seed+'_g'+d.generation+'_', used={};
-    function resourceRule(kind){ return CFG.observe.resourceSemantics[kind]||{}; }
-    function yieldOf(kind){ var amount=resourceRule(kind).amount;return typeof amount==='number'?amount:0; }
-    function itemOf(kind){ return resourceRule(kind).yieldItemId||null; }
+    var prefix='tm_'+d.seed+'_g'+d.generation+'_', used=Object.create(null),usedIds=Object.create(null);
     function add(kind,gx,gy,extra,explicitUid){
       var key=gx+','+gy, c=cellAt(d,(gx+.5)*GRID,(gy+.5)*GRID);
       if(used[key] || !c.walkable) return false;
-      used[key]=true;
-      var uid=explicitUid||prefix+'flora_'+kind+'_'+gx+'_'+gy, mineral=resourceRule(kind).mineral===true;
-      var flags={ yieldItemId:itemOf(kind), depleted:mineral&&!!gone[uid], mineralRemains:mineral&&!!gone[uid] };
-      if(extra) Object.keys(extra).forEach(function(k){ flags[k]=extra[k]; });
-      if(mineral&&gone[uid]){flags.depleted=true;flags.mineralRemains=true;}
-      if(flags.depleted)flags.amount=0;
-      out.push(resource(uid,kind,gx,gy,flags.depleted?0:yieldOf(kind),flags,d.grid));
+      var uid=explicitUid||prefix+'flora_'+kind+'_'+gx+'_'+gy;
+      if(usedIds[uid]){errors.push({uid:uid,kind:kind,error:'duplicate-resource-uid'});return false;}
+      var record=resourceRecord(d.seed,kind,gx,gy,extra,uid,extra&&(extra.variantId||extra.variant));
+      var error=record?resourceError(record,false):'unknown-resource-kind:'+String(kind||'');
+      if(error){errors.push({uid:uid,kind:kind,error:error});return false;}
+      var rule=resolvedResourceRule(kind,record.variantId||record.variant),mineral=rule.mineral===true;
+      if(mineral&&gone[uid]){record.depleted=true;record.mineralRemains=true;}
+      if(record.depleted){record.amount=0;if(mineral)record.mineralRemains=true;}
+      used[key]=true;usedIds[uid]=true;
+      var flags={},recordKey;
+      for(recordKey in record)if(record.hasOwnProperty(recordKey)&&recordKey!=='gx'&&recordKey!=='gy'&&recordKey!=='kind'&&recordKey!=='uid'&&recordKey!=='amount')flags[recordKey]=record[recordKey];
+      flags.hp=record.hp;flags.maxHp=record.hp;
+      out.push(resource(uid,kind,gx,gy,record.depleted?0:record.amount,flags,d.grid));
       return true;
     }
     if(d.observation){
       var observedResources=Array.isArray(d.observation.resources)?d.observation.resources:[];
+      var observedCells=Object.create(null);
       for(var oi=0;oi<observedResources.length;oi++){
         var source=observedResources[oi],extra={},sourceKey;
         if(!source||!source.kind) continue;
+        var observedCell=source.gx+','+source.gy;
+        if(observedCells[observedCell]){
+          errors.push({uid:source.uid,kind:source.kind,error:'duplicate-resource-cell'});continue;
+        }
+        observedCells[observedCell]=true;
+        if(d.kind==='expedition'){
+          var sourceError=resourceError(source,true,d.seed,{allowMissingDerived:true,requireObservationUid:true});
+          if(sourceError){errors.push({uid:source.uid,kind:source.kind,error:sourceError});continue;}
+        }
         for(sourceKey in source) if(source.hasOwnProperty(sourceKey)&&sourceKey!=='gx'&&sourceKey!=='gy'&&sourceKey!=='kind'&&sourceKey!=='uid') extra[sourceKey]=source[sourceKey];
         add(source.kind,source.gx,source.gy,extra,source.uid||('obs_'+d.seed+'_'+source.kind+'_'+source.gx+'_'+source.gy));
       }
@@ -336,15 +494,66 @@ APH.TerrainModel = (function(){
     }
     return out;
   }
+
+  function footprintAt(gx,gy,footprint){
+    var w=Math.max(1,Math.floor(n(footprint&&footprint[0],1)));
+    var h=Math.max(1,Math.floor(n(footprint&&footprint[1],1))),cells=[];
+    for(var y=0;y<h;y++)for(var x=0;x<w;x++)cells.push({gx:gx+x,gy:gy+y});
+    return {w:w,h:h,cells:cells};
+  }
+  function reserveCells(occupied,cells,label){
+    occupied=occupied||{};
+    (cells||[]).forEach(function(cell){occupied[cell.gx+','+cell.gy]=label||true;});
+    return occupied;
+  }
+  function findOverlayPlacement(scene,opts){
+    opts=opts||{};
+    var d=normalize(scene),dims=dimensions(d),shape=footprintAt(0,0,opts.footprint);
+    var maxGX=dims.cols-shape.w,maxGY=dims.rows-shape.h;
+    var occupied=opts.occupied||{},origin=opts.origin||landingCell(),safeOrigin=opts.safeOrigin||landingCell();
+    var safe=Math.max(0,Math.floor(n(opts.safeRadius,CFG.expedition.overlaySafeRadiusCells||0)));
+    var minDistance=Math.max(0,n(opts.minDistance,0)),maxDistance=n(opts.maxDistance,Infinity);
+    var tries=Math.max(0,Math.floor(n(opts.tries,CFG.expedition.overlayTries||0)));
+    var seed=u32(n(opts.seed,d.seed)^u32(n(opts.salt,0)));
+    function candidate(gx,gy,fallback,attempts){
+      if(gx<0||gy<0||gx>maxGX||gy>maxGY)return null;
+      var footprint=footprintAt(gx,gy,[shape.w,shape.h]);
+      for(var i=0;i<footprint.cells.length;i++){
+        var cell=footprint.cells[i],key=cell.gx+','+cell.gy;
+        if(occupied[key]||(Math.abs(cell.gx-safeOrigin.gx)<=safe&&Math.abs(cell.gy-safeOrigin.gy)<=safe))return null;
+        if(!cellAt(d,(cell.gx+.5)*dims.grid,(cell.gy+.5)*dims.grid).walkable)return null;
+      }
+      var centerGX=gx+(shape.w-1)/2,centerGY=gy+(shape.h-1)/2;
+      var distance=Math.sqrt(Math.pow(centerGX-origin.gx,2)+Math.pow(centerGY-origin.gy,2));
+      if(distance<minDistance||distance>maxDistance)return null;
+      return {ok:true,gx:gx,gy:gy,x:(gx+shape.w/2)*dims.grid,y:(gy+shape.h/2)*dims.grid,
+        w:shape.w,h:shape.h,cells:footprint.cells,fallback:!!fallback,attempts:attempts};
+    }
+    if(maxGX<0||maxGY<0)return {ok:false,why:'no-valid-footprint',attempts:0};
+    var rng=U.makeRng(seed||1),result,attempt=0;
+    for(;attempt<tries;attempt++){
+      result=candidate(Math.floor(rng()*(maxGX+1)),Math.floor(rng()*(maxGY+1)),false,attempt+1);
+      if(result)return result;
+    }
+    var total=(maxGX+1)*(maxGY+1),start=total?hash(seed,shape.w,shape.h)%total:0;
+    for(var scan=0;scan<total;scan++){
+      var index=(start+scan)%total;
+      result=candidate(index%(maxGX+1),Math.floor(index/(maxGX+1)),true,attempt+scan+1);
+      if(result)return result;
+    }
+    return {ok:false,why:'no-valid-footprint',attempts:attempt+total};
+  }
   function regionColor(scene, x, y, fallback){
     var c=cellAt(scene,x,y);
     return c.color || fallback || '#1c2419';
   }
 
   return { HOME_SIZE:HOME_SIZE, LEGACY_SIZE:LEGACY_SIZE, GRID:GRID, REGIONS:REGIONS,
-    home:home, newHome:newHome, planet:planet, homeObservation:homeObservation, snapshotObservation:snapshotObservation,
+    home:home, newHome:newHome, planet:planet, homeObservation:homeObservation, planetObservation:planetObservation, snapshotObservation:snapshotObservation,
     legacy:legacy, normalize:normalize, dimensions:dimensions, revision:revision,
     hasObservation:hasObservation, isHome:isHome, cellAt:cellAt,
     landmarks:landmarks, resources:resources, regionColor:regionColor,
+    resourceRecord:resourceRecord,resourceError:resourceError,
+    findOverlayPlacement:findOverlayPlacement,reserveCells:reserveCells,
     fertilityMultiplier:fertilityMultiplier };
 })();

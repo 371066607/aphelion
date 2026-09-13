@@ -124,3 +124,15 @@ test('world runtime: serializable restore keeps entities groups carry and recove
   assert.strictEqual(restored.entities[2].gate,restored.ruins.gate);
   assert.strictEqual(restored.entities[3].def,APH.Colony.get('bl_bed'));
 });
+
+test('#203 world runtime: corrupt expedition regen clocks are bounded at persistence seams',()=>{
+  const period=APH.CFG.time.prodTick;
+  [1e12,-1,Infinity,NaN,'30'].forEach(function(value){
+    const restored=WR.restore({scene:'expedition',expeditionRegenT:value,entities:[]});
+    assert.equal(typeof restored.expeditionRegenT,'number');
+    assert(restored.expeditionRegenT>=0&&restored.expeditionRegenT<period,'恢复后时钟未归一: '+String(value));
+    const snapshot=WR.serializable({scene:'expedition',expeditionRegenT:value,entities:[]});
+    assert(snapshot.expeditionRegenT>=0&&snapshot.expeditionRegenT<period,'写盘前时钟未归一: '+String(value));
+  });
+  assert.equal(WR.restore({expeditionRegenT:period+7,entities:[]}).expeditionRegenT,7,'合法余数被错误丢弃');
+});

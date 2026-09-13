@@ -62,13 +62,17 @@ APH.CFG = {
       pack_ice:   {fertility:.04,moveCost:1.08,color:'#8aa9b3'},
     },
     resourceSemantics: {
-      tree:          {yieldItemId:'it_wood',amount:4},
-      rock_stone:    {yieldItemId:'it_stone',amount:4,mineral:true},
-      rock_iron:     {yieldItemId:'it_iron',amount:3,mineral:true},
-      bush_berry:    {yieldItemId:'it_berry',amount:3},
-      bush_herb:     {yieldItemId:'it_herb',amount:2},
-      bush_alien:    {yieldItemId:'specimen_dew',yieldItemIds:['specimen_dew','specimen_flora_glow','specimen_crystal_vine','specimen_star_velvet'],yieldSalt:313,amount:1,seedItemFromYield:true,exposureRisk:true},
-      rock_wreckage: {yieldItemId:'it_alloy',amount:2,mineral:true,repairableCutoff:.008,repairBid:'bl_solar_panel',variants:{
+      tree:          {name:'高大红树',visualKind:'tree',yieldItemId:'it_wood',amount:4,hp:30,renewable:true,regenTicks:8},
+      rock_stone:    {name:'花岗岩石',visualKind:'rock_stone',yieldItemId:'it_stone',amount:4,hp:35,mineral:true,renewable:false,regenTicks:0},
+      rock_iron:     {name:'富铁矿脉',visualKind:'rock_iron',yieldItemId:'it_iron',amount:3,hp:40,mineral:true,renewable:false,regenTicks:0},
+      bush_berry:    {name:'浆果丛',visualKind:'bush_berry',yieldItemId:'it_berry',amount:3,hp:15,renewable:true,regenTicks:6},
+      bush_herb:     {name:'草药灌木',visualKind:'bush_herb',yieldItemId:'it_herb',amount:2,hp:20,renewable:true,regenTicks:6},
+      bush_alien:    {name:'异星样本植物',visualKind:'bush_alien',yieldItemId:'specimen_dew',yieldItemIds:['specimen_dew','specimen_flora_glow','specimen_crystal_vine','specimen_star_velvet'],yieldSalt:313,amount:1,hp:20,renewable:true,regenTicks:8,seedItemFromYield:true,exposureRisk:true},
+      flora_glow:    {name:'荧光菌簇',visualKind:'flora_glow',yieldItemId:'specimen_flora_glow',amount:1,hp:12,renewable:true,regenTicks:8,seedItem:'specimen_flora_glow'},
+      flora_crystal: {name:'晶藤',visualKind:'flora_crystal',yieldItemId:'specimen_crystal_vine',amount:1,hp:16,renewable:true,regenTicks:10,seedItem:'specimen_crystal_vine'},
+      flora_dew:     {name:'露果苔',visualKind:'flora_dew',yieldItemId:'specimen_dew',amount:1,hp:12,renewable:true,regenTicks:7,seedItem:'specimen_dew'},
+      flora_star:    {name:'星绒草',visualKind:'flora_star',yieldItemId:'specimen_star_velvet',amount:1,hp:14,renewable:true,regenTicks:10,seedItem:'specimen_star_velvet'},
+      rock_wreckage: {name:'可回收机械残骸',visualKind:'rock_wreckage',yieldItemId:'it_alloy',amount:2,hp:35,mineral:true,renewable:false,regenTicks:0,repairableCutoff:.008,repairBid:'bl_solar_panel',variants:{
         homeCore:{yieldItemId:'it_alloy',amount:8,mineral:true,coreWreckage:true,repairable:false}
       }},
     },
@@ -110,6 +114,7 @@ APH.CFG = {
       biome_spore_forest: {
         resourceGround: {
           tree:['spore_grove'], bush_herb:['spore_moss'], bush_alien:['spore_moss','spore_grove'],
+          flora_glow:['spore_moss','spore_grove'],
         },
         tiles: [
           {id:'spore_moss',weight:8}, {id:'spore_grove',weight:5},
@@ -124,6 +129,7 @@ APH.CFG = {
       biome_crystal_wasteland: {
         resourceGround: {
           rock_stone:['silica','spire'], rock_iron:['silica','spire'], bush_alien:['silica'],
+          flora_crystal:['silica','spire'],
         },
         tiles: [
           {id:'silica',weight:8}, {id:'spire',weight:4},
@@ -134,7 +140,7 @@ APH.CFG = {
       },
       biome_acid_marsh: {
         resourceGround: {
-          bush_herb:['peat','bog'], bush_alien:['bog'], rock_stone:['peat'],
+          bush_herb:['peat','bog'], bush_alien:['bog'], rock_stone:['peat'], flora_dew:['peat','bog'],
         },
         tiles: [
           {id:'peat',weight:7}, {id:'bog',weight:5},
@@ -149,6 +155,7 @@ APH.CFG = {
       biome_cryo_tundra: {
         resourceGround: {
           bush_herb:['permafrost','snowfield'], rock_stone:['permafrost'], rock_iron:['permafrost'],
+          flora_star:['permafrost','snowfield'],
         },
         tiles: [
           {id:'permafrost',weight:8}, {id:'snowfield',weight:5},
@@ -156,6 +163,30 @@ APH.CFG = {
         ],
         bonds: [['permafrost','snowfield','pack_ice']],
       },
+    },
+    expeditionResourceScatter: {
+      biome_spore_forest:{
+        spore_moss:[{kind:'flora_glow',max:.045},{kind:'bush_herb',max:.07}],
+        spore_grove:[{kind:'tree',max:.075},{kind:'flora_glow',max:.13},{kind:'bush_alien',max:.15}],
+      },
+      biome_crystal_wasteland:{
+        silica:[{kind:'rock_iron',max:.045},{kind:'flora_crystal',max:.085},{kind:'rock_stone',max:.115}],
+        spire:[{kind:'flora_crystal',max:.07},{kind:'rock_iron',max:.13}],
+      },
+      biome_acid_marsh:{
+        peat:[{kind:'bush_herb',max:.045},{kind:'flora_dew',max:.075},{kind:'rock_stone',max:.095}],
+        bog:[{kind:'flora_dew',max:.075},{kind:'bush_alien',max:.115}],
+      },
+      biome_cryo_tundra:{
+        permafrost:[{kind:'rock_iron',max:.04},{kind:'flora_star',max:.075},{kind:'rock_stone',max:.105}],
+        snowfield:[{kind:'flora_star',max:.065},{kind:'bush_herb',max:.09}],
+      },
+    },
+    expeditionResourceMinimums: {
+      biome_spore_forest:[{kind:'flora_glow',count:4}],
+      biome_crystal_wasteland:[{kind:'flora_crystal',count:4}],
+      biome_acid_marsh:[{kind:'flora_dew',count:4}],
+      biome_cryo_tundra:[{kind:'flora_star',count:4}],
     },
   },
   DAY_LEN: 3600,               // 一天 60 分钟（ADR-30 / #166）
@@ -755,12 +786,16 @@ APH.CFG = {
   expedition: {
     checkpointSeconds:5, supplyFoodGain:25, oxygenWarning:25,
     landingSafeRadiusCells:2,
+    overlaySafeRadiusCells:4,overlayTries:48,
+    overlayFootprints:{ruin:[5,5],rivalBase:[2,2],deposit:[1,1],guard:[1,1]},
+    overlaySalt:{ruin:0xA5C3,rivalBase:0x51A7,deposit:0xD390,guard:0x6A4D},
+    overlayDistanceCells:{ruin:[7,20],rivalBase:[12,22],deposit:[5,12],guard:[2,4]},
     debugDestinationSeed:0xA201,
     resourceDeposits:[{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_iron',itemId:'it_iron',amount:5,hp:20},{kind:'rock_stone',itemId:'it_stone',amount:6,hp:20}],
     depositRadius:330,depositSpacing:72,
     objectives:{
       resources:{name:'资源搜集',description:'回收晶体矿与可用材料，为家园建设补给。',target:6,itemIds:['it_crystal_ore','it_mineral','it_iron','it_stone','it_wood']},
-      samples:{name:'植物取样',description:'采集异星植物标本，带回实验室化验。',target:2,itemIds:['specimen_dew','specimen_crystal_vine','specimen_flora_glow']},
+      samples:{name:'植物取样',description:'采集异星植物标本，带回实验室化验。',target:2,itemIds:['specimen_dew','specimen_crystal_vine','specimen_flora_glow','specimen_star_velvet']},
       relics:{name:'遗迹设备',description:'搜查遗迹，回收遗件与古代部件。',target:1,itemIds:['it_relic','it_ancient_core','it_ancient_blueprint']}
     },
     lootTable: [

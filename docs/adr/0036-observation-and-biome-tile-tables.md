@@ -50,7 +50,7 @@
 - `APH.TerrainModel` 是运行系统的唯一地形查询缝。它兼容新的行优先 observation、已合入版本的二维 `observation.grid`、未观测 generation 1，以及不读取 Observation 的 generation 0。
 - 水格为零时不保留无来源的 lakeshore。湖仍不是保证存在的地标。
 
-Observation 的持久化版本从 `v: 1` 开始，归属家园或某颗星球的场景描述；只在该场景第一次观测时创建。`v`、`widthCells`、`heightCells`、`biomeId`、`degraded`、行优先 `ground` 与 `resources` 是 v1 字段。每条 resource 至少包含 `gx`、`gy`、`kind`、`yieldItemId` 和 `amount`；同格最多一条，越界、未知种类或与 Ground Tile 不兼容的记录不进入结果。版本演进只增字段，持久化迁移仍统一走 `save.js`。
+Observation 的持久化版本从 `v: 1` 开始，归属家园或某颗星球的场景描述；只在该场景第一次观测时创建。`v`、`widthCells`、`heightCells`、`biomeId`、`degraded`、行优先 `ground` 与 `resources` 是 v1 字段。每条 resource 至少包含 `gx`、`gy`、`kind`、`yieldItemId` 和 `amount`；同格最多一条，越界、未知种类或与 Ground Tile 不兼容的记录不进入结果。远征资源的新记录使用 `obs_<worldSeed>_<kind>_<gx>_<gy>`；早期最小记录可以没有 `uid` 并在实体化时补齐，但显式 `uid` 必须与该推导值完全相同，不能占用遗迹、建筑或其他统一实体身份。版本演进只增字段，持久化迁移仍统一走 `save.js`。
 
 资源产物由 `CFG.observe.resourceSemantics` 定义；调用方传入的产物 ID 或数量不能覆盖这张表。每张群系砖表的 `resourceGround` 再声明该资源允许占用哪些 Ground Tile。求解时 resource pin 会限制所在格的地面候选，但不会把资源种类写进 `ground`。Ground pin 与 fallback 输出都要经过当前群系砖表校验；非法约束进入确定性 degraded 路径，表外地面不会写进 Observation。未知群系 ID 原样保留并进入确定性 degraded 路径，`Observe` 不修改全局配置或把它伪装成迫降点群系。Observed 场景也不再从 `landmarks` 补一座固定圆湖；水体只来自 `ground`。
 
@@ -109,3 +109,13 @@ Atlas 的一次“发现”就是首次实际着陆，因此新条目写入 `vis
 #201 阶段已经着陆但写成 `visits:0`、缺少 `lastVisitedAt` 的条目，在第一次加载/回填时按一次首访归一，后续第一次重访正确变成 2。PlanetSpec 回填和重访会拒绝显式越界 tier、负数或越界地形密度、缺失/非法 `nightBoost` 以及空或未归一的阵营权重，避免刷怪间隔或移动速度进入 `NaN`；早期完全缺少 tier 的 v1 legacy PlanetSpec 仍按既有 tier 1 默认值兼容。colony 中的 `metaSnapshot` 是权威 meta，若其版本高于当前构建，Save 会在任何 colony 迁移写回、Atlas 扫描、运行态 `metaWillSave` checkpoint 或统一 colony 写入口前同时检查 localStorage 与会话兜底，不能用当前 v1 meta 降级它。字符串、数组等合法 JSON 损坏快照不参与默认值修补，加载回退独立 meta 且不写回原 colony 字节。
 
 #201 对“远征重载均要求 generation 1”的约束在这里收窄：新发现和带 Observation 的已知星仍必须是 generation 1，并要求 runtime 的 spec/descriptor Observation 与持久 PlanetSpec 完全一致；已有但没有 Observation 的 PlanetSpec 则是只读 legacy 兼容分支，描述固定为 generation 0。legacy runtime 只有在 scene、实体数组、ID、seed、尺寸和无 Observation 状态都与持久档相符时才能恢复。刷新后两条路径都用持久 PlanetSpec 覆盖 runtime 镜像；错误身份或损坏结构安全返航。返航消费 Active Run 一次并清空 active，重复调用不重复结算；下一次出发仍需显式重选目的地。
+
+## 2026-09-14 修订：远征资源与合法覆盖物（#203）
+
+新 observed PlanetSpec 的 `Observation.resources[]` 与 ground 同次确定并持久化。新记录包含稳定 `uid`、格坐标、资源 `kind`、`visualKind`、合法 `yieldItemId`、正数量、正耐久、初始 `depleted:false`、确定性 `seed`、`renewable` 和 `regenTicks`；需要带回化验的植物另带 `seedItem`。早期 v1 最小记录仍可缺少后来新增的派生字段，由实体化入口按 seed、坐标和共享资源表补齐；已经显式保存的派生字段若与规范值冲突则拒绝。资源 uid 在同一 Observation 内必须唯一。这些字段由 `CFG.observe.resourceSemantics` 解释，PlanetSpec 校验报告未知资源或语义冲突。运行时的采集器遇到未知 kind/产物只返回明确错误，不再沿旧默认分支产出木材。
+
+`TerrainModel.resources` 只把 Observation 中可验证的资源实体化，并补齐当前构建认识的旧记录默认语义。`main.js` 在 generation 1 远征只调用该入口；旧 rock/crystal/flora scatter 仅留给没有 Observation 的 generation 0。资源被采完后，死亡实体和再生队列都在 Active Run runtime 中 checkpoint；刷新恢复同一状态。矿物声明不可再生；植物在固定生产 tick 后回到原格，恢复条目必须保留相同资源身份、可见类别、产物、数量和种子字段。
+
+#203 之前已经保存的 observed Active Run 没有资源闭环版本标记，runtime 可能含无法与 Observation 区分的第二套 rock/crystal/flora 和旧覆盖物。恢复门禁不猜测迁移这类局内实体，而是沿既有幂等返航路径结算已取得货物并回收队员；generation 0 不受影响。#203 创建的 observed runtime 同时保存有限再生相位与覆盖物失败表，缺一即不安装。
+
+覆盖物放置输入为 scene、seed salt、`[w,h]` 占地和已占格。验证逐格查询 `TerrainModel.cellAt`，拒绝越界、水格、着陆安全区、Observation 资源、信标及先前占地。算法先执行配置上限内的 seeded 候选，再从 seeded 起点遍历有限候选表；因此零水地图可稳定成功，密集地图会稳定成功或返回 `no-valid-footprint`，不会无限循环或强放。任务矿藏逐个占 1×1，敌基地占 2×2，遗迹占完整 5×5；基地守军再使用独立 seed salt 在基地附近逐格找空位并登记占格，不回退进水格、资源格或基地内部。失败记录进入 runtime 供诊断，且不制造非法实体。远征再生相位只接受一个生产周期内的有限非负数；持久化边界归一，恢复校验拒绝危险值，主循环也限制单帧补算次数。

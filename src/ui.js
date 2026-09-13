@@ -1823,7 +1823,8 @@ APH.UI = (function(){
     if(target.type === 'flora'){
       /* 3. 自然树木/矿石 */
       var fe = target.entity || target;
-      var kindName = fe.coreWreckage?'新曙光核心残骸':fe.kind==='bush_alien'?'异星样本植物':fe.kind === 'tree' ? '高大红树' : (fe.kind === 'rock_stone' ? '花岗岩石' : (fe.kind === 'rock_iron' ? '富铁矿脉' : (fe.kind === 'rock_wreckage' ? '可回收机械残骸' : (fe.kind === 'bush_berry' ? '浆果丛' : '野生灌木'))));
+      var resourceRule=CFG.observe&&CFG.observe.resourceSemantics&&CFG.observe.resourceSemantics[fe.kind];
+      var kindName = fe.coreWreckage?'新曙光核心残骸':resourceRule&&resourceRule.name||('未知资源 · '+String(fe.kind||''));
       var icon = fe.kind === 'tree' ? '🌲' : (fe.kind && fe.kind.startsWith('rock') ? '🪨' : '🌿');
       var hp = Math.round(fe.hp || 0);
       var maxHp = Math.round(fe.maxHp || 30);

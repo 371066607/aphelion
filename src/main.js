@@ -140,13 +140,17 @@ window.APH = window.APH || {};
     try{stored=APH.Save.loadPlanet(destination.destination.planetId);}catch(e){return false;}
     var descriptor=runtime&&runtime.worldDescriptor,expected=stored&&descriptorForPlanet(stored),storedValid=null;
     try{storedValid=stored&&APH.Planet.validate(stored);}catch(e){return false;}
-    var valid=!!(runtime&&runtime.scene==='expedition'&&
+    var regenPeriod=Number(CFG.time&&CFG.time.prodTick)||30;
+    var hasRegen=runtime&&Object.prototype.hasOwnProperty.call(runtime,'expeditionRegenT');
+    var regenValid=!hasRegen||(typeof runtime.expeditionRegenT==='number'&&isFinite(runtime.expeditionRegenT)&&
+      runtime.expeditionRegenT>=0&&runtime.expeditionRegenT<regenPeriod);
+    var valid=!!(runtime&&runtime.scene==='expedition'&&regenValid&&
       Array.isArray(runtime.entities)&&storedValid&&storedValid.ok&&
       stored.id===destination.destination.planetId&&stored.seed===destination.destination.seed&&
       runtime.spec&&runtime.spec.id===stored.id&&runtime.spec.seed===stored.seed&&
       descriptor&&descriptor.kind==='expedition'&&descriptor.seed===stored.seed&&descriptor.grid===expected.grid);
-    if(valid&&stored.observation)valid=descriptor.generation===1&&sameObservation(runtime.spec.observation,stored.observation)&&
-      sameObservation(descriptor.observation,stored.observation);
+    if(valid&&stored.observation)valid=descriptor.generation===1&&hasRegen&&Array.isArray(runtime.overlayFailures)&&
+      sameObservation(runtime.spec.observation,stored.observation)&&sameObservation(descriptor.observation,stored.observation);
     else if(valid)valid=descriptor.generation===0&&!runtime.spec.observation&&!descriptor.observation&&
       descriptor.width===expected.width&&descriptor.height===expected.height;
     if(!valid)return false;
@@ -154,6 +158,7 @@ window.APH = window.APH || {};
        恢复时丢弃其中可能残缺或陈旧的 spec 镜像，避免装入“同 ID 的另一张图”。 */
     runtime.spec=stored;
     runtime.worldDescriptor=expected;
+    if(!hasRegen)runtime.expeditionRegenT=0;
     return true;
   }
   function restoreWorldSession(s){
@@ -298,20 +303,27 @@ window.APH = window.APH || {};
       if(lead){s.px=lead.x;s.py=lead.y;s.selectedRid=lead.rid;s.selectedPawns=s.entities.filter(function(e){return e.type===T.RESIDENT;});}
       s.camX=CFG.HAB.x; s.camY=CFG.HAB.y+70;
       var rng=U.makeRng(p.seed ^ 0x9E3779B9);
-      var pr=0,gd=0;
-      while(pr<CFG.caps.rocks && gd++<500){
-        var rx=rng()*(APH.Scene.width()-120)+60, ry=rng()*(APH.Scene.height()-120)+60;
-        if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
-        if(!APH.TerrainModel.cellAt(s.worldDescriptor,rx,ry).walkable)continue;
-        if(p.beacons.some(function(b){return U.dst(rx,ry,b.x,b.y)<90;})) continue;
-        s.entities.push(APH.Ent.makeRock(rx,ry,rng)); pr++;
-      }
-      var pc=0; gd=0;
-      while(pc < Math.floor(CFG.caps.crystals*p.terrain.crystalDensity) && gd++<500){
-        var cx=rng()*(APH.Scene.width()-140)+70, cy=rng()*(APH.Scene.height()-140)+70;
-        if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
-        if(!APH.TerrainModel.cellAt(s.worldDescriptor,cx,cy).walkable)continue;
-        s.entities.push(APH.Ent.makeCrystal(cx,cy)); pc++;
+      var observedMap=APH.TerrainModel.hasObservation(s.worldDescriptor);
+      if(observedMap){
+        var observedResources=APH.TerrainModel.resources(s.worldDescriptor,{});
+        if(observedResources.errors.length)throw new Error('invalid observed resources: '+JSON.stringify(observedResources.errors));
+        observedResources.forEach(function(resource){if(!resource.depleted)s.entities.push(resource);});
+      }else{
+        var pr=0,gd=0;
+        while(pr<CFG.caps.rocks && gd++<500){
+          var rx=rng()*(APH.Scene.width()-120)+60, ry=rng()*(APH.Scene.height()-120)+60;
+          if(U.dst(rx,ry,CFG.HAB.x,CFG.HAB.y)<140) continue;
+          if(!APH.TerrainModel.cellAt(s.worldDescriptor,rx,ry).walkable)continue;
+          if(p.beacons.some(function(b){return U.dst(rx,ry,b.x,b.y)<90;})) continue;
+          s.entities.push(APH.Ent.makeRock(rx,ry,rng)); pr++;
+        }
+        var pc=0; gd=0;
+        while(pc < Math.floor(CFG.caps.crystals*p.terrain.crystalDensity) && gd++<500){
+          var cx=rng()*(APH.Scene.width()-140)+70, cy=rng()*(APH.Scene.height()-140)+70;
+          if(U.dst(cx,cy,CFG.HAB.x,CFG.HAB.y)<150) continue;
+          if(!APH.TerrainModel.cellAt(s.worldDescriptor,cx,cy).walkable)continue;
+          s.entities.push(APH.Ent.makeCrystal(cx,cy)); pc++;
+        }
       }
       p.beacons.forEach(function(d){ s.entities.push(APH.Ent.makeBeacon(d)); });
       s.spores=[];
@@ -321,6 +333,9 @@ window.APH = window.APH || {};
       s.found=0; s.cry=0; s.carry={};              // 远征状态清零
       s.runLoot=0;
       s.settledLoot=0;
+      s.floraRespawn=[];
+      s.expeditionRegenT=0;
+      s.overlayFailures=[];
       s.landedAt=s.clock||0;
       s.clinicKit = s.colony.buildings.some(function(b){ return b.id==='bl_clinic'; }) ? 1 : 0;
       s.lastExpedition=p;                          // 袭击刷怪用, 不写回家园 spec
@@ -330,15 +345,7 @@ window.APH = window.APH || {};
         id:'be_pad', type:T.BUILDING, bid:'bl_landing_pad',
         x:CFG.HAB.x, y:CFG.HAB.y+70, def:APH.Colony.get('bl_landing_pad'), pad:true,
       });
-      /* 远征野生异星植物生成 (Flora #36) */
-      if(APH.Planet && APH.Planet.generateExpeditionFlora){
-        var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
-        expFlora.forEach(function(f){ s.entities.push(f); });
-      }
-      if(APH.Planet.expeditionDeposits)APH.Planet.expeditionDeposits(p.seed,begun.run.objective.kind).forEach(function(ore){s.entities.push(ore);});
-      /* ADR-24: 远征远古遗迹生成 */
-      if(APH.Planet && APH.Planet.generateAncientRuins){
-        var ruins = APH.Planet.generateAncientRuins(p, p.seed);
+      function installRuins(ruins){
         s.ruins = ruins;
         if(ruins){
           (ruins.walls || []).forEach(function(w, wi){
@@ -355,22 +362,35 @@ window.APH = window.APH || {};
           }
         }
       }
-      /* 敌对殖民地基地(Phase4 进攻目标): 星球远端 */
-      if(p.rivals && p.rivals.length){
-        var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
-        var ba=Math.random()*U.TAU;
-        var bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, APH.Scene.width()-100);
-        var by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, APH.Scene.height()-100);
-        s.entities.push({
-          id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
-          x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
-          hp:60, maxHp:60, def:{ name:rv.name+' 基地', size:70 },
-        });
-        /* 基地守军×3 */
-        for(var gi=0; gi<3; gi++){
-          var gf=p.enemies.factions[gi % p.enemies.factions.length];
-          s.entities.push(APH.Ent.makeEnemy(gf,
-            bx+(Math.random()*120-60), by+(Math.random()*90-45)));
+      if(observedMap){
+        var overlays=APH.Planet.expeditionOverlays(p,begun.run.objective.kind);
+        s.overlayFailures=overlays.failures;
+        overlays.deposits.forEach(function(deposit){s.entities.push(deposit);});
+        installRuins(overlays.ruins);
+        if(overlays.rivalBase)s.entities.push(overlays.rivalBase);
+        overlays.guards.forEach(function(guard){s.entities.push(APH.Ent.makeEnemy(guard.faction,guard.x,guard.y));});
+      }else{
+        /* generation 0 的旧远征保持原有布局与身份。 */
+        if(APH.Planet && APH.Planet.generateExpeditionFlora){
+          var expFlora = APH.Planet.generateExpeditionFlora(p.seed, p.tier||1);
+          expFlora.forEach(function(f){ s.entities.push(f); });
+        }
+        if(APH.Planet.expeditionDeposits)APH.Planet.expeditionDeposits(p.seed,begun.run.objective.kind).forEach(function(ore){s.entities.push(ore);});
+        installRuins(APH.Planet&&APH.Planet.generateAncientRuins?APH.Planet.generateAncientRuins(p,p.seed):null);
+        if(p.rivals && p.rivals.length){
+          var rv=p.rivals[Math.floor(Math.random()*p.rivals.length)];
+          var ba=Math.random()*U.TAU;
+          var bx=U.clamp(CFG.HAB.x+Math.cos(ba)*820, 100, APH.Scene.width()-100);
+          var by=U.clamp(CFG.HAB.y+Math.sin(ba)*820, 100, APH.Scene.height()-100);
+          s.entities.push({
+            id:'rv_base_'+rv.id, type:T.BUILDING, bid:'bl_rival_base',
+            x:bx, y:by, rivalId:rv.id, rivalName:rv.name,
+            hp:60, maxHp:60, def:{ name:rv.name+' 基地', size:70 },
+          });
+          for(var gi=0; gi<3; gi++){
+            var gf=p.enemies.factions[gi % p.enemies.factions.length];
+            s.entities.push(APH.Ent.makeEnemy(gf,bx+(Math.random()*120-60),by+(Math.random()*90-45)));
+          }
         }
       }
     }
@@ -403,6 +423,9 @@ window.APH = window.APH || {};
     }
     closeColonyOverlays();
     APH.UI.floatText(sh.mission,'#ffc857');
+    if(s.overlayFailures&&s.overlayFailures.length){
+      APH.UI.floatText('⚠ 有 '+s.overlayFailures.length+' 处覆盖物没有合法落点，已安全跳过','#ffc857');
+    }
     /* T9: 超重出发提醒(不阻止) */
     if(loadW > capNow*.7){
       APH.UI.floatText('⚠ 负重 '+loadW+'/'+capNow+
@@ -1502,12 +1525,18 @@ window.APH = window.APH || {};
         else{
           target=order.flora;
           if(U.dst(e.x,e.y,target.x,target.y)<32){
-            if(target.seedItem){
+            if(s.worldDescriptor&&s.worldDescriptor.generation===0&&target.seedItem){
               if(CFG.items[target.seedItem])APH.Combat.spawnDrop(target.x,target.y,target.seedItem,1);
               target.dead=true;
             }else{
               var harvest=APH.Colony.workOnFlora(target,r,dt);
-              if(harvest.done){var mined=APH.Combat.spawnDrop(target.x,target.y,harvest.dropItemId,harvest.dropCount);if(mined)e.userOrder={type:'haul',pile:mined};}
+              if(harvest.error){
+                e.userOrder=null;
+                if(!s._background)APH.UI.floatText('✕ 无法采集：'+harvest.error,'#ff9a9a');
+              }else if(harvest.done&&harvest.dropItemId){
+                var mined=APH.Combat.spawnDrop(target.x,target.y,harvest.dropItemId,harvest.dropCount);
+                if(mined)e.userOrder={type:'haul',pile:mined};
+              }
             }
             e.walking=false;if(target.dead&&e.userOrder===order)e.userOrder=null;target=null;
           }
@@ -1540,6 +1569,23 @@ window.APH = window.APH || {};
       if(e.o2<=0){r.downed=true;e.downed=true;}
     });
     s.px=leader.x;s.py=leader.y;s.o2=Math.min.apply(null,pawns.map(function(e){return e.o2==null?100:e.o2;}));
+    if(s.worldDescriptor&&s.worldDescriptor.generation===1){
+      var regenPeriod=Math.max(.001,Number(CFG.time.prodTick)||30);
+      var regenElapsed=typeof s.expeditionRegenT==='number'&&isFinite(s.expeditionRegenT)&&s.expeditionRegenT>=0?s.expeditionRegenT:0;
+      regenElapsed+=Math.max(0,Number(dt)||0);
+      if(!isFinite(regenElapsed))regenElapsed=0;
+      var regenSteps=Math.min(4,Math.floor(regenElapsed/regenPeriod));
+      s.expeditionRegenT=regenElapsed%regenPeriod;
+      while(regenSteps>0){
+        regenSteps--;
+        var regrown=APH.Colony.floraRespawnTick(s);
+        if(regrown.length){
+          var regrownIds={};regrown.forEach(function(resource){regrownIds[resource.id]=true;});
+          s.entities=s.entities.filter(function(entity){return !(entity&&entity.dead&&regrownIds[entity.id]);});
+          regrown.forEach(function(resource){s.entities.push(resource);});
+        }
+      }
+    }
     s.squadNeedT=(s.squadNeedT||0)+dt;
     while(s.squadNeedT>=CFG.time.prodTick){
       s.squadNeedT-=CFG.time.prodTick;
@@ -1573,8 +1619,8 @@ window.APH = window.APH || {};
     s.nearPad = !!pad;
     s.nearFlora = APH.Ent.findNearest(s.entities, T.FLORA, s.px, s.py, 50);
     if(!s._background && s.nearFlora && !s.nearPad && !s.nearBeacon){
-      var seedName = (CFG.items[s.nearFlora.seedItem]&&CFG.items[s.nearFlora.seedItem].name)||'种子';
-      APH.UI.setHint('[E] 采集异星样本 ('+seedName+')');
+      var yieldDef=CFG.items[s.nearFlora.yieldItemId],resourceDef=CFG.observe.resourceSemantics[s.nearFlora.kind]||{};
+      APH.UI.setHint('[E] 采集 '+((yieldDef&&yieldDef.name)||resourceDef.name||'未知资源'));
     }else if(!s._background && s.nearPad && !s.nearBeacon){
       APH.UI.setHint('[E] 返航殖民地 (结算战利品)');
     }
