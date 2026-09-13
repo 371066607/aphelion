@@ -7,6 +7,9 @@ APH.MapUI=(function(){
   function el(tag,text){var e=document.createElement(tag);if(text!=null)e.textContent=text;return e;}
   function button(text,fn){var b=el('button',text);b.type='button';b.style.cssText='padding:7px 10px;border:1px solid #798674;border-radius:7px;background:#424d42;color:#f1e8cc;font:inherit;cursor:pointer';b.addEventListener('click',fn);return b;}
   function viewport(){return APH.World.getViewport();}
+  function descriptor(s){var d=APH.Scene.of(s);return d&&d.generation===1&&APH.TerrainModel&&APH.TerrainModel.hasObservation(d)?APH.TerrainModel.normalize(d):d;}
+  function terrainColor(scene,x,y,fallback){return APH.TerrainModel.regionColor(scene,x,y,fallback);}
+  function terrainKey(s,d){return s.scene+':'+(d.generation===1&&APH.TerrainModel.revision&&APH.TerrainModel.hasObservation(d)?APH.TerrainModel.revision(d):[d.width,d.height,d.seed,d.generation].join(':'));}
   function zoom(factor,anchor){var s=APH.state;APH.Camera.setZoom(s,APH.Camera.zoom(s)*factor,anchor,viewport());update(s);}
   function focus(x,y){var s=APH.state;s.camX=x;s.camY=y;s.camFollow=false;APH.Camera.clamp(s,viewport());}
   function close(){APH.UI.close('mapOverview');}
@@ -20,14 +23,14 @@ APH.MapUI=(function(){
     card.appendChild(el('h2','地图总览'));
     card.appendChild(el('p','点击地图定位；方向键移动视野，Enter 返回。青色为居民，红色为危险，米色为建筑。'));
     canvas=el('canvas');canvas.width=512;canvas.height=512;canvas.tabIndex=0;canvas.setAttribute('aria-label','地图，点击定位；方向键移动视野');canvas.style.cssText='width:min(512px,78vw);height:auto;border:1px solid #6f7a66;cursor:crosshair;vertical-align:top';
-    canvas.addEventListener('click',function(ev){var rect=canvas.getBoundingClientRect(),d=APH.Scene.of();focus((ev.clientX-rect.left)/rect.width*d.width,(ev.clientY-rect.top)/rect.height*d.height);close();});
+    canvas.addEventListener('click',function(ev){var rect=canvas.getBoundingClientRect(),d=descriptor(APH.state);focus((ev.clientX-rect.left)/rect.width*d.width,(ev.clientY-rect.top)/rect.height*d.height);close();});
     canvas.addEventListener('keydown',function(ev){var dx=0,dy=0;if(ev.key==='ArrowLeft')dx=-1;if(ev.key==='ArrowRight')dx=1;if(ev.key==='ArrowUp')dy=-1;if(ev.key==='ArrowDown')dy=1;if(dx||dy){ev.preventDefault();ev.stopPropagation();focus(APH.state.camX+dx*APH.CFG.GRID*4,APH.state.camY+dy*APH.CFG.GRID*4);render();}if(ev.key==='Enter'){ev.preventDefault();close();}});
     card.appendChild(canvas);list=el('div');list.style.cssText='display:inline-flex;vertical-align:top;flex-direction:column;gap:6px;padding:8px;max-width:220px';card.appendChild(list);card.appendChild(button('返回 [Esc]',close));panel.appendChild(card);document.body.appendChild(panel);
     APH.UI.registerModal('mapOverview',{elId:'mapOverviewOverlay',isOverlay:true});
   }
   function render(){
-    var s=APH.state,d=APH.Scene.of(s),ctx=canvas.getContext('2d'),k=[s.scene,d.width,d.height,d.seed,d.generation].join(':');
-    if(!cache||key!==k){key=k;cache=document.createElement('canvas');cache.width=512;cache.height=512;var g=cache.getContext('2d');for(var y=0;y<64;y++)for(var x=0;x<64;x++){g.fillStyle=s.scene==='home'?APH.TerrainModel.regionColor(d,(x+.5)*d.width/64,(y+.5)*d.height/64,'#526052'):'#334550';g.fillRect(x*8,y*8,8,8);}}
+    var s=APH.state,d=descriptor(s),ctx=canvas.getContext('2d'),k=terrainKey(s,d);
+    if(!cache||key!==k){key=k;cache=document.createElement('canvas');cache.width=512;cache.height=512;var g=cache.getContext('2d');for(var y=0;y<64;y++)for(var x=0;x<64;x++){g.fillStyle=s.scene==='home'?terrainColor(d,(x+.5)*d.width/64,(y+.5)*d.height/64,'#526052'):'#334550';g.fillRect(x*8,y*8,8,8);}}
     ctx.drawImage(cache,0,0);(s.entities||[]).forEach(function(e){if(e.dead)return;var color=e.type==='resident'?'#86f4d1':(e.type==='enemy'||e.wild&&e.warning)?'#ff6d67':e.type==='building'?'#efdcac':null;if(!color)return;ctx.fillStyle=color;ctx.fillRect(e.x/d.width*512-2,e.y/d.height*512-2,4,4);});
     var view=viewport(),z=APH.Camera.zoom(s),w=view.w/z,h=view.h/z;ctx.strokeStyle='#fff2c9';ctx.lineWidth=2;ctx.strokeRect((s.camX-w/2)/d.width*512,(s.camY-h/2)/d.height*512,w/d.width*512,h/d.height*512);
     list.innerHTML='';list.appendChild(el('strong',s.scene==='home'?'家园':'当前远征'));
@@ -37,5 +40,5 @@ APH.MapUI=(function(){
   }
   function open(){ensure();render();APH.UI.open('mapOverview');panel.style.display='flex';canvas.focus();return true;}
   function update(s){ensure();controls.style.display=s.mode==='running'?'flex':'none';zoomLabel.textContent=Math.round(APH.Camera.zoom(s)*100)+'%';}
-  return {open:open,close:close,update:update,zoom:zoom,focus:focus};
+  return {open:open,close:close,update:update,zoom:zoom,focus:focus,terrainColor:terrainColor};
 })();

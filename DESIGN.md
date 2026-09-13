@@ -277,3 +277,7 @@ Observation 从 `v:1` 起归属家园或单颗星球；观测格由一个 Ground
 ### ADR-48 修订：家园只观测一次（2026-09-14，#199）
 
 殖民地存档 envelope 升至 v3，PlanetSpec 版本不变。新家园创建时生成一次完整 Observation，并在进入 running 前和 `metaSnapshot` 一起写入殖民地存档。旧 generation 1 家园由 Save 唯一迁移入口把现有确定性地面和自然资源原样快照一次；generation 0 只升 envelope，不生成 Observation。持久化失败时保留一份完整的会话内存快照，存储恢复后整份重试，不能留下半迁移地图。未来 Observation 若保留 v1 基础字段则按增量格式读取并原样保存，否则拒绝改写；核心残骸等资源变体的产物和数量统一归 `CFG.observe.resourceSemantics`。详见 `docs/adr/0036-observation-and-biome-tile-tables.md`。
+
+### ADR-48 修订：家园消费者统一读取 Observation（2026-09-14，#200）
+
+带 Observation 的场景以 `widthCells × grid` 和 `heightCells × grid` 为正式边界；`TerrainModel.cellAt` 同时给出 tile、region、水岸标记、颜色、通行、建设、肥力与移动代价。正式世界块和地图总览只按该查询着色，矩形地图分别计算横纵区块，generation 1 不再叠画圆湖；相机、建筑占格、玩家轴分离碰撞、A* 格网、种植区肥力与生态栖息地也读取同一格语义。居民娱乐、精神崩溃游荡和家畜移动必须携带同一导航格；即使全图没有障碍或额外代价，observed 场景也不能走绕过边界校验的直线快路径，野生动物由 Ecology 单独推进一次。现代家园只实体化 Observation 的 `resources`，不再追加旧版 22 组装饰岩；恢复 #200 前保存的 homeRuntime 时删除旧 `rock`/`crystal` 覆盖物并写回，保留 Observation 的 `flora`。Observation 视为不可变快照；替换对象会产生新的地形 revision，使世界块、总览和导航缓存一起失效。`TerrainModel` 在构建顺序中先于需要其边界的 `BuildGrid`。generation 0 继续保留 2200×2200、固定圆湖、旧装饰岩和旧移动规则，即使旧描述残留 Observation 也不能改写旧边界。

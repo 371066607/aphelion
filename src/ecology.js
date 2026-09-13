@@ -14,22 +14,29 @@ APH.Ecology = (function(){
   function hash(seed,a,b){ var h=(seed>>>0)^Math.imul((a|0)+0x9e3779b9,0x85ebca6b)^Math.imul((b|0)+0xc2b2ae35,0x27d4eb2f);h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;h=Math.imul(h,0x846ca68b);return (h^(h>>>16))>>>0; }
   function unit(seed,a,b){ return hash(seed,a,b)/4294967296; }
   function animalId(scene,gx,gy){ return 'eco_'+scene.seed+'_'+gx+'_'+gy; }
-  function usable(scene,gx,gy){ var c=APH.TerrainModel.cellAt(scene,(gx+.5)*scene.grid,(gy+.5)*scene.grid);return c.walkable&&(c.region==='woodland'||c.region==='ridge'); }
+  function habitatAt(scene,x,y){
+    var c=scene&&APH.TerrainModel.cellAt(scene,x,y);
+    if(!c||!c.walkable)return null;
+    if(c.region==='ridge')return 'ridge_guard';
+    if(c.region==='woodland')return 'grazer';
+    return null;
+  }
+  function usable(scene,gx,gy,grid){ return !!habitatAt(scene,(gx+.5)*grid,(gy+.5)*grid); }
   function seed(s){
     if(!modernHome(s)) return [];
-    var scene=sceneOf(s), E=s.entities||(s.entities=[]), C=settings(), found=[];
-    var cols=Math.ceil(scene.width/scene.grid), rows=Math.ceil(scene.height/scene.grid), want=C.count;
+    var scene=sceneOf(s),dims=APH.TerrainModel.dimensions(scene),E=s.entities||(s.entities=[]),C=settings(),found=[];
+    var cols=dims.cols,rows=dims.rows,want=C.count;
     var existing={}, present=0, prefix='eco_'+scene.seed+'_';
     E.forEach(function(e){if(e&&e.id){existing[e.id]=true;if(e.wild&&e.id.indexOf(prefix)===0)present++;}});
     want=Math.max(0,want-present);
     for(var attempt=0;found.length<want&&attempt<C.spawnSearch;attempt++){
       var gx=Math.floor(unit(scene.seed,attempt,17)*cols), gy=Math.floor(unit(scene.seed,attempt,29)*rows);
-      if(!usable(scene,gx,gy))continue;
-      var x=(gx+.5)*scene.grid,y=(gy+.5)*scene.grid;
+      if(!usable(scene,gx,gy,dims.grid))continue;
+      var x=(gx+.5)*dims.grid,y=(gy+.5)*dims.grid;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y)<C.spawnMinHab)continue;
       var id=animalId(scene,gx,gy);if(existing[id])continue;
-      var region=APH.TerrainModel.cellAt(scene,x,y).region;
-      var e={id:id,type:T.ANIMAL||'animal',kind:region==='ridge'?'ridge_guard':'grazer',wild:true,x:x,y:y,
+      var habitat=habitatAt(scene,x,y);
+      var e={id:id,type:T.ANIMAL||'animal',kind:habitat,wild:true,x:x,y:y,
         hp:C.hp||20,maxHp:C.hp||20,warning:false,warningT:0,attackCd:0,feedCd:0,wanderT:0};
       E.push(e);existing[id]=true;found.push(e);
     }
@@ -72,9 +79,9 @@ APH.Ecology = (function(){
     return (s.entities||[]).some(function(e){return e&&!e.dead&&e.exposureRisk&&
       U.dst(e.x,e.y,position.x,position.y)<=settings().alienExposureRadius;});
   }
-  function tick(s,dt){
+  function tick(s,dt,navGrid){
     if(!modernHome(s))return false;
-    var C=settings(), scene=sceneOf(s), grid=APH.Nav.gridOf(s.colony.buildings||[],scene), rs=residents(s);
+    var C=settings(), scene=sceneOf(s), grid=navGrid||APH.Nav.gridOf(s.colony.buildings||[],scene), rs=residents(s);
     (s.entities||[]).filter(function(e){return e&&e.type===T.ANIMAL&&e.wild&&!e.dead;}).forEach(function(e){
       e.feedCd=Math.max(0,(e.feedCd||0)-dt);e.attackCd=Math.max(0,(e.attackCd||0)-dt);e.warningT=Math.max(0,(e.warningT||0)-dt);
       var near=nearest(rs,e,e.kind==='ridge_guard'?C.guardWarningRadius:C.fleeRadius);
@@ -84,5 +91,5 @@ APH.Ecology = (function(){
     });
     return true;
   }
-  return {seed:seed,tick:tick,exposedAt:exposedAt};
+  return {seed:seed,tick:tick,exposedAt:exposedAt,habitatAt:habitatAt};
 })();

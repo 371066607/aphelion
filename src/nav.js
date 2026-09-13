@@ -18,6 +18,10 @@ APH.Nav = (function(){
 
   function sceneOf(scene){
     scene = scene || {};
+    if(scene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.dimensions&&APH.TerrainModel.hasObservation(scene)){
+      var terrainDims=APH.TerrainModel.dimensions(scene);
+      return {grid:terrainDims.grid,cols:terrainDims.cols,rows:terrainDims.rows};
+    }
     var grid = scene.grid || GRID;
     var hasWidth=scene.width != null, hasHeight=scene.height != null;
     return { grid:grid, cols:hasWidth?Math.floor(scene.width/grid):NC, rows:hasHeight?Math.floor(scene.height/grid):NC };
@@ -34,7 +38,10 @@ APH.Nav = (function(){
   /* ---------- 障碍矩阵: 建筑记录 → descriptor 尺寸的 0/1 ---------- */
   var gridCache=new WeakMap();
   function gridOf(buildings, scene){
-    var signature=JSON.stringify([scene&&scene.width,scene&&scene.height,scene&&scene.seed,scene&&scene.generation,scene&&scene.kind,(buildings||[]).map(function(b){return b&&[b.id,b.uid,b.x,b.y,b.gx,b.gy,b.rotation,b.cells,b.geometryVersion,b.solid,b.dead];})]);
+    var terrainRevision=scene&&scene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.revision&&APH.TerrainModel.hasObservation(scene)
+      ? APH.TerrainModel.revision(scene)
+      : [scene&&scene.width,scene&&scene.height,scene&&scene.seed,scene&&scene.generation,scene&&scene.kind].join(':');
+    var signature=JSON.stringify([terrainRevision,(buildings||[]).map(function(b){return b&&[b.id,b.uid,b.x,b.y,b.gx,b.gy,b.rotation,b.cells,b.geometryVersion,b.solid,b.dead];})]);
     var cached=buildings&&gridCache.get(buildings);
     if(cached&&cached.signature===signature)return cached.grid;
     var spec=sceneOf(scene), cols=spec.cols, rows=spec.rows;
@@ -47,7 +54,7 @@ APH.Nav = (function(){
         for(var tx=0;tx<cols;tx++){
           var terrain=APH.TerrainModel.cellAt(scene,(tx+.5)*spec.grid,(ty+.5)*spec.grid);
           if(!terrain.walkable)g[ty][tx]=1;
-          g.costs[ty][tx]=isFinite(terrain.moveCost)&&terrain.moveCost>0?terrain.moveCost:1;
+          g.costs[ty][tx]=terrain.walkable&&isFinite(terrain.moveCost)&&terrain.moveCost>0?terrain.moveCost:Infinity;
         }
       }
     }
@@ -107,7 +114,12 @@ APH.Nav = (function(){
   }
   function astar(grid, from, to, costFn, scene){
     if (!grid || !from || !to) return null;
-    var dims=dimensionsOf(grid,scene||grid.scene), cols=dims.cols, rows=dims.rows, stepGrid=dims.grid;
+    var activeScene=scene||grid.scene;
+    var dims=dimensionsOf(grid,activeScene), cols=dims.cols, rows=dims.rows, stepGrid=dims.grid;
+    /* Observation 是现代地图的边界真相。越界目标不能先钳到边缘格、
+       再由 rebuild 把原始坐标追加回路径，否则实体仍会走出地图。 */
+    var observedBounds=activeScene&&activeScene.generation===1&&window.APH.TerrainModel&&APH.TerrainModel.hasObservation(activeScene);
+    if(observedBounds&&(!isFinite(to.x)||!isFinite(to.y)||to.x<0||to.y<0||to.x>=cols*stepGrid||to.y>=rows*stepGrid)) return null;
     var pen = costFn || function(){ return 0; };   // P2: 代价惩罚函数(陷阱格) — 必须先定义, lineClear 用
     var pathCost=function(x,y){return pen(x,y)+Math.max(0,terrainCost(grid,x,y)-1);};
     var sx = Math.max(0, Math.min(cols - 1, Math.floor(from.x / stepGrid)));
@@ -115,7 +127,7 @@ APH.Nav = (function(){
     var tx = Math.max(0, Math.min(cols - 1, Math.floor(to.x / stepGrid)));
     var ty = Math.max(0, Math.min(rows - 1, Math.floor(to.y / stepGrid)));
     if (grid[ty][tx] === 1 && !(sx === tx && sy === ty)) return null;  // 目标在墙内: 无精确路径
-    if (lineClear(grid, from, to, pathCost, scene||grid.scene)) return [{ x: to.x, y: to.y }];
+    if (lineClear(grid, from, to, pathCost, activeScene)) return [{ x: to.x, y: to.y }];
     if (grid[sy][sx] === 1) sx = -1;   // 起点本身被墙覆盖: 从邻格逃生(起点不入路径)
 
     var open = [{ x: sx, y: sy, g: 0, f: heur(sx, sy, tx, ty), prev: null }];

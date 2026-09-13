@@ -226,9 +226,10 @@ APH.Colony = (function(){
     s.px = spawnX; s.py = spawnY;
     s.camX = spawnX; s.camY = spawnY;
 
-    /* 少量岩石装饰(避开核心区) */
+    var modern=s.colony.scene&&s.colony.scene.generation===1;
+    /* generation 0 保留旧装饰岩；新家园的一切自然物只从 Observation 实体化。 */
     var placed=0, guard=0;
-    while(placed < 22 && guard++ < 300){
+    while(!modern&&placed < 22 && guard++ < 300){
       var x = rng()*(CFG.WORLD-160)+80, y = rng()*(CFG.WORLD-160)+80;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y) < 260) continue;
       if(U.dst(x,y,CFG.HAB.x,CFG.HAB.y+240) < 140) continue;   // 发射台区
@@ -252,7 +253,6 @@ APH.Colony = (function(){
       });
     });
     /* 程序化生成自然资源生态实体(树木/矿脉/灌木) */
-    var modern=s.colony.scene&&s.colony.scene.generation===1;
     var flora=modern?APH.TerrainModel.resources(s.colony.scene,s.colony.depleted).filter(function(f){return !f.depleted;}).map(function(f){
       var hp=f.kind==='tree'?30:f.kind==='rock_iron'?40:f.kind==='rock_stone'?35:f.kind==='bush_berry'?15:20;
       return Object.assign({},f,{id:f.uid,hp:hp,maxHp:hp});
