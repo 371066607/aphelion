@@ -130,38 +130,44 @@ APH.Nav = (function(){
     if (lineClear(grid, from, to, pathCost, activeScene)) return [{ x: to.x, y: to.y }];
     if (grid[sy][sx] === 1) sx = -1;   // 起点本身被墙覆盖: 从邻格逃生(起点不入路径)
 
-    var open = [{ x: sx, y: sy, g: 0, f: heur(sx, sy, tx, ty), prev: null }];
-    var closed = {};
-    var key = function(x, y){ return y * cols + x; };
+    /* open 集 = 二叉堆(懒删除)。节点是整数索引 y*cols+x: 相比旧的「数组线性扫描 +
+       splice + Array.find」, 每轮取最小 f 从 O(open) 降到 O(log open), 邻居查重
+       从闭包扫描降到一次 TypedArray 比较。虚拟起点(被墙覆盖的起点, 旧代码的 x=-1)
+       用索引 total 表示。语义与旧实现逐项一致, 只有等价代价 tie-break 会给出不同路径点。 */
+    var total = cols * rows, vac = total;
+    var gScore = new Float64Array(total + 1), prevOf = new Int32Array(total + 1), closed = new Uint8Array(total + 1);
+    gScore.fill(Infinity); prevOf.fill(-1);
+    var startIdx = sx < 0 ? vac : sy * cols + sx;
+    gScore[startIdx] = 0;
+    var heap = heapScratch();
+    heapPush(heap, startIdx, heur(sx, sy, tx, ty));
 
-    while (open.length){
-      // 取 f 最小 (规模小, 线性扫描)
-      var bi = 0;
-      for (var i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
-      var cur = open.splice(bi, 1)[0];
-      var ck = key(cur.x, cur.y);
-      if (closed[ck]) continue;
-      closed[ck] = true;
-      if (cur.x === tx && cur.y === ty) return rebuild(cur, to, stepGrid);
+    while (heap.hn){
+      var curIdx = heapPop(heap);
+      if (closed[curIdx]) continue;   // 懒删除: 同格旧副本丢弃
+      closed[curIdx] = 1;
+      var cx, cy;
+      if (curIdx === vac){ cx = -1; cy = sy; }
+      else { cx = curIdx % cols; cy = (curIdx - cx) / cols; }
+      if (cx === tx && cy === ty) return rebuild(prevOf, curIdx, cols, to, stepGrid);
+      var cg = gScore[curIdx];
       for (var dy = -1; dy <= 1; dy++){
         for (var dx = -1; dx <= 1; dx++){
           if (!dx && !dy) continue;
-          var nx = cur.x + dx, ny = cur.y + dy;
+          var nx = cx + dx, ny = cy + dy;
           if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
           if (grid[ny][nx] === 1) continue;
           if (dx && dy){
             // 对角: 两正交向必须都通, 防贴角穿墙
-            if (grid[cur.y][nx] === 1 || grid[ny][cur.x] === 1) continue;
+            if (grid[cy][nx] === 1 || grid[ny][cx] === 1) continue;
           }
-          var nk = key(nx, ny);
+          var nk = ny * cols + nx;
           if (closed[nk]) continue;
           var move=(dx&&dy)?Math.SQRT2:1;
-          var ng = cur.g + move*terrainCost(grid,nx,ny) + pen(nx, ny);   // 地形倍率 + P2 陷阱罚权
-          var ex = open.find(function(o){ return o.x === nx && o.y === ny; });
-          if (ex){
-            if (ng < ex.g) { ex.g = ng; ex.f = ng + heur(nx, ny, tx, ty); ex.prev = cur; }
-          } else {
-            open.push({ x: nx, y: ny, g: ng, f: ng + heur(nx, ny, tx, ty), prev: cur });
+          var ng = cg + move*terrainCost(grid,nx,ny) + pen(nx, ny);   // 地形倍率 + P2 陷阱罚权
+          if (ng < gScore[nk]){
+            gScore[nk] = ng; prevOf[nk] = curIdx;
+            heapPush(heap, nk, ng + heur(nx, ny, tx, ty));
           }
         }
       }
@@ -169,19 +175,59 @@ APH.Nav = (function(){
     return null;
   }
 
+  /* ---------- 二叉堆 (复用 scratch, 容量翻倍增长) ----------
+     只在 astar 内部使用, 且 costFn 是纯查表(见 combat.js 陷阱罚权), 不会重入。
+     堆池化是因为它的增长是摊销的; g/prev/closed 不适合池化——它们每次都比格数定长,
+     新建 + 一次 fill 比自己维护生命周期更不容易出错。 */
+  var HEAP_MIN_CAP = 64;
+  var heapStore = { hf: new Float64Array(HEAP_MIN_CAP), hi: new Int32Array(HEAP_MIN_CAP), hn: 0 };
+  function heapScratch(){ heapStore.hn = 0; return heapStore; }
+  function heapGrow(h){
+    var hf = new Float64Array(h.hf.length * 2), hi = new Int32Array(h.hi.length * 2);
+    hf.set(h.hf); hi.set(h.hi);
+    h.hf = hf; h.hi = hi;
+  }
+  function heapPush(h, idx, f){
+    if (h.hn + 1 >= h.hf.length) heapGrow(h);
+    var hf = h.hf, hi = h.hi, n = ++h.hn;
+    hf[n] = f; hi[n] = idx;
+    while (n > 1){
+      var p = n >> 1;
+      if (hf[p] <= hf[n]) break;
+      var tf = hf[p]; hf[p] = hf[n]; hf[n] = tf;
+      var ti = hi[p]; hi[p] = hi[n]; hi[n] = ti;
+      n = p;
+    }
+  }
+  function heapPop(h){
+    var hf = h.hf, hi = h.hi, top = hi[1], last = h.hn--;
+    hf[1] = hf[last]; hi[1] = hi[last];
+    var n = 1;
+    for (;;){
+      var c = n << 1;
+      if (c > h.hn) break;
+      if (c + 1 <= h.hn && hf[c + 1] < hf[c]) c++;
+      if (hf[n] <= hf[c]) break;
+      var tf = hf[n]; hf[n] = hf[c]; hf[c] = tf;
+      var ti = hi[n]; hi[n] = hi[c]; hi[c] = ti;
+      n = c;
+    }
+    return top;
+  }
+
   function heur(x, y, tx, ty){
     var dx = Math.abs(x - tx), dy = Math.abs(y - ty);
     return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);   // octile
   }
 
-  function rebuild(node, to, stepGrid){
+  function rebuild(prevOf, endIdx, cols, to, stepGrid){
     var chain = [];
-    while (node){ chain.unshift(node); node = node.prev; }
+    for (var cur = endIdx; cur !== -1; cur = prevOf[cur]) chain.unshift(cur);
     /* chain[0] = 起点格: 调用方已经在起点, 不入路径 */
-    var pts = chain.slice(1).map(function(n){
-      return { x: n.x * stepGrid + stepGrid / 2, y: n.y * stepGrid + stepGrid / 2 };
+    var pts = chain.slice(1).map(function(idx){
+      var gx = idx % cols, gy = (idx - gx) / cols;
+      return { x: gx * stepGrid + stepGrid / 2, y: gy * stepGrid + stepGrid / 2 };
     });
-    var last = chain[chain.length - 1];
     /* 终点格(若已入路径)保留格心, 否则 push 精确终点 */
     if (!pts.length || Math.abs(pts[pts.length - 1].x - to.x) > 1e-6 || Math.abs(pts[pts.length - 1].y - to.y) > 1e-6){
       pts.push({ x: to.x, y: to.y });   // 终点精确

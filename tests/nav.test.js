@@ -216,3 +216,42 @@ test('#94 astar: 外部行为不变 (无 costFn 全绿兼容)', () => {
   const p = Nav.astar(grid, {x:0,y:24}, {x:48*5,y:24});
   if(!p) throw new Error('无代价应照常出路径');
 });
+
+/* ---------- (issue #205) 最优性回归: 手推真值, 不随实现重算 ----------
+   60×60 全空 + x=30 一列墙(0..54 行), 唯一缺口格 (30,55)。
+   任意路径必过缺口格; 且缺口格上下邻居是墙 → 进出它的对角步被「防贴角穿墙」禁掉,
+   只能正交进出 (左 (29,55) 进、右 (31,55) 出), 因此最优代价 =
+      octile(5,5→29,55) + 1 + 1 + octile(31,55→55,5)
+    = [50+(√2-1)*24] + 2 + [50+(√2-1)*24] = 102 + 48(√2-1)。 */
+test('#205 astar: 长绕行的累计代价=手推最优(二叉堆 open 集不牺牲最优性)', () => {
+  const S2 = Math.SQRT2 - 1, COLS = 60, ROWS = 60;
+  const walls = [];
+  for (let y = 0; y < ROWS; y++) if (y !== 55) walls.push({ id: 'bl_wall', x: 30*G, y: y*G });
+  const scene = { grid: G, width: COLS*G, height: ROWS*G };
+  const grid = Nav.gridOf(walls, scene);
+  if (grid[54][30] !== 1 || grid[55][30] !== 0) throw new Error('夹具: x=30 列应只有 (30,55) 通行');
+  const from = { x: 5*G + G/2, y: 5*G + G/2 }, to = { x: 55*G + G/2, y: 5*G + G/2 };
+  const p = Nav.astar(grid, from, to, null, scene);
+  if (!p || !p.length) throw new Error('应有路径: ' + JSON.stringify(p));
+  if (p[p.length-1].x !== to.x || p[p.length-1].y !== to.y) throw new Error('终点应精确');
+  /* 累加只认格链: 起格不计, 每进入一格按平移量(1 或 √2)计 1 次代价 */
+  const cells = [{ gx: 5, gy: 5 }];
+  for (const pt of p) {
+    const gx = Math.floor(pt.x / G), gy = Math.floor(pt.y / G);
+    if (grid[gy] && grid[gy][gx] === 1) throw new Error('路径穿墙: ' + gx + ',' + gy);
+    const last = cells[cells.length-1];
+    if (last.gx !== gx || last.gy !== gy) {
+      if (Math.abs(gx-last.gx) > 1 || Math.abs(gy-last.gy) > 1) throw new Error('路径跳格: '+gx+','+gy);
+      cells.push({ gx: gx, gy: gy });
+    }
+  }
+  let cost = 0, hitGap = false;
+  for (let i = 1; i < cells.length; i++) {
+    const a = cells[i-1], b = cells[i];
+    cost += (b.gx !== a.gx && b.gy !== a.gy) ? Math.SQRT2 : 1;
+    if (b.gx === 30 && b.gy === 55) hitGap = true;
+  }
+  if (!hitGap) throw new Error('必过缺口格 (30,55)');
+  const expect = 102 + 48*S2;
+  if (Math.abs(cost - expect) > 1e-9) throw new Error('代价应=手推最优 '+expect.toFixed(6)+', 实际 '+cost.toFixed(6));
+});
