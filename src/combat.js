@@ -1401,8 +1401,20 @@ APH.Combat = (function(){
       var en;
       if(window.APH.Res && APH.Res.hostilePawn && APH.Res.embodyHostile){
         var taken=((s.meta&&s.meta.residents)||[]).map(function(r){return r&&r.name;});
-        (s.entities||[]).forEach(function(exEnt){ if(exEnt&&exEnt.name) taken.push(exEnt.name); });
-        var person=APH.Res.hostilePawn((((s.seed||7)*31)+((s.war.spawned||0)*917))>>>0, taken, {
+        var usedIds={};
+        (s.entities||[]).forEach(function(exEnt){
+          if(exEnt&&exEnt.name) taken.push(exEnt.name);
+          if(exEnt&&exEnt.id) usedIds[exEnt.id]=true;
+        });
+        ((s.meta&&s.meta.prisoners)||[]).forEach(function(pr){ if(pr&&pr.id) usedIds[pr.id]=true; });
+        /* #211: spawned 是「本波进度」, 第二波交接处会归零 —— 拿它做 seed 会让第二波第 1 人
+           拿到与第一波第 1 人相同的 id(名字因 taken 不同而看不出冲突, 整季证据里 27 个俘虏
+           只有 6 个不同 id)。改用整场袭击只增不减的生成序, 再跳过已被在场实体/俘虏占用的
+           id, 兜住老档与跨袭击留下的残兵。 */
+        var serial = (s.war.spawnSerial = (s.war.spawnSerial || 0) + 1);
+        var hSeed = (((s.seed||7)*31) + serial*917) >>> 0;
+        for(var idTry=0; idTry<4096 && usedIds['rs_h'+hSeed]; idTry++) hSeed=(hSeed+917)>>>0;
+        var person=APH.Res.hostilePawn(hSeed, taken, {
           faction:(s.war&&s.war.rivalId)||'hostile'
         });
         en=APH.Res.embodyHostile(person, ex, ey);

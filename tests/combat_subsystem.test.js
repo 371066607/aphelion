@@ -121,3 +121,63 @@ test('#210 combat: 久攻不下的袭击必须撤走并解除 raidActive', () =>
   if (legacy.war.routed) throw new Error('旧档缺 beganAt 时不得立刻撤走');
   if (legacy.war.beganAt !== 5000) throw new Error('旧档首帧应补记 beganAt, got ' + legacy.war.beganAt);
 });
+
+test('#211 combat: 双波袭击的敌人 id 必须全局唯一', () => {
+  const Combat = window.APH.Combat, CFG = window.APH.CFG, T = CFG.entType;
+  /* 双波袭击现场: 第一波被击倒/俘虏腾出名额后, 交接处把 spawned 归零 ——
+     正是整季证据里 rs_h290165 出现两次(米娅·三号 被俘 / 白芷·三号 进攻)的触发点 */
+  const s = {
+    scene: 'home', clock: 100, px: CFG.HAB.x, py: CFG.HAB.y, noiseT: 0, parts: [], seed: 8123,
+    worldDescriptor: { width: 128 * CFG.GRID, height: 128 * CFG.GRID, grid: CFG.GRID },
+    colony: { scene: { width: 128 * CFG.GRID, height: 128 * CFG.GRID, grid: CFG.GRID, generation: 1 }, buildings: [] },
+    meta: { residents: [], weather: { id: 'wx_clear' }, stats: {} },
+    war: { raidActive: true, raidWarn: 0, beganAt: 100, routed: false, spawned: 0,
+      wave: { count: 2, waves: 2, tactic: 'assault' }, wavesLeft: 1, betweenWaves: false,
+      casualties: 0, stolen: 0, wins: 0, raidSpawnT: 0 },
+    entities: []
+  };
+  window.APH.state = s;
+  const foes = () => s.entities.filter(e => e.type === T.ENEMY);
+  const ids = () => foes().map(e => e.id);
+  const dupes = () => { const a = ids(); return a.filter((v, i) => a.indexOf(v) !== i); };
+
+  // 1. 第一波刷满 2 人
+  for (let i = 0; i < 6 && foes().length < 2; i++) Combat.tickRaid(s, 1);
+  if (foes().length !== 2) throw new Error('第一波应刷出 2 个敌人, got ' + foes().length);
+
+  // 2. 第一波被打倒并俘虏(与本票证据同形): 场上仍占着 id, 但不再计入 aliveEnemies
+  foes().forEach(e => { e.captured = true; e.hp = e.maxHp; });
+
+  // 3. 双波间歇结束: spawned 归零(同一帧即开始刷第二波, 所以归零后最多 +1)
+  s.war.betweenWaves = true;
+  s.war.nextWaveT = 0;
+  Combat.tickRaid(s, 1);
+  if (s.war.betweenWaves) throw new Error('间歇归零后应转入第二波');
+  if ((s.war.spawned || 0) > 1) throw new Error('第二波应从 spawned 归零重新计数, got ' + s.war.spawned);
+
+  // 4. 第二波刷满 2 人
+  for (let i = 0; i < 6 && foes().length < 4; i++) Combat.tickRaid(s, 1);
+  if (foes().length !== 4) throw new Error('第二波应刷到 4 个敌人, got ' + foes().length);
+
+  // 5. 跨波次不得重用 id
+  const bad = dupes();
+  if (bad.length) throw new Error('#211 波次间重用实体 id: ' + bad.join(','));
+
+  // 6. 跨袭击也不得撞: 上一场留下的俘虏仍占着 id (整季实测 27 个俘虏只有 6 个不同 id)
+  foes().forEach(e => { e.captured = true; e.hp = e.maxHp; });
+  const stale = ids();
+  s.war.spawned = 0; s.war.wavesLeft = 1; s.war.routed = false; s.war.beganAt = s.clock;  // 新一场袭击开打
+  for (let i = 0; i < 6 && foes().length < 6; i++) Combat.tickRaid(s, 1);
+  if (foes().length !== 6) throw new Error('新袭击应刷出 2 个敌人, got ' + (foes().length - stale.length));
+  const clash = foes().slice(stale.length).map(e => e.id).filter(id => stale.indexOf(id) >= 0);
+  if (clash.length) throw new Error('#211 新袭击撞上在场俘虏的 id: ' + clash.join(','));
+  if (dupes().length) throw new Error('#211 新袭击内部也有重复 id: ' + dupes().join(','));
+
+  // 7. 名册记账: 俘虏按 id 进 meta.prisoners, 不得因撞 id 被去重吞掉
+  if (!window.APH.Res || !window.APH.Res.capturePrisoner) throw new Error('缺少 APH.Res.capturePrisoner');
+  const target = foes()[0];
+  window.APH.Res.capturePrisoner(s.meta, target);
+  const recorded = (s.meta.prisoners || []).map(p => p && p.id);
+  if (recorded.indexOf(target.id) < 0) throw new Error('俘虏应按 id 记录进 meta.prisoners');
+  if (new Set(recorded).size !== recorded.length) throw new Error('#211 meta.prisoners 出现重复 id: ' + recorded.join(','));
+});

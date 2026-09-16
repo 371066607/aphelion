@@ -1,7 +1,7 @@
 {
   "passed": true,
   "fixtureSeed": 9301,
-  "generatedAt": "2026-09-16T07:58:06.593Z",
+  "generatedAt": "2026-09-16T10:26:22.251Z",
   "scope": "Automated six-day soak of a legal prebuilt colony with one season of initial fuel stock; normal gather, return, civilian draft/movement and capture commands provide intervention, and destroyed raid walls are rebuilt through construction when any are lost. This is not a fresh-save manual playthrough. Resource expedition enemy encounters are isolated; home raids remain active.",
   "exitReady": true,
   "clock": 21600.000000022552,
@@ -39,8 +39,8 @@
   "raidStuck": null,
   "enemies": [
     {
-      "id": "rs_h290165",
-      "name": "米娅·三号",
+      "id": "rs_h291082",
+      "name": "铁蛋·二号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -59,8 +59,8 @@
       "atkCd": -11.100000000000016
     },
     {
-      "id": "rs_h291082",
-      "name": "铁蛋·二号",
+      "id": "rs_h291999",
+      "name": "白芷·一号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -79,8 +79,8 @@
       "atkCd": -0.050000000000000266
     },
     {
-      "id": "rs_h291999",
-      "name": "白芷·一号",
+      "id": "rs_h292916",
+      "name": "米娅·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -99,8 +99,8 @@
       "atkCd": 0.5499999999999998
     },
     {
-      "id": "rs_h290165",
-      "name": "白芷·三号",
+      "id": "rs_h296584",
+      "name": "格里·一号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -119,8 +119,8 @@
       "atkCd": 0.09999999999999976
     },
     {
-      "id": "rs_h291082",
-      "name": "布兰·一号",
+      "id": "rs_h297501",
+      "name": "远山·八号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -139,8 +139,8 @@
       "atkCd": 0.8499999999999999
     },
     {
-      "id": "rs_h292916",
-      "name": "米娅·六号",
+      "id": "rs_h299335",
+      "name": "青禾·八号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -159,8 +159,8 @@
       "atkCd": -14.850000000000025
     },
     {
-      "id": "rs_h288331",
-      "name": "老周·二号",
+      "id": "rs_h300252",
+      "name": "云杉·一号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -179,8 +179,8 @@
       "atkCd": -6.0000000000000036
     },
     {
-      "id": "rs_h291999",
-      "name": "老周·六号",
+      "id": "rs_h303920",
+      "name": "老周·二号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -199,8 +199,8 @@
       "atkCd": -10.200000000000014
     },
     {
-      "id": "rs_h292916",
-      "name": "苏木·四号",
+      "id": "rs_h304837",
+      "name": "白芷·四号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -219,8 +219,8 @@
       "atkCd": 1.15
     },
     {
-      "id": "rs_h289248",
-      "name": "冬青·一号",
+      "id": "rs_h306671",
+      "name": "格里·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -239,8 +239,8 @@
       "atkCd": 0.24999999999999978
     },
     {
-      "id": "rs_h291082",
-      "name": "阿澈·四号",
+      "id": "rs_h308505",
+      "name": "阿枝·一号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -259,8 +259,8 @@
       "atkCd": 0.09999999999999976
     },
     {
-      "id": "rs_h291999",
-      "name": "石头·八号",
+      "id": "rs_h309422",
+      "name": "布兰·五号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -279,8 +279,8 @@
       "atkCd": 0.24999999999999978
     },
     {
-      "id": "rs_h292916",
-      "name": "石头·五号",
+      "id": "rs_h310339",
+      "name": "卡帕·三号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -299,8 +299,8 @@
       "atkCd": -6.150000000000004
     },
     {
-      "id": "rs_h291082",
-      "name": "铁蛋·五号",
+      "id": "rs_h314007",
+      "name": "晚星·五号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -319,8 +319,8 @@
       "atkCd": -8.85000000000001
     },
     {
-      "id": "rs_h292916",
-      "name": "洛尘·五号",
+      "id": "rs_h315841",
+      "name": "洛尘·三号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -339,8 +339,8 @@
       "atkCd": 0.24999999999999978
     },
     {
-      "id": "rs_h292916",
-      "name": "阿澈·七号",
+      "id": "rs_h321343",
+      "name": "洛尘·四号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -359,8 +359,8 @@
       "atkCd": -12.450000000000019
     },
     {
-      "id": "rs_h290165",
-      "name": "阿枝·八号",
+      "id": "rs_h324094",
+      "name": "石头·八号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -379,8 +379,8 @@
       "atkCd": -9.750000000000012
     },
     {
-      "id": "rs_h291999",
-      "name": "远山·七号",
+      "id": "rs_h325928",
+      "name": "米娅·五号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -399,8 +399,8 @@
       "atkCd": -15.300000000000026
     },
     {
-      "id": "rs_h290165",
-      "name": "晚星·六号",
+      "id": "rs_h329596",
+      "name": "铁蛋·七号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -419,8 +419,8 @@
       "atkCd": 0.24999999999999978
     },
     {
-      "id": "rs_h292916",
-      "name": "布兰·四号",
+      "id": "rs_h332347",
+      "name": "阿澈·八号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -439,8 +439,8 @@
       "atkCd": -7.800000000000008
     },
     {
-      "id": "rs_h289248",
-      "name": "小满·二号",
+      "id": "rs_h334181",
+      "name": "老周·三号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -459,8 +459,8 @@
       "atkCd": 0.6999999999999998
     },
     {
-      "id": "rs_h290165",
-      "name": "老周·一号",
+      "id": "rs_h335098",
+      "name": "冬青·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -479,8 +479,8 @@
       "atkCd": -11.850000000000017
     },
     {
-      "id": "rs_h292916",
-      "name": "铁蛋·八号",
+      "id": "rs_h343351",
+      "name": "老周·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -499,8 +499,8 @@
       "atkCd": 0.9999999999999999
     },
     {
-      "id": "rs_h288331",
-      "name": "青禾·六号",
+      "id": "rs_h344268",
+      "name": "布兰·七号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -519,8 +519,8 @@
       "atkCd": 0.6999999999999998
     },
     {
-      "id": "rs_h289248",
-      "name": "布兰·二号",
+      "id": "rs_h345185",
+      "name": "青禾·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -539,8 +539,8 @@
       "atkCd": 0.09999999999999976
     },
     {
-      "id": "rs_h291999",
-      "name": "卡帕·四号",
+      "id": "rs_h347936",
+      "name": "阿岚·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,
@@ -559,8 +559,8 @@
       "atkCd": 0.09999999999999976
     },
     {
-      "id": "rs_h292916",
-      "name": "铁蛋·一号",
+      "id": "rs_h348853",
+      "name": "晚星·六号",
       "state": "idle",
       "hp": 0,
       "dead": false,

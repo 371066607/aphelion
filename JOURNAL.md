@@ -2379,3 +2379,11 @@ console:  (无)
 - 机制层面把死锁点找齐了：结束袭击的两条路都要「对敌人造成伤害」（清空/伤亡 60%），而炮塔只会击倒、俘虏按 `!e.captured` 从敌军里排除却不进 `casualties`、敌人自己的逃跑阈值 `CFG.enemy.fleeHpPct=0.22` 也必须先挨打 —— 伤害源一旦耗尽（炮塔被墙挡、居民全倒），残兵就既打不动也走不掉。`pillage` 战术本来有 `stealCap`（「偷够即走」）这条出口，`assault` 强攻一条都没有，而精英双波正是强攻。
 - 修法沿用同一家族的做法：新增 `CFG.raidTactics.giveUpSec = 600`（ADR-10 数据表），`startRaid` 记 `war.beganAt`，`tickRaid` 到点调用**既有的** `Combat.raidRetreat`（存活敌人置 `retreat` → 走越界回收分支，`escaped` 取 `war.stolen>0`），不新增第二种撤离实现；旧档缺 `beganAt` 在首帧补记，避免读档即撤。
 - 回归用例进 `tests/combat_subsystem.test.js`（`#210`）：未到时限不撤、到时限撤并把存活敌人置 `retreat`、残兵真正走出 `fleeDespawnR` 被回收后 `raidActive` 才落下、旧档首帧补记不立刻撤。1062 单元 / 146 scenario / 5 perf / 7 boss 全绿，`game.html` 重建 40996KB。ADR-50 收口在 `docs/adr/0038-raid-give-up-exit.md`。
+
+### 2026-09-16 18:26 +08 · #211 袭击者 id 跨波次/跨袭击全局唯一
+
+- 现象（整季长测转储实证）：一场袭击里两个不同的人共用一个实体 id —— `rs_h290165 米娅·三号 downed+captured` 与 `rs_h290165 白芷·三号 attack, hp=15` 同时在场；整季 27 个俘虏只有 6 个不同 id（×8 ×5 ×5 ×4 ×3 ×2）。后果是 `meta.prisoners` 按 id 去重（`residents.js` 捕获分支）把撞车的第二个俘虏静默丢掉，`releasePrisoner`/`recruitPrisoner` 也按 id 找人。
+- 触发链：刷怪 seed 用 `s.war.spawned`（本波进度），而双波交接处会 `s.war.spawned = 0` 重新计数 → 第二波第 1 人的 seed 与第一波第 1 人完全相同。名字看不出冲突是因为 `taken` 名单里已含第一名（会换名），id 却一样。真要在现场撞上还得第一波腾出名额（`aliveEnemies < waveCount` 门控），所以证据里的现场总是「第一波被击倒/俘虏之后」。
+- 修法：seed 改用整场袭击只增不减的 `s.war.spawnSerial`（随 `s.colony.war` 整体落盘，读档不丢），再对 `s.entities` + `meta.prisoners` 已占用的 id 顺延（兜住老档与跨袭击残留）；`hostilePawn` 函数本身与它的确定性（同 seed 同名同属性）未动。
+- 回归用例 `tests/combat_subsystem.test.js`「#211 combat: 双波袭击的敌人 id 必须全局唯一」：第一波 2 人 → 被俘（与本票证据同形）→ 交接帧 `spawned` 归零 → 第二波 2 人 → 断言 4 个 id 互不相同；再模拟新一场袭击（场上 4 个俘虏仍占着 id）断言新刷 2 人不撞旧 id 且内部不重复；最后用 `capturePrisoner` 断言 `meta.prisoners` 无重复 id。红灯环已验：修前同用例 ✗ `#211 波次间重用实体 id: rs_h251813,rs_h252730`，修后 ✓。
+- 证据：同一夹具（seed 固定）整季长测 `captures` 仍是 27（行为未变），而转储里 `enemies[]` 的不同 id 由 6 个变成 **27 个**；`passed=true, clock=21600, raidStuck=null`。构建 `game.html` 40997KB；1063 单元 / 146 scenario / 5 perf / 7 boss 全绿。另注：27 个 idle 俘虏整季站在场上不消失也不衰减，这条另议。
