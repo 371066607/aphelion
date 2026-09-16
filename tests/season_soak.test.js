@@ -119,6 +119,15 @@ try{
   let previousRaidActive=false,wallRepairsQueued=0,wallRepairRecovered=false;
   const defending=new Set();let defenseOrders=0;
   let firstFailure=null,firstDowned=null,executedSteps=0;
+  let raidActiveSince=null,raidStuck=null;
+  /* 敌人侧状态: 长测红在「袭击不结束」时, 缺了这份转储就只能猜谁还活着。 */
+  const enemyDump=en=>({id:en.id,name:en.name,state:en.state,hp:en.hp,dead:!!en.dead,downed:!!en.downed,
+    captured:!!en.captured,prisoner:!!en.prisoner,retreat:!!en.retreat,sieging:!!en.sieging,pillager:!!en.pillager,
+    isSoldier:!!en.isSoldier,x:Math.round(en.x),y:Math.round(en.y),
+    distHab:Math.round(Math.hypot(en.x-CFG.HAB.x,en.y-CFG.HAB.y)),
+    distEdge:Math.round(Math.min(en.x,en.y,APH.Scene.width()-en.x,APH.Scene.width()-en.y)),
+    stealT:en.stealT,atkCd:en.atkCd});
+  const liveEnemies=home=>((home.entities||[]).filter(e=>e&&e.type===T.ENEMY));
   const expectedIds=['soak_a','soak_b','soak_c'];
   /* A real expedition with cargo returns during the run; two residents remain home. */
   const launch=M.launchExpedition({memberIds:['soak_c'],supply:{food:0},objective:'resources',destination:{kind:'unknown'}});ok(launch&&launch.ok,'setup expedition failed');
@@ -152,6 +161,14 @@ try{
     raidWarned=raidWarned||!!(home.war&&home.war.raidWarn>0);
     const raidActive=!!(home.war&&home.war.raidActive);
     raidSeen=raidSeen||raidActive;
+    /* 袭击持续超过 10 分钟基本就是卡死: 战时门控会永久压住后勤。这里抓一次现场。 */
+    if(raidActive&&raidActiveSince==null)raidActiveSince=S.clock;
+    if(!raidActive)raidActiveSince=null;
+    if(raidActive&&raidActiveSince!=null&&S.clock-raidActiveSince>600&&!raidStuck){
+      raidStuck={step:i,clock:S.clock,stuckFor:S.clock-raidActiveSince,
+        war:JSON.parse(JSON.stringify(home.war)),enemies:liveEnemies(home).map(enemyDump),
+        buildings:{turrets:home.colony.buildings.filter(b=>b.id==='bl_turret').map(b=>({x:b.x,y:b.y,powered:b.powered,fireT:b.fireT}))}};
+    }
     if(previousRaidActive&&!raidActive){
       raidResolved=true;
       /* 预警后玩家使用普通建造入口补回被拆墙；材料照常预约、搬运、施工。 */
@@ -179,10 +196,15 @@ try{
       }
     });
     /* 炮塔只会击倒来袭者；预警后的合法玩家处置是右键俘虏，
-       这里走同一个公开命令入口，让危机能被实际干预并结束。 */
-    (home.entities||[]).filter(e=>e&&e.type===T.ENEMY&&!e.dead&&e.downed).forEach(en=>{
+       这里走同一个公开命令入口，让危机能被实际干预并结束。
+       ADR-47: 人形俘虏是「同一个对象 + prisoner/captured 置位」，契约明文禁止标死
+       （见 tests/hostile_pawn.test.js「俘虏保持同一 id 与伤势，不标死、不进名册」），
+       所以这里断言的必须是俘获本身，不是死亡。已俘获的不再重复干预。 */
+    (home.entities||[]).filter(e=>e&&e.type===T.ENEMY&&!e.dead&&!e.captured&&e.downed).forEach(en=>{
       APH.WorldRuntime.run(home,()=>M.cmd.rightClick(en.x,en.y));
-      ok(en.dead,'right-click defense intervention must capture downed raider '+en.id);
+      ok(en.captured===true,'right-click defense intervention must capture downed raider '+en.id);
+      const roster=(home.meta&&home.meta.prisoners)||S.meta.prisoners||[];
+      ok(roster.some(p=>p&&p.id===en.id),'captured raider must enter prisoner roster '+en.id);
       raidInterventions++;
     });
     home.colony.buildings.filter(b=>b.id==='bl_wood_generator').forEach(b=>{
@@ -199,7 +221,8 @@ try{
       powerStatus:home.powerStatus&&{prodW:home.powerStatus.prodW,loadW:home.powerStatus.loadW,shed:home.powerStatus.shed},
       generators:home.colony.buildings.filter(b=>b.id==='bl_wood_generator').map(b=>({x:b.x,y:b.y,fuelWood:b.fuelWood,burnT:b.burnT,powered:b.powered,grid:b.grid})),
       heater:home.colony.buildings.filter(b=>b.id==='bl_heater').map(b=>({x:b.x,y:b.y,powered:b.powered,grid:b.grid})),
-      residents:S.meta.residents.map(r=>residentDump(r.worldId==='home'?home:(S.worlds&&S.worlds.expedition)||S,r))};
+      residents:S.meta.residents.map(r=>residentDump(r.worldId==='home'?home:(S.worlds&&S.worlds.expedition)||S,r)),
+      enemies:liveEnemies(home).map(enemyDump)};
     if(firstFailure)break;
   }
   const finalHome=S.worlds&&S.worlds.home||S;
@@ -214,6 +237,8 @@ try{
     fuel:{initialStock:fixture.initialWood,finalStock:S.meta.res.wood||0,
       initialGeneratorFuel:fixture.initialGeneratorFuel,finalGeneratorFuel,
       refillEvents:fuelRefillEvents,refilledUnitsObserved:fuelRefilledUnits},
+    raidStuck,
+    enemies:liveEnemies(finalHome).map(enemyDump),
     rooms:APH.Nav.roomsOf(finalHome.colony.buildings,finalHome.colony.scene).map(r=>({id:r.id,temp:r.temp})),
     residents:S.meta.residents.map(r=>residentDump(finalHome,r))};
   const evidenceDir=path.join(__dirname,'..','docs','evidence','colony-home');
