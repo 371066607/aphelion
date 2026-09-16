@@ -317,3 +317,11 @@ Observation 只保存初始事实，当前远征中的耐久、死亡、地上�
 LLM 富化成功时先持久化完整 PlanetSpec，再把 `name`、`paletteName` 与 `lore` 同步到当前远征对象并重算标题；保存失败则不展示未落盘身份。这样异步富化后的当前画面、刷新恢复和后续重访读取同一份名称与群系。
 
 固定 seed 的 128×128 家园实测确认 Observation 只存在于 `colony.scene`，`homeRuntime` 不保存第二份 worldDescriptor/Observation。Observation 使主记录存档比历史基线增加约 46.6%，其中 398,208 字节可精确归因于这份持久地图；去掉该 envelope 增量后当前存档反而比基线小约 7%。本阶段接受一次观测长期复用所需的体积与序列化成本，不新增压缩或分片格式；只有当地图尺寸、字段量或保存频率继续增长并在目标设备上形成实际阻塞时，才重开存储格式决策。详细测量和人工链路见 `docs/evidence/map-observation/`。
+
+### ADR-49 居民世界侧接线独立成 APH.ResidentWork（2026-09-16，#206）
+
+main.js 拆分第三批（前两批 ADR-41/42/43）。先量后切：`updateResidents` 的调用闭包是 28 个函数（主体 559 行 + 27 个 helper），其中 20 个只被本簇调用（375 行）可整体搬走；7 个簇外也有调用者，其中 4 个只是转发已被归位的领域函数（删壳直连），剩下 `freeDropCount`/`nearestDrop`/`syncResidentEntities` 是真的共享入口。被搬代码只依赖 main 模块作用域的 `CFG/U/T`，闭包干净。顺带扫出死代码 `doHaul`（39 行、零调用点）。13 处 `APH.UI.floatText` 按 ADR-40 改成 `U.emit('notice')` 后，新模块对 `APH.Main`/`APH.UI` 引用均为 0。
+
+新模块 `src/resident_work.js`（`APH.ResidentWork`，1045 行）只暴露五个被外部真正需要的入口：`update(s,dt)`、`syncResidentEntities()`、`tryResidentJoy(...)`、`nearestDrop(...)`、`freeDropCount(s,e)`；`main.js` 保留 `updateResidents`/`syncResidentEntities`/`tryResidentJoy` 三个旧名薄委托（帧循环与四个测试入口都按旧名调）。放在 `visitors.js` 之后、`colonytick.js` 之前 —— 它引用的模块全部在它之前加载，零新增向后依赖。`updateCmdPanel`/`updateInspectorNow` 实测本簇一次都不调用（帧循环每帧已在刷），因此不为它们做缝。
+
+main.js 4730 → 3675 行（本批 −1055），累计 ADR-41/42/43/49 为 6048 → 3675（−2373）。行为不变的证据是同 seed 夹具下的逐帧状态对拍：基线树与搬迁后前 600 步逐字节一致；该窗口放宽到约 760 步后会出现浮点级差异，在未改动的基线树上同样复现，属既有仿真不确定性（ADR-5 的可复现性需要单独排查）。详见 `docs/adr/0037-resident-work-module.md`。

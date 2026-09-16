@@ -63,12 +63,15 @@ const TM = global.APH.TerrainModel;
 /* ---------- 语料 ---------- */
 function lcg(seed){ let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; }
 const COSTS = [1, 1, 1, 1.06, 1.42, 2];
+/* 水/不可走格在现代地图里是 Infinity 造价(见 Nav.gridOf: g.costs 写 Infinity)。
+   差分与 Dijkstra 都走同一份 terrainCost, 所以这里是「同温层」比较。 */
+const WATER = 'water';
 function makeGrid(cols, rows, wallDensity, withCosts, rnd){
   const g = [];
   for (let y = 0; y < rows; y++){ const row = new Array(cols).fill(0); for (let x = 0; x < cols; x++) row[x] = rnd() < wallDensity ? 1 : 0; g.push(row); }
   if (withCosts){
     g.costs = [];
-    for (let y = 0; y < rows; y++){ const row = []; for (let x = 0; x < cols; x++) row.push(COSTS[Math.floor(rnd() * COSTS.length)]); g.costs.push(row); }
+    for (let y = 0; y < rows; y++){ const row = []; for (let x = 0; x < cols; x++) row.push(rnd() < 0.08 ? WATER : COSTS[Math.floor(rnd() * COSTS.length)]); g.costs.push(row); }
   }
   g.scene = { grid: G, width: cols * G, height: rows * G };
   return g;
@@ -106,6 +109,8 @@ function corpus(){
 }
 
 /* ---------- 度量: 代价/合法性都以格链为准(含起点→首点那段) ---------- */
+/* 与 Nav.terrainCost 同规则: 非有限/非正 → 1 (Infinity 造价的水格在网格里同时是墙=1,
+   永远不会被进入; 这里保持同一口径才能做同温层比较) */
 const terrainCost = (grid, x, y) => { const c = grid.costs && grid.costs[y] && grid.costs[y][x]; return isFinite(c) && c > 0 ? c : 1; };
 function chainOf(grid, from, pts){
   const seq = [{ x: from.x, y: from.y }].concat(pts || []);

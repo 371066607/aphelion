@@ -51,6 +51,7 @@ MODULE_ORDER = [
     "world.js",
     "entities.js",
     "visitors.js",
+    "resident_work.js",
     "colonytick.js",
     "draw.js",
     "sfx.js",

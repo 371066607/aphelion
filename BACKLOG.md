@@ -431,8 +431,13 @@
       访客拜访/请客/招募 → `src/visitors.js`（`APH.Visitors`，232 行）。
       顺带 `Ent.selectedPawn` / `Colony.nibblePile` 归位。
       **main.js 5297 → 4787 行**（ADR-41/42/43 累计 6048 → 4787，−1261）
-- [ ] **main.js 拆分第三批**：`updateResidents` ~470 行（居民世界侧接线，
-      依赖 10 个 main 本地函数，需先把 `pawnWorldAt`/`tryEatHere`/`doHaul` 理清）
+- [x] **ADR-49 main.js 拆分第三批**（#206）：`updateResidents` 及其调用闭包 →
+      `src/resident_work.js`（`APH.ResidentWork`，1045 行）。先量后切：闭包 28 个函数里
+      20 个只被本簇调用可整体搬走，4 个薄包装删壳直连领域模块，3 个真共享入口走模块导出；
+      13 处 `floatText` → `U.emit('notice')`（ADR-40）。顺带清掉死代码 `doHaul`（39 行、
+      零调用点）。**main.js 4730 → 3675 行**（累计 6048 → 3675，−2373）。
+      对新模块零 `APH.Main`/零 `APH.UI`；行为不变由同 seed 逐帧对拍（600 步逐字节一致）
+      + 1061 单元/145 scenario/5 perf/7 boss 全绿背书。详见 `docs/adr/0037-resident-work-module.md`
 - [ ] **`selfCenter` 接不接**：T11 相机自愈保护（画面偏移超阈值就硬对齐），
       ADR-43 发现**全项目从来没有调用过它** —— 写完没接上。代码已放回相机段并标注。
       要么接进 `updateCamera`，要么删掉，别让它继续挂着

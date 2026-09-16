@@ -23,7 +23,7 @@ const ORDER = [
   'building_art_data.js','building_art.js','input.js','humanoid.js','planet.js','save.js','opening.js',
   'llm.js','colony.js','construction.js','recovery.js','home_progress.js','logistics.js',
   'production_jobs.js','storage.js','rivals.js','events.js','nav.js','weather.js',
-  'residents.js','ecology.js','alerts.js','combat.js','expedition_state.js','world.js','entities.js','visitors.js',
+  'residents.js','ecology.js','alerts.js','combat.js','expedition_state.js','world.js','entities.js','visitors.js','resident_work.js',
   'colonytick.js','draw.js','sfx.js','sprites.js','ui.js','expedition_ui.js','map_ui.js','hints.js',
   'building_proto_model.js','building_proto_draw.js','building_proto.js','main.js',
 ];
@@ -50,7 +50,7 @@ test('layering: 反向调用 main 的次数只减不增 (棘轮)', () => {
 });
 
 test('layering: 模拟层已彻底不再反向调用 main (ADR-38/43)', () => {
-  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js',
+  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'resident_work.js', 'draw.js',
    'construction.js', 'ecology.js', 'logistics.js', 'recovery.js', 'home_progress.js', 'storage.js', 'production_jobs.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.Main\./g) || []).length;
     if (hits)
@@ -74,7 +74,7 @@ test('layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)
 /* ADR-40: 模拟层不得直接驱动视图。combat 52 处 + colony 6 处 APH.UI.* 已清零,
    改为 U.emit('notice'|'hint'|'death') 由 ui.js 订阅。 */
 test('layering: 模拟层不得直接调用 APH.UI (ADR-40/43)', () => {
-  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'draw.js',
+  ['colony.js', 'combat.js', 'colonytick.js', 'visitors.js', 'resident_work.js', 'draw.js',
    'construction.js', 'ecology.js', 'logistics.js', 'recovery.js', 'home_progress.js', 'storage.js', 'production_jobs.js'].forEach(f => {
     const hits = (codeOf(f).match(/APH\.UI\./g) || []).length;
     if (hits)
@@ -86,7 +86,7 @@ test('layering: 模块不得引用加载顺序在自己之后的模块', () => {
   const NS = {
     'colony.js':'Colony','rivals.js':'Rivals','events.js':'Events','nav.js':'Nav',
     'weather.js':'Weather','residents.js':'Res','alerts.js':'Alerts','combat.js':'Combat',
-    'world.js':'World','entities.js':'Ent','visitors.js':'Visitors','colonytick.js':'ColonyTick','draw.js':'Draw',
+    'world.js':'World','entities.js':'Ent','visitors.js':'Visitors','resident_work.js':'ResidentWork','colonytick.js':'ColonyTick','draw.js':'Draw',
     'building_art.js':'BuildArt','sfx.js':'SFX','sprites.js':'Sprites',
     'building_proto_model.js':'BuildProtoModel','building_proto_draw.js':'BuildProtoDraw','building_proto.js':'BuildPrototype',
     'ui.js':'UI','hints.js':'Hints','main.js':'Main','planet.js':'Planet',
