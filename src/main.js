@@ -570,7 +570,7 @@ window.APH = window.APH || {};
       worldUiRunId(s)===ticket.runId&&worldUiSession(s)===ticket.session;
   }
   function performExpeditionInteraction(pawn, target){
-    var s=APH.state,r=residentOf(pawn);
+    var s=APH.state,r=APH.Res.residentOf(pawn);
     if(!r||pawn.downed||target.dead||U.dst(pawn.x,pawn.y,target.x,target.y)>55)return false;
     if(target.type===T.BEACON){s.selectedRid=pawn.rid||pawn.id;s.scanning=target;s.scanT=0;return true;}
     if(target.bid==='ancient_vault'){
@@ -833,7 +833,6 @@ window.APH = window.APH || {};
   function playerDowned(){ return APH.Res.playerDowned(); }
   function playerSick(){ return APH.Res.playerSick(); }
   function playerFood(){ return APH.Res.playerFood(); }
-  function foodEatBelow(){ return APH.Res.foodEatBelow(); }
   /* #65 走到粮边吃: E 吃一口(bindInput 与 debugPressE 共用, 避免双份逻辑)。
      只消费 s.nearFood 指向的粮堆/仓库, 绝不写 s.target 自动寻路。 */
   function pickHuntedAnimal(x, y){
@@ -896,12 +895,12 @@ window.APH = window.APH || {};
     return {
       raid: !!(s.war&&s.war.raidActive),
       night: !!(window.APH.World && APH.World.daylight && APH.World.daylight()<0.5),
-      eatBelow: foodEatBelow(),
+      eatBelow: APH.Res.foodEatBelow(),
       restSleepAt: (CFG.player&&CFG.player.restSleepAt!=null)?CFG.player.restSleepAt:20,
       restNightAt: (CFG.player&&CFG.player.restNightAt!=null)?CFG.player.restNightAt:75,
       joyAt: (CFG.residents&&CFG.residents.recreationJoyAt!=null)?CFG.residents.recreationJoyAt:30,
       hour: (APH.Res && APH.Res.hourOfDay) ? APH.Res.hourOfDay(s.clock||0, CFG.DAY_LEN) : 0,
-      meal: nearestMeal({x:x,y:y}, 1e9),
+      meal: APH.Colony.nearestMeal({x:x,y:y}, 1e9),
       house: house,
       blueprint: nearestBlueprint(x,y),
       drop: nearestDrop({x:x,y:y}, (CFG.haul&&CFG.haul.seekR)||1200),
@@ -1021,7 +1020,7 @@ window.APH = window.APH || {};
     }
     e.wanderIdle = false;
     e.wanderT = U.rr(C.strollMin!=null?C.strollMin:2.8, C.strollMax!=null?C.strollMax:5.5);
-    var rr = residentOf(e);
+    var rr = APH.Res.residentOf(e);
     var dest = pickIdleDest(e.x, e.y, rr && rr.restrictId);
     e.tx = dest.x; e.ty = dest.y;
   }
@@ -1073,7 +1072,7 @@ window.APH = window.APH || {};
     var broken = null;
     (s.entities||[]).forEach(function(e){
       if(broken || !e || e.dead || e.type!==T.RESIDENT) return;
-      var rp = residentOf(e);
+      var rp = APH.Res.residentOf(e);
       if(rp && APH.Res.isBroken && APH.Res.isBroken(rp)) broken = { entity:e, resident:rp };
     });
     s.nearBrokenResident = broken;
@@ -2472,7 +2471,7 @@ window.APH = window.APH || {};
         if(clinicB){
           hitDowned.x = clinicB.x; hitDowned.y = clinicB.y;
           hitDowned.downed = false; hitDowned.medLying = true;
-          var rDowned = residentOf(hitDowned);
+          var rDowned = APH.Res.residentOf(hitDowned);
           if(rDowned){
             rDowned.downed = false; rDowned.medLying = true;
           }
@@ -3402,8 +3401,6 @@ window.APH = window.APH || {};
   function nearestDrop(from, r, pred){
     var s=APH.state;return APH.Ent.findNearest(s.entities,T.DROPPED,from.x,from.y,r,function(e){return freeDropCount(s,e)>0&&(!s.colony.rulesVersion||!APH.Storage.isStored(e,s))&&(!pred||pred(e));});
   }
-  function nibblePile(drop, n){ return APH.Colony.nibblePile(drop, n); }
-  function residentOf(e){ return APH.Res.residentOf(e); }
   /* ================= ADR-29 征召与直接命令 (环世界式) ================= */
   function selectedPawnEnt(){ return APH.Ent.selectedPawn(); }
   function selectPawn(rid){
@@ -3411,7 +3408,7 @@ window.APH = window.APH || {};
     s.selectedRid=rid;
     var ent=selectedPawnEnt();
     if(ent) s.selectedTarget={ type:'resident', entity:ent };
-    var r=ent?residentOf(ent):null;
+    var r=ent?APH.Res.residentOf(ent):null;
     APH.UI.floatText('已选中 '+(r?r.name:'居民')+' · 左键点地下令, Esc 解除', '#59d9ff');
     updateCmdPanel();
     updateInspectorNow();
@@ -3503,7 +3500,7 @@ window.APH = window.APH || {};
       panel.style.display='none';
       return;
     }
-    var r=residentOf(ent);
+    var r=APH.Res.residentOf(ent);
     var orderTxt='待命中';
     if(ent.userOrder){
       var ot=ent.userOrder.type;
@@ -3612,7 +3609,7 @@ window.APH = window.APH || {};
   }
   /* 征召仍然存在 —— 环世界里征召的是殖民者。删掉的是「征召指挥官」那半边。 */
   function equipSelected(itemId){
-    var s=APH.state,e=selectedPawnEnt(),r=e&&residentOf(e),it=CFG.items[itemId];
+    var s=APH.state,e=selectedPawnEnt(),r=e&&APH.Res.residentOf(e),it=CFG.items[itemId];
     if(s.scene!=='home'||!e||!r||r.downed||!it||!it.slot)return false;
     var pile=APH.Ent.findNearest(s.entities,T.DROPPED,e.x,e.y,Infinity,function(p){
       return p.itemId===itemId&&freeDropCount(s,p)>0;
@@ -3643,7 +3640,6 @@ window.APH = window.APH || {};
   }
   var CMD_BTN_CSS='background:rgba(89,217,255,.10);border:1px solid rgba(89,217,255,.45);color:#bfe8ff;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;white-space:nowrap';
 
-  function nearestMeal(e, rMax){ return APH.Colony.nearestMeal(e, rMax); }
   /* T8: 无桌吃饭心情惩罚(在餐桌用餐豁免): 每次非atTable 吃成后结算 */
   function applyNoTablePenalty(r){
     var C=CFG.residents||{};
@@ -3680,7 +3676,7 @@ window.APH = window.APH || {};
       e.food=r.food;
       return true;
     }
-    var meal=nearestMeal(e, 1e9);
+    var meal=APH.Colony.nearestMeal(e, 1e9);
     if(!meal) return false;
     var need=meal.kind==='stock'?dumpR:mealR;
     if(U.dst(e.x,e.y,meal.x,meal.y)>=need) return false;
@@ -3694,7 +3690,7 @@ window.APH = window.APH || {};
     }else{
       if(!meal.drop || meal.drop.dead) return false;
       var itDefG = (CFG.items && CFG.items[meal.drop.itemId]) || { name:'食物', foodGain:25 };
-      if(nibblePile(meal.drop,1)!==1)return false;
+      if(APH.Colony.nibblePile(meal.drop,1)!==1)return false;
       var eatResG = (APH.Res.eatMeal) ? APH.Res.eatMeal(r, itDefG, { atTable: TBL_FLAG }) : { ate: APH.Res.eatOnce(r, itDefG) };
       if(!eatResG.ate) return false;
       if(itDefG.isCooked){
@@ -3729,46 +3725,6 @@ window.APH = window.APH || {};
     e.haulCarry=left.length?(Array.isArray(e.haulCarry)?left:left[0]):null;
     if(!stored)e.workReason='仓储位置不可达，保留携带物资';
     return stored;
-  }
-
-  function doHaul(e, r){
-    var s = APH.state;
-    var stock = APH.Colony.stockpileSpot(s.colony&&s.colony.buildings);
-    var H = CFG.haul||{};
-    var pickR = H.pickR!=null?H.pickR:52;
-    var grabR = H.grabR!=null?H.grabR:18;
-    var dumpR = H.dumpR!=null?H.dumpR:36;
-    var rooms = (window.APH.Nav&&APH.Nav.roomsOf)?APH.Nav.roomsOf((s.colony&&s.colony.buildings)||[],s.colony&&s.colony.scene):[];
-
-    if(e.haulCarry){
-      var carryPiles = Array.isArray(e.haulCarry) ? e.haulCarry : [e.haulCarry];
-      var firstItem = carryPiles[0];
-      if(firstItem && firstItem.itemId){
-        var targetSpot=storageDestination(s,firstItem.itemId,e);
-        if(!targetSpot){e.workReason='仓储位置不可达';e.walking=false;return;}
-        e.tx = targetSpot.x; e.ty = targetSpot.y;
-        if(U.dst(e.x, e.y, targetSpot.x, targetSpot.y) < dumpR){
-          storeCarried(s,e);
-        }
-      } else {
-        e.haulCarry = null;
-      }
-    } else {
-      var reach = e.job ? pickR : ((CFG.haul && CFG.haul.seekR) || 1200);
-      var drop = nearestDrop(e, reach);
-      if(drop){
-        e.tx = drop.x; e.ty = drop.y;
-        if(U.dst(e.x, e.y, drop.x, drop.y) < grabR){
-          var dropsPool = s.entities.filter(function(x){ return x && x.type === T.DROPPED && !x.dead&&(!s.colony.rulesVersion||!APH.Storage.isStored(x,s)); });
-          var candidates = (APH.Colony && APH.Colony.bulkHaulCandidates) ? APH.Colony.bulkHaulCandidates(drop, dropsPool) : [drop];
-          var bundle = [],weightLeft=CFG.haul.carryWeight;
-          candidates.forEach(function(c){
-            var taken=takeHaulPile(s,c,weightLeft);if(taken){bundle.push(taken);weightLeft-=taken.n*((CFG.items[taken.itemId]||{}).w||1);}
-          });
-          e.haulCarry = bundle;
-        }
-      }
-    }
   }
 
   function moveConstructionMaterials(s,e,r,dt,speed,nav){
@@ -3851,7 +3807,7 @@ window.APH = window.APH || {};
     if(!raid && diningTbls.length && diningChairs.length){
       s.entities.forEach(function(e){
         if(e && e.type===T.RESIDENT){
-          var r0=residentOf(e);
+          var r0=APH.Res.residentOf(e);
           if(r0 && r0.food!=null && r0.food<eatBelow) hungryRes.push({id:r0.id,x:e.x,y:e.y});
         }
       });
@@ -3874,11 +3830,11 @@ window.APH = window.APH || {};
     var encR = (CFG.social && CFG.social.encounterArriveR) || 40;
     for(var sa = 0; sa < resEntities.length; sa++){
       var ea = resEntities[sa];
-      var ra = residentOf(ea);
+      var ra = APH.Res.residentOf(ea);
       if(!ra || (ea.socialPauseT||0) > 0) continue;
       for(var sb = sa + 1; sb < resEntities.length; sb++){
         var eb = resEntities[sb];
-        var rb = residentOf(eb);
+        var rb = APH.Res.residentOf(eb);
         if(!rb || (eb.socialPauseT||0) > 0) continue;
         var dist = U.dst(ea.x, ea.y, eb.x, eb.y);
         if(dist >= 16 && dist < encR){
@@ -3916,7 +3872,7 @@ window.APH = window.APH || {};
       }
       e.hurtCd=Math.max(0,(e.hurtCd||0)-dt);
       if(e.hitFlash>0) e.hitFlash=Math.max(0,e.hitFlash-dt);
-      var r=residentOf(e);
+      var r=APH.Res.residentOf(e);
       /* 任务认领清理先于睡眠/倒地/社交的提前返回，物资不能被失能者永久锁住。 */
       if(r && APH.Logistics && (e.dead || r.downed || r.isSleeping || r.medLying || e.drafted || APH.Res.isBroken(r))){
         var releasedCargo=APH.Logistics.releaseCarrier(s.colony,r.id,e);
@@ -4058,7 +4014,7 @@ window.APH = window.APH || {};
           if(!gearItem||!gearItem.slot||freeDropCount(s,gearPile)<1){e.userOrder=null;e.workReason='装备已被取走或预订';return;}
           if(U.dst(e.x,e.y,gearPile.x,gearPile.y)<=grabR){
             var previous=r.gear&&r.gear[gearItem.slot];
-            if(nibblePile(gearPile,1)!==1){e.userOrder=null;return;}APH.Colony.equipGear(r,gearPile.itemId);
+            if(APH.Colony.nibblePile(gearPile,1)!==1){e.userOrder=null;return;}APH.Colony.equipGear(r,gearPile.itemId);
             if(previous)APH.Combat.spawnDrop(e.x,e.y,previous,1,{stock:true,jitter:0});
             e.userOrder=null;e.workReason='已装备 '+gearItem.name;
             if(!s._background)APH.UI.floatText(r.name+' 已装备 '+gearItem.name,'#9fe8c8');
@@ -4082,7 +4038,7 @@ window.APH = window.APH || {};
             }
             return;
           }
-          /* 已抓取 → 送最近兼容仓储点入库 (同 doHaul 逻辑) */
+          /* 已抓取 → 送最近兼容仓储点入库 */
           var uSpot=storageDestination(s,e.haulCarry.itemId,e);
           if(!uSpot){e.workReason='仓储位置不可达';e.walking=false;return;}
           if(U.dst(e.x,e.y,uSpot.x,uSpot.y)<=dumpR){
@@ -4115,9 +4071,9 @@ window.APH = window.APH || {};
         }
         else if(uo.type==='eat'){
           var ate=tryEatHere(e, r, grabR, dumpR);
-          if(ate || !nearestMeal(e, 1e9)){ e.userOrder=null; }
+          if(ate || !APH.Colony.nearestMeal(e, 1e9)){ e.userOrder=null; }
           else{
-            var um=nearestMeal(e, 1e9);
+            var um=APH.Colony.nearestMeal(e, 1e9);
             e.tx=um.x; e.ty=um.y;
             APH.Res.walkAround(e, {x:um.x,y:um.y}, dt, spdO, navGrid);
           }
@@ -4158,7 +4114,7 @@ window.APH = window.APH || {};
       /* ADR-30 / #168: 与指挥官同一套 thinkPawn */
       if(!raid && r && !e.drafted && APH.Res && APH.Res.thinkPawn){
         var wp = (m.workPrio && m.workPrio[r.id]) || {};
-        var mealN = nearestMeal(e, 1e9);
+        var mealN = APH.Colony.nearestMeal(e, 1e9);
         var houseN=null, houseND=Infinity;
         (s.colony.buildings||[]).forEach(function(hb){
           if(!hb || hb.dead || hb.id!=='bl_house') return;
@@ -4196,14 +4152,14 @@ window.APH = window.APH || {};
             if(s.colony.rulesVersion===1){
               var carriedMeals=Array.isArray(e.haulCarry)?e.haulCarry:(e.haulCarry?[e.haulCarry]:[]);
               if(!carriedMeals.some(function(p){return dropStore(p)==='food';})){
-                var fetchMeal=nearestMeal(e,Infinity);
+                var fetchMeal=APH.Colony.nearestMeal(e,Infinity);
                 if(!fetchMeal){e.workReason='没有可取用的食物';e.walking=false;return;}
                 if(U.dst(e.x,e.y,fetchMeal.x,fetchMeal.y)>grabR){
                   e.workReason='先取餐，再去餐位';APH.Res.walkAround(e,fetchMeal,dt,spdMul,navGrid);return;
                 }
                 var mealId=fetchMeal.kind==='stock'?'it_food':fetchMeal.drop.itemId;
                 var gotMeal=fetchMeal.kind==='stock'?APH.Colony.takeStock(s.meta.res,[],'food',1).ok:
-                  (freeDropCount(s,fetchMeal.drop)>0&&nibblePile(fetchMeal.drop,1)===1);
+                  (freeDropCount(s,fetchMeal.drop)>0&&APH.Colony.nibblePile(fetchMeal.drop,1)===1);
                 if(!gotMeal){e.workReason='食物已被取走或预订';return;}
                 carriedMeals.push({itemId:mealId,n:1});e.haulCarry=carriedMeals;
               }
