@@ -1217,6 +1217,7 @@ APH.Combat = (function(){
   function startRaid(s){
     if(!s || !s.war) return;
     s.war.raidActive = true;
+    s.war.beganAt = s.clock || 0;   /* 久攻不下即撤的计时起点(#210) */
     var buildings = (s.colony && s.colony.buildings) || [];
     var barracks = buildings.filter(function(b){ return b.id === 'bl_barracks'; });
     var n = soldierCount(barracks);
@@ -1316,6 +1317,17 @@ APH.Combat = (function(){
 
     // 2. 战斗进行中
     if(!s.war.raidActive) return;
+
+    /* 久攻不下即撤 (#210): 只剩残兵且场上已无伤害源时(炮塔被墙挡、居民全倒),
+       敌人打不动也逃不掉(fleeHpPct 只靠挨打触发), raidActive 会永久锁死战时
+       工作门控 → 不补燃料不取暖 → 全灭。参照 pillage「偷够即走」给强攻一条时间出口。
+       旧档没有 beganAt 的在这里补上, 免得读档即撤。 */
+    var RTg = CFG.raidTactics || {};
+    if(s.war.beganAt == null) s.war.beganAt = s.clock || 0;
+    if(RTg.giveUpSec && !s.war.routed && (s.clock || 0) - s.war.beganAt > RTg.giveUpSec){
+      raidRetreat(s, '⚠ 久攻不下, 敌军撤走', (s.war.stolen || 0) > 0);
+      return;
+    }
 
     updateCombat(dt, false);
 

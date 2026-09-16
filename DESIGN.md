@@ -325,3 +325,9 @@ main.js 拆分第三批（前两批 ADR-41/42/43）。先量后切：`updateResi
 新模块 `src/resident_work.js`（`APH.ResidentWork`，1045 行）只暴露五个被外部真正需要的入口：`update(s,dt)`、`syncResidentEntities()`、`tryResidentJoy(...)`、`nearestDrop(...)`、`freeDropCount(s,e)`；`main.js` 保留 `updateResidents`/`syncResidentEntities`/`tryResidentJoy` 三个旧名薄委托（帧循环与四个测试入口都按旧名调）。放在 `visitors.js` 之后、`colonytick.js` 之前 —— 它引用的模块全部在它之前加载，零新增向后依赖。`updateCmdPanel`/`updateInspectorNow` 实测本簇一次都不调用（帧循环每帧已在刷），因此不为它们做缝。
 
 main.js 4730 → 3675 行（本批 −1055），累计 ADR-41/42/43/49 为 6048 → 3675（−2373）。行为不变的证据是同 seed 夹具下的逐帧状态对拍：基线树与搬迁后前 600 步逐字节一致；该窗口放宽到约 760 步后会出现浮点级差异，在未改动的基线树上同样复现，属既有仿真不确定性（ADR-5 的可复现性需要单独排查）。详见 `docs/adr/0037-resident-work-module.md`。
+
+### ADR-50 袭击必须有出口：久攻不下即撤（2026-09-16，#210）
+
+家园袭击原本只有两个结束条件（清空敌人、或伤亡 ≥ `routAt` 触发溃退），两条都要求玩家对敌人造成伤害；而炮塔只会击倒、玩家的合法处置是俘虏（ADR-47）、溃退只数击杀、敌人自己的 `fleeHpPct` 也要挨打才可能触发。于是存在一条无出口状态：**残血敌人打不动也逃不掉，`raidActive` 永远为真** → 战时工作门控让居民拒绝出工 → 不补燃料不取暖 → 冻饿全灭，袭击仍挂着。六日生存长测实测抓到该现场（`docs/evidence/colony-home/season.json` 的 `raidStuck`：两个 hp 15/12 的袭击者蹲在围墙内侧、六座炮塔 `powered:true` 却隔着墙打不到、`casualties:0`、袭击已挂 8647 秒）。`pillage` 有 `stealCap`（「偷够即走」），`assault` 此前没有任何撤离条件。
+
+决策：`CFG.raidTactics.giveUpSec = 600`，`startRaid` 记 `war.beganAt`，`tickRaid` 到点调用**既有的** `Combat.raidRetreat`（存活敌人置 `retreat` 交给越界回收分支，`escaped` 取 `war.stolen > 0`）；旧档缺 `beganAt` 首帧补记以免读档即撤。既有平衡参数与第二种撤离实现都不新增，`stealCap`/`routAt` 优先级不变。详见 `docs/adr/0038-raid-give-up-exit.md`。

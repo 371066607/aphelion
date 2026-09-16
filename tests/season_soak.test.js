@@ -161,10 +161,12 @@ try{
     raidWarned=raidWarned||!!(home.war&&home.war.raidWarn>0);
     const raidActive=!!(home.war&&home.war.raidActive);
     raidSeen=raidSeen||raidActive;
-    /* 袭击持续超过 10 分钟基本就是卡死: 战时门控会永久压住后勤。这里抓一次现场。 */
+    /* #210 之后袭击有 patience 上限(CFG.raidTactics.giveUpSec), 所以「持续超过上限两倍」
+       才是真的卡死; 通过轮不该再留这种现场, 留下即代表规则失效。 */
+    const stuckLimit=Math.max(600,(CFG.raidTactics&&CFG.raidTactics.giveUpSec||600)*2);
     if(raidActive&&raidActiveSince==null)raidActiveSince=S.clock;
     if(!raidActive)raidActiveSince=null;
-    if(raidActive&&raidActiveSince!=null&&S.clock-raidActiveSince>600&&!raidStuck){
+    if(raidActive&&raidActiveSince!=null&&S.clock-raidActiveSince>stuckLimit&&!raidStuck){
       raidStuck={step:i,clock:S.clock,stuckFor:S.clock-raidActiveSince,
         war:JSON.parse(JSON.stringify(home.war)),enemies:liveEnemies(home).map(enemyDump),
         buildings:{turrets:home.colony.buildings.filter(b=>b.id==='bl_turret').map(b=>({x:b.x,y:b.y,powered:b.powered,fireT:b.fireT}))}};

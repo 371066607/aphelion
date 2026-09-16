@@ -2372,3 +2372,10 @@ console:  (无)
 - 修法：把俘虏分支提到发射台之前，并给俘虏选择加 `!en.captured`。后者是这次重排的必要配套：已俘获的 raider 仍保持 `downed=true`，不加过滤会反过来把发射台本体的点击也吞掉。
 - 锁死这个 bug 的回归用例进 `tests/scenario.test.js`（`#209 倒地敌人的右键处置优先于发射台`）：夹具用真实 `cmdHomeSetup()` 生成的发射台，把 humanlike raider 放在 pad+18/+12（距离 21.6 ≤ 50）后击倒，断言 `captured===true`、`dead===false`（ADR-47）、进 `meta.prisoners`、`ExpeditionUI.open` 零调用；再右键发射台本体断言面板打开 1 次，保证重排没有把发射台功能挤掉。
 - 该用例已做「红灯环」验证：把 `src/main.js` 临时还原成修复前顺序 → `✗ #209`（145 通过 / 1 失败），恢复修复版 → 146 通过 / 0 失败。构建 `game.html` 40995KB；1061 单元、146 scenario、5 perf、7 boss 全绿。
+
+### 2026-09-16 15:40 +08 · #210 袭击永不结束：给强攻一条撤离出口
+
+- 修掉 #207（断言）与 #209（发射台抢点击）后长测前进到 16560/21600 秒才死，死因是新一层：**袭击卡死**。诊断转储抓到 600 秒现场 —— 两个 hp 15/12、未倒地未俘获的袭击者在 `state:'attack'` 蹲在离庇护所 120 的围墙**内侧**，而六座炮塔全部 `powered:true` 却在墙外打不到；`casualties:0` 所以溃退永不触发；`wavesLeft:0`、`raidSpawnT=-8647`，这场仗挂了 8600 多秒，战时门控把后勤压死（`refillEvents` 停在 256/2048 单位，四台发电机 `fuelWood:0` 但库存还剩 4173 木料），三居民冻饿而亡。
+- 机制层面把死锁点找齐了：结束袭击的两条路都要「对敌人造成伤害」（清空/伤亡 60%），而炮塔只会击倒、俘虏按 `!e.captured` 从敌军里排除却不进 `casualties`、敌人自己的逃跑阈值 `CFG.enemy.fleeHpPct=0.22` 也必须先挨打 —— 伤害源一旦耗尽（炮塔被墙挡、居民全倒），残兵就既打不动也走不掉。`pillage` 战术本来有 `stealCap`（「偷够即走」）这条出口，`assault` 强攻一条都没有，而精英双波正是强攻。
+- 修法沿用同一家族的做法：新增 `CFG.raidTactics.giveUpSec = 600`（ADR-10 数据表），`startRaid` 记 `war.beganAt`，`tickRaid` 到点调用**既有的** `Combat.raidRetreat`（存活敌人置 `retreat` → 走越界回收分支，`escaped` 取 `war.stolen>0`），不新增第二种撤离实现；旧档缺 `beganAt` 在首帧补记，避免读档即撤。
+- 回归用例进 `tests/combat_subsystem.test.js`（`#210`）：未到时限不撤、到时限撤并把存活敌人置 `retreat`、残兵真正走出 `fleeDespawnR` 被回收后 `raidActive` 才落下、旧档首帧补记不立刻撤。1062 单元 / 146 scenario / 5 perf / 7 boss 全绿，`game.html` 重建 40996KB。ADR-50 收口在 `docs/adr/0038-raid-give-up-exit.md`。

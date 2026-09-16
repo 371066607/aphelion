@@ -1006,6 +1006,10 @@ APH.CFG = {
     wave2Angle: 2.4,      // 第二波换向(rad)
     routAt: 0.6,          // 伤亡比例 ≥60% → 全体溃退
     routDropChance: 0.5,  // 溃退者掉落随身赃物概率
+    /* 久攻不下即撤(秒): 强攻没有偷够即走的条件, 只剩残兵又打不动时
+       敌人会永远杵在场上, raidActive 与战时工作门控就把殖民地锁死到全灭。
+       参照 pillage 的 stealCap「偷够即走」, 强攻用时间上限换取出口。 */
+    giveUpSec: 600,
     fleeDespawnR: 1000,   // 溃退者离家园此距离消失(须<轴向可达上限1070, 防卡边)
     fleeSpdMul: 1.15,
     siegeWanderR: 46,
