@@ -2581,6 +2581,34 @@ test('#163 right_click: 全局右键交互（出航、开箱、破译、送医�
   A(ally.medLying === true, '送医后应处于医疗舱躺卧治疗态');
 });
 
+/* #209: 倒地敌人与发射台的判定半径有重叠区（发射台 50 > 俘虏 42），
+   发射台分支在前时会把「倒地者躺在发射台旁」的俘虏点击吃成开远征面板，
+   该处危机就永远无法用合法处置结束。 */
+test('#209 倒地敌人的右键处置优先于发射台', () => {
+  APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;
+  S.scene='home';S.entities=[];S.parts=[];S.clock=0;S.mode='running';S.paused=false;S.timeScale=1;
+  cmdHomeSetup();
+  const pad=S.entities.find(e=>e.type===T.BUILDING&&e.pad);
+  A(!!pad,'家园应有发射台（本用例靠它制造重叠半径）');
+  const person=APH.Res.hostilePawn(9209,[],{faction:'hostile'});
+  const raider=APH.Res.embodyHostile(person,pad.x+18,pad.y+12);
+  raider.downed=true;raider.hp=0;
+  S.entities.push(raider);
+  A(APH.U.dst(raider.x,raider.y,pad.x,pad.y)<=50,'夹具: 倒地者必须落在发射台 50 半径内');
+  let padOpened=0;const realOpen=APH.ExpeditionUI.open;
+  APH.ExpeditionUI.open=function(){padOpened++;return realOpen.apply(this,arguments);};
+  try{ M.cmd.rightClick(raider.x,raider.y); } finally { APH.ExpeditionUI.open=realOpen; }
+  A(raider.captured===true,'发射台半径内的倒地敌人也必须被右键俘获');
+  A(raider.dead===false,'ADR-47: 俘虏不标死');
+  A((S.meta.prisoners||[]).some(p=>p&&p.id===person.id),'俘虏应进入名单');
+  A(padOpened===0,'不应被发射台分支吃掉（远征面板不得打开）');
+  /* 已俘获的不再吃点击：发射台本体右键仍要能开编组面板 */
+  let padOpened2=0;
+  APH.ExpeditionUI.open=function(){padOpened2++;return realOpen.apply(this,arguments);};
+  try{ M.cmd.rightClick(pad.x,pad.y); } finally { APH.ExpeditionUI.open=realOpen; }
+  A(padOpened2===1,'右键发射台本体仍应打开编组面板（已俘获的不得再吞点击）');
+});
+
 
 test('#201 unknown destination: 先保存 PlanetSpec/Atlas，再扣补给并安装同一 observed runtime', () => {
   APH.Save.wipeAll();S.meta=APH.Save.loadMeta();S.colony=APH.Save.loadColony();delete S.worlds;

@@ -2159,6 +2159,18 @@ window.APH = window.APH || {};
         }
       }
 
+      /* 2b. 倒地敌人的处置优先于发射台: 两者判定半径有重叠区(发射台 50 > 俘虏 42),
+         发射台在前会把「倒地者躺在发射台旁」的俘虏点击吃成开面板, 该处危机就永远救不下来。
+         已俘获的不再重复吃点击(否则重排后反而会吞掉发射台点击)。 */
+      var hitDownEn=(s0.entities||[]).find(function(en){
+        return en && en.type===T.ENEMY && !en.dead && !en.captured && (en.downed || (en.hp||1)<=0) && U.dst(en.x,en.y,wx,wy)<=42;
+      });
+      if(hitDownEn && APH.Res.capturePrisoner){
+        APH.Res.capturePrisoner(s0.meta, hitDownEn);
+        APH.UI.floatText('⛓ 已俘虏 '+ (hitDownEn.name||'袭击者') +'（可释放，非奴隶）', '#c5e3f6');
+        return true;
+      }
+
       /* 3. 检查是否右键发射台 / 返回舱 (出航/返航) */
       var hitPad = s0.entities.find(function(en){
         return en && en.type === T.BUILDING && (en.bid === 'bl_landing_pad' || en.pad) && U.dst(en.x, en.y, wx, wy) <= 50;
@@ -2169,15 +2181,6 @@ window.APH = window.APH || {};
         } else if(s0.scene === 'expedition'){
           returnHome();
         }
-        return true;
-      }
-
-      var hitDownEn=(s0.entities||[]).find(function(en){
-        return en && en.type===T.ENEMY && !en.dead && (en.downed || (en.hp||1)<=0) && U.dst(en.x,en.y,wx,wy)<=42;
-      });
-      if(hitDownEn && APH.Res.capturePrisoner){
-        APH.Res.capturePrisoner(s0.meta, hitDownEn);
-        APH.UI.floatText('⛓ 已俘虏 '+ (hitDownEn.name||'袭击者') +'（可释放，非奴隶）', '#c5e3f6');
         return true;
       }
       var hitCorpse=(s0.entities||[]).find(function(en){

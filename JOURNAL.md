@@ -2358,3 +2358,17 @@ console:  (无)
 - 接口只暴露五个真正被外部需要的入口（`update`/`syncResidentEntities`/`tryResidentJoy`/`nearestDrop`/`freeDropCount`），main 保留 `updateResidents`/`syncResidentEntities`/`tryResidentJoy` 三个旧名薄委托（帧循环与 scenario/perf/boss/season_soak 四个入口都按旧名调）。13 处 `APH.UI.floatText` 按 ADR-40 改成 `U.emit('notice', {text,color})`，`!s._background` 门禁原样保留；新模块对 `APH.Main`/`APH.UI` 引用均为 0，引用的 17 个命名空间全部在它之前加载。模块清单同步进 build.py 与 6 个测试入口，layering 的 ORDER/两条模拟层清单/NS 映射一并纳入。
 - 行为不变的证据除了 1061 单元 / 145 scenario / 5 perf / 7 boss 全绿，还新增长仿真对拍：同 seed 夹具下逐帧比较居民 job/food/位置/workReason + 实体表 + 库存，基线树（`5200d9c`，pre-#206）与搬迁后**前 600 步逐字节一致**，基线树连跑两次也一致。边界诚实记录：窗口放宽到约 760 步后同一棵树两次运行开始出现浮点级差异（同一步位移 1.7469 vs 1.7839），此时 `Math.random` 调用次数、天气、库存、任务分配完全一致 —— 既有仿真不确定性，在未改动的基线树上同样复现，与本次搬迁无关。
 - 另一条既有红灯：`tests/season_soak.test.js` 在 `2037419`（pre-#205）、`5200d9c`（pre-#206）与本分支上都失败于 `right-click defense intervention must capture downed raider rs_h290165`，连 raider id 都相同 —— 与寻路改写和本次搬迁都无关，回归区间落在 #197–#204，另开票处置。
+
+### 2026-09-16 15:05 +08 · #207 六日生存长测红灯定位：断言写错，不是游戏错
+
+- 先按诊断纪律把分钟级长测缩成秒级夹具（`/tmp/tight_loop.js`，四个用例一次覆盖：点不点得中 / 俘获后标志位 / 袭击会不会结束 / 发射台是否抢点击）。实测：右键倒地 raider 确实俘获成功（`captured=true`、`prisoner=true`、进 `meta.prisoners`），但 `dead` 保持 false。
+- 根因是**长测断言错了**，不是游戏错：`tests/hostile_pawn.test.js` 有一条 ADR-47 契约测试，标题就叫「俘虏保持同一 id 与伤势，**不标死**、不进名册」，里面明写 `if (e.dead) throw new Error('俘虏不得把原对象标死')`。`capturePrisoner` 的人形分支刻意 `enemy.dead = false`（只有非人形才标死），`combat.js` 也在 4 处（敌人 AI 更新 552、raidFoes 1325、aliveEnemies 1362、终局 left 1424）统一用 `!e.captured` 把俘虏排除出敌军。soak 原来断言的 `ok(en.dead, ...)` 恰好断言了 ADR-47 明文禁止的语义 —— 所以这盏灯从 ADR-47 落地起就一直红，跟 #197–#204、#205、#206 都没有关系（此前「环境漂移 or 真实回归」的怀疑方向被证伪）。
+- 断言改为契约本身：`en.captured===true` + 进俘虏名单；干预名单同时加 `!e.captured` 过滤，避免已俘获者被每帧重复"处置"。夹具另证：俘获后 1 步内 `raidActive` 归零（终局判定用 `!e.captured` 把俘虏算作已解决），说明「俘虏能结束危机」这条玩法契约是成立的。
+- 断言改正后长测随即前进了一大步并暴露下一层（旧断言在第一只倒地敌人就抛出，从没走到过这里）：见随后条目。
+
+### 2026-09-16 15:12 +08 · #209 倒地敌人的右键处置不再被发射台抢走
+
+- #207 诊断的顺带发现：`handleContextMenu` 里「右键发射台/返回舱」分支排在「右键倒地敌人 → 俘虏」分支之前，两者判定半径有重叠区（发射台 50 > 俘虏 42），于是倒地敌人躺在发射台 50 半径内时点击被 `ExpeditionUI.open()` 吃掉。秒级夹具的 (D) 用例实测 `ExpeditionUI.open 被调用 =1`、`meta.prisoners=0`、零俘虏；对照组（把发射台从世界实体里拿掉）则俘获正常 —— 说明俘虏链路本身没问题，纯粹是分支顺序。
+- 修法：把俘虏分支提到发射台之前，并给俘虏选择加 `!en.captured`。后者是这次重排的必要配套：已俘获的 raider 仍保持 `downed=true`，不加过滤会反过来把发射台本体的点击也吞掉。
+- 锁死这个 bug 的回归用例进 `tests/scenario.test.js`（`#209 倒地敌人的右键处置优先于发射台`）：夹具用真实 `cmdHomeSetup()` 生成的发射台，把 humanlike raider 放在 pad+18/+12（距离 21.6 ≤ 50）后击倒，断言 `captured===true`、`dead===false`（ADR-47）、进 `meta.prisoners`、`ExpeditionUI.open` 零调用；再右键发射台本体断言面板打开 1 次，保证重排没有把发射台功能挤掉。
+- 该用例已做「红灯环」验证：把 `src/main.js` 临时还原成修复前顺序 → `✗ #209`（145 通过 / 1 失败），恢复修复版 → 146 通过 / 0 失败。构建 `game.html` 40995KB；1061 单元、146 scenario、5 perf、7 boss 全绿。
