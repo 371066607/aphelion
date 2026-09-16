@@ -1,0 +1,30 @@
+Chrome CPU profile over the 120 measured frames (isolated profile, seed 58098,
+128x128 home, 20 residents, 2059 world objects). Sampling interval 100us.
+Sample window total 2264 ms -> 18.87 ms/frame; JS in game.html is 2.43 ms/frame.
+
+=== self time, top 20 ===
+ ms/frame   share  frame
+    9.243   49.0%  (idle)                           :0
+    4.609   24.4%  (program)                        :0
+    1.185    6.3%  fillText                         :0
+    0.966    5.1%  drawImage                        :0
+    0.360    1.9%  (anonymous)                      game.html?autostart=1:2150
+    0.312    1.7%  prepare                          game.html?autostart=1:2144
+    0.275    1.5%  (garbage collector)              :0
+    0.260    1.4%  pawnWorldAt                      game.html?autostart=1:18053
+    0.128    0.7%  pickDesignatedFloraAt            game.html?autostart=1:18033
+    0.111    0.6%  groundTally                      game.html?autostart=1:6916
+    0.103    0.5%  drawResidentMarks                game.html?autostart=1:17148
+    0.098    0.5%  groundCount                      game.html?autostart=1:6909
+    0.082    0.4%  render                           game.html?autostart=1:15618
+    0.068    0.4%  nearestMeal                      game.html?autostart=1:6786
+    0.062    0.3%  update                           game.html?autostart=1:18492
+    0.039    0.2%  drawDesignations                 game.html?autostart=1:19826
+    0.036    0.2%  fill                             :0
+    0.034    0.2%  syncResidentEntities             game.html?autostart=1:18280
+    0.033    0.2%  senseHome                        game.html?autostart=1:24815
+    0.031    0.2%  drawFlora                        game.html?autostart=1:17337
+
+=== by file (top 8) ===
+   16.436 ms/frame   87.1%  (native)
+    2.430 ms/frame   12.9%  game.html?autostart=1
