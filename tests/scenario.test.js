@@ -3726,6 +3726,104 @@ test('modern dining: 餐位离食物货架超过 200px 时先取一份再走回�
   A(food.n===1&&!food.dead,'取餐用餐只能消耗一份，剩余食物不能被重复扣除');
 });
 
+/* ---------- #189 俘虏身份链：同一个人、同一 id、一份世界实体 ----------
+/* 夹具：打出一个倒地的人型袭击者再俘获。construct 场景本身，不注入通过条件。 */
+function captiveFixtureAt(x, y){
+  const p = APH.Res.hostilePawn(778, []);
+  p.origin = '外来袭击者';
+  const body = APH.Res.embodyHostile(p, x, y);
+  body.downed = true; body.hp = 0;
+  S.entities.push(body);
+  S.meta.prisoners = S.meta.prisoners || [];
+  APH.Res.capturePrisoner(S.meta, body);
+  return { p, body };
+}
+function dropFixture(p, body){
+  S.entities = S.entities.filter(e => e !== body && e.id !== p.id);
+  S.meta.prisoners = (S.meta.prisoners || []).filter(q => q.id !== p.id);
+  S.meta.residents = (S.meta.residents || []).filter(q => q.id !== p.id);
+}
+
+test('#189 释放俘虏：同一个人自己走出地图，不是删一行', () => {
+  const scene = S.scene;
+  S.scene = 'home';
+  try {
+    const { p, body } = captiveFixtureAt(APH.CFG.HAB.x + 200, APH.CFG.HAB.y + 200);
+    A(S.meta.prisoners.some(q => q.id === p.id), '俘获后应进俘虏名单');
+    A(typeof APH.UI.cmd === 'function', 'UI 命令通道应存在');
+    A(APH.UI.cmd('releasePrisoner', p.id), '释放应返回被释放的那个人（走按钮同一条命令通道）');
+    A(!S.meta.prisoners.some(q => q.id === p.id), '释放后应离开俘虏名单');
+    A(body.id === p.id, '离开的必须是同一个人');
+    A(body.captured === false && body.prisoner === false, '释放后不再是俘虏状态');
+    A(body.retreat === true, '释放 = 同一对象撤离（复用既有 retreat），不是删一行');
+    let steps = 0;
+    while(!body.dead && steps++ < 3000) APH.Combat.updateCombat(0.05, false);
+    A(body.dead, '离开者应自己走出地图消失，已走 ' + steps + ' 步');
+    dropFixture(p, body);
+  } finally { S.scene = scene; }
+});
+
+test('#189 招降俘虏：同 id 只留一份世界实体（玩家居民）', () => {
+  const scene = S.scene;
+  S.scene = 'home';
+  try {
+    const { p, body } = captiveFixtureAt(APH.CFG.HAB.x + 260, APH.CFG.HAB.y + 40);
+    const bed = { id: 'bl_bed', uid: 'bed_189', x: APH.CFG.HAB.x + 60, y: APH.CFG.HAB.y };
+    S.colony.buildings.push(bed);
+    A(APH.UI.cmd('recruitPrisoner', p.id), '招降应成功（加床保证有席位，走按钮同一条命令通道）');
+    A(S.meta.residents.some(r => r.id === p.id), '名册里必须是同一 id');
+    A(!S.meta.prisoners.some(q => q.id === p.id), '招降后应离开俘虏名单');
+    const same = S.entities.filter(e => e.id === p.id);
+    A(same.length === 1, '同 id 世界实体必须唯一，got ' + same.map(e => e.type).join('+'));
+    A(same[0].type === T.RESIDENT && same[0].rid === p.id, '留下的一份应是玩家居民实体');
+    S.colony.buildings = S.colony.buildings.filter(b => b !== bed);
+    dropFixture(p, same[0]);
+  } finally { S.scene = scene; }
+});
+
+test('#189 囚犯有玩家出口：检查器面板 + 名册俘虏区 + 键盘等价路径', () => {
+  const scene = S.scene;
+  S.scene = 'home';
+  try {
+    const { p, body } = captiveFixtureAt(APH.CFG.HAB.x + 300, APH.CFG.HAB.y + 300);
+    S.selectedTarget = { type: 'enemy', entity: body };
+    const html = APH.UI.inspectorHtml(S.selectedTarget, S);
+    A(html.indexOf(p.name) >= 0, '囚犯面板应显示名字');
+    A(html.indexOf('释放') >= 0, '检查器应给释放出口');
+    A(html.indexOf('招降') >= 0, '检查器应给招降出口');
+    A(html.indexOf("APH.UI.cmd('releasePrisoner'") >= 0 && html.indexOf("APH.UI.cmd('recruitPrisoner'") >= 0,
+      '面板按钮应指向已存在的命令: ' + html.slice(0, 200));
+    const roster = APH.UI.prisonersHtml(S.meta);
+    A(roster.indexOf(p.name) >= 0, '名册应列出俘虏');
+    A(roster.indexOf('释放') >= 0 && roster.indexOf('招降') >= 0, '名册每行应给释放/招降');
+    A(APH.CFG.keybindings.game.KeyY === 'RELEASE_PRISONER' && APH.CFG.keybindings.game.KeyN === 'RECRUIT_PRISONER',
+      '释放/招降必须有键盘等价路径');
+    S.selectedTarget = { type: 'player' };
+    dropFixture(p, body);
+  } finally { S.scene = scene; }
+});
+
+test('#189 非人俘虏（基因体）只能放走，不能入籍', () => {
+  const scene = S.scene;
+  S.scene = 'home';
+  try {
+    const beast = APH.Ent.makeEnemy(null, APH.CFG.HAB.x + 120, APH.CFG.HAB.y + 120);
+    beast.downed = true;
+    S.entities.push(beast);
+    S.meta.prisoners = S.meta.prisoners || [];
+    const stub = APH.Res.capturePrisoner(S.meta, beast);
+    A(stub && !stub.humanlike, '基因体俘虏应是 stub 记录（不是小人）');
+    const before = (S.meta.residents || []).length;
+    A(APH.UI.cmd('recruitPrisoner', stub.id) === false, '非人俘虏不得入籍');
+    A((S.meta.residents || []).length === before, '名册不得变化');
+    const html = APH.UI.prisonersHtml(S.meta);
+    A(html.indexOf(stub.id) >= 0 && html.indexOf('不可入籍') >= 0, '名册该行应说明只能放走');
+    A(M.releasePrisoner(stub.id), '非人俘虏也应能放走');
+    A(!S.meta.prisoners.some(q => q.id === stub.id), '放走后应离开名单');
+    S.entities = S.entities.filter(e => e !== beast);
+  } finally { S.scene = scene; }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

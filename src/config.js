@@ -1258,6 +1258,8 @@ APH.CFG = {
       Minus: 'ZOOM_OUT',
       KeyO: 'TOGGLE_DIPLOMACY',
       KeyR: 'TOGGLE_DRAFT',
+      KeyY: 'RELEASE_PRISONER',
+      KeyN: 'RECRUIT_PRISONER',
       Home: 'FOCUS_COMMANDER',
       KeyT: 'TOGGLE_TECH',
       KeyL: 'TOGGLE_CODEX',

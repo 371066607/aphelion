@@ -100,15 +100,16 @@ APH.Res = (function(){
     enemy.prisoner = true;
     return stub;
   }
+  /* ADR-47/#189: 释放返回「被释放的那个人」（不是布尔）——
+     调用方要拿同一对象把身体送出场，而不是把一行名单删掉了事。 */
   function releasePrisoner(meta, id){
-    if(!meta) return false;
-    var n = (meta.prisoners || []).length;
+    if(!meta) return null;
     var released = null;
     meta.prisoners = (meta.prisoners || []).filter(function(p){
       if(p && p.id === id){ released = p; p.prisoner = false; return false; }
       return true;
     });
-    return !!(released || meta.prisoners.length < n);
+    return released;
   }
   function recruitPrisoner(meta, id, housingCap){
     if(!meta) return { ok:false, why:'无存档' };

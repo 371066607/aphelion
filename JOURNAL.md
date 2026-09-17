@@ -2387,3 +2387,17 @@ console:  (无)
 - 修法：seed 改用整场袭击只增不减的 `s.war.spawnSerial`（随 `s.colony.war` 整体落盘，读档不丢），再对 `s.entities` + `meta.prisoners` 已占用的 id 顺延（兜住老档与跨袭击残留）；`hostilePawn` 函数本身与它的确定性（同 seed 同名同属性）未动。
 - 回归用例 `tests/combat_subsystem.test.js`「#211 combat: 双波袭击的敌人 id 必须全局唯一」：第一波 2 人 → 被俘（与本票证据同形）→ 交接帧 `spawned` 归零 → 第二波 2 人 → 断言 4 个 id 互不相同；再模拟新一场袭击（场上 4 个俘虏仍占着 id）断言新刷 2 人不撞旧 id 且内部不重复；最后用 `capturePrisoner` 断言 `meta.prisoners` 无重复 id。红灯环已验：修前同用例 ✗ `#211 波次间重用实体 id: rs_h251813,rs_h252730`，修后 ✓。
 - 证据：同一夹具（seed 固定）整季长测 `captures` 仍是 27（行为未变），而转储里 `enemies[]` 的不同 id 由 6 个变成 **27 个**；`passed=true, clock=21600, raidStuck=null`。构建 `game.html` 40997KB；1063 单元 / 146 scenario / 5 perf / 7 boss 全绿。另注：27 个 idle 俘虏整季站在场上不消失也不衰减，这条另议。
+
+### 2026-09-17 11:24 +08 · #189 俘虏身份链收口：同一个人、同一 id、一份世界实体
+
+- 审计 #188 时把 #189 的真缺口定位到了**世界层与 UI 层**，不在数据层：id/技能/伤势保留早就有 ADR-47 契约测试，但 `meta.prisoners` 是一份**只写不读**的死数据 —— 全 `src/` 唯一的读者是我 #211 加的 id 占用检查，`ui.js` 里 `prisoners`/释放/招降零命中。于是玩家俘虏一个人之后再无出口，那个身体以 `captured:true` 永远站在战场上（#211 长测转储里 22 个 idle 俘虏就是它们）。
+- 更硬的一处是**同 id 两份实体**：`recruitPrisoner` 把人放进 `meta.residents` 后，`syncResidentEntities` 会以同一 id 造出居民实体，而战场上那份 `captured` ENEMY 实体没人退役 —— 同一 id 同时是敌对与居民，正是 #211 刚锁死的「id 必须唯一」的反例。
+- 修法（零新机制）：
+  - `Res.releasePrisoner` 从返回布尔改成**返回被释放的那个人**；`main.js` 拿同一对象交给既有 `retreat` 撤离分支（顺带清 `downed`、`hp≥1`，免得走进 `flee` 分支的 `killEnemy`），他背向家园走出 `fleeDespawnR` 自行消失 —— 释放 = 同一个人离开，不是把名单删一行，也不新增第二种离场实现。
+  - 新增 `Main.recruitPrisoner`：招降成功后**退役战场上那份同 id 的敌对实体**，再由既有 `syncResidentEntities` 以同一 id 体现玩家居民，`saveMeta` 落盘。
+  - 玩家出口：检查器囚犯面板（`⛓` 头 + 释放/招降按钮）与名册面板俘虏区（`APH.UI.prisonersHtml`）；键盘等价路径 `KeyY`/`KeyN`（`CFG.keybindings` → `RELEASE_PRISONER`/`RECRUIT_PRISONER`，只作用于选中囚犯）。
+- 语义补白：非人俘虏（`capturePrisoner` 的 stub 分支没有 `humanlike`）在 `recruitPrisoner` 与面板两处都被拒绝入籍 —— 基因团不该变成殖民者，它只能被放走。
+- 回归用例进 `tests/scenario.test.js` 四条，且断言走 `APH.UI.cmd`（按钮同源通道，不是绕开 UI 直调 Main）：释放后 `retreat===true` 并真的走出地图 `dead`、招降后同 id 世界实体唯一且是 RESIDENT、检查器与名册都给出口 + 键位表齐、非人俘虏只能放走。**红灯环已验**：修前该套 3 红（`释放应返回被释放的那个人` / `M.recruitPrisoner is not a function` / `检查器应给释放出口`），修后 **150 通过 / 0 失败**。
+- 门禁：构建 `game.html` 41003KB（`</html>` 结尾）；**1063 单元 / 150 scenario / 5 perf / 7 boss** 全绿；整季长测 `passed=true, clock=21600, steps=144000, raidStuck=null`，本季 22 个俘虏 **22 个不同 id**、全部 `idle`。
+- 端到端（headless Chrome + CDP，真 DOM 点击）暴露并修掉一个只有跑起来才看得见的问题：释放后名册面板不刷新，仍挂着已释放的人（截图 `docs/evidence/prisoner-chain/prisoner-panel.png` 里看得见）。补 `refreshRosterIfOpen()` 后同一步骤 `rosterStillLists=false`；探针与数据表固化在 `docs/evidence/prisoner-chain/`。
+- 仍开着（诚实边界）：俘虏就地站着，押送/牢房/需求衰减没有做；`meta.prisoners` 里非人 stub 与真人记录共用一张表。ADR-47 修订段已记入 `DESIGN.md`。

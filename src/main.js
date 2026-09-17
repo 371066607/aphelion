@@ -1928,6 +1928,17 @@ window.APH = window.APH || {};
         }
         return false;
       },
+      /* #189: 选中囚犯时的键盘等价路径（Y=释放他走 / N=招降入籍） */
+      RELEASE_PRISONER: function(){
+        var t = APH.state.selectedTarget;
+        if(!t || t.type !== 'enemy' || !t.entity || !t.entity.captured) return false;
+        return releasePrisoner(t.entity.id);
+      },
+      RECRUIT_PRISONER: function(){
+        var t = APH.state.selectedTarget;
+        if(!t || t.type !== 'enemy' || !t.entity || !t.entity.captured) return false;
+        return recruitPrisoner(t.entity.id);
+      },
       TOGGLE_TECH: function(){
         var s=APH.state;
         if(s.debugKeys && s.scene!=='home' && !techMapOpen()){
@@ -3216,10 +3227,60 @@ window.APH = window.APH || {};
     if(APH.UI&&APH.UI.floatText) APH.UI.floatText('仓储过滤 → '+(next&&next.name||z.filter), '#ffc857');
     updateInspectorNow(); saveColony();
   }
+  /* #189: 名册面板开着时，俘虏/名册变更后要当场刷新（否则面板里挂着已经放走的人）。 */
+  function refreshRosterIfOpen(){
+    var el = document.getElementById('resPanel');
+    if(el && el.style.display !== 'none') renderResPanel();
+  }
+
+  /* #189: 释放 = 同一个人离开，不是删一行 —— 名单里摘掉他，世界里那个身体自己走出地图。
+     离场复用既有的 retreat（背向家园撤离、越界消失），不新增第二种离场实现。 */
   function releasePrisoner(id){
-    if(APH.Res.releasePrisoner) APH.Res.releasePrisoner(APH.state.meta, id);
-    if(APH.UI&&APH.UI.floatText) APH.UI.floatText('已释放俘虏', '#8fd4ff');
+    var s = APH.state;
+    var person = (APH.Res && APH.Res.releasePrisoner && s.meta) ? APH.Res.releasePrisoner(s.meta, id) : null;
+    var body = null;
+    (s.entities || []).forEach(function(e){
+      if(e && e.type === T.ENEMY && e.id === id && !e.dead) body = e;
+    });
+    if(body){
+      body.captured = false; body.prisoner = false;
+      body.downed = false;                       /* 倒地者要先站起来才走得动 */
+      body.hp = Math.max(1, body.hp || 1);       /* 放人不等于补刀（flee 分支的 killEnemy 不得触发） */
+      body.retreat = true; body.state = 'flee';
+    }
+    if(person && APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
+    if(APH.UI && APH.UI.floatText){
+      APH.UI.floatText(person ? ('⛓→ 已释放 ' + (person.name || '俘虏') + '，他会自己离开')
+                              : '没有这个俘虏', person ? '#8fd4ff' : '#ff9a9a');
+    }
     updateInspectorNow();
+    refreshRosterIfOpen();
+    return !!person;
+  }
+
+  /* #189: 招降 = 同一 id 只改阵营/身份。战场上那份俘虏身体必须退役 ——
+     否则同一 id 会同时留下敌对与居民两份实体（#211 的教训：id 必须唯一）。 */
+  function recruitPrisoner(id){
+    var s = APH.state;
+    if(!(APH.Res && APH.Res.recruitPrisoner) || !s.meta) return false;
+    var rec0 = (s.meta.prisoners || []).filter(function(p){ return p && p.id === id; })[0];
+    if(rec0 && !rec0.humanlike){          /* 非人俘虏（基因体/野兽）没有「入籍」这回事 */
+      if(APH.UI && APH.UI.floatText) APH.UI.floatText('⚑ ' + (rec0.name || '非人俘虏') + ' 不是小人，不能入籍', '#ff9a9a');
+      return false;
+    }
+    var rec = APH.Res.recruitPrisoner(s.meta, id, housingCap());
+    if(!rec || !rec.ok){
+      if(APH.UI && APH.UI.floatText) APH.UI.floatText('⚑ 招降失败：' + ((rec && rec.why) || '未知'), '#ff9a9a');
+      return false;
+    }
+    s.entities = (s.entities || []).filter(function(e){ return !(e && e.id === id && e.type === T.ENEMY); });
+    if(APH.Save && APH.Save.saveMeta) APH.Save.saveMeta(s.meta);
+    syncResidentEntities();          /* 同一 id 的居民实体在殖民地重新体现 */
+    if(APH.UI && APH.UI.floatText) APH.UI.floatText('⚑ ' + ((rec.resident && rec.resident.name) || '俘虏') + ' 入籍 —— 还是同一个人', '#7dffab');
+    if(APH.UI && APH.UI.renderColonistBar) APH.UI.renderColonistBar();
+    refreshRosterIfOpen();
+    updateInspectorNow();
+    return true;
   }
   function assignRestrict(){
     var z=selectedZone();
@@ -3507,6 +3568,7 @@ window.APH = window.APH || {};
     cycleSchedule:cycleSchedule,
     addBuildingBill:addBuildingBill,
     releasePrisoner:releasePrisoner,
+    recruitPrisoner:recruitPrisoner,
     assignRestrict:assignRestrict,
     cycleGrowCrop:cycleGrowCrop,
     cycleZoneFilter:cycleZoneFilter,
@@ -3630,6 +3692,7 @@ window.APH = window.APH || {};
     cycleGrowCrop:cycleGrowCrop,
     assignRestrict:assignRestrict,
     releasePrisoner:releasePrisoner,
+    recruitPrisoner:recruitPrisoner,
     updateHome:updateHome,
     ecologyStep:ecologyStep,
     simStep:simStep,

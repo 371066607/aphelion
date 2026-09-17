@@ -1592,6 +1592,7 @@ APH.UI = (function(){
         })() +
         '</div>';
     });
+    html += prisonersHtml(m);
     if(m.bonds && Object.keys(m.bonds).length){
       html += '<div style="margin-top:14px;color:#ffc857;font-size:12px;font-weight:700">殖民地人际羁绊网络</div>';
       Object.keys(m.bonds).forEach(function(k){
@@ -1607,6 +1608,30 @@ APH.UI = (function(){
       });
     }
     body.innerHTML = html;
+  }
+
+  /* #189: 俘虏区 —— 名单里的每个人都在这里拿到出口（释放/招降），
+     不再是一份只写不读、玩家永远够不着的死数据。 */
+  function prisonersHtml(m){
+    var list = (m && m.prisoners) || [];
+    if(!list.length) return '';
+    var h = '<div style="margin-top:14px;color:#c5e3f6;font-size:12px;font-weight:700">⛓ 俘虏 ' + list.length + ' 人' +
+      ' <span style="color:#5d6f96;font-weight:400;font-size:11px">同一个人，只是换了身份（非奴隶）</span></div>';
+    list.forEach(function(p){
+      var sk = (APH.Res.SKILLS || []).map(function(s){
+        return (APH.Res.SKILL_NAMES[s] || s) + ((p.skills && p.skills[s]) || 0);
+      }).join(' · ');
+      h += '<div style="border:1px solid #1a2334;border-radius:10px;padding:10px 16px;margin:8px 0 0;background:#0c1220">' +
+        '<b style="font-size:12px">' + esc(p.name || '俘虏') + '</b>' +
+        '<span style="color:#8fa3cc;font-size:11px"> · ' + esc(p.trait || '') + ' · ' + esc(p.origin || '外来者') + '</span><br>' +
+        '<span style="color:#5d6f96;font-size:11px">' + sk + '</span><br>' +
+        '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'releasePrisoner\',\'' + p.id + '\')">释放 · 他离开</button>' +
+        (p.humanlike
+          ? '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'recruitPrisoner\',\'' + p.id + '\')">招降入籍</button>'
+          : '<span style="color:#5d6f96;font-size:10px;margin-left:6px">非人（基因体/野兽）不可入籍，只能放走</span>') +
+        '</div>';
+    });
+    return h;
   }
 
   registerModal('roster', {
@@ -1783,9 +1808,19 @@ APH.UI = (function(){
         var food = Math.round(pawn.food != null ? pawn.food : 80);
         var rest = Math.round(pawn.rest != null ? pawn.rest : 80);
         var rec = Math.round(pawn.recreation != null ? pawn.recreation : 80);
-        var hh2 = inspHead('⚔', nm, (trait ? trait + ' · ' : '') + '敌对阵营', '#ff6d6d', '');
+        /* #189: 俘虏是「同一个人换身份」——面板给玩家两个出口：
+           释放（他自己走出地图，复用 retreat）/ 招降（入籍，仍同一 id）。 */
+        var isCap = !!ee.captured;
+        var capCmds = isCap
+          ? ('<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'releasePrisoner\',\'' + ee.id + '\')">释放 · 他离开</button>' +
+             '<button class="insp-cmd" type="button" onclick="APH.UI.cmd(\'recruitPrisoner\',\'' + ee.id + '\')">招降入籍</button>')
+          : '';
+        var hh2 = inspHead(isCap ? '⛓' : '⚔', nm,
+          (trait ? trait + ' · ' : '') + (isCap ? '囚犯 · 战斗已解除' : '敌对阵营'),
+          isCap ? '#c5e3f6' : '#ff6d6d', capCmds);
         hh2 += needBarsHtml(food, rest, rec, mood);
         hh2 += '<div class="insp-body">';
+        if(isCap) hh2 += '<div style="font-size:10px;color:#8fa3cc">打倒后还是同一个对象，id、技能、伤势都保留（ADR-47）</div>';
         hh2 += thoughtsHtml(pawn, {}, pawn.thoughts);
         hh2 += '</div>';
         return hh2;
@@ -2038,7 +2073,7 @@ APH.UI = (function(){
   }
 
   return {
-    registerCommands:registerCommands, cmd:cmd,
+    registerCommands:registerCommands, cmd:cmd, prisonersHtml:prisonersHtml,
     updHUD:updHUD, setHint:setHint, floatText:floatText, showCard:showCard,
     showScanRing:showScanRing, hideScanRing:hideScanRing, setScanProgress:setScanProgress,
     setActBtn:setActBtn, hideIntro:hideIntro, hideOpening:hideOpening,
