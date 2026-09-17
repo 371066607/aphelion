@@ -29,6 +29,37 @@ test('combat: tickRaid 递减袭击预警并在归零时触发 startRaid', () =>
   }
 });
 
+test('#190 combat: 全员被俘也结束袭击（俘虏不进玩家名册）', () => {
+  const Combat = window.APH.Combat, Res = window.APH.Res, CFG = window.APH.CFG, T = CFG.entType;
+  const s = {
+    px: 1000, py: 1000, scene: 'home', seed: 11, clock: 100, parts: [],
+    war: { raidWarn: 0, raidActive: true, raidFrom: 'rv_ash', spawned: 2, routed: false,
+      wavesLeft: 0, betweenWaves: false, casualties: 0, beganAt: 100, wave: { count: 2, waves: 1 } },
+    colony: { buildings: [] },
+    meta: { residents: [], prisoners: [], tech: {} },
+    entities: []
+  };
+  for (let i = 0; i < 2; i++){
+    const p = Res.hostilePawn(100 + i, []);
+    const e = Res.embodyHostile(p, 1050 + i * 20, 1000);
+    s.entities.push(e);
+    Res.capturePrisoner(s.meta, e);          /* 一个都没杀，全部被俘 */
+  }
+  if (s.meta.prisoners.length !== 2) throw new Error('应记下 2 个俘虏');
+  const prevState = window.APH.state;
+  window.APH.state = s;                      /* tickRaid → updateCombat 读全局 state */
+  try {
+    Combat.tickRaid(s, 0.1);
+    if (s.war.raidActive !== false) throw new Error('#190 全员被俘应结束袭击, raidActive=' + s.war.raidActive);
+    if (s.war.wins !== 1) throw new Error('#190 该计一次击退, wins=' + s.war.wins);
+    if (s.meta.residents.length) throw new Error('#190 俘虏不是居民（未招降不得进名册）');
+    const foes = (s.entities || []).filter(e => e.type === T.ENEMY && !e.dead);
+    if (foes.some(e => !e.captured)) throw new Error('场上不应还有未俘获的敌人');
+  } finally {
+    if (prevState === undefined) delete window.APH.state; else window.APH.state = prevState;
+  }
+});
+
 test('combat: tickRaid 在战斗中推进炮塔开火并处理终盘胜利', () => {
   const Combat = window.APH.Combat, CFG = window.APH.CFG, T = CFG.entType;
   const enemy = { id: 'en1', type: T.ENEMY, x: 1050, y: 1000, hp: 20, isSoldier: false, dead: false, faction: { behavior: 'melee_swarm', hp: 20, dmg: 5, speed: 50, gene: { hue: 200 } } };

@@ -3824,6 +3824,59 @@ test('#189 非人俘虏（基因体）只能放走，不能入籍', () => {
   } finally { S.scene = scene; }
 });
 
+/* ---------- #190 工作表、征召、框选、头像条只认玩家阵营 ---------- */
+test('#190 框选只收玩家居民，敌对小人进不了编队', () => {
+  const home = S.meta.residents[0] || APH.Res.generate('wk_190', 1);
+  const foe = APH.Res.hostilePawn(919, []);
+  const foeBody = APH.Res.embodyHostile(foe, APH.CFG.HAB.x + 80, APH.CFG.HAB.y + 80);
+  const resBody = { id: home.id, type: T.RESIDENT, rid: home.id, name: home.name,
+    x: APH.CFG.HAB.x + 40, y: APH.CFG.HAB.y + 40 };
+  S.entities.push(foeBody, resBody);
+  try {
+    const picked = APH.Colony.boxSelectPawns(S.entities,
+      APH.CFG.HAB.x, APH.CFG.HAB.y, APH.CFG.HAB.x + 120, APH.CFG.HAB.y + 120);
+    A(picked.some(e => e.id === home.id), '框选应含玩家居民');
+    A(!picked.some(e => e.id === foe.id), '框选不得含敌对小人');
+    A(!picked.some(e => e.type === T.ENEMY), '框选结果不得出现敌对阵营');
+  } finally {
+    S.entities = S.entities.filter(e => e !== foeBody && e !== resBody);
+  }
+});
+
+test('#190 征召只认玩家阵营：敌对小人即使被选中也不立正', () => {
+  const foe = APH.Res.hostilePawn(920, []);
+  const body = APH.Res.embodyHostile(foe, APH.CFG.HAB.x + 30, APH.CFG.HAB.y + 30);
+  S.entities.push(body);
+  const prevRid = S.selectedRid, prevTarget = S.selectedTarget;
+  try {
+    S.selectedRid = foe.id;
+    S.selectedTarget = { type: 'enemy', entity: body };
+    APH.UI.cmd('toggleSelectedDraft');
+    A(!body.drafted && !foe.drafted, '敌对小人不得被征召');
+  } finally {
+    S.selectedRid = prevRid; S.selectedTarget = prevTarget;
+    S.entities = S.entities.filter(e => e !== body);
+  }
+});
+
+test('#190 头像条只列殖民者，不含敌对小人', () => {
+  const foe = APH.Res.hostilePawn(921, []);
+  foe.name = 'ZZ_敌对探针';
+  const body = APH.Res.embodyHostile(foe, APH.CFG.HAB.x + 40, APH.CFG.HAB.y + 40);
+  S.entities.push(body);
+  const prevMode = S.mode;
+  try {
+    S.mode = 'running';
+    APH.UI.renderColonistBar();
+    const html = String(document.getElementById('colonistBar').innerHTML || '');
+    A(html.length > 0, '头像条应渲染出殖民者');
+    A(html.indexOf(foe.name) < 0, '头像条不得出现袭击者');
+  } finally {
+    S.mode = prevMode;
+    S.entities = S.entities.filter(e => e !== body);
+  }
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

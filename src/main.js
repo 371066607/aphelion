@@ -2378,8 +2378,7 @@ window.APH = window.APH || {};
         var dDistP = Math.abs(APH.state.pawnDragEnd.x - APH.state.pawnDragStart.x) + Math.abs(APH.state.pawnDragEnd.y - APH.state.pawnDragStart.y);
         if(dDistP >= 18){
           var s0 = APH.state;
-          var boxed = APH.Colony.boxSelectEntities(s0.entities, APH.state.pawnDragStart.x, APH.state.pawnDragStart.y, APH.state.pawnDragEnd.x, APH.state.pawnDragEnd.y);
-          var pawns = boxed.filter(function(en){ return en && !en.dead && en.type === T.RESIDENT; });
+          var pawns = APH.Colony.boxSelectPawns(s0.entities, APH.state.pawnDragStart.x, APH.state.pawnDragStart.y, APH.state.pawnDragEnd.x, APH.state.pawnDragEnd.y);
           var minX = Math.min(APH.state.pawnDragStart.x, APH.state.pawnDragEnd.x), maxX = Math.max(APH.state.pawnDragStart.x, APH.state.pawnDragEnd.x);
           var minY = Math.min(APH.state.pawnDragStart.y, APH.state.pawnDragEnd.y), maxY = Math.max(APH.state.pawnDragStart.y, APH.state.pawnDragEnd.y);
           /* ADR-45: 框选只收居民。没有主角可塞进编队。 */

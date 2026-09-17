@@ -2971,6 +2971,13 @@ APH.Colony = (function(){
     return res;
   }
 
+  /* #190: 框选只收玩家阵营的自由小人 —— 敌对小人（含俘虏）不是编队成员，
+     别再让每个调用点自己重写一遍过滤（漏一处就是一个“拉框能选到敌人”的 bug）。 */
+  function boxSelectPawns(entities, x0, y0, x1, y1){
+    return boxSelectEntities(entities, x0, y0, x1, y1).filter(function(e){
+      return e && !e.dead && e.type === T.RESIDENT;
+    });
+  }
   function applyDesignation(designations, entity, tool){
     if(!designations || !entity) return false;
     var id = entity.id;
@@ -3105,7 +3112,7 @@ APH.Colony = (function(){
     findNearbySourcedItem:findNearbySourcedItem,
     roomTemperatureTick:roomTemperatureTick, cropThermalGrowthMul:cropThermalGrowthMul,
     floraRespawnTick:floraRespawnTick,
-    boxSelectEntities:boxSelectEntities, applyDesignation:applyDesignation,
+    boxSelectEntities:boxSelectEntities, boxSelectPawns:boxSelectPawns, applyDesignation:applyDesignation,
     colonyGoal:colonyGoal, winterFoodNeed:winterFoodNeed,
     makeAnimal:makeAnimal, syncPastureAnimals:syncPastureAnimals,
     persist:persist, recordOf:recordOf, nearestMeal:nearestMeal, nibblePile:nibblePile, serializeGround:serializeGround,

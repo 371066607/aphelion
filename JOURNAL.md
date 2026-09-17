@@ -2401,3 +2401,10 @@ console:  (无)
 - 门禁：构建 `game.html` 41003KB（`</html>` 结尾）；**1063 单元 / 150 scenario / 5 perf / 7 boss** 全绿；整季长测 `passed=true, clock=21600, steps=144000, raidStuck=null`，本季 22 个俘虏 **22 个不同 id**、全部 `idle`。
 - 端到端（headless Chrome + CDP，真 DOM 点击）暴露并修掉一个只有跑起来才看得见的问题：释放后名册面板不刷新，仍挂着已释放的人（截图 `docs/evidence/prisoner-chain/prisoner-panel.png` 里看得见）。补 `refreshRosterIfOpen()` 后同一步骤 `rosterStillLists=false`；探针与数据表固化在 `docs/evidence/prisoner-chain/`。
 - 仍开着（诚实边界）：俘虏就地站着，押送/牢房/需求衰减没有做；`meta.prisoners` 里非人 stub 与真人记录共用一张表。ADR-47 修订段已记入 `DESIGN.md`。
+
+### 2026-09-17 11:47 +08 · #190 复核：工作表/征召/框选/头像条只认玩家阵营（无功能缺口，收口一处重复过滤）
+
+- 复核结论：**六条验收都已成立，本票没有行为改动**。逐条证据 —— 工作指派走 `colony.js:1809/1815` 的 `Res.isPlayerFaction` 过滤（敌对与俘虏都被剔除，契约测试已锁）；征召入口 `toggleSelectedDraft` 要求实体是 `RESIDENT`，且 `selectedRid` 只会被居民命中，于是「把敌对 id 硬塞进选中态」也映射不到实体；编队框选在调用点按 `T.RESIDENT` 过滤；头像条走 ADR-45 名册渲染（`meta.residents`），袭击者与俘虏都不在名册里；士兵由 `Res.embodySoldier` 生成为玩家阵营 RESIDENT；全员被俘同样结束袭击。
+- 唯一代码改动是**把重复的过滤收口**：新增 `Colony.boxSelectPawns(entities,x0,y0,x1,y1)`（框选 + `T.RESIDENT`），`main.js` 的编队框选改用它 —— 此前这条不变式在每个调用点各写一遍，漏一处就是「拉框能选到敌人」。
+- 新增锁定用例 4 条：`tests/scenario.test.js` 三条（框选不含敌对、敌对即使被选中也不立正、头像条不含袭击者 —— 探针名写死 `ZZ_敌对探针` 以避开重名假阴性）；`tests/combat_subsystem.test.js` 一条「**全员被俘**也结束袭击」（`raidActive` 落下、`wins` 计一次、俘虏不进名册、场上无未俘获敌人；夹具需补 `window.APH.state`，因为 `tickRaid → updateCombat` 读的是全局 state —— 第一版就因为这个红了）。
+- 门禁：构建 `game.html` 41003KB（`</html>` 结尾）；**1064 单元 / 153 scenario / 5 perf / 7 boss** 全绿。
