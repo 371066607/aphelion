@@ -148,6 +148,13 @@ APH.ColonyTick = (function(){
       p.x=e.x;p.y=e.y;
       var hCtx = e.x != null && APH.Res.thoughtCtxAt ? APH.Res.thoughtCtxAt(e.x, e.y, thEnv) : { raid: true };
       hCtx.raid = !!(s.war&&s.war.raidActive)&&!e.captured;
+      hCtx.allyDown = hCtx.raid && (s.entities||[]).some(function(o){
+        return o!==e && !o.isSoldier && !o.captured && o.pawn && o.pawn.faction===p.faction &&
+          ((o.type===T.CORPSE && !o.dead) || (o.type===T.ENEMY &&
+            (o.downed || o.pawn.downed || (o.dead && !o.retreat))));
+      });
+      hCtx.pain = e.hp < e.maxHp || Object.keys(p.parts||{}).some(function(k){return p.parts[k]<1;}) ||
+        (p.ailments||[]).some(function(a){return a.type==='wound' && a.sev>0;});
       APH.Res.needsTick(p, false, hCtx);
       var room=window.APH.Nav&&APH.Nav.roomAt?APH.Nav.roomAt({x:e.x,y:e.y},T9_rooms):null;
       var atFire=!!(campfire&&U.dst(e.x,e.y,campfire.x,campfire.y)<=50);
@@ -159,6 +166,7 @@ APH.ColonyTick = (function(){
       APH.Res.clinicTick(p,{hasClinic:false,inClinic:false,rng:hostileSickRng});
       if(APH.Res.checkDowned(p)){e.downed=true;e.walking=false;}
     });
+    APH.Combat.tickRaiderMorale(s);
     residents.forEach(function(r){
       var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });
       var rTemp = ambT;

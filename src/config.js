@@ -238,6 +238,8 @@ APH.CFG = {
     th_sick:       { text:'身体不舒服', mood:-4 },
     th_downed:     { text:'倒在地上起不来', mood:-15 },
     th_raid:       { text:'遭到袭击', mood:-8 },
+    th_ally_down:  { text:'同伴倒下了', mood:-12 },
+    th_pain:       { text:'伤口疼痛', mood:-8 },
     th_exposed:    { text:'暴露在恶劣天气里', mood:-5 },
     th_dark:       { text:'摸黑干活', mood:-2 },
     th_lonely:     { text:'没人说话', mood:-2 },
@@ -1016,6 +1018,9 @@ APH.CFG = {
     waveGap: 45,          // 波次间隔(秒)
     wave2Angle: 2.4,      // 第二波换向(rad)
     routAt: 0.6,          // 伤亡比例 ≥60% → 全体溃退
+    moraleRoutAt: 0.5,    // 在场人型半数崩溃 → 复用整队撤离
+    moraleRoutMin: 2,     // 至少两人崩溃，避免首个入场者独自取消整波
+    breakReach: 40,       // 崩溃斗殴/暴食必须走到目标附近
     routDropChance: 0.5,  // 溃退者掉落随身赃物概率
     /* 久攻不下即撤(秒): 强攻没有偷够即走的条件, 只剩残兵又打不动时
        敌人会永远杵在场上, raidActive 与战时工作门控就把殖民地锁死到全灭。

@@ -123,10 +123,10 @@ test('perf: 128格、20居民、2000自然对象的模拟与寻路记录',()=>{
   }finally{S.meta.residents=oldResidents;Object.assign(S,snapshot);}
 });
 
-test('#212 perf: 80 名人型敌对按生产跳结算，不进入逐帧工作扫描',()=>{
+test('#212/#214 perf: 80 名人型敌对按生产跳结算需求与袭击士气',()=>{
   const S=APH.state,snapshot=Object.assign({},S),oldResidents=S.meta.residents,oldPrisoners=S.meta.prisoners;
   try{
-    S.scene='home';S.mode='running';S.war={raidActive:false};S.clock=3600;
+    S.scene='home';S.mode='running';S.war={raidActive:true};S.clock=3600;
     S.colony={rulesVersion:1,buildings:[],buildQueue:[],scene:APH.TerrainModel.home(77),ground:[]};
     S.meta.residents=[];S.meta.prisoners=[];
     for(let i=0;i<20;i++)S.meta.residents.push(APH.Res.generate('perf_human_'+i,77+i,[]));

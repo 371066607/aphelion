@@ -1826,6 +1826,8 @@ APH.UI = (function(){
           (trait ? trait + ' · ' : '') + (isCap ? '囚犯 · 战斗已解除' : '敌对阵营'),
           isCap ? '#c5e3f6' : '#ff6d6d', capCmds);
         hh2 += needBarsHtml(food, rest, rec, mood);
+        if(APH.Res.isBroken(pawn)) hh2 += '<div class="insp-body">精神崩溃 · '+
+          APH.Res.BREAK_NAMES[pawn.breakType]+' · 剩余 '+pawn.breakT+' 跳</div>';
         hh2 += '<div style="padding:0 10px 6px">'+inspRiskRow('病情',pawn.illness)+
           inspRiskRow('暴露',pawn.exposure)+'</div>';
         hh2 += '<div class="insp-body">';

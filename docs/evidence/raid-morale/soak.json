@@ -1,0 +1,181 @@
+{
+  "issue": 214,
+  "command": "node tests/run.js raid_morale.test.js",
+  "fixture": {
+    "seeds": [
+      1,
+      16
+    ],
+    "raiders": 4,
+    "food": 20,
+    "rest": 15,
+    "recreation": 10,
+    "mood": "unchanged generated value",
+    "breakState": "unset",
+    "frameSeconds": 0.05,
+    "productionEverySeconds": 30,
+    "maxSecondsPerRun": 600,
+    "damageSources": "none; no colonists or turrets",
+    "updates": "real ColonyTick.run and Combat.tickRaid; DOM stub, not browser gameplay"
+  },
+  "results": [
+    {
+      "seed": 1,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    },
+    {
+      "seed": 2,
+      "reason": "morale",
+      "routAt": 510,
+      "ended": true,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 4
+    },
+    {
+      "seed": 3,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    },
+    {
+      "seed": 4,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 2
+    },
+    {
+      "seed": 5,
+      "reason": "morale",
+      "routAt": 150,
+      "ended": true,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 4
+    },
+    {
+      "seed": 6,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 3
+    },
+    {
+      "seed": 7,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 2
+    },
+    {
+      "seed": 8,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 0
+    },
+    {
+      "seed": 9,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 2
+    },
+    {
+      "seed": 10,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    },
+    {
+      "seed": 11,
+      "reason": "morale",
+      "routAt": 120,
+      "ended": true,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 4
+    },
+    {
+      "seed": 12,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    },
+    {
+      "seed": 13,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 0
+    },
+    {
+      "seed": 14,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    },
+    {
+      "seed": 15,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 2
+    },
+    {
+      "seed": 16,
+      "reason": "none",
+      "routAt": null,
+      "ended": false,
+      "casualties": 0,
+      "kills": 0,
+      "departed": 1
+    }
+  ],
+  "validation": {
+    "build": true,
+    "unit": 1076,
+    "scenario": 161,
+    "perf": 6,
+    "boss": 7
+  },
+  "activeRaidPerformance": {
+    "hostiles": 80,
+    "residents": 20,
+    "productionTicks": 5,
+    "totalMs": 367,
+    "avgMs": 73.4
+  }
+}

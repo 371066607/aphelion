@@ -4011,6 +4011,13 @@ test('#190 头像条只列殖民者，不含敌对小人', () => {
   }
 });
 
+test('#214 敌对检查器直接显示共享崩溃类型与剩余跳数',()=>{
+  const p=APH.Res.hostilePawn(214,[]),e=APH.Res.embodyHostile(p,400,500);
+  p.breakType='brawl';p.breakT=2;
+  const html=APH.UI.inspectorHtml({type:'enemy',entity:e},S);
+  A(html.includes('精神崩溃 · 斗殴')&&html.includes('剩余 2 跳'),'检查器应显示真实 pawn 崩溃字段');
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败 / 共 ${pass+fail}`);
 
 process.exit(fail?1:0);

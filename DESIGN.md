@@ -347,3 +347,12 @@ main.js 4730 → 3675 行（本批 −1055），累计 ADR-41/42/43/49 为 6048 
 家园袭击原本只有两个结束条件（清空敌人、或伤亡 ≥ `routAt` 触发溃退），两条都要求玩家对敌人造成伤害；而炮塔只会击倒、玩家的合法处置是俘虏（ADR-47）、溃退只数击杀、敌人自己的 `fleeHpPct` 也要挨打才可能触发。于是存在一条无出口状态：**残血敌人打不动也逃不掉，`raidActive` 永远为真** → 战时工作门控让居民拒绝出工 → 不补燃料不取暖 → 冻饿全灭，袭击仍挂着。六日生存长测实测抓到该现场（`docs/evidence/colony-home/season.json` 的 `raidStuck`：两个 hp 15/12 的袭击者蹲在围墙内侧、六座炮塔 `powered:true` 却隔着墙打不到、`casualties:0`、袭击已挂 8647 秒）。`pillage` 有 `stealCap`（「偷够即走」），`assault` 此前没有任何撤离条件。
 
 决策：`CFG.raidTactics.giveUpSec = 600`，`startRaid` 记 `war.beganAt`，`tickRaid` 到点调用**既有的** `Combat.raidRetreat`（存活敌人置 `retreat` 交给越界回收分支，`escaped` 取 `war.stolen > 0`）；旧档缺 `beganAt` 首帧补记以免读档即撤。既有平衡参数与第二种撤离实现都不新增，`stealCap`/`routAt` 优先级不变。详见 `docs/adr/0038-raid-give-up-exit.md`。
+
+
+### ADR-47 修订：袭击士气出口（2026-09-26，#214）
+
+敌对人型在家园 30 秒生产跳中先结算需求/健康，再经 `Combat.tickRaiderMorale` 调用同一个 `Res.breakTick`/`isBroken`；使用独立 seeded RNG，不复制崩溃概率或性格映射表。饥饿沿用原念头，伤口/受损部位/战斗掉血和同阵营倒地者或具名遗体分别提供疼痛、同伴倒下念头；敌方检查器直接显示 `pawn.breakType/breakT`。已撤离而被回收的身体不算同伴死亡。
+
+逐帧只执行既有类型的行为：出走设置原 `retreat` 交给旧撤离回收；怠工停止战斗；斗殴先沿 Nav 接近同阵营小人，一次崩溃通过 `hurtResident` 互伤一次；暴食先接近地上食物，只消费一份实物，沿用居民暴食增益。不接入敌方工作名册，不隔空扣玩家库存。行为优先于围攻和攻击；非人型、士兵、俘虏不走袭击崩溃。
+
+新增 `moraleRoutAt=0.5`、`moraleRoutMin=2`：当前在场存活、未俘获的人型中，至少两人且至少半数同时崩溃才整队撤离（倒地者计入规模但不计崩溃人数）。复用 `raidRetreat` 取消后续波次、设置全队撤离并发出事件；原因记为 `war.retreatReason=morale`，新袭击清空原因。原 `routAt=0.6`、`giveUpSec=600`、`fleeHpPct=0.22` 不变。单人队伍仍依赖个体出走或原有退出路径。

@@ -235,6 +235,8 @@ APH.Res = (function(){
     if(pawn.downed) add('th_downed');
     if(ctx.raid) add('th_raid');
     else if(!pawn.downed) add('th_safe');
+    if(ctx.allyDown) add('th_ally_down');
+    if(ctx.pain) add('th_pain');
     if(ctx.exposed) add('th_exposed');
     if(ctx.night && !ctx.sheltered) add('th_dark');
     if(ctx.lonely) add('th_lonely');

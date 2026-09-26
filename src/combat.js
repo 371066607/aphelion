@@ -543,6 +543,63 @@ APH.Combat = (function(){
     if(best)return {x:best.x,y:best.y,kind:'resident',e:best};
     return run?null:{x:s.px,y:s.py,kind:'player'};
   }
+  /* #214: 生产跳沿用居民崩溃契约；俘虏/士兵/非人型不参与袭击士气。 */
+  function tickRaiderMorale(s){
+    if(!s || s.scene!=='home' || !s.war || !s.war.raidActive || s.war.routed) return;
+    var R=APH.Res, RT=CFG.raidTactics;
+    var foes=(s.entities||[]).filter(function(e){
+      return e.type===T.ENEMY && !e.dead && !e.captured && !e.isSoldier && R.isHumanlike(e) && e.pawn;
+    });
+    var rng=U.makeRng((((s.seed||7)*1009)+Math.floor(s.clock||0)*17+0x214)>>>0);
+    var broken=0;
+    foes.forEach(function(e){
+      if(e.downed || e.pawn.downed) return;
+      var b=R.breakTick(e.pawn,rng);
+      if(b.started || b.ended) e.breakActed=false;
+      if(b.started) U.emit('notice',{text:'💢 袭击者 '+e.pawn.name+' 崩溃了: '+R.BREAK_NAMES[b.started],color:'#ff9a9a'});
+      if(R.isBroken(e.pawn)) broken++;
+    });
+    if(broken>=RT.moraleRoutMin && broken>=Math.ceil(foes.length*RT.moraleRoutAt)){
+      s.war.retreatReason='morale';
+      raidRetreat(s,'⚠ 士气瓦解, 敌军溃退!',false);
+    }
+  }
+
+  /* 崩溃优先于围攻、偷窃与攻击。出走交给原有撤离分支；斗殴/暴食
+     使用原有类型与伤病数值，只允许接触目标后行动，不隔空取玩家库存。 */
+  function stepRaiderBreak(en,s,dt){
+    var R=APH.Res, p=en.pawn;
+    if(!p || !R.isBroken(p)) { en.breaking=null; return false; }
+    en.breaking=p.breakType;
+    var target=null, best=Infinity, C=CFG.residents, reach=CFG.raidTactics.breakReach;
+    if(!en.breakActed && (p.breakType==='brawl'||p.breakType==='binge')){
+      (s.entities||[]).forEach(function(o){
+        if(o===en || o.dead) return;
+        var valid=p.breakType==='brawl'
+          ? o.type===T.ENEMY && o.pawn && !o.isSoldier && !o.captured && !o.downed &&
+            !o.pawn.downed && o.pawn.faction===p.faction
+          : o.type===T.DROPPED && o.n>0 && CFG.items[o.itemId] && CFG.items[o.itemId].store==='food';
+        if(!valid) return;
+        var d=U.dst(en.x,en.y,o.x,o.y);
+        if(d<best){best=d;target=o;}
+      });
+    }
+    en.state='idle';en.walking=false;
+    if(target && best>reach){
+      R.walkAround(en,target,dt,en.faction.speed,APH.Nav.gridOf((s.colony&&s.colony.buildings)||[],s.colony&&s.colony.scene));
+    }else if(target){
+      en.breakActed=true;
+      if(p.breakType==='brawl'){
+        R.hurtResident(target.pawn,C.brawlIll,'wound',{mood:C.brawlMoodHit});
+        R.hurtResident(p,C.brawlIll,'wound',{mood:false});
+      }else{
+        target.n--;if(target.n<=0)target.dead=true;
+        p.food=Math.min(100,(p.food||0)+C.eatGain);
+      }
+    }
+    return true;
+  }
+
   function updateCombat(dt, night){
     var s = APH.state;
     var ctx2 = { night:night, px:s.px, py:s.py };
@@ -556,6 +613,9 @@ APH.Combat = (function(){
       }
       if(en.type !== T.ENEMY) return;
       alive++;
+      if(en.hp<=0){killEnemy(en);return;}
+
+      if(s.scene==='home' && en.pawn && APH.Res.isBroken(en.pawn) && en.pawn.breakType==='wander') en.retreat=true;
 
       /* 阶段E: 溃退者——背向家园撤离, 越界消失 */
       if(en.retreat){
@@ -571,6 +631,8 @@ APH.Combat = (function(){
         if(en.hp<=0) killEnemy(en);
         return;
       }
+
+      if(s.scene==='home' && stepRaiderBreak(en,s,dt)) return;
 
       /* 阶段E: 围攻扎营——绕营地游走, 不进攻(被打死照常掉落) */
       if(en.sieging){
@@ -1261,6 +1323,7 @@ APH.Combat = (function(){
 
     s.war.wave = s.war.pendingWave || { count: 4 };
     s.war.tactic = s.war.wave.tactic || 'assault';
+    delete s.war.retreatReason;
     s.war.spawned = 0;
     s.war.raidSpawnT = 0;
     s.war.casualties = 0;
@@ -1497,6 +1560,7 @@ APH.Combat = (function(){
     /* 袭家防务推进高阶接缝 (ADR-21) */
     startRaid:startRaid,
     raidRetreat:raidRetreat,
+    tickRaiderMorale:tickRaiderMorale,
     tickRaid:tickRaid,
   };
 })();
