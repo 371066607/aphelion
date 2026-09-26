@@ -107,6 +107,7 @@ APH.ColonyTick = (function(){
   function run(context){
     var s=context||APH.state, m=s.meta;
     if(!s || !m || s.scene!=='home') return false;
+    (s.entities||[]).forEach(function(e){if(e&&e.type===T.CORPSE)APH.Res.corpseTick(e);});
     var residents=residentsInContext(s,m);
     var modernWork=modernWorkRules(s);
     /* W3 天气效果: 当前天气 id(读 meta.weather, 老档兜底 wx_clear); 极端清单以 exposureGain>0 为准 */
@@ -139,12 +140,24 @@ APH.ColonyTick = (function(){
       var ctx = rEnt ? APH.Res.thoughtCtxAt(rEnt.x, rEnt.y, thEnv) : { raid: !!(s.war&&s.war.raidActive) };
       APH.Res.needsTick(r, false, ctx);
     });
-    /* ADR-47: 人型袭击者与殖民者同一套念头，但不走吃饭/上岗。 */
+    /* #212: 敌对与俘虏按同一生产跳结算身体；不进入玩家工作/吃饭名册。 */
+    var hostileSickRng=U.makeRng((((s.seed||7)*1009)+Math.floor(s.clock||0)*17+0x212)>>>0);
     (s.entities||[]).forEach(function(e){
-      if(!e || e.dead || e.isSoldier || !APH.Res.isHumanlike || !APH.Res.isHumanlike(e) || !e.pawn) return;
+      if(!e || e.dead || e.type!==T.ENEMY || !APH.Res.isHumanlike(e) || !e.pawn) return;
+      var p=e.pawn;
+      p.x=e.x;p.y=e.y;
       var hCtx = e.x != null && APH.Res.thoughtCtxAt ? APH.Res.thoughtCtxAt(e.x, e.y, thEnv) : { raid: true };
-      hCtx.raid = true;
-      APH.Res.moodFromThoughts(e.pawn, hCtx);
+      hCtx.raid = !!(s.war&&s.war.raidActive)&&!e.captured;
+      APH.Res.needsTick(p, false, hCtx);
+      var room=window.APH.Nav&&APH.Nav.roomAt?APH.Nav.roomAt({x:e.x,y:e.y},T9_rooms):null;
+      var atFire=!!(campfire&&U.dst(e.x,e.y,campfire.x,campfire.y)<=50);
+      var suit=(p.gear&&p.gear.suit&&CFG.items)?CFG.items[p.gear.suit]:null;
+      var stress=APH.Res.thermalStressTick(p,room&&room.temp!=null?room.temp:ambT,suit,30,atFire);
+      if(stress.downed){p.downed=true;p.isSleeping=false;}
+      APH.Res.exposureTick(p,
+        APH.Res.shelteredFor({x:e.x,y:e.y},s.colony.buildings,T9_rooms),wxExtreme,wxId);
+      APH.Res.clinicTick(p,{hasClinic:false,inClinic:false,rng:hostileSickRng});
+      if(APH.Res.checkDowned(p)){e.downed=true;e.walking=false;}
     });
     residents.forEach(function(r){
       var ent = (s.entities||[]).find(function(e){ return e.type===T.RESIDENT && (e.rid===r.id || e.id===r.id); });

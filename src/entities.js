@@ -229,6 +229,15 @@ APH.Ent = (function(){
     ctx.fillText((it.name||'?')+'×'+(e.n||1), e.x, e.y-12+bob);
     ctx.restore();
   }
+  function drawCorpse(e){
+    if(!e || e.dead) return;
+    ctx.save();ctx.translate(e.x,e.y);
+    ctx.fillStyle='#433b43';ctx.beginPath();ctx.ellipse(0,0,18,8,0,0,U.TAU);ctx.fill();
+    ctx.fillStyle='#bba7a5';ctx.beginPath();ctx.arc(-9,-2,5,0,U.TAU);ctx.fill();
+    ctx.fillStyle='#ddd0c5';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(e.name||'无名',0,-14);
+    ctx.restore();
+  }
 
   /* ================= 原有绘制 ================= */
   function drawRock(e){
@@ -479,6 +488,13 @@ APH.Ent = (function(){
     var r=geometryRect(e);return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;
   }
   function drawBuilding(e,time){
+    if(e.bid==='bl_prison_spot' && e.type!==T.BLUEPRINT){
+      ctx.save();ctx.translate(e.x,e.y);
+      ctx.fillStyle='rgba(77,105,127,.36)';ctx.fillRect(-20,-20,40,40);
+      ctx.strokeStyle='#8fd4ff';ctx.lineWidth=2;ctx.strokeRect(-19,-19,38,38);
+      ctx.fillStyle='#d8efff';ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText('⛓',0,7);
+      ctx.restore();return;
+    }
     /* 蓝图(施工中): 金色虚线椭圆+锤子+青色进度环——绝不画成成品 */
     if(e.type===T.BLUEPRINT){
       if(isGeometry(e)){ drawGeometryFurniture(e,time,true); return; }
@@ -1770,7 +1786,7 @@ APH.Ent = (function(){
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
-    drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped,
+    drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped, drawCorpse:drawCorpse,
     drawBuilding:drawBuilding, drawFlora:drawFlora, hitBuilding:hitBuilding,
     drawWalls:drawWalls,
     updatePlayer:updatePlayer, resolveTerrainMove:resolveTerrainMove, findPlayer:findPlayer,

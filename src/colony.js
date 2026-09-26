@@ -16,6 +16,9 @@ APH.Colony = (function(){
      cells: 占位格[宽,高]×48px格网(ADR-4), 非全部1x1——大建筑占2x2 */
   var BUILDINGS = {
     bl_bed: {name:'床',cost:0,costMineral:0,costRes:{wood:8},size:48,max:40,buildTime:8,cells:[1,2],dispH:72,desc:'一张独立床，提供一个床位。床边必须能走到。'},
+    bl_prison_spot: {name:'收容点',cost:0,costMineral:0,costRes:{wood:6,stone:4},size:48,max:12,buildTime:5,
+      cells:[1,1],layer:'floor',solid:false,dispH:48,
+      desc:'一格收容一名人型俘虏；战后由空闲居民押送。未建时使用家园临时收容区。'},
     bl_floor: {name:'舱板地板',cost:0,costMineral:0,costRes:{wood:1},size:48,max:16000,buildTime:2,cells:[1,1],dispH:48,desc:'可与墙、家具、导线叠放的地面。'},
     bl_landing_pad: { name:'发射台', cost:0, costMineral:0, costRes:{}, size:64, buildTime:0,
       desc:'远征出发口。永远只有一座。' },
@@ -3012,7 +3015,7 @@ APH.Colony = (function(){
     }
 
     if(tool === 'haul'){
-      if(entity.type === dType){
+      if(entity.type === dType || entity.type === (T.CORPSE || 'corpse')){
         designations[id] = { type: 'haul', entityId: id };
         return true;
       }

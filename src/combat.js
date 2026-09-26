@@ -453,7 +453,7 @@ APH.Combat = (function(){
     var best=null, bd=1e9;
     for(var i=0;i<entities.length;i++){
       var o=entities[i];
-      if(!o || o===en || o.dead || o.type!==T.ENEMY || o.isSoldier) continue;
+      if(!o || o===en || o.dead || o.captured || o.type!==T.ENEMY || o.isSoldier) continue;
       var d=U.dst(en.x,en.y,o.x,o.y);
       if(d<bd){ bd=d; best=o; }
     }
@@ -842,7 +842,7 @@ APH.Combat = (function(){
               break;
             }
           }
-          if(en.type !== T.ENEMY || en.dead || en.isSoldier) continue;
+          if(en.type !== T.ENEMY || en.dead || en.captured || en.isSoldier) continue;
           var r = 14 * en.faction.gene.size * (en.isBoss?1.9:1);
           if(segDist(segX0,segY0,p.x,p.y,en.x,en.y) < r){
             p.dead = true;
@@ -968,7 +968,7 @@ APH.Combat = (function(){
     if(turret.cd>0) return false;
     var best=null,bd=CFG.turret.range;
     enemies.forEach(function(en){
-      if(en.dead || en.isSoldier) return;
+      if(en.dead || en.captured || en.isSoldier) return;
       var d=U.dst(turret.x,turret.y,en.x,en.y);
       if(d<bd){bd=d;best=en;}
     });
@@ -984,8 +984,10 @@ APH.Combat = (function(){
 
   /* ---- 击杀: 掉落生成 ---- */
   function killEnemy(en){
+    if(!en || en.dead) return;
     var s0 = APH.state;
-    if(s0 && s0.scene==='home' && s0.war && s0.war.raidActive && en && !en.isBoss && !en.isSoldier){
+    if(s0 && s0.scene==='home' && s0.war && s0.war.raidActive && !en.isBoss && !en.isSoldier &&
+       (!en.humanlike || !en.downed)){
       en.hp = 0;
       en.downed = true;
       en.walking = false;
@@ -994,6 +996,10 @@ APH.Combat = (function(){
     }
     en.dead = true;
     var s = APH.state;
+    if(en.humanlike && en.pawn && window.APH.Res && APH.Res.makeCorpse){
+      en.pawn.downed=false;
+      s.entities.push(APH.Res.makeCorpse(en.pawn,en.x,en.y));
+    }
     s.meta.stats.kills++;
     s.shake = Math.min(1, s.shake+.25);
     var rng = U.makeRng((s.seed ^ Math.floor(en.x*7) ^ Math.floor(en.y*13)) >>> 0);

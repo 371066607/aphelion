@@ -3744,6 +3744,140 @@ function dropFixture(p, body){
   S.meta.residents = (S.meta.residents || []).filter(q => q.id !== p.id);
 }
 
+test('#212 人型敌对与俘虏随生产跳走同一需求/健康结算，面板读实时值', () => {
+  const oldScene=S.scene,oldEntities=S.entities,oldPrisoners=S.meta.prisoners,oldWar=S.war;
+  try{
+    S.scene='home';S.war={raidActive:true};S.entities=oldEntities.slice();
+    S.meta.prisoners=[];
+    const attacker=APH.Res.hostilePawn(2121,[]),enemy=APH.Res.embodyHostile(attacker,400,500);
+    const captive=APH.Res.hostilePawn(2122,[]),body=APH.Res.embodyHostile(captive,450,500);
+    S.entities.push(enemy,body);APH.Res.capturePrisoner(S.meta,body);
+    [attacker,captive].forEach(p=>{p.food=26;p.rest=50;p.exposure=20;p.illness=0;p.ailments=[];});
+    M.residentsTick();
+    [attacker,captive].forEach(p=>{
+      A(Math.abs(p.food-(26-APH.CFG.residents.foodDrain))<1e-9&&
+        Math.abs(p.rest-(50-APH.CFG.residents.restDrain))<1e-9&&p.exposure===5,
+        '需求应按同一生产跳变化：'+JSON.stringify({food:p.food,rest:p.rest,exposure:p.exposure}));
+      A(p.illness>0&&p.ailments.some(a=>a.type==='wound'),'饥饿伤病应走同一 ailment 链');
+      A(!S.meta.residents.some(r=>r.id===p.id),'敌对与俘虏不能进入玩家名册');
+    });
+    const html=APH.UI.inspectorHtml({type:'enemy',entity:body},S);
+    A(html.includes('病情')&&html.includes('暴露')&&html.includes('饱食'),'面板应显示更新后的需求与健康');
+  }finally{S.scene=oldScene;S.entities=oldEntities;S.meta.prisoners=oldPrisoners;S.war=oldWar;}
+});
+
+test('#213 居民看到具名人型尸体会起既有念头，埋葬后消失', () => {
+  const guards=cmdHomeSetup(),guard=guards[0];
+  const person=S.meta.residents.find(r=>r.id===(guard.rid||guard.id));
+  const oldWar=S.war;
+  const corpse=APH.Res.makeCorpse(APH.Res.hostilePawn(2133,[]),guard.x+20,guard.y);
+  try{
+    S.war={raidActive:false};S.entities.push(corpse);
+    M.residentsTick();
+    A(person.thoughts.some(t=>t.id==='th_saw_corpse'),'居民应看到人型尸体并产生既有念头');
+    APH.Res.buryCorpse(corpse);
+    M.residentsTick();
+    A(!person.thoughts.some(t=>t.id==='th_saw_corpse'),'埋葬后念头不应继续由尸体触发');
+  }finally{S.war=oldWar;S.entities=S.entities.filter(e=>e!==corpse);}
+});
+
+test('#213 标记搬运后居民实际移动同一遗体，仍可安葬', () => {
+  const guards=cmdHomeSetup(),oldWar=S.war,oldScene=S.colony.scene,oldDesignations=S.designations;
+  const corpse=APH.Res.makeCorpse(APH.Res.hostilePawn(2134,[]),APH.CFG.HAB.x+380,APH.CFG.HAB.y+220);
+  try{
+    S.war={raidActive:false};S.colony.scene={width:2200,height:2200};S.designations={};
+    guards.forEach((g,i)=>{g.x=APH.CFG.HAB.x+80+i*40;g.y=APH.CFG.HAB.y+96;g.userOrder=null;g.drafted=false;});
+    S.entities.push(corpse);
+    A(APH.Colony.applyDesignation(S.designations,corpse,'haul'),'搬运工具应能标记遗体');
+    const startX=corpse.x,startY=corpse.y;
+    let steps=0;
+    while(!corpse.hauled&&steps++<600)M.updateResidents(.2);
+    A(corpse.hauled&&corpse.x!==startX&&corpse.y!==startY,'居民应实际搬走原遗体：'+JSON.stringify({steps,x:corpse.x,y:corpse.y}));
+    A(!S.designations[corpse.id]&&S.entities.filter(e=>e===corpse).length===1,'搬运完成后不复制遗体');
+    APH.Res.buryCorpse(corpse);A(corpse.dead,'搬走后仍可安葬');
+  }finally{S.entities=S.entities.filter(e=>e!==corpse);S.war=oldWar;S.colony.scene=oldScene;S.designations=oldDesignations;}
+});
+
+test('#213 家园与远征绘制表都能显示具名尸体', () => {
+  const original=document.getElementById('cv').getContext('2d'),labels=[];
+  const spy={save(){},restore(){},translate(){},beginPath(){},ellipse(){},fill(){},arc(){},
+    fillText(t){labels.push(t);}};
+  try{
+    APH.Ent.bindCtx(spy);
+    const corpse=APH.Res.makeCorpse({id:'rs_draw_corpse',name:'旧雨'},500,600);
+    const home=APH.Draw.homeDrawers(),expedition=APH.Draw.expeditionDrawers();
+    A(typeof home.corpse==='function'&&typeof expedition.corpse==='function','两个世界都应接入尸体绘制');
+    home.corpse(corpse);expedition.corpse(corpse);
+    A(labels.filter(t=>t==='旧雨').length===2,'应在两个世界显示遗体原名：'+JSON.stringify(labels));
+  }finally{APH.Ent.bindCtx(original);}
+});
+
+test('ADR-47 收容：居民押送同一俘虏到建成点，释放仍由同一身体撤离', () => {
+  const guards=cmdHomeSetup();
+  const oldScene=S.colony.scene;
+  S.colony.scene={width:2200,height:2200};
+  const spot={id:'bl_prison_spot',uid:'hold_scenario',x:APH.CFG.HAB.x+240,y:APH.CFG.HAB.y+192};
+  S.colony.buildings.push(spot);
+  guards.forEach((g,i)=>{g.x=APH.CFG.HAB.x+80+i*40;g.y=APH.CFG.HAB.y+96;g.userOrder=null;g.drafted=false;});
+  const {p,body}=captiveFixtureAt(APH.CFG.HAB.x+420,APH.CFG.HAB.y+240);
+  let picked=false,steps=0;
+  try{
+    while(!body.held&&steps++<500){
+      M.updateResidents(.2);
+      picked=picked||!!body.escortId;
+    }
+    A(picked,'必须有居民实际接到俘虏');
+    A(body.held&&body.holdingId===spot.uid,'应送达已建收容点：'+JSON.stringify({steps,x:body.x,y:body.y,reason:guards.map(g=>g.workReason)}));
+    A(body.x===spot.x&&body.y===spot.y&&p.x===spot.x&&p.y===spot.y,'同一人的身体和名册位置须同步');
+    A(S.entities.filter(e=>e.id===p.id).length===1&&S.meta.prisoners[0]===p,'不得另造同 id 身体或名册记录');
+    A(M.releasePrisoner(p.id),'收容后仍可释放');
+    A(body.retreat&&body.id===p.id&&!body.captured,'释放必须仍是原身体撤离');
+  }finally{
+    dropFixture(p,body);
+    S.colony.buildings=S.colony.buildings.filter(b=>b!==spot);
+    S.colony.scene=oldScene;
+  }
+});
+
+test('ADR-47 收容：未建专用点时押送到家园临时收容区', () => {
+  const guards=cmdHomeSetup(),oldScene=S.colony.scene;
+  S.colony.scene={width:2200,height:2200};
+  guards.forEach((g,i)=>{g.x=APH.CFG.HAB.x+80+i*40;g.y=APH.CFG.HAB.y+96;g.userOrder=null;g.drafted=false;});
+  const {p,body}=captiveFixtureAt(APH.CFG.HAB.x+420,APH.CFG.HAB.y+240);
+  let steps=0;
+  try{
+    while(!body.held&&steps++<500)M.updateResidents(.2);
+    A(body.held&&body.holdingId.indexOf('temporary@')===0,'无建筑时应送达临时收容点：'+JSON.stringify({steps,x:body.x,y:body.y}));
+    A(Math.hypot(body.x-APH.CFG.HAB.x,body.y-APH.CFG.HAB.y)<300,'临时收容点必须在家园附近');
+    A(S.meta.prisoners.some(q=>q===p),'临时收容期间仍是同一个人');
+  }finally{dropFixture(p,body);S.colony.scene=oldScene;}
+});
+
+test('ADR-47 收容：一名空闲居民连续押送多名俘虏，不会只处理首人', () => {
+  const guards=cmdHomeSetup(),oldScene=S.colony.scene;
+  S.colony.scene={width:2200,height:2200};
+  guards[0].x=APH.CFG.HAB.x+80;guards[0].y=APH.CFG.HAB.y+96;
+  guards[0].userOrder=null;guards[0].drafted=false;
+  guards[1].drafted=true;
+  const bodies=[];
+  for(let i=0;i<3;i++){
+    const p=APH.Res.hostilePawn(820+i,[]);
+    const body=APH.Res.embodyHostile(p,APH.CFG.HAB.x+360+i*28,APH.CFG.HAB.y+210);
+    body.downed=true;body.hp=0;S.entities.push(body);APH.Res.capturePrisoner(S.meta,body);
+    bodies.push(body);
+  }
+  let steps=0;
+  try{
+    while(bodies.some(b=>!b.held)&&steps++<1500)M.updateResidents(.2);
+    A(bodies.every(b=>b.held),'单人应逐个押送所有俘虏：'+JSON.stringify(bodies.map(b=>({id:b.id,held:b.held,x:b.x,y:b.y,holdingId:b.holdingId}))));
+    A(new Set(bodies.map(b=>b.holdingId)).size===3,'多人不得占同一个收容位');
+  }finally{
+    bodies.forEach(b=>dropFixture(b.pawn,b));
+    guards[1].drafted=false;
+    S.colony.scene=oldScene;
+  }
+});
+
 test('#189 释放俘虏：同一个人自己走出地图，不是删一行', () => {
   const scene = S.scene;
   S.scene = 'home';

@@ -89,6 +89,23 @@ test('ADR-47: 释放仍是同一对象，招降只改阵营', () => {
   if (meta.prisoners.length) throw new Error('招降后应离开俘虏名单');
 });
 
+test('ADR-47: 家园快照读回后俘虏身体重新绑定权威名册同一人', () => {
+  const p=Res.hostilePawn(44,[]), e=Res.embodyHostile(p,680,720);
+  const meta={prisoners:[],residents:[]};
+  Res.capturePrisoner(meta,e);
+  e.x=710;e.y=750;e.held=true;e.holdingId='hold_saved';
+  const saved=APH.WorldRuntime.serializable({entities:[e]});
+  const loadedMeta=JSON.parse(JSON.stringify(meta));
+  const loadedWorld=APH.WorldRuntime.restore(saved,{meta:loadedMeta});
+  const body=loadedWorld.entities[0];
+  if(body.pawn===loadedMeta.prisoners[0])throw new Error('夹具必须先模拟两份独立 JSON');
+  Res.bindPrisonerBodies(loadedMeta,loadedWorld.entities);
+  if(body.pawn!==loadedMeta.prisoners[0]||body.id!==p.id||body.x!==710||body.y!==750)
+    throw new Error('读档后必须恢复同一 id 与权威人引用');
+  if(body.pawn.x!==710||body.pawn.y!==750||!body.pawn.held||body.pawn.holdingId!=='hold_saved')
+    throw new Error('名册位置和收容状态须与身体同步');
+});
+
 test('ADR-47: 招募过客保持同一 id', () => {
   const guest = Res.generate('v_keep', 8);
   guest.origin = '本地出生';

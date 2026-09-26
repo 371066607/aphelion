@@ -169,6 +169,8 @@ window.APH = window.APH || {};
   function restoreWorldSession(s){
     var saved=s.colony.homeRuntime,prunedLegacyNature=0;
     if(saved){var home=APH.WorldRuntime.restore(saved,s);APH.WorldRuntime.install(s,home);s.scene='home';s._worldReady=true;prunedLegacyNature=pruneLegacyHomeNature(s);}
+    /* 快照与 meta 分开反序列化后，俘虏身体重新指向名册里的同一个人。 */
+    if(APH.Res&&APH.Res.bindPrisonerBodies)APH.Res.bindPrisonerBodies(s.meta,s.entities);
     s.worlds={home:APH.WorldRuntime.capture(s),expedition:null};
     var restoredRun=APH.ExpeditionState.restore(s.meta,s.colony,APH.ExpeditionState.snapshot(s.colony));
     var run=restoredRun.run;
@@ -1380,6 +1382,7 @@ window.APH = window.APH || {};
     s.squadNeedT=(s.squadNeedT||0)+dt;
     while(s.squadNeedT>=CFG.time.prodTick){
       s.squadNeedT-=CFG.time.prodTick;
+      (s.entities||[]).forEach(function(e){if(e&&e.type===T.CORPSE)APH.Res.corpseTick(e);});
       APH.ExpeditionState.membersForWorld(s.meta,run.id).forEach(function(r){
         APH.Res.needsTick(r,false,{raid:false});
         if(r.food<CFG.residents.eatBelow&&run.supply.food>0){run.supply.food--;r.food=Math.min(100,r.food+CFG.expedition.supplyFoodGain);}
@@ -3243,6 +3246,8 @@ window.APH = window.APH || {};
     });
     if(body){
       body.captured = false; body.prisoner = false;
+      body.held = false; body.holdingId = null; body.escortId = null;
+      if(person){person.held=false;person.holdingId=null;}
       body.downed = false;                       /* 倒地者要先站起来才走得动 */
       body.hp = Math.max(1, body.hp || 1);       /* 放人不等于补刀（flee 分支的 killEnemy 不得触发） */
       body.retreat = true; body.state = 'flee';

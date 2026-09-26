@@ -483,6 +483,49 @@ APH.ResidentWork = (function(){
     return true;
   }
 
+  /* 纯规划：已占用的点保留给原俘虏；空收容点优先，家园临时区兜底。
+     身体仍在 entities[]，这里只返回 id/坐标，不创建第二份人或岗位记录。 */
+  function planPrisonerTransport(prisoners, workers, buildings, hab, reachable){
+    var C=CFG.prisonerTransport, used={}, settled={}, taken={}, plans=[];
+    var cells=(buildings||[]).filter(function(b){return b && b.id==='bl_prison_spot' && !b.dead;})
+      .map(function(b){return {id:b.uid||('spot@'+b.x+','+b.y),x:b.x,y:b.y};});
+    var count=(prisoners||[]).length, cols=C.fallbackColumns, fallbackCount=count*2+cols;
+    (prisoners||[]).forEach(function(p){
+      var match=/^temporary@(\d+)$/.exec(p.holdingId||'');
+      if(match) fallbackCount=Math.max(fallbackCount,Number(match[1])+1);
+    });
+    for(var i=0;i<fallbackCount;i++) cells.push({id:'temporary@'+i,
+      x:hab.x+C.fallbackX+(i%cols)*CFG.GRID,
+      y:hab.y+C.fallbackY+Math.floor(i/cols)*CFG.GRID});
+    var byId={}; cells.forEach(function(c){byId[c.id]=c;});
+    (prisoners||[]).forEach(function(p){
+      var held=byId[p.holdingId];
+      if(p.held && held && !used[held.id] && U.dst(p.x,p.y,held.x,held.y)<=C.arriveR){used[held.id]=true;settled[p.id]=true;}
+    });
+    (prisoners||[]).forEach(function(p){
+      var held=byId[p.holdingId];
+      if(settled[p.id]) return;
+      var options=cells.filter(function(c){return !used[c.id];});
+      options.sort(function(a,b){
+        var ap=a.id===p.holdingId?-1:0, bp=b.id===p.holdingId?-1:0;
+        var ab=a.id.indexOf('temporary@')===0?1:0, bb=b.id.indexOf('temporary@')===0?1:0;
+        return ap-bp || ab-bb || U.dst(p.x,p.y,a.x,a.y)-U.dst(p.x,p.y,b.x,b.y);
+      });
+      var escorts=(workers||[]).filter(function(w){return !taken[w.id];});
+      escorts.sort(function(a,b){return (a.id===p.escortId?-1:0)-(b.id===p.escortId?-1:0) || U.dst(a.x,a.y,p.x,p.y)-U.dst(b.x,b.y,p.x,p.y);});
+      for(var wi=0;wi<escorts.length;wi++){
+        var w=escorts[wi];
+        if(reachable && !reachable(w,p)) continue;
+        var dest=options.find(function(c){return !reachable || (reachable(p,c) && reachable(w,c));});
+        if(!dest) continue;
+        used[dest.id]=true; taken[w.id]=true;
+        plans.push({prisonerId:p.id,workerId:w.id,holdingId:dest.id,x:dest.x,y:dest.y});
+        break;
+      }
+    });
+    return plans;
+  }
+
   function update(s, dt){
     if(APH.EntityIndex)APH.EntityIndex.prepare(s.entities);
     var m=s.meta;
@@ -524,6 +567,56 @@ APH.ResidentWork = (function(){
     }
     /* T3 绕墙走位: 每帧一张障碍矩阵(墙/围攻营地=1, 闸门=0), 居民共享 */
     var navGrid=(window.APH.Nav&&APH.Nav.gridOf)?APH.Nav.gridOf((s.colony&&s.colony.buildings)||[],s.colony&&s.colony.scene):null;
+    var transportByWorker={},corpseByWorker={};
+    if(!raid && s.scene==='home'){
+      var captives=s.entities.filter(function(en){return en&&en.type===T.ENEMY&&en.humanlike&&en.captured&&!en.dead;});
+      var escortAvailable=function(en){
+        if(!en||en.type!==T.RESIDENT||en.dead||en.drafted||en.userOrder||en.haulCarry||en.socialPauseT>0)return false;
+        var person=APH.Res.residentOf(en);
+        return person&&!person.downed&&!person.isSleeping&&!person.medLying&&!APH.Res.isBroken(person);
+      };
+      var escorts=s.entities.filter(escortAvailable);
+      var cache=s._prisonerTransportCache;
+      var captiveById={},escortById={};
+      captives.forEach(function(en){captiveById[en.id]=en;});
+      escorts.forEach(function(en){escortById[en.id]=en;});
+      var spots={};
+      (s.colony.buildings||[]).forEach(function(b){if(b&&b.id==='bl_prison_spot'&&!b.dead)spots[b.uid||('spot@'+b.x+','+b.y)]=true;});
+      var valid=cache&&cache.scene===s.scene&&cache.remaining>0&&cache.captiveCount===captives.length&&
+        cache.plans.every(function(p){return captiveById[p.prisonerId]&&!captiveById[p.prisonerId].held&&
+          escortById[p.workerId]&&(p.holdingId.indexOf('temporary@')===0||spots[p.holdingId]);});
+      if(!valid){
+        cache={scene:s.scene,remaining:CFG.prisonerTransport.planInterval,captiveCount:captives.length,
+          plans:planPrisonerTransport(captives,escorts,s.colony.buildings||[],CFG.HAB,
+            function(from,to){return !navGrid || !!APH.Nav.astar(navGrid,from,to);})};
+        s._prisonerTransportCache=cache;
+      }else cache.remaining-=dt;
+      cache.plans.forEach(function(plan){transportByWorker[plan.workerId]=plan;});
+      /* 既有「搬运」规划也可标记尸体；居民搬动原尸体实体，到家园边缘后仍可右键安葬。 */
+      var haulCorpses=s.entities.filter(function(en){
+        return en&&en.type===T.CORPSE&&!en.dead&&!en.hauled&&s.designations&&
+          s.designations[en.id]&&s.designations[en.id].type==='haul';
+      });
+      haulCorpses.forEach(function(corpse){
+        var carrier=escorts.find(function(w){return w.id===corpse.haulerId&&!transportByWorker[w.id]&&!corpseByWorker[w.id];})||
+          escorts.find(function(w){return !transportByWorker[w.id]&&!corpseByWorker[w.id]&&
+            (!navGrid||APH.Nav.astar(navGrid,w,corpse));});
+        if(!carrier)return;
+        if(corpse.haulX==null||corpse.haulY==null){
+          var C=CFG.corpseHaul;
+          for(var hi=0;hi<haulCorpses.length+C.columns;hi++){
+            var dest={x:CFG.HAB.x+C.fallbackX+(hi%C.columns)*CFG.GRID,
+              y:CFG.HAB.y+C.fallbackY+Math.floor(hi/C.columns)*CFG.GRID};
+            if(!navGrid||APH.Nav.astar(navGrid,corpse,dest)){
+              corpse.haulX=dest.x;corpse.haulY=dest.y;break;
+            }
+          }
+        }
+        if(corpse.haulX==null)return;
+        corpse.haulerId=carrier.id;
+        corpseByWorker[carrier.id]=corpse;
+      });
+    }
     var observedNavGrid=s.colony&&s.colony.scene&&s.colony.scene.generation===1&&window.APH.TerrainModel&&
       APH.TerrainModel.hasObservation(s.colony.scene)?navGrid:null;
     /* T9 无顶房间: 墙/门围合区域 (每帧重算, 46×46 flood) —— 供暴露/心情/路灯照明 */
@@ -648,12 +741,12 @@ APH.ResidentWork = (function(){
         e.fireCd = Math.max(0, (e.fireCd || 0) - dt);
         /* 自动索敌或集火开火 */
         var targetEn = null;
-        if(e.userOrder && e.userOrder.type === 'attack' && e.userOrder.enemy && !e.userOrder.enemy.dead){
+        if(e.userOrder && e.userOrder.type === 'attack' && e.userOrder.enemy && !e.userOrder.enemy.dead && !e.userOrder.enemy.captured){
           targetEn = e.userOrder.enemy;
         } else {
           var aimR = (CFG.combat && (CFG.combat.plasmaSpeed*CFG.combat.plasmaLife)) || 240;
           targetEn = APH.Ent.findNearest(s.entities, T.ENEMY, e.x, e.y, aimR, function(en){
-            return en && !en.dead && !en.isSoldier;
+            return en && !en.dead && !en.captured && !en.isSoldier;
           });
         }
         if(targetEn){
@@ -807,6 +900,52 @@ APH.ResidentWork = (function(){
           return;
         }
         else { e.userOrder=null; }
+      }
+      var transport=transportByWorker[e.id];
+      if(transport){
+        var captive=s.entities.find(function(en){return en&&en.id===transport.prisonerId&&en.captured&&!en.dead;});
+        if(captive){
+          captive.escortId=e.id;
+          captive.holdingId=transport.holdingId;
+          captive.held=false;
+          if(captive.pawn){captive.pawn.holdingId=captive.holdingId;captive.pawn.held=false;}
+          var pickup=(CFG.prisonerTransport||{}).pickupR;
+          var withPrisoner=U.dst(e.x,e.y,captive.x,captive.y)<=pickup;
+          var destination=withPrisoner?transport:captive;
+          e.tx=destination.x;e.ty=destination.y;
+          e.workReason=withPrisoner?'押送俘虏':'前往接俘虏';
+          APH.Res.walkAround(e,destination,dt,spd*sickSpeedMul*wxMul*bagMul*CFG.prisonerTransport.escortSpeedMul,navGrid);
+          if(withPrisoner){
+            captive.x=e.x;captive.y=e.y;
+            if(captive.pawn){captive.pawn.x=captive.x;captive.pawn.y=captive.y;}
+            if(U.dst(captive.x,captive.y,transport.x,transport.y)<=CFG.prisonerTransport.arriveR){
+              captive.x=transport.x;captive.y=transport.y;
+              if(captive.pawn){captive.pawn.x=captive.x;captive.pawn.y=captive.y;}
+              captive.held=true;captive.escortId=null;e.walking=false;
+              if(captive.pawn)captive.pawn.held=true;
+              U.emit('notice',{text:(captive.name||'俘虏')+' 已送达收容点',color:'#8fd4ff'});
+            }
+          }
+          return;
+        }
+      }
+      var corpse=corpseByWorker[e.id];
+      if(corpse){
+        var corpseDest={x:corpse.haulX,y:corpse.haulY};
+        var carrying=U.dst(e.x,e.y,corpse.x,corpse.y)<=CFG.corpseHaul.pickupR;
+        var target=carrying?corpseDest:corpse;
+        e.tx=target.x;e.ty=target.y;
+        e.workReason=carrying?'搬运遗体':'前往遗体';
+        APH.Res.walkAround(e,target,dt,spd*sickSpeedMul*wxMul*bagMul,navGrid);
+        if(carrying){
+          corpse.x=e.x;corpse.y=e.y;
+          if(U.dst(e.x,e.y,corpseDest.x,corpseDest.y)<=CFG.corpseHaul.arriveR){
+            corpse.x=corpseDest.x;corpse.y=corpseDest.y;
+            corpse.hauled=true;corpse.haulerId=null;
+            delete s.designations[corpse.id];
+          }
+        }
+        return;
       }
       if(r&&!raid&&moveConstructionMaterials(s,e,r,dt,spd*sickSpeedMul*wxMul*bagMul,navGrid))return;
       /* ADR-29 征召待命: 被选中但无命令 → 不上岗不游荡 (饥饿/困倦仍放行安全网) */
@@ -1040,6 +1179,6 @@ APH.ResidentWork = (function(){
       if(!handled)APH.Res.walkAround(e, {x:e.tx, y:e.ty}, dt, spd*sickSpeedMul*wxMul*bagMul, navGrid);
     });
   }
-  return { update: update, syncResidentEntities: syncResidentEntities,
+  return { update: update, syncResidentEntities: syncResidentEntities, planPrisonerTransport: planPrisonerTransport,
            tryResidentJoy: tryResidentJoy, nearestDrop: nearestDrop, freeDropCount: freeDropCount };
 })();

@@ -73,9 +73,16 @@ APH.Res = (function(){
       type: (CFG.entType && CFG.entType.CORPSE) || 'corpse',
       name: (r && r.name) || '无名',
       rid: r && r.id,
+      pawn: r || null,
       x: x || 0, y: y || 0,
-      dead: false
+      dead: false, ageTicks: 0
     };
+  }
+  function corpseTick(c){
+    if(!c || c.dead) return false;
+    c.ageTicks=(c.ageTicks||0)+1;
+    if(c.ageTicks >= RS().corpseDecayTicks){c.dead=true;return true;}
+    return false;
   }
   function capturePrisoner(meta, enemy){
     if(!meta || !enemy) return null;
@@ -89,6 +96,11 @@ APH.Res = (function(){
       enemy.captured = true;
       enemy.dead = false;
       enemy.state = 'idle';
+      enemy.held = false;
+      enemy.holdingId = null;
+      enemy.escortId = null;
+      person.x = enemy.x; person.y = enemy.y;
+      person.held = false; person.holdingId = null;
       var exists = false;
       for(var i=0;i<meta.prisoners.length;i++) if(meta.prisoners[i] && meta.prisoners[i].id===person.id) exists=true;
       if(!exists) meta.prisoners.push(person);
@@ -99,6 +111,16 @@ APH.Res = (function(){
     enemy.dead = true;
     enemy.prisoner = true;
     return stub;
+  }
+  /* 家园快照与 meta 各自反序列化；按稳定 id 恢复身体→权威人记录的引用。 */
+  function bindPrisonerBodies(meta, entities){
+    var byId={};
+    ((meta&&meta.prisoners)||[]).forEach(function(p){if(p&&p.humanlike)byId[p.id]=p;});
+    (entities||[]).forEach(function(e){
+      if(!e||!e.humanlike||!e.captured||e.dead)return;
+      var person=byId[e.id];
+      if(person){e.pawn=person;person.x=e.x;person.y=e.y;person.held=!!e.held;person.holdingId=e.holdingId||null;}
+    });
   }
   /* ADR-47/#189: 释放返回「被释放的那个人」（不是布尔）——
      调用方要拿同一对象把身体送出场，而不是把一行名单删掉了事。 */
@@ -122,8 +144,10 @@ APH.Res = (function(){
     if(!rec.ok) return rec;
     rec.resident.faction = 'home';
     rec.resident.prisoner = false;
+    rec.resident.held = false; rec.resident.holdingId = null;
     person.faction = 'home';
     person.prisoner = false;
+    person.held = false; person.holdingId = null;
     meta.prisoners = list.filter(function(p){ return p && p.id !== id; });
     return rec;
   }
@@ -2477,8 +2501,9 @@ APH.Res = (function(){
     collectThoughts:collectThoughts, thoughtMoodSum:thoughtMoodSum, rememberShared:rememberShared,
     moodFromThoughts:moodFromThoughts,
     ensureParts:ensureParts, hurtPart:hurtPart, partsMoveMul:partsMoveMul,
-    makeCorpse:makeCorpse, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
-    capturePrisoner:capturePrisoner, releasePrisoner:releasePrisoner, recruitPrisoner:recruitPrisoner,
+    makeCorpse:makeCorpse, corpseTick:corpseTick, buryCorpse:buryCorpse, BODY_PARTS:BODY_PARTS,
+    capturePrisoner:capturePrisoner, bindPrisonerBodies:bindPrisonerBodies,
+    releasePrisoner:releasePrisoner, recruitPrisoner:recruitPrisoner,
     hostilePawn:hostilePawn, isHumanlike:isHumanlike, isPlayerFaction:isPlayerFaction,
     embodyHostile:embodyHostile, embodySoldier:embodySoldier,
   };

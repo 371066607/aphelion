@@ -122,7 +122,8 @@ try{
   let raidActiveSince=null,raidStuck=null;
   /* 敌人侧状态: 长测红在「袭击不结束」时, 缺了这份转储就只能猜谁还活着。 */
   const enemyDump=en=>({id:en.id,name:en.name,state:en.state,hp:en.hp,dead:!!en.dead,downed:!!en.downed,
-    captured:!!en.captured,prisoner:!!en.prisoner,retreat:!!en.retreat,sieging:!!en.sieging,pillager:!!en.pillager,
+    captured:!!en.captured,prisoner:!!en.prisoner,held:!!en.held,holdingId:en.holdingId||null,
+    retreat:!!en.retreat,sieging:!!en.sieging,pillager:!!en.pillager,
     isSoldier:!!en.isSoldier,x:Math.round(en.x),y:Math.round(en.y),
     distHab:Math.round(Math.hypot(en.x-CFG.HAB.x,en.y-CFG.HAB.y)),
     distEdge:Math.round(Math.min(en.x,en.y,APH.Scene.width()-en.x,APH.Scene.width()-en.y)),
@@ -229,6 +230,8 @@ try{
   }
   const finalHome=S.worlds&&S.worlds.home||S;
   const finalGeneratorFuel=finalHome.colony.buildings.filter(b=>b.id==='bl_wood_generator').reduce((n,b)=>n+(b.fuelWood||0),0);
+  const finalCaptives=liveEnemies(finalHome).filter(e=>e.captured&&e.humanlike&&!e.dead);
+  const heldCaptives=finalCaptives.filter(e=>e.held&&e.holdingId);
   const report={passed:false,fixtureSeed:9301,generatedAt:new Date().toISOString(),scope:'Automated six-day soak of a legal prebuilt colony with one season of initial fuel stock; normal gather, return, civilian draft/movement and capture commands provide intervention, and destroyed raid walls are rebuilt through construction when any are lost. This is not a fresh-save manual playthrough. Resource expedition enemy encounters are isolated; home raids remain active.',
     exitReady:!firstFailure&&S.clock>=seasonSeconds&&S.meta.residents.every(r=>!r.downed),
     clock:S.clock,steps:executedSteps,dt,timeScale:scale,days,harvested,mined,returned,
@@ -240,10 +243,13 @@ try{
       initialGeneratorFuel:fixture.initialGeneratorFuel,finalGeneratorFuel,
       refillEvents:fuelRefillEvents,refilledUnitsObserved:fuelRefilledUnits},
     raidStuck,
+    captivity:{captured:finalCaptives.length,held:heldCaptives.length,
+      waiting:finalCaptives.length-heldCaptives.length,
+      uniqueHoldings:new Set(heldCaptives.map(e=>e.holdingId)).size},
     enemies:liveEnemies(finalHome).map(enemyDump),
     rooms:APH.Nav.roomsOf(finalHome.colony.buildings,finalHome.colony.scene).map(r=>({id:r.id,temp:r.temp})),
     residents:S.meta.residents.map(r=>residentDump(finalHome,r))};
-  const evidenceDir=path.join(__dirname,'..','docs','evidence','colony-home');
+  const evidenceDir=process.env.APHELION_SOAK_EVIDENCE_DIR||path.join(__dirname,'..','docs','evidence','colony-home');
   fs.mkdirSync(evidenceDir,{recursive:true});fs.writeFileSync(path.join(evidenceDir,'season.json'),JSON.stringify(report,null,2)+'\n');
   ok(!firstFailure,'survival chain first failure: '+JSON.stringify(firstFailure));
   ok(S.clock>=seasonSeconds,'did not complete configured full season: '+S.clock+'/'+seasonSeconds);
@@ -254,6 +260,8 @@ try{
   ok(warningRecovered,'crop loop did not recover the warned food shortage');
   ok(fuelRefilled&&fuelRefillEvents>0&&S.meta.res.wood<fixture.initialWood,'wood generators did not use real stock-to-machine fuel logistics');
   ok(raidWarned&&raidSeen&&raidResolved,'raid warning and defense must reach a resolved raid');
+  ok(heldCaptives.length>0&&heldCaptives.length===new Set(heldCaptives.map(e=>e.holdingId)).size,
+    'transported humanlikes must hold distinct spots: '+JSON.stringify(report.captivity));
   if(wallRepairsQueued>0)ok(wallRepairRecovered,'destroyed raid walls were not rebuilt through ordinary construction logistics');
   ok(S.meta.residents.every(r=>!r.downed),'residents did not recover by season end: '+JSON.stringify(firstDowned));
   report.passed=true;fs.writeFileSync(path.join(evidenceDir,'season.json'),JSON.stringify(report,null,2)+'\n');

@@ -384,6 +384,16 @@ APH.CFG = {
     speed: 96,
     dmg: 8
   },
+  prisonerTransport: {
+    planInterval: 0.5,
+    pickupR: 18,
+    arriveR: 6,
+    fallbackColumns: 8,
+    fallbackX: -168,
+    fallbackY: 144,
+    escortSpeedMul: 0.7,
+  },
+  corpseHaul: { pickupR:18, arriveR:6, fallbackX:-240, fallbackY:192, columns:8 },
 
   /* 战斗 */
   combat: {
@@ -519,6 +529,7 @@ APH.CFG = {
 
   /* 殖民者需求(饱食/心情/病情). 不是玩家 HP/O2, 也不是远征消耗品 */
   residents: {
+    corpseDecayTicks: 240,
     illnessMax: 100,
     sickMarkAt: 20,             // 病情达到此值显示场上病号标记
     sickMarkFontPx: 14,

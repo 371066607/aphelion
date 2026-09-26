@@ -34,9 +34,31 @@ test('#180 parts: 六部位与腿伤减速', () => {
 
 test('#181 corpse: 埋葬标记死亡', () => {
   const c = Res.makeCorpse({ id: 'rs_x', name: '青禾' }, 100, 200);
-  if (c.type !== 'corpse' || c.name !== '青禾') throw new Error('应是尸体');
+  if (c.type !== 'corpse' || c.name !== '青禾' || c.rid!=='rs_x') throw new Error('应是有身份的尸体');
   Res.buryCorpse(c);
   if (!c.dead) throw new Error('埋葬后应 dead');
+});
+
+test('#213: 人型敌人死亡留下同一人的尸体；非人不留；尸体会腐烂', () => {
+  const old=APH.state;
+  const s={scene:'home',war:{raidActive:false},seed:213,entities:[],parts:[],shake:0,
+    meta:{stats:{kills:0}}};
+  APH.state=s;
+  try{
+    const person=Res.hostilePawn(213,[]),enemy=Res.embodyHostile(person,600,700);
+    enemy.hp=1;s.entities.push(enemy);
+    APH.Combat.turretStep({x:600,y:700,cd:0,lv:1},[enemy],0.1);
+    const corpse=s.entities.find(e=>e.type==='corpse');
+    if(!enemy.dead||!corpse||corpse.rid!==person.id||corpse.pawn!==person||corpse.name!==person.name)
+      throw new Error('人型死亡应留下同一人的具名尸体');
+    const blob={id:'en_blob',type:'enemy',x:620,y:700,hp:1,faction:{id:'fx_blob',gene:{hue:1,size:1}}};
+    s.entities.push(blob);
+    APH.Combat.turretStep({x:620,y:700,cd:0,lv:1},[blob],0.1);
+    if(!blob.dead||s.entities.filter(e=>e.type==='corpse').length!==1)
+      throw new Error('非人敌人仍按旧规则死亡，不生成人尸体');
+    for(let i=0;i<APH.CFG.residents.corpseDecayTicks;i++)Res.corpseTick(corpse);
+    if(!corpse.dead)throw new Error('尸体应在既定生产跳后腐烂回收');
+  }finally{APH.state=old;}
 });
 
 test('#178 clean: 小人会去最脏格', () => {

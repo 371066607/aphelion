@@ -2408,3 +2408,20 @@ console:  (无)
 - 唯一代码改动是**把重复的过滤收口**：新增 `Colony.boxSelectPawns(entities,x0,y0,x1,y1)`（框选 + `T.RESIDENT`），`main.js` 的编队框选改用它 —— 此前这条不变式在每个调用点各写一遍，漏一处就是「拉框能选到敌人」。
 - 新增锁定用例 4 条：`tests/scenario.test.js` 三条（框选不含敌对、敌对即使被选中也不立正、头像条不含袭击者 —— 探针名写死 `ZZ_敌对探针` 以避开重名假阴性）；`tests/combat_subsystem.test.js` 一条「**全员被俘**也结束袭击」（`raidActive` 落下、`wins` 计一次、俘虏不进名册、场上无未俘获敌人；夹具需补 `window.APH.state`，因为 `tickRaid → updateCombat` 读的是全局 state —— 第一版就因为这个红了）。
 - 门禁：构建 `game.html` 41003KB（`</html>` 结尾）；**1064 单元 / 153 scenario / 5 perf / 7 boss** 全绿。
+
+### 2026-09-26 12:58 +08 · ADR-47 最小囚犯收容闭环
+
+- 审过 ADR-47、#189、`meta.prisoners` 与 `homeRuntime.entities` 两份落盘、48px Nav 和居民工作循环。新增可建 `bl_prison_spot`（一格一人）；无空位时选家园附近的临时格。`ResidentWork.planPrisonerTransport` 纯规划独占可达点与空闲押送员，居民实际走到原敌对身体旁，再按 Nav 路径一起走到收容点。被俘身体始终是 `entities[]` 原对象，名册仍是同 id 的人；无人/不可达时等待，不瞬移。检查器显示待押送/押送中/已收容，地面点有可见标记。
+- `Res.bindPrisonerBodies` 在家园恢复时按 id 把快照身体重新指向 `meta.prisoners` 权威记录；收容位置、占位状态同步。释放沿 #189 `retreat`，招降仍退役敌对身体并在居民层体现同 id。玩家弹丸和征召士兵自动索敌跳过已俘获者。非人 stub 与 illness/#64 链未改。
+- 纯函数回归覆盖一格一人、不可达点、押送员替换及名单缩短后的高序号临时格；场景回归覆盖建成点、无建筑兜底、单人连续押送多人及释放；读档回归覆盖身体与权威名册重新绑定。最终门禁：`python3 build.py` 成功（`game.html` 41010KB）；1068 单元 / 156 场景 / 5 perf / 7 boss 全绿，`git diff --check` 绿。
+- 整季固定种子长测 6 天 / 144000 帧 `passed=true`、袭击已结算：134 名不同 id 俘虏，季末 121 名占据不同格位，13 名仍排队。最初“季末全部入点”断言因此红灯，改为报告已入点/待押送并锁定已入点不重复；单人多俘虏场景证明队列可继续推进。长测原有脏 `docs/evidence/colony-home/season.json` 未覆盖，新结果存 `docs/evidence/prisoner-transport/season.json`。边界：收容点尚无牢门、看守、需求照料或越狱；没有可用居民时俘虏会等待。
+
+### 2026-09-26 14:52 +08 · #212/#213 人型生理与具名遗体
+
+- #212 在 `ColonyTick.run` 的 30 秒生产跳对敌对和俘虏的同一 `pawn` 调用 `Res.needsTick`、体温、暴露、病程与击倒规则；面板显示饱食、精力、病情和暴露，敌对不进入玩家名册、吃饭或工作指派。20 居民 + 80 人型敌对的 DOM 桩性能护栏独占运行：5 个生产跳共 247ms，平均 49.4ms；并发长测占 CPU 时同一墙钟测试曾红 703ms，因此性能结论限于隔离运行。
+- #213 人型敌人死亡由 `Res.makeCorpse` 留下原 id、名字与 `pawn` 的尸体。家园/远征绘制共用具名尸体画法；复用搬运标记由居民实际将同一尸体搬到家园边缘，仍可右键安葬；无人处理 240 个生产跳腐烂。修掉 `draw.js` 原有同名 `corpse` 抽屉后定义覆盖前定义的问题。非人击杀仍只掉原战利品。
+- `python3 build.py` 绿；1069 单元、160 场景、6 perf、7 boss 全绿，`git diff --check` 绿。六日长测 144000 帧 `passed=true`、袭击已结算、无卡死；本轮生理结算后季末 68 名不同俘虏，60 已收容、8 等待，证据在 `docs/evidence/adr47-completion/season.json`。该长测在最后的尸体绘制和远征腐烂小修之前启动，这两处由场景和静态检查覆盖；正式收口时仍须跑最终门禁。原有脏 `docs/evidence/colony-home/season.json` 保留未覆盖。
+
+### 2026-09-26 14:55 +08 · 最终门禁复核
+
+- 最后两处小修后重新构建成功，1069 单元 / 160 场景 / 6 perf / 7 boss 全绿；80 敌对性能护栏在隔离运行下 5 跳 265ms（平均 53ms），`git diff --cached --check` 绿。`colony-home/season.json` 保持原有脏改动且不纳入本次提交。

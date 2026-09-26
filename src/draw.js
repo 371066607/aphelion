@@ -45,6 +45,7 @@ APH.Draw = (function(){
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
       enemy:function(e,t){ APH.Ent.drawEnemy(e,t); },
+      corpse:function(e){ APH.Ent.drawCorpse(e); },
       projectile:function(e,t){ APH.Ent.drawProj(e,t); },
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
@@ -306,6 +307,7 @@ APH.Draw = (function(){
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){},
       enemy:function(e,t){ APH.Ent.drawEnemy(e,t); },
+      corpse:function(e){ APH.Ent.drawCorpse(e); },
       projectile:function(e,t){ APH.Ent.drawProj(e,t); },
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
@@ -326,17 +328,6 @@ APH.Draw = (function(){
         ctx.beginPath(); ctx.ellipse(0,2,10,7,0,0,Math.PI*2); ctx.fill();
         ctx.fillStyle='#333'; ctx.font='10px sans-serif'; ctx.textAlign='center';
         ctx.fillText('🐑', 0, 4);
-        ctx.restore();
-      },
-      corpse:function(e,t){
-        if(!e || e.dead) return;
-        var ctx=document.getElementById('cv') && document.getElementById('cv').getContext('2d');
-        if(!ctx) return;
-        ctx.save(); ctx.translate(e.x,e.y);
-        ctx.fillStyle='rgba(80,40,40,0.85)';
-        ctx.beginPath(); ctx.ellipse(0,4,16,8,0,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle='#c5a3a3'; ctx.font='10px sans-serif'; ctx.textAlign='center';
-        ctx.fillText('☠', 0, 2);
         ctx.restore();
       },
       walls:function(t){ APH.Ent.drawWalls(t); },

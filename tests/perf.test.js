@@ -123,5 +123,27 @@ test('perf: 128格、20居民、2000自然对象的模拟与寻路记录',()=>{
   }finally{S.meta.residents=oldResidents;Object.assign(S,snapshot);}
 });
 
+test('#212 perf: 80 名人型敌对按生产跳结算，不进入逐帧工作扫描',()=>{
+  const S=APH.state,snapshot=Object.assign({},S),oldResidents=S.meta.residents,oldPrisoners=S.meta.prisoners;
+  try{
+    S.scene='home';S.mode='running';S.war={raidActive:false};S.clock=3600;
+    S.colony={rulesVersion:1,buildings:[],buildQueue:[],scene:APH.TerrainModel.home(77),ground:[]};
+    S.meta.residents=[];S.meta.prisoners=[];
+    for(let i=0;i<20;i++)S.meta.residents.push(APH.Res.generate('perf_human_'+i,77+i,[]));
+    S.entities=APH.TerrainModel.resources(S.colony.scene,{}).slice(0,2000).map(f=>Object.assign({},f,{id:f.uid,hp:30,maxHp:30}));
+    for(let i=0;i<80;i++){
+      const p=APH.Res.hostilePawn(80000+i,[]);
+      S.entities.push(APH.Res.embodyHostile(p,300+i*6,500+i*3));
+    }
+    M.syncResidents();
+    const t0=Date.now();
+    for(let i=0;i<5;i++)M.residentsTick();
+    const elapsed=Date.now()-t0;
+    console.log('HOSTILE_NEEDS_METRICS '+JSON.stringify({hostiles:80,residents:20,productionTicks:5,totalMs:elapsed,avgMs:elapsed/5}));
+    A(elapsed<500,'80 敌对 5 个生产跳应低于 500ms，实际 '+elapsed+'ms');
+    A(S.entities.filter(e=>e.type===T.ENEMY).length===80,'需求结算不得删除或招募敌对');
+  }finally{S.meta.residents=oldResidents;S.meta.prisoners=oldPrisoners;Object.assign(S,snapshot);}
+});
+
 console.log(`\n${pass} 通过 / ${fail} 失败`);
 process.exit(fail?1:0);

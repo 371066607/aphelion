@@ -1350,6 +1350,13 @@ APH.UI = (function(){
       '<div class="insp-need-track"><div class="insp-need-fill" style="width:' + val + '%;background:' + col + '"></div></div>' +
       '<span class="insp-need-val">' + Math.round(val) + '</span></div>';
   }
+  function inspRiskRow(lab, val){
+    val=Math.max(0,Math.min(100,val||0));
+    var col=val>=60?'#d06060':(val>=35?'#d4a84a':'#6bcf8e');
+    return '<div class="insp-need"><span class="insp-need-lab">'+lab+'</span>'+
+      '<div class="insp-need-track"><div class="insp-need-fill" style="width:'+val+'%;background:'+col+'"></div></div>'+
+      '<span class="insp-need-val">'+Math.round(val)+'</span></div>';
+  }
   function needBarsHtml(food, rest, rec, mood){
     var h = '<div style="padding:4px 10px 6px;border-top:1px solid #3a3428">';
     h += inspNeedRow('饱食', food, '#6bcf8e');
@@ -1819,8 +1826,12 @@ APH.UI = (function(){
           (trait ? trait + ' · ' : '') + (isCap ? '囚犯 · 战斗已解除' : '敌对阵营'),
           isCap ? '#c5e3f6' : '#ff6d6d', capCmds);
         hh2 += needBarsHtml(food, rest, rec, mood);
+        hh2 += '<div style="padding:0 10px 6px">'+inspRiskRow('病情',pawn.illness)+
+          inspRiskRow('暴露',pawn.exposure)+'</div>';
         hh2 += '<div class="insp-body">';
-        if(isCap) hh2 += '<div style="font-size:10px;color:#8fa3cc">打倒后还是同一个对象，id、技能、伤势都保留（ADR-47）</div>';
+        if(isCap) hh2 += '<div style="font-size:10px;color:#8fa3cc">' +
+          (ee.held ? '已收容' : ee.escortId ? '押送中' : '待押送') +
+          ' · 同一 id、技能和伤势保留（ADR-47）</div>';
         hh2 += thoughtsHtml(pawn, {}, pawn.thoughts);
         hh2 += '</div>';
         return hh2;
