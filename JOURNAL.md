@@ -2433,3 +2433,11 @@ console:  (无)
 - 当前在场人型至少两人且半数同时崩溃时，复用 `Combat.raidRetreat` 整队离场/取消后续波次；新一轮清理原因标记。原伤亡 0.6、超时 600s、低血逃离 0.22 未改。Standards/Spec 自审检查了共享契约、seeded RNG、纯注册测试、生成产物来源、俘虏/士兵/非人型排除及旧退出参数。
 - 16 组每组最多 600s、50ms 帧长的确定性长测，无殖民者或炮塔伤害；初始饥饿/疲惫，未设置心情或崩溃、未改概率。seed 2/5/11 分别在 510/150/120s 士气溃退，四人全部离场，击杀与伤亡均为 0。其余组在观测窗口末仍有袭击者，不将它们说成全数通过溃退；日志 `docs/evidence/raid-morale/soak.json` 保存全部组。此证据是生产/战斗系统模拟，不等同于正常满状态袭击的实玩频率或整季生存验收。
 - 构建成功；1076 单元 / 161 场景 / 6 perf / 7 boss 全绿，`git diff --check` 绿。80 敌对 + 20 居民开启袭击的 5 个生产跳共 367ms，平均 73.4ms，通过现有 500ms 总量护栏（DOM 桩测量）。检查器由场景 HTML 断言覆盖，未声称浏览器视觉验收。保留既有脏 `docs/evidence/colony-home/season.json`，不纳入提交。下一步：实玩观察满状态袭击中的崩溃频率，再决定是否调整新增士气阈值。
+
+### 2026-09-29 15:54 +08 · #212/#213 票据归档复核（无代码改动）
+
+- #212 与 #213 的实现早在 `9da28ac` 落地，但两张票一直挂着 OPEN —— 属于「仓库文档已 [x]、tracker 落后」的不一致。本轮只做复核与归档，没有改一行源码。
+- #212 逐条对上：`colonytick.js:158` 与居民循环 `:141` 是同一个 `Res.needsTick`（无第二套结算）；后果链继续走 `thermalStressTick / exposureTick / clinicTick / checkDowned`（`:160-168`，与居民段 `:176-186` 同函数）；检查器 `ui.js:1808-1840` 读同一个 `pawn`；工作指派仍过 `Res.isPlayerFaction`。唯一表现层差异：敌对体温失调击倒不发 `notice` 飘字（80 人刷屏不值得）。边界：需求只掉不补给，囚犯没有喂饭/给床入口。
+- #213 逐条对上：`combat.js:1061-1063` 复用 `Res.makeCorpse` 产出 `{name,rid,pawn}`；搬运走既有 `applyDesignation(...,'haul')`（搬的是同一个对象，不复制）、安葬走 `main.js:2203` 右键；`th_saw_corpse` 由 `residents.js:245` + `ctx.corpseNearby` 触发；非人敌人以 `en.humanlike && en.pawn` 为门保持不变；腐烂按 `CFG.residents.corpseDecayTicks=240` 跳由 `colonytick.js:110` / `main.js:1385` 统一回收。**验收项里的「天葬」路径在本仓库根本不存在**（全库 grep 无实现），故该项无对应物，记录为事实而非漏接。
+- 门禁复跑：构建 `game.html` 成功；**1076 单元 / 161 场景 / 6 perf / 7 boss 全绿**。两张票已带证据评论关闭，tracker 现在只剩 #208 / #187 / #186 / #164。
+- **顺带发现一个交付层问题（未动，待拍板）**：`git fetch` 后确认当前分支 `fix/map-observation-repair-main` 领先 `origin/main`（914501b，2026-09-13）**24 个提交且 0 落后**（可 fast-forward），却**没有任何 PR**。也就是说 #197～#214 的全部工作（地图观测修复、寻路二叉堆、main.js 拆分第三批、俘虏身份链、袭击卡死修复、人型生理/遗体/士气）都还只在分支上，main 停在 13 天前。分支已推送到 origin，不涉及数据丢失，但「main 等于现状」不成立。
