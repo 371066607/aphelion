@@ -1,0 +1,105 @@
+--- UI Modals Seam Tests ---
+  ✓ 初始无活动模态
+  ✓ 初始 hasActiveModal 为 false
+  ✓ 初始 closeActive 返回 false
+  ✓ UI.open(diplomacy) 返回 true
+  ✓ diplomacy DOM display 显示
+  ✓ diplomacy 触发了 render
+  ✓ 活动模态为 diplomacy
+  ✓ hasActiveModal 为 true
+  ✓ 全屏模态打开自动将 state.mode 挂起为 paused
+  ✓ 模态打开自动同步 APH.Input 上下文栈
+  ✓ UI.open(roster) 返回 true
+  ✓ 前序模态 diplomacy 被自动隐藏
+  ✓ roster DOM display 显示
+  ✓ 活动模态切换为 roster
+  ✓ state.mode 依然保持 paused
+  ✓ UI.close(roster) 返回 true
+  ✓ roster DOM 隐藏
+  ✓ 活动模态清空为 null
+  ✓ hasActiveModal 回到 false
+  ✓ 所有全屏模态关闭后，state.mode 自动恢复为 running
+  ✓ 所有模态关闭后，APH.Input 上下文栈回到 game
+  ✓ buildCatalog DOM display 显示
+  ✓ 抽屉模态打开不会将 state.mode 改为 paused
+  ✓ 抽屉模态不算阻断全屏模态 (hasActiveModal 为 false)
+  ✓ 建造抽屉不占用 modal 上下文
+  ✓ buildCatalog 正常关闭
+  ✓ state.mode 保持 running
+  ✓ 准备关闭: diplomacy 打开且 mode=paused
+  ✓ closeActive() 返回 true
+  ✓ diplomacy 被关闭
+  ✓ state.mode 恢复为 running
+  ✓ 再次调用 closeActive 返回 false
+  ✓ toggle 打开返回 true
+  ✓ toggle 关闭返回 false
+  ✓ state.mode 正确恢复 running
+  ✓ 打开未知模态返回 false 且不崩溃
+  ✓ 关闭未知模态返回 false 且不崩溃
+  ✓ DOM 节点不存在时 open 安全返回 false
+  ✓ codex 默认已注册并能打开
+  ✓ techMap 默认已注册并能打开
+  ✓ diplomacy 默认已注册并能打开
+  ✓ buildCatalog 默认已注册并能打开
+  ✓ roster 默认已注册并能打开
+  ✓ orders 默认已注册并能打开
+  ✓ orders 作为抽屉模态不阻断主循环
+  ✓ 命令抽屉打开时上下文仍是 game
+  ✓ 命令抽屉打开时仍能按下画布开始拉框
+  ✓ prioGridHtml 已导出
+  ✓ 命令表不含主角行
+  ✓ 命令表仍含居民行
+  ✓ 零居民时命令表不崩
+  ✓ inspectorHtml 已导出
+  ✓ 默认检查器是殖民地概览
+  ✓ 殖民地概览报人口
+  ✓ 殖民地概览给下一个目标
+  ✓ 殖民地概览提示点选小人
+  ✓ 默认检查器不再有主角字样
+  ✓ 居民检查器含姓名
+  ✓ 居民检查器含特质
+  ✓ 居民检查器含娱乐条
+  ✓ 树木检查器含名称
+  ✓ 树木检查器含耐久
+  ✓ 地表检查器非空且含坐标
+  ✓ colonistBarHtml 已导出
+  ✓ renderColonistBar 已导出
+  ✓ 头像条包含居民卡片
+  ✓ 头像条包含居民姓名
+  ✓ 头像条不含玩家化身卡片
+  ✓ 征召的居民卡片带 drafted 样式
+  ✓ 征召卡片含武器角标
+  ✓ 零居民时工作面板不再渲染主角卡
+  ✓ 零居民时工作面板不崩
+--- ADR-39 Command Table ---
+  ✓ 未注册命令不抛错(静默 no-op)
+  ✓ 未注册命令返回 undefined
+  ✓ 已注册命令被调用且参数透传
+  ✓ 已注册命令的返回值原样回传
+  ✓ 同名命令可被后注册的覆盖
+  ✓ registerCommands 接受空参数不抛错
+  ✓ 检查器 HTML 不含 APH.Main
+  ✓ 默认检查器不含主角征召按钮
+  ✓ 检查器命令经命令表抵达实现
+--- ADR-40 Sim → UI via bus ---
+  ✓ notice 事件创建了飘字元素
+  ✓ notice 的文案落到 DOM
+  ✓ notice 的颜色落到 DOM
+  ✓ 第二条 notice 复用同一个元素
+  ✓ 第二条 notice 更新了文案
+  ✓ 第二条 notice 更新了颜色
+  ✓ hint 事件落到提示条
+  ✓ 有内容时提示条可见
+  ✓ 空 hint 清空提示条
+  ✓ 空 hint 隐藏提示条
+  ✓ 缺失载荷不抛错
+  ✓ 空载荷的 hint 视作清空
+
+结果: 93 通过 / 0 失败
+--- ADR-45 Endgame reachable ---
+  ✓ 通电的通信灯塔给出进度按钮
+  ✓ 按钮文案指向继续经营的扎根目标
+  ✓ 不再提供离开星球结局
+  ✓ 没电时不给按钮
+  ✓ 没电时说明原因
+最终结果: 98 通过 / 0 失败
