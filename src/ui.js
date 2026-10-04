@@ -33,8 +33,9 @@ APH.UI = (function(){
     var cap=(APH.Colony&&APH.Colony.housingCapacity)?APH.Colony.housingCapacity(s.colony&&s.colony.buildings,s.colony):0;
     var bPop=$('bPop'), vPop=$('vPop');
     if(bPop) bPop.style.width = U.clamp(cap?pop/cap*100:0,0,100)+'%';
-    if(vPop) vPop.textContent = pop + (cap? '/'+cap : '');
+    if(vPop) vPop.textContent = pop+' 人 / '+cap+' 床位';
     var atHome=s.scene==='home';
+    ['rowCrystal','rowCarry','rowDiscovery'].forEach(function(id){var row=$(id);if(row)row.style.display=atHome?'none':'';});
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);
@@ -59,21 +60,14 @@ APH.UI = (function(){
         $('bWAR').style.background = ws>=60?'#7dffab':(ws>=35?'#ffc857':'#ff6d7a');
       }
     }
-    $('bDS').style.width = (s.found/s.totalBeacons*100)+'%';
+    $('bDS').style.width = (s.totalBeacons?s.found/s.totalBeacons*100:0)+'%';
     $('vDS').textContent = s.found+'/'+s.totalBeacons;
+    var rowEco=$('rowEco');if(rowEco)rowEco.style.display=atHome?'':'none';
     var vEco=$('vEco');
-    if(vEco && s.meta && s.meta.res){
+    if(atHome && vEco && s.meta && s.meta.res){
       var C = window.APH.Colony;
-      var gt = (C && C.groundTally) ? C.groundTally(s.entities) : {};
-      var sh = (C && C.shortageBrief)
-        ? C.shortageBrief(s.meta, s.colony&&s.colony.buildings, gt)
-        : null;
-      var lab = (C && C.stockLabel)
-        ? function(k){ return C.stockLabel(s.meta.res, s.entities, k); }
-        : function(k){ return String((s.meta.res[k]||0)); };
-      vEco.textContent = sh
-        ? ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med')+' 闲'+sh.idle)
-        : ('矿'+lab('mineral')+' 粮'+lab('food')+' 药'+lab('med'));
+      vEco.textContent = '粮 '+C.stockOf(s.meta.res,s.entities,'food')+' · 木 '+C.stockOf(s.meta.res,s.entities,'wood')+' · 铁 '+C.stockOf(s.meta.res,s.entities,'iron')+' · 石 '+C.stockOf(s.meta.res,s.entities,'stone');
+      vEco.title='当前可用：仓库与地面物资，扣除预订；不含在途物资';
     }
     var vig = $('vig');
     /* P1b 暴露警示: >50 边缘红雾(与氧气低共用 vig, 取更强) */
@@ -448,6 +442,7 @@ APH.UI = (function(){
   /* ---------- 启动探针（调试协议，验证用） ---------- */
   var probeT=null;
   function armProbe(){
+    if(!APH.state.debugTools&&!APH.state.debugKeys)return;
     if(document.getElementById('probeRun')) return;
     var pb=document.createElement('button');
     pb.id='probeRun';
@@ -1209,85 +1204,59 @@ APH.UI = (function(){
   });
 
   /* ---------- 建造抽屉目录 (BuildCatalog, ADR-18) ---------- */
+  var buildCategory=0, buildSelection=null, thumbnailCache={};
+  function assetThumbnail(id){
+    var art=APH.BuildArt, sprites=APH.Sprites;
+    var ready=!!(art&&art.isReady()), sprReady=!!(sprites&&sprites.isReady(id));
+    var key=id+':'+ready+':'+sprReady;
+    if(thumbnailCache[key])return thumbnailCache[key];
+    if(typeof document.createElement!=='function')return '';
+    var cv=document.createElement('canvas');cv.width=96;cv.height=88;
+    var g=cv.getContext&&cv.getContext('2d');if(!g||!cv.toDataURL)return '';
+    var cells=APH.Construction?APH.Construction.cellsOf(id):[1,1],scale=Math.min(72/cells[0],74/cells[1]),w=cells[0]*scale,h=cells[1]*scale;
+    var drawn=art&&art.drawSprite(g,id,(96-w)/2,(88-h)/2,w,h);
+    if(!drawn&&ready&&(id==='bl_wall'||id==='bl_floor')){art.fillMaterial(g,id==='bl_wall'?'wall':'floor',18,22,60,44);drawn=true;}
+    if(!drawn&&id==='bl_gate'&&ready)drawn=art.drawSprite(g,'gate_closed',10,20,76,50);
+    if(!drawn&&sprReady){var d=sprites.sheetDef(id);drawn=sprites.draw(g,id,48,80,0,Math.min(80/d.fw,76/d.fh));}
+    if(!drawn)return '';
+    return thumbnailCache[key]=cv.toDataURL();
+  }
+  function materialName(k){return ({wood:'木材',iron:'铁材',stone:'石料',mineral:'矿材',food:'食物',med:'药品',leather:'皮革',alloy:'合金'})[k]||((APH.CFG.items[k]||{}).name)||k;}
+  function buildAccess(bid,s){
+    var def=APH.Colony.get(bid),n=s.colony.buildings.filter(function(b){return b.id===bid;}).length+(s.colony.buildQueue||[]).filter(function(q){return q.bid===bid;}).length;
+    var unlocked=!def.reqTech||!!(s.meta.tech||{})[def.reqTech]||!!(APH.Construction&&APH.Construction.isBasic(bid));
+    return {unlocked:unlocked,count:n,allowed:!!s.devFreeBuild||(unlocked&&n<(def.max||99))};
+  }
   function renderBuildRow(){
-    var s = window.APH && window.APH.state;
-    if(!s || !s.colony) return;
-    var brResearch = document.getElementById('brResearch');
-    if(brResearch) brResearch.textContent = '研究点 ' + ((s.meta && s.meta.research) || 0);
-    var bm = document.getElementById('brMineral');
-    if(bm){
-      var r = (s.meta && s.meta.res) || {};
-      bm.textContent = '木 ' + (r.wood || 0) + ' · 铁 ' + (r.iron || r.mineral || 0) + ' · 石 ' + (r.stone || 0);
-    }
-    var qEl = document.getElementById('brQueue');
-    if(qEl){
-      if(s.colony.buildQueue && s.colony.buildQueue.length){
-        var q0 = s.colony.buildQueue[0];
-        var remain = Math.ceil((q0.total || 0) * (1 - (q0.progress || 0)));
-        qEl.textContent = '施工中 ' + s.colony.buildQueue.length + ' 项 · ' + remain + 's';
-      } else {
-        qEl.textContent = '';
-      }
-    }
-    var grid = document.getElementById('brCards');
-    if(!grid) return;
-    grid.innerHTML = '';
-    var colors = ['#82d5bb','#f7cd67','#e59266','#889df0','#fc736d','#8ac68a','#b77dee','#d1da49','#e18c6f'];
-    var i = 0;
-    var CFG = APH.CFG || {};
-    var free = !!(s.devFreeBuild);
-    var fbBtn = document.getElementById('brFreeBuild');
-    if(fbBtn){
-      fbBtn.textContent = free ? '∞ 无限建造 ON' : '∞ 无限建造';
-      fbBtn.style.borderColor = free ? '#ffc857' : 'rgba(255,255,255,.25)';
-      fbBtn.style.color = free ? '#ffc857' : '#c5e3f6';
-    }
-    Object.keys(APH.Colony.list()).forEach(function(bid){
-      if(bid === 'bl_landing_pad') return;
-      var def = APH.Colony.get(bid);
-      var nBuilt = s.colony.buildings.filter(function(b){ return b.id === bid; }).length;
-      var nQueued = (s.colony.buildQueue || []).filter(function(q){ return q.bid === bid; }).length;
-      var n = nBuilt + nQueued;
-      var unlocked = !def.reqTech || (s.meta.tech||{})[def.reqTech] || (APH.Construction && APH.Construction.isBasic(bid));
-      var ok = free || (unlocked && n < (def.max||99));
-      var costRes = def.costRes || {};
-      var costPills = free
-        ? '<span style="display:inline-block;background:#794f27;color:#ffc857;border-radius:50px;padding:1px 7px;font-size:10px">免费</span>'
-        : Object.keys(costRes).map(function(k){
-            var itName = (CFG.items && CFG.items[k] && CFG.items[k].name) ? CFG.items[k].name : k;
-            return '<span style="display:inline-block;background:#3d4a28;color:#c8e89a;border-radius:50px;' +
-              'padding:1px 7px;font-size:10px;margin-right:3px">' + costRes[k] + itName + '</span>';
-          }).join('');
-      var reqTag = (!free && def.reqTech && (!s.meta.tech || !s.meta.tech[def.reqTech]))
-        ? '<div style="color:#ff6d7a;font-size:10px;margin-top:2px">[需研: ' + (APH.Colony.TECHS[def.reqTech] ? APH.Colony.TECHS[def.reqTech].name : def.reqTech) + ']</div>'
-        : '';
-      var card = document.createElement('div');
-      card.style.cssText = 'flex:0 0 auto;width:150px;border-radius:16px;padding:10px 12px;cursor:' +
-        (ok ? 'pointer' : 'not-allowed') + ';opacity:' + (ok ? 1 : .55) + ';background:' + colors[i % colors.length] +
-        ';border:2px solid #fff;box-shadow:0 3px 8px rgba(61,52,40,.12);transition:transform .25s cubic-bezier(.4,0,.2,1)';
-      card.innerHTML = '<b style="color:#fff;font-size:13px;text-shadow:0 1px 2px rgba(61,52,40,.35)">' +
-        def.name + '</b><span style="float:right;color:#fff;font-size:10px">' + n + '/' + def.max + '</span><br>' +
-        '<div style="margin-top:4px">' + costPills + '</div>' +
-        reqTag +
-        '<span style="display:inline-block;background:#794f27;color:#f7f3df;border-radius:50px;' +
-        'padding:1px 8px;font-size:10px;margin-top:4px">' + def.buildTime + 's</span>' +
-        ((def.cells && def.cells[0] > 1) ? '<span style="display:inline-block;background:rgba(255,255,255,.25);color:#fff;' +
-          'border-radius:50px;padding:1px 7px;font-size:10px;margin-left:3px">' + def.cells[0] + '×' + def.cells[1] + '</span>' : '');
-      if(ok){
-        card.tabIndex=0; card.setAttribute('role','button');
-        card.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();card.click();}});
-        card.addEventListener('click', function(){
-          s.buildMode = bid;
-          close('buildCatalog');
-          s.buildRotation=0;
-          setHint('建造: ' + def.name + ' · 点击规划，R旋转，Esc取消；缺料也可规划');
-        });
-        card.addEventListener('mouseover', function(){ card.style.transform = 'translateY(-2px)'; });
-        card.addEventListener('mouseout', function(){ card.style.transform = ''; });
-      }
+    var s=APH.state;if(!s||!s.colony)return;
+    var categories=APH.CFG.visual.buildCategories, category=categories[buildCategory];
+    if($('brResearch'))$('brResearch').textContent='研究点 '+(s.meta.research||0);
+    if($('brMineral'))$('brMineral').textContent='可用 '+['wood','iron','stone'].map(function(k){return materialName(k)+' '+APH.Colony.stockOf(s.meta.res,s.entities,k);}).join(' · ');
+    if($('brQueue'))$('brQueue').textContent=(s.colony.buildQueue||[]).length+' 项施工';
+    var fb=$('brFreeBuild');if(fb){fb.style.display=(s.debugTools||s.debugKeys)?'':'none';fb.textContent=s.devFreeBuild?'∞ 无限建造 ON':'∞ 无限建造';}
+    var cats=$('brCategories');
+    if(cats){cats.innerHTML='';categories.forEach(function(c,i){var b=document.createElement('button');b.textContent=c.name;b.type='button';b.setAttribute('aria-pressed',i===buildCategory?'true':'false');b.onclick=function(){buildCategory=i;buildSelection=null;renderBuildRow();var buttons=cats.querySelectorAll('button');if(buttons[i])buttons[i].focus();};cats.appendChild(b);});}
+    var grid=$('brCards');if(!grid)return;grid.innerHTML='';
+    if(category.ids.indexOf(buildSelection)<0)buildSelection=category.ids[0];
+    category.ids.forEach(function(bid){
+      var def=APH.Colony.get(bid);if(!def)return;
+      var access=buildAccess(bid,s),img=assetThumbnail(bid),card=document.createElement('button');
+      card.type='button';card.className='build-card'+(buildSelection===bid?' selected':'')+(!access.allowed?' locked':'');
+      card.setAttribute('aria-pressed',buildSelection===bid?'true':'false');
+      card.innerHTML=(img?'<img alt="" src="'+img+'">':'<span class="build-fallback">'+esc(def.name.slice(0,1))+'</span>')+'<b>'+esc(def.name)+'</b><small>'+(!access.unlocked&&!s.devFreeBuild?'待研究':access.count+'/'+(def.max||99))+'</small>';
+      card.onclick=function(){buildSelection=bid;renderBuildDetail();var cards=grid.querySelectorAll('button');for(var i=0;i<cards.length;i++){var active=category.ids[i]===bid;cards[i].classList.toggle('selected',active);cards[i].setAttribute('aria-pressed',active?'true':'false');}};
       grid.appendChild(card);
-      i++;
     });
+    renderBuildDetail();
+  }
+  function renderBuildDetail(){
+    var pane=$('brDetail'),s=APH.state,bid=buildSelection;if(!pane||!bid)return;
+    var def=APH.Colony.get(bid),access=buildAccess(bid,s),cost=APH.Construction.materialNeed(def,APH.Res.globalBonuses(s.meta.residents||[]).buildCostMul),cells=APH.Construction.cellsOf(bid);
+    var need=Object.keys(cost).map(function(k){var have=APH.Colony.stockOf(s.meta.res,s.entities,k);return materialName(k)+' '+cost[k]+'（可用 '+have+'）';}).join(' · ');
+    var reason=!access.unlocked?'需研究：'+((APH.Colony.TECHS[def.reqTech]||{}).name||def.reqTech):'已达建造上限';
+    pane.innerHTML='<div><b>'+esc(def.name)+'</b><p>'+esc(def.desc||'')+'</p><p>'+esc(need||'无需材料')+'</p><p>占地 '+cells[0]+' × '+cells[1]+' · 建造 '+def.buildTime+' 秒 · R 旋转</p></div>'+
+      '<div><button type="button" id="brPlace" '+(!access.allowed?'disabled':'')+'>'+(access.allowed?'开始规划':esc(reason))+'</button><p>'+(s.devFreeBuild?'调试：立即建成':'缺料也可规划，备齐材料后施工')+'</p></div>';
+    var place=$('brPlace');if(place)place.onclick=function(){if(!buildAccess(bid,s).allowed)return;s.buildMode=bid;s.buildRotation=0;close('buildCatalog');setHint('建造: '+def.name+' · 点击规划，R旋转，Esc取消；缺料也可规划');};
   }
 
   registerModal('buildCatalog', {
@@ -1976,6 +1945,17 @@ APH.UI = (function(){
   }
 
   /* ---------- ADR-29 / Ticket #161: 顶部殖民者头像栏 ---------- */
+  var portraitCache={};
+  function portraitFor(id){
+    var H=APH.Humanoid,S=APH.Sprites;if(!H||!S||typeof document.createElement!=='function')return '';
+    var p=H.poseFor({role:'resident',id:id,face:Math.PI/2,moving:false,time:0},S.isReady);
+    if(!S.isReady(p.sheet))return '';
+    var key=p.sheet+':'+p.frame;if(portraitCache[key])return portraitCache[key];
+    var cv=document.createElement('canvas');cv.width=72;cv.height=72;
+    var g=cv.getContext&&cv.getContext('2d'),d=S.sheetDef(p.sheet);if(!g||!cv.toDataURL||!d)return '';
+    S.draw(g,p.sheet,36,112,p.frame,110/(d.contentH||240));
+    return portraitCache[key]=cv.toDataURL();
+  }
   function colonistBarHtml(residents, s){
     if(!s) s = (window.APH && window.APH.state) || {};
     var m = s.meta || {};
@@ -1996,14 +1976,15 @@ APH.UI = (function(){
       var hpCol = hp > 50 ? '#7dffab' : (hp > 25 ? '#ffc857' : '#ff4d4d');
       var cls = 'aph-colonist-card' + (isSel ? ' selected' : '') + (isDrafted ? ' drafted' : '');
       var badge = isDrafted ? '<div class="aph-card-badge" title="已征召战备">⚔</div>' : '';
-      var face = mood >= 70 ? '🙂' : (mood >= 35 ? '😐' : '😞');
+      var portrait=portraitFor(r.id);
+      var face=portrait?'<img class="colonist-portrait" alt="" src="'+portrait+'">':'<span class="portrait-fallback">'+esc((r.name||'居').slice(0,1))+'</span>';
 
-      h += '<div class="' + cls + '" data-pawn-id="' + r.id + '" title="' + r.name + ' · 心情 ' + mood + '% · 单击选中, 双击镜头聚焦">' +
+      h += '<button type="button" class="' + cls + '" data-pawn-id="' + r.id + '" title="' + r.name + ' · 心情 ' + mood + '% · 单击选中, 双击镜头聚焦">' +
         badge +
-        '<div style="font-size:16px;line-height:1">' + face + '</div>' +
-        '<div style="font-size:10px;font-weight:700;color:#c5e3f6;margin-top:2px">' + (r.name || '居民').slice(0, 3) + '</div>' +
+        '<div class="portrait-frame">' + face + '</div>' +
+        '<div style="font-size:10px;font-weight:700;color:#c5e3f6;margin-top:2px">' + esc(r.name || '居民') + '</div>' +
         '<div class="aph-card-bar"><div class="aph-card-fill" style="width:' + Math.max(0, Math.min(100, hp)) + '%;background:' + hpCol + '"></div></div>' +
-      '</div>';
+      '</button>';
     });
 
     return h;
@@ -2040,7 +2021,12 @@ APH.UI = (function(){
     if(bar && s){
       if(s.mode === 'running'){
         bar.style.display = 'flex';
-        bar.innerHTML = colonistBarHtml(null, s);
+        var html=colonistBarHtml(null,s);
+        if(bar._portraitHtml!==html){
+          var active=document.activeElement,focused=active&&bar.contains&&bar.contains(active)&&active.getAttribute?active.getAttribute('data-pawn-id'):null;
+          bar.innerHTML=html;bar._portraitHtml=html;
+          if(focused&&bar.querySelectorAll){var cards=bar.querySelectorAll('[data-pawn-id]');for(var i=0;i<cards.length;i++)if(cards[i].getAttribute('data-pawn-id')===focused){cards[i].focus();break;}}
+        }
       } else {
         bar.style.display = 'none';
       }

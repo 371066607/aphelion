@@ -85,6 +85,13 @@ APH.Draw = (function(){
     ctx2.beginPath();
     ctx2.ellipse(p.x,p.y,ringR*z,ringR*.42*z,0,0,U.TAU);
     ctx2.stroke();
+    /* Opaque canopies keep their depth; the selected colonist gets a foreground locator. */
+    var canopy=(s.entities||[]).some(function(e){return !e.dead&&e.type==='flora'&&(e.visualKind||e.kind)==='tree'&&Math.abs(e.x-ent.x)<CFG.visual.environmentSizes.tree_a[0]/2&&e.y>ent.y&&e.y-ent.y<CFG.visual.environmentSizes.tree_a[1];});
+    if(canopy){
+      var head=screenOf(ent.x,ent.y-(CFG.humanoid.drawH||78));
+      ctx2.strokeStyle='#ffe2a2';ctx2.lineWidth=2;ctx2.beginPath();
+      ctx2.moveTo(head.x-10*z,head.y-4*z);ctx2.lineTo(head.x,head.y+3*z);ctx2.lineTo(head.x+10*z,head.y-4*z);ctx2.stroke();
+    }
     /* 命令旗标: 虚线到目标点 */
     var uo=ent.userOrder;
     if(uo && uo.type==='move'){

@@ -1,0 +1,257 @@
+{
+  "build": "baseline",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "dpr": 1
+  },
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [],
+  "residentsState": [
+    {
+      "id": "rs_visual_lab_0",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_1",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_2",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_3",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_4",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_5",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_6",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_7",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_8",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_9",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_10",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_11",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_12",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_13",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_14",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_15",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_16",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_17",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_18",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    },
+    {
+      "id": "rs_visual_lab_19",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 100,
+      "rest": 100
+    }
+  ],
+  "queue": 0,
+  "available": [
+    [
+      "wood",
+      50
+    ],
+    [
+      "stone",
+      30
+    ],
+    [
+      "iron",
+      100
+    ],
+    [
+      "food",
+      0
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "20-resident performance; natural world preserved",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 902.1834000000016,
+  "dayFraction": 0.251,
+  "paused": false,
+  "camera": {
+    "x": 1100,
+    "y": 1210
+  },
+  "residents": 20,
+  "buildings": 0,
+  "nonResidentObjects": 2059,
+  "entities": 2079,
+  "terrain": {
+    "cacheSize": 12,
+    "cacheLimit": 36,
+    "hits": 3348,
+    "misses": 12,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 280,
+    "clock": 902.2,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 0
+  },
+  "frameCostMs": {
+    "samples": 120,
+    "median": 4.3,
+    "p95": 5.4,
+    "max": 5.7
+  },
+  "frameIntervalMs": {
+    "samples": 120,
+    "median": 16.7,
+    "p95": 17.9,
+    "max": 18.6
+  },
+  "gameFramesAdvanced": 131,
+  "simulationSecondsAdvanced": 2.183,
+  "terrainCache": {
+    "cacheSize": 12,
+    "cacheLimit": 36,
+    "hits": 3348,
+    "misses": 12,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "worldObjects": 2059
+}

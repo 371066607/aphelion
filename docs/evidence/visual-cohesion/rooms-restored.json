@@ -1,0 +1,97 @@
+{
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [
+    {
+      "area": 12
+    },
+    {
+      "area": 16
+    }
+  ],
+  "residentsState": [
+    {
+      "id": "rs_start1",
+      "job": null,
+      "bedId": "b_31_mutegt0n:0",
+      "sleeping": false,
+      "food": 81,
+      "rest": 100
+    },
+    {
+      "id": "rs_start2",
+      "job": null,
+      "bedId": "b_32_mutegt24:0",
+      "sleeping": false,
+      "food": 83,
+      "rest": 100
+    },
+    {
+      "id": "rs_start3",
+      "job": null,
+      "bedId": "b_33_mutegt3j:0",
+      "sleeping": false,
+      "food": 83,
+      "rest": 100
+    }
+  ],
+  "queue": 0,
+  "available": [
+    [
+      "wood",
+      50
+    ],
+    [
+      "stone",
+      30
+    ],
+    [
+      "iron",
+      100
+    ],
+    [
+      "food",
+      0
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "free-build two enclosed rooms; natural objects preserved; not survival",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 900.0078919999993,
+  "dayFraction": 0.25,
+  "paused": false,
+  "camera": {
+    "x": 1128,
+    "y": 1008
+  },
+  "residents": 3,
+  "buildings": 72,
+  "nonResidentObjects": 2093,
+  "entities": 2096,
+  "terrain": {
+    "cacheSize": 0,
+    "cacheLimit": 36,
+    "hits": 0,
+    "misses": 0,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 1,
+    "clock": 900,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 0
+  },
+  "restored": true
+}

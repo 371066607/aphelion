@@ -190,6 +190,8 @@ APH.Input = (function(){
 
     addEventListener('keydown', function(e){
       if(e.defaultPrevented) return;
+      /* Native controls own activation keys; Space must click a card rather than pause the world. */
+      if((e.code==='Space'||e.code==='Enter')&&e.target&&e.target.closest&&e.target.closest('button,[role=button]'))return;
       var consumed = dispatchKey(e.code, 'keydown', e);
       if(consumed && e.preventDefault && (e.code.indexOf('Arrow') === 0 || e.code === 'Space')){
         e.preventDefault();

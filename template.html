@@ -172,6 +172,29 @@
   .techDesc{color:#9db1dc;font-size:11px;margin-top:4px}
   .techWhy{color:#ff9a9a;font-size:10px;margin-top:4px}
   .techAct{color:#ffc857;font-size:11px;margin-top:6px;letter-spacing:1px}
+
+  :root{--settlement-panel:#26382fee;--settlement-edge:#7e8a6d;--settlement-text:#eee6cc;--settlement-accent:#e6bd72}
+  #hud,#mainTabsBar,#cmdPanel,#inspector{background:var(--settlement-panel);border-color:var(--settlement-edge);color:var(--settlement-text);border-radius:8px}
+  #hud{max-width:330px}#hud h1{font-size:13px;letter-spacing:1px}#hud .row{font-size:12px}#hud .lab{color:#c0c9b0;width:38px}#vPop{width:auto;min-width:95px;color:#eee6cc}#vEco{line-height:1.7;color:#eee6cc}
+  #colonistBar{max-width:calc(100vw - 710px)}
+  .aph-colonist-card{min-width:64px;width:64px;background:#293c32;border:1px solid #a3a788;border-radius:8px;padding:4px 6px;color:#eee6cc}
+  .aph-colonist-card.selected{background:#435847;border:2px solid #f4ce86;box-shadow:0 0 0 1px #27382c}
+  .aph-colonist-card.drafted{border-color:#f47465}
+  .aph-colonist-card>div:not(.portrait-frame):not(.aph-card-bar):not(.aph-card-badge){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .portrait-frame{height:44px;overflow:hidden}.colonist-portrait{width:48px;height:48px;object-fit:contain}.portrait-fallback{font-size:24px;line-height:44px}
+  #colonistBar .aph-colonist-card div{color:var(--settlement-text)!important;font-size:12px!important}
+  #mainTabsBar{gap:4px}.aph-main-tab{color:#e4dfc8;border-color:#71826b;background:#344a3b;font-size:13px}.aph-main-tab.active{background:#556b4b;border-color:#e6bd72;box-shadow:none}
+  #hint{color:#e4dfc8;background:#28372ee8;border-color:#7e8a6d;max-width:78vw;white-space:normal;line-height:1.6}
+  #inspector .insp-body,#inspector .insp-sub,#inspector .insp-tab,#inspector .insp-need,#inspector .insp-cmd{font-size:12px}
+  #buildRow{background:#f1ead6!important;border-color:#8e9675!important;color:#364735;max-height:58vh;overflow-y:auto;padding:12px 20px!important}
+  #brCategories{display:flex;gap:6px;margin-bottom:10px}#brCategories button,#brPlace{border:1px solid #899577;background:#e1dfc6;color:#354d3c;padding:7px 20px;border-radius:5px;font:600 13px/1.4 system-ui;cursor:pointer}
+  #brCategories button[aria-pressed=true],#brPlace{background:#3d5d48;color:#fff5d8}#brPlace:disabled{background:#a7ab99;cursor:not-allowed}
+  #brCards{flex-wrap:wrap;overflow-x:visible!important;gap:8px!important}
+  .build-card{display:flex;align-items:center;gap:8px;text-align:left;position:relative;width:172px;min-height:72px;background:#e4e1c9;border:1px solid #b8b99c;border-radius:6px;padding:6px;color:#364735;cursor:pointer}
+  .build-card img{width:52px;height:52px;object-fit:contain}.build-card b{font-size:13px}.build-card small{position:absolute;right:8px;bottom:5px;font-size:12px;color:#67715c}.build-card.selected{outline:2px solid #577553;background:#f9f3df}.build-card.locked{opacity:.65}.build-fallback{width:52px;height:52px;display:grid;place-items:center;background:#c6cfb2;border-radius:4px;font-size:24px}
+  #brDetail{display:flex;justify-content:space-between;gap:24px;border-top:1px solid #bbc1a1;margin-top:10px;padding-top:10px;font-size:13px;line-height:1.7}#brDetail p{font-size:12px;color:#606e56}.build-help{font-size:12px;margin-top:8px;color:#6b765f}
+  button:focus-visible{outline:3px solid #d29a41;outline-offset:2px}
+  @media(max-width:1300px){#hud{max-width:285px;padding:8px}#colonistBar{max-width:calc(100vw - 610px)}.aph-main-tab{padding:6px 10px}#brDetail{gap:12px}.build-card{width:155px}}
 </style>
 </head>
 <body>
@@ -212,8 +235,10 @@
     <span id="brQueue" style="margin-left:auto;color:#9f927d;font-size:11px"></span>
     <button type="button" id="brFreeBuild" onclick="window.APH.Main&&APH.Main.toggleFreeBuild()" style="margin-left:10px;font-size:11px;padding:3px 8px;border-radius:8px;border:1px solid #c4b89e;background:#fff;color:#794f27;cursor:pointer">∞ 无限建造</button>
   </div>
+  <nav id="brCategories" aria-label="建造分类"></nav>
   <div id="brCards" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:6px"></div>
-  <p style="color:#9f927d;font-size:10px;margin:8px 0 0;text-align:center">点击卡片选择 · 再点击地面放置 · Esc取消</p>
+  <div id="brDetail" aria-live="polite"></div>
+  <p class="build-help">Tab 切换 · Enter 选择 · 开始规划后点击地面 · R 旋转 · Esc 取消</p>
 </div>
 
 <div id="resPanel" style="display:none;position:absolute;inset:0;background:rgba(7,10,22,.92);z-index:41;padding:56px 48px;overflow:auto">
@@ -247,9 +272,9 @@
 <div id="hud">
   <h1 id="planetTitle">APH-P1 · 前哨站</h1>
   <div class="row"><span class="lab">人口</span><div class="track"><div class="fill" id="bPop" style="width:0%;background:#7dffab"></div></div><span class="val" id="vPop">0</span></div>
-  <div class="row"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
-  <div class="row"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
-  <div class="row"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
+  <div class="row" id="rowCrystal"><span class="lab">晶体</span><div class="track"><div class="fill" id="bCR" style="width:0%;background:#ff4fd8"></div></div><span class="val" id="vCR">0</span></div>
+  <div class="row" id="rowCarry"><span class="lab">负重</span><div class="track"><div class="fill" id="bCW" style="width:0%;background:#c39bff"></div></div><span class="val" id="vCW">0</span></div>
+  <div class="row" id="rowDiscovery"><span class="lab">异常</span><div class="track"><div class="fill" id="bDS" style="width:0%;background:#ffc857"></div></div><span class="val" id="vDS">0/6</span></div>
   <div class="row" id="rowWar" style="display:none;cursor:pointer" title="点击或按 [O] 打开外交面板"><span class="lab">战况</span><div class="track"><div class="fill" id="bWAR" style="width:50%;background:#ff9a4d"></div></div><span class="val" id="vWAR">50</span><span style="font-size:10px;color:#5d6f96;margin-left:4px">[O]</span></div>
   <div class="row" id="rowEco"><span class="lab">经营</span><span class="val" id="vEco" style="width:auto;flex:1;text-align:left;letter-spacing:0">矿0 粮0</span></div>
 </div>
