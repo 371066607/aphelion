@@ -1,0 +1,498 @@
+{
+  "scope": "CUA normal 3-person start; actual E/planner departure with1pawn2home, day/night clock fixtures, scene switch and recall; no freebuild or injected resources",
+  "cases": [
+    {
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_start1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 93,
+          "rest": 100
+        },
+        {
+          "id": "rs_start2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 81,
+          "rest": 100
+        },
+        {
+          "id": "rs_start3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 92,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "ordinary fresh home",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "expedition",
+      "clock": 900,
+      "dayFraction": 0.25,
+      "paused": true,
+      "camera": {
+        "x": 1100,
+        "y": 1170,
+        "zoom": 1
+      },
+      "residents": 3,
+      "buildings": 0,
+      "nonResidentObjects": 215,
+      "entities": 216,
+      "terrain": {
+        "cacheSize": 8,
+        "cacheLimit": 36,
+        "hits": 13784,
+        "misses": 8,
+        "width": 2208,
+        "height": 2208,
+        "grid": 48,
+        "seed": 371481138,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 6121,
+        "clock": 900,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 6,
+        "enemies": 3,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 244.29999999701977,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 1,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_start1",
+          "x": 1126,
+          "y": 1170
+        }
+      ],
+      "blueprints": [],
+      "time": "day"
+    },
+    {
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_start1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 93,
+          "rest": 100
+        },
+        {
+          "id": "rs_start2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 81,
+          "rest": 100
+        },
+        {
+          "id": "rs_start3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 92,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "ordinary fresh home",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "expedition",
+      "clock": 2700,
+      "dayFraction": 0.75,
+      "paused": true,
+      "camera": {
+        "x": 1100,
+        "y": 1170,
+        "zoom": 1
+      },
+      "residents": 3,
+      "buildings": 0,
+      "nonResidentObjects": 215,
+      "entities": 216,
+      "terrain": {
+        "cacheSize": 8,
+        "cacheLimit": 36,
+        "hits": 14368,
+        "misses": 8,
+        "width": 2208,
+        "height": 2208,
+        "grid": 48,
+        "seed": 371481138,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 6194,
+        "clock": 2700,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 6,
+        "enemies": 3,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 244.29999999701977,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 1,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_start1",
+          "x": 1126,
+          "y": 1170
+        }
+      ],
+      "blueprints": [],
+      "time": "night"
+    },
+    {
+      "transition": "home while expedition active",
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_start1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 93,
+          "rest": 100
+        },
+        {
+          "id": "rs_start2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 81,
+          "rest": 100
+        },
+        {
+          "id": "rs_start3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 92,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "ordinary fresh home",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2700,
+      "dayFraction": 0.75,
+      "paused": true,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 3,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2061,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 54828,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 10837,
+        "clock": 2700,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 244.29999999701977,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 1,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_start2",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_start3",
+          "x": 1100,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "exportedAt": "2026-10-07T11:35:53.507Z"
+    },
+    {
+      "transition": "recalled home",
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_start1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 93,
+          "rest": 100
+        },
+        {
+          "id": "rs_start2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 81,
+          "rest": 100
+        },
+        {
+          "id": "rs_start3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 92,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "ordinary fresh home",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2700,
+      "dayFraction": 0.75,
+      "paused": true,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 3,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2062,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 804,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 10973,
+        "clock": 2700,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 244.29999999701977,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 2,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_start2",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_start3",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_start1",
+          "x": 1072,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "exportedAt": "2026-10-07T11:35:56.972Z"
+    }
+  ]
+}

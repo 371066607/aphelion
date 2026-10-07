@@ -253,6 +253,23 @@ APH.World = (function(){
     ctx.restore();
   }
 
+  /* Keep one unified list. Resolve bed rendering once before sorting, then
+     reuse the pose in drawResident. Logical positions and EntityIndex stay
+     untouched. With no valid sleeper the original Y comparator is retained. */
+  function sortRenderEntities(entities){
+    var sleepPoses=null;
+    if(window.APH.Ent && APH.Ent.bedSleepPose) entities.forEach(function(e){
+      if(!e.isSleeping || e.type!==CFG.entType.RESIDENT) return;
+      var pose=APH.Ent.bedSleepPose(e);
+      if(pose){if(!sleepPoses) sleepPoses=new Map();sleepPoses.set(e,pose);}
+    });
+    entities.sort(sleepPoses?function(a,b){
+      var pa=sleepPoses.get(a), pb=sleepPoses.get(b);
+      return (pa?pa.depth:a.y)-(pb?pb.depth:b.y) || (pa?1:0)-(pb?1:0);
+    }:function(a,b){return a.y-b.y;});
+    return {entities:entities,sleepPoses:sleepPoses};
+  }
+
   /* ---------- 主渲染入口（main.js 每帧调用） ----------
      ents: 统一实体列表 (ADR-3)。渲染只认 type。 */
   function render(dt, drawEntityFns){
@@ -332,9 +349,11 @@ APH.World = (function(){
       APH.EntityIndex.queryRect(s.entities,view.left-entityPad,view.top-entityPad,view.right+entityPad,view.bottom+entityPad))||s.entities;
     var sorted = entityCandidates.filter(function(e){ return !e.dead && e.type!=='player'&&entityVisible(e); })
                   .concat([entityCandidates.find(function(e){return e.type==='player'&&entityVisible(e);})])
-                  .filter(Boolean)
-                  .sort(function(a,b){ return a.y-b.y; });
-    sorted.forEach(function(e){ drawEntityFns[e.type] && drawEntityFns[e.type](e, time); });
+                  .filter(Boolean);
+    var ordered=sortRenderEntities(sorted);
+    ordered.entities.forEach(function(e){
+      drawEntityFns[e.type] && drawEntityFns[e.type](e,time,ordered.sleepPoses&&ordered.sleepPoses.get(e)||null);
+    });
 
     /* 孢子 */
     drawSpores(time, dL);
@@ -614,7 +633,7 @@ APH.World = (function(){
 
   return {
     initCanvas:initCanvas, buildTerrain:buildTerrain,
-    daylight:daylight, drawDarkness:drawDarkness, render:render,
+    daylight:daylight, drawDarkness:drawDarkness, render:render, sortRenderEntities:sortRenderEntities,
     drawWeather:drawWeather, drawFog:drawFog,
     terrainColor:terrainColor, legacyLake:legacyLake,
     wxCount:function(){ return wxParts.length; },

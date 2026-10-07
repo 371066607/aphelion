@@ -2216,14 +2216,14 @@ window.APH = window.APH || {};
       var squadNow = (s0.selectedPawns && s0.selectedPawns.length>0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
       var draftedNow = !!s0.playerDrafted || squadNow.some(function(p){ return p && p.drafted; });
       if(hitBp && s0.scene==='home' && !draftedNow){
-        var bpx=hitBp.x, bpy=hitBp.y;
+        var bpx=hitBp.x, bpy=hitBp.y, bpUid=hitBp.uid;
         if(squadNow.length){
           squadNow.forEach(function(p){
-            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type:'build', x:bpx, y:bpy };
-            else if(p) p.userOrder = { type:'build', x:bpx, y:bpy };
+            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
+            else if(p) p.userOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
           });
         } else {
-          s0.playerOrder = { type:'build', x:bpx, y:bpy };
+          s0.playerOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
         }
         APH.UI.floatText('→ 优先建造', '#ffc857');
         APH.state.parts.push({ t:'ping', x:bpx, y:bpy, life:0.8, max:0.8 });

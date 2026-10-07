@@ -2366,10 +2366,10 @@ APH.Res = (function(){
     var forceBuild = ot === 'build';
     var forceHaul = ot === 'haul';
     if(forceBuild && order.x != null && order.y != null){
-      return { type:'build', x:order.x, y:order.y };
+      return { type:'build', x:order.x, y:order.y, uid:order.uid };
     }
     if((prio.sk_build > 0 || forceBuild) && world.blueprint){
-      return { type:'build', x:world.blueprint.x, y:world.blueprint.y };
+      return { type:'build', x:world.blueprint.x, y:world.blueprint.y, uid:world.blueprint.uid };
     }
     if(pawn.haulCarry && (prio.sk_haul > 0 || forceHaul) && world.storage){
       return { type:'haul_dump', x:world.storage.x, y:world.storage.y, carry:pawn.haulCarry };

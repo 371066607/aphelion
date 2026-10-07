@@ -13,6 +13,7 @@ APH.CFG = {
     environmentSizes:{tree_a:[132,142],tree_b:[130,140],berry:[48,42],herb:[45,40],stone:[48,40],iron:[48,42],wreck:[72,58],cargo:[86,65],glow:[48,44],crystal:[50,47],dew:[46,44],star:[48,46]},
     environmentKinds:{tree:'tree_a',bush_berry:'berry',bush_herb:'herb',rock_stone:'stone',rock_iron:'iron',rock_wreckage:'wreck',bush_alien:'dew',flora_glow:'glow',flora_crystal:'crystal',flora_dew:'dew',flora_star:'star'},
     homeDarkness:.52, homeVignette:.45, groundTextureAlpha:.18, terrainEdge:8,
+    bedSleepInset:{side:6,end:8}, // Mattress inset in world pixels; rendering only.
     homeTerrain:{landing:'#707254',woodland:'#596e4c',lakeshore:'#7b8771',ridge:'#918771',alien:'#7b756e',wreckage:'#8a7a63',water:'#426c73'},
     buildCategories:[
       {name:'结构',ids:['bl_wall','bl_gate','bl_floor']},

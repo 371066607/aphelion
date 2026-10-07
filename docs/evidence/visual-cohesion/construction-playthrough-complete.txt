@@ -1,0 +1,4 @@
+{"seconds":600,"built":52,"queued":14,"phase":1}
+{"seconds":900,"built":61,"queued":5,"phase":1}
+{"seconds":1200,"built":70,"queued":2,"phase":2}
+Construction completed 72 components in 1329.40 simulated seconds

@@ -1,0 +1,1132 @@
+
+  ✓ soil: soilFertilityAt 根据地形返回对应肥力倍率
+  ✓ zones: createGrowingZone 圈定种植区并生成网格单元
+  ✓ zones: removeGrowingZone 正确移除种植区
+  ✓ #167 alerts: 导出 collect/focus
+  ✓ #167 alerts: 没事返回空数组
+  ✓ #167 alerts: 远征不报家园警报
+  ✓ #167 alerts: 指挥官饥饿
+  ✓ #167 alerts: 居民饥饿用其名字与坐标
+  ✓ #167 alerts: 困了但已睡不再报
+  ✓ #167 alerts: 倒地优先于饥饿
+  ✓ #167 alerts: 仓库没粮
+  ✓ #167 alerts: 蓝图缺料
+  ✓ #167 alerts: focus 把镜头移到警报坐标
+  ✓ T3 alert: 入冬前存粮不足 → 预警; 存粮充足 → 不吵
+  ✓ T3 alert: 距冬还早不预警, 入冬当季缺粮持续预警
+  ✓ T3 alert: 冬季预警排在袭击/倒地之下, 缺料之上
+  ✓ 后台世界继续模拟，但视觉 UI 与异步事件文案只属于当前前台会话
+  ✓ #173 bills: addBill / activeBill
+  ✓ #173 bills: 空工单不生产
+  ✓ #173 bills: 工单 1 件只产 1 件
+  ✓ #173 bills: 无 bills 字段仍可无限产（旧测试兼容）
+  ✓ biomes: 4 大异星生态群系规格定义完整
+  ✓ biomes: biomeOf 根据 seed 确定性派生群系
+  ✓ biomes: fallbackPlanet 正确包含 spec.biome
+  ✓ biome_laws: 远征星球必带当前群系的核心环境法则
+  ✓ biome_flora: generateExpeditionFlora 依据群系主导生成植被
+  ✓ biome_atmosphere: 根据群系派生对应环境氛围粒子类型
+  ✓ BuildGrid: 新记录四向旋转占格与矩形
+  ✓ BuildGrid: 新记录分层索引允许地板与家具同格
+  ✓ BuildGrid: 新记录字段覆盖目录，bid 实体也能查定义
+  ✓ BuildGrid: 互动格随朝向转到家具前方且排除阻挡
+  ✓ BuildGrid: legacy 记录保持像素锚点和旧占格
+  ✓ Nav: 新家具占格阻挡，legacy 家具继续可通行
+  ✓ Nav: descriptor 地图尺寸驱动 A*，不再固定46格
+  ✓ Nav: 房间缓存跨同一数组复用，split/merge按重叠继承温度
+  ✓ building art: only an explicit load decodes the atlas; concurrent consumers share it
+  ✓ building art: corrupt or missing images leave a usable fallback
+  ✓ building art: the build accepts the prepared atlas and rejects the generated RGB master
+  ✓ camera: world and screen projections roundtrip at every zoom
+  ✓ camera: viewport reports world extent scaled by zoom
+  ✓ camera: anchored zoom keeps the same world point under pointer
+  ✓ camera: zoom and center clamp respect limits and 128-grid bounds
+  ✓ camera: viewport larger than world pins camera to world center
+  ✓ 建筑目录: 全部 bl_ 前缀, 发射台免费且唯一
+  ✓ canPlace: 无限建造跳过材料和科技
+  ✓ canPlace: 建材不足拒绝
+  ✓ canPlace: 数量上限拒绝
+  ✓ canPlace: 离核心太近 / 建筑重叠 拒绝
+  ✓ canPlace: 矿材不足拒绝
+  ✓ productionTick: 无人不上岗则不产
+  ✓ productionTick: 采矿机+2矿/实验室+1研究(有人)
+  ✓ 科技树: te_前缀 + canBuy 边界
+  ✓ buyTech: 扣费+升级+效果由applyTech解释(数据分离)
+  ✓ buildQueue v2: 玩家在场进度增长
+  ✓ buildQueue v2: 玩家离开进度冻结
+  ✓ buildQueue v2: 进度满完工出队
+  ✓ builderBonusOf: 最高建造技能×0.15
+  ✓ canUpgrade: 费用与上限校验
+  ✓ upgradeCost: 1.6倍指数曲线
+  ✓ mineOutput/labOutput: 随等级线性
+  ✓ productionTick: 消费建筑等级
+  ✓ housingCapacity: 基础2+房3×lv+医疗1
+  ✓ refundOf: 半价退款, 发射台不可拆
+  ✓ carryMaxOf: 仓库加成纯函数化(重启不丢/拆除自动回退)
+  ✓ buildColonyWorld: 实体重建保留lv(重载后炮塔不退1级)
+  ✓ buildColonyWorld: 施工队列重实体化为蓝图(重载后蓝图仍可见)
+  ✓ footprintOf: cells×48格网
+  ✓ canPlace: 占位矩形碰撞——贴邻拒绝/隔空可放/1x1与2x2混排
+  ✓ 建筑目录: 大建筑2x2/工位2x1/小建筑1x1 且带dispH
+  ✓ footprintOf: 新几何用目录格, 旧工坊/餐桌保留原占格
+  ✓ ranchTick: 无牧民不增长不产肉不出皮
+  ✓ ranchTick: 增长概率受技能调制且封顶cap=3+lv*2
+  ✓ ranchTick: 皮革阈值3只起, 随herd/等级线性
+  ✓ 畜牧圈升级: 皮革专属货币, 研究点不可替代
+  ✓ ranchTick: 效率打折减产
+  ✓ ranchTick: herdMul 本跳产出×3 并消耗
+  ✓ queueTick: 居民坐标数组可施工, 远离冻结
+  ✓ shortageBrief: 缺矿/缺粮紧急, 且把出路指回殖民地 (T4)
+  ✓ T4 brief: 任务简报不得再承诺远征能带回粮食/矿材
+  ✓ shortageBrief: 有病人无药时提示工坊
+  ✓ cycleJob: 在已有建筑间轮转并锁岗
+  ✓ cycleJob: 有医疗舱时可转到诊所岗
+  ✓ harvestMods: 无法则不修正
+  ✓ harvestMods: 夜间酸雨减农, 白天不减
+  ✓ harvestMods: 磁暴窗口停实验室
+  ✓ productionTick: 磁暴 labMul=0 不产研究
+  ✓ climateLaws: 同 seed 确定, 1~2条且仅酸雨/磁暴
+  ✓ refundMineralOf: 半价矿材, 发射台0
+  ✓ workshopTick: 无人不产, 有人扣矿产药, 矿不够停工
+  ✓ cycleJob: 有工坊可转到手工岗
+  ✓ collectHome: 矿粮药入仓, 遗件变研究点
+  ✓ serializeGround: 地上堆+搬运中的都记下
+  ✓ stockOf/takeStock: 先仓后堆, 搬运途中不计
+  ✓ ensureStock: 合金整件补仓, takeStock 不拆件
+  ✓ shortageBrief: 地上粮药计入短缺
+  ✓ #83 trapTriggers: 敌人进入陷阱格(24px)且armed → 触发
+  ✓ #83 trapTriggers: 已触发(armed=false)不再触发
+  ✓ #83 trapStrike: 穿刺伤害+出血计时+hitFlash
+  ✓ #83 sandbagMul: 沙袋格内 ×0.5 格外 ×1
+  ✓ #83 bleedMul: 出血减速 ×0.7, 无出血 ×1
+  ✓ #83 canPlace: 陷阱/沙袋科技挂靠炮术+成本
+  ✓ T2 goal: 阶梯逐级推进, 且永不枯竭
+  ✓ T2 goal: 死亡建筑不算数, 太阳能也能满足通电
+  ✓ T3 economy: winterFoodNeed 由真实经济推导, 随人口线性、随数值自适应
+  ✓ T5 power: 发射器的耗电必须是「造得起的电网」带得动的
+  ✓ colony: tickConstruction 推进蓝图进度并在满进度时实体化建筑
+  ✓ colony: tickProduction 30s 周期触发电网结算与多岗产出, 并报告本跳是否发生 (ADR-38)
+  ✓ colony: 建筑落成走事件总线, 不反向调用 main (ADR-38)
+  ✓ colonyTick modern 工位必须有真实在场的活居民
+  ✓ colonyTick modern 同一居民一跳只绑定一个设施
+  ✓ colonyTick modern 征召、睡眠、倒地和远离工位者不算工人
+  ✓ colonyTick modern 把断电与入口堵塞记到建筑
+  ✓ colonyTick 新家园低技能居民可修建筑, 旧档仍要技能3
+  ✓ colonyTick 仅 rulesVersion===1 启用在场工位约束
+  ✓ colonyTick 新家园按 TerrainModel 肥力推进农田，旧地图倍率保持 1
+  ✓ colonyTick home context 只结算 home 居民，不改远征名册
+  ✓ colonyTick home 工位不接纳远征 worldId 的居民或实体
+  ✓ colonyTick 覆灭判定保留远征幸存者
+  ✓ colonyTick 刺激性异星植物在晴天也产生局部暴露，防护服减免
+  ✓ FSM: idle 远距保持 idle
+  ✓ FSM: idle 进入 aggro 半径 → alert
+  ✓ FSM: idle 枪声在 noiseAggroR 内 → alert
+  ✓ FSM: echo 弱视 — 中距不看见, 枪声才警
+  ✓ FSM: 夜间 aggro 半径扩大 (×1.6)
+  ✓ FSM: alert → chase
+  ✓ FSM: chase 进入攻击距离 → attack
+  ✓ FSM: chase 超出脱战半径 → idle
+  ✓ FSM: 低血量任何状态 → flee (最高优先)
+  ✓ FSM: flee 持续到脱战半径外(低血逃跑是持续状态)
+  ✓ moveIntent: chase 朝玩家, flee 背离玩家
+  ✓ shouldSpit: 仅 spitter 行为 + 距离窗口 + 冷却
+  ✓ rollLoot: 只产出物品表内的 id
+  ✓ rollLoot: 大样本覆盖掉落表全部档位(表由 CFG 定义)
+  ✓ T4 loot: 掉落表不得含散装资源(粮/木/石/铁/矿/皮/草药/药)
+  ✓ T4 loot: 远征产出结算为研究点, 不再产出散装矿材
+  ✓ addToCarry: 正常装入与累加
+  ✓ addToCarry: 超重截断并报告 overflow
+  ✓ addToCarry: 完全满载拒绝
+  ✓ carryWeight: 权重计算正确
+  ✓ turretStep: 射程内敌人受击+进冷却
+  ✓ turretStep: 射程外不攻击
+  ✓ turretStep: 冷却期不开火
+  ✓ turretStep: 不攻击 isSoldier
+  ✓ settleValue: 缺物品id不抛错, 只结算已知物
+  ✓ settleGoods: 矿材入仓, 晶体变研究点
+  ✓ pickRaidFocus: 优先仓库, 玩家靠近则改追人
+  ✓ pickRaidFocus: 更近的居民优先于仓库
+  ✓ homeRegen: 无舱不回血, 靠近医疗舱回血, 氧气始终补
+  ✓ hurtPlayer: 医疗舱急救一次
+  ✓ hurtPlayer: 家园击倒 != 死亡 (不进死亡画面, 不记死亡)
+  ✓ hurtPlayer: 家园击倒不消耗 clinicKit (远征急救仅在远征分支消耗)
+  ✓ hurtPlayer: 远征生命归零且名册为空 → 本局结束 (ADR-44)
+  ✓ raidPillage: 扣粮扣矿并给建筑冷却
+  ✓ raidPillage: 扣药品
+  ✓ pickRaidFocus: 工坊可被锁定
+  ✓ soldierCount: 兵营等级×2
+  ✓ spawnDrop: 同种近距叠堆
+  ✓ updateDropped: 家园拾取入库不进背包
+  ✓ updateCombat: home 远距袭击者不脱战不回收
+  ✓ updateCombat: 远征仍按 despawnR 回收
+  ✓ updateCombat: 玩家弹丸跳过 isSoldier
+  ✓ updateCombat: 士兵不打玩家 / 只打袭击敌人
+  ✓ updateCombat: 袭击者近战可打士兵致死
+  ✓ updateCombat: 袭击者近战打伤附近居民且当摆不抢仓
+  ✓ raidBaseSuccess: 击毁敌对基地正常掉落战利品与保底遗件(零未定义错误)
+  ✓ #95 pathHasTrap: 路径途经待触发陷阱格 → true
+  ✓ #95 pathHasTrap: 已触发陷阱不算 (可踩无伤)
+  ✓ #95 strikeTrap: 拆陷阱=移除记录+掉落石料+armed清
+  ✓ #95 strikeTrap: 已触发(armed=false)不拆
+  ✓ combat: tickRaid 递减袭击预警并在归零时触发 startRaid
+  ✓ #190 combat: 全员被俘也结束袭击（俘虏不进玩家名册）
+  ✓ combat: tickRaid 在战斗中推进炮塔开火并处理终盘胜利
+  ✓ #210 combat: 久攻不下的袭击必须撤走并解除 raidActive
+  ✓ #211 combat: 双波袭击的敌人 id 必须全局唯一
+  ✓ construction: vertical and horizontal wall gaps have a reachable perimeter work cell
+  ✓ formal renderer: 新家具按未旋转原始尺寸绘制并以共享rect命中
+  ✓ formal renderer: 新蓝图不画成品图并保留共享矩形
+  ✓ formal renderer: 新地板导线与相邻墙走共享格层
+  ✓ construction: overlapping floor and reversed bed finish without switching targets each frame
+  ✓ construction: overlapping floor and north-facing lamp keep the chosen blueprint identity
+  ✓ construction: forced UID selects the lamp when another blueprint shares its centre
+  ✓ construction: coordinate-free build order keeps the identity selected by nearestBlueprint
+  ✓ construction: legacy coordinate-only build order still finds its blueprint
+  ✓ construction: thinkPawn carries blueprint identity through automatic and forced intents
+  ✓ cooked_items: 5 大外星熟食菜肴定义齐全且数值完整
+  ✓ cook_recipes: 烹饪配方表与建筑/科技依赖合法
+  ✓ cooking_pipeline: cookingTick 推进烹饪工时、扣除食材并产出熟食
+  ✓ cooking_tech_and_material_gate: 前置科技未解锁或材料不足时拒绝烹饪
+  ✓ eat_meal: 熟食分级享用与身心增益结算 (饱食/心情/娱乐/驱寒联动)
+  ✓ campfire_aura: 篝火驱寒、娱乐恢复与围炉夜话社交羁绊
+  ✓ hospitality: 熟食款待过客获得大额好感 (+35)
+  ✓ tech_and_buildings: 烹饪科技树与设施蓝图契约完整
+  ✓ mulberry32 同 seed 同序列(ADR-5 确定性)
+  ✓ makeRng 不同 seed 序列不同
+  ✓ 事件总线 on/emit/off (ADR-8)
+[bus] t_err Error: boom
+    at Array.eval (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:32:31)
+    at Object.emit (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:41:3), <anonymous>:58:18)
+    at Object.eval [as fn] (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:34:5)
+    at Object.<anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:65:7)
+    at Module._compile (node:internal/modules/cjs/loader:1829:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+    at Module.load (node:internal/modules/cjs/loader:1552:32)
+    at Module._load (node:internal/modules/cjs/loader:1354:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+  ✓ 事件总线单监听者抛错不拖垮其他
+  ✓ meta 默认结构与写读一致 (ADR-2)
+  ✓ exo_suit 迁 te_exosuit, 战争并入 meta
+  ✓ planet 缓存读写与按 id 隔离
+  ✓ 损坏 JSON 视为不存在而非崩溃
+  ✓ migrate 把 v0 推进到当前版本
+  ✓ fallbackPlanet 同 seed 完全一致(星球可复现)
+  ✓ PlanetSpec 满足 ADR-1 契约字段
+  ✓ enemies 契约: 3阵营/基因字段/权重归一
+  ✓ pickRaidFaction: 空阵营不抛错且给出真阵营, 不写回 spec
+  ✓ pickRaidFaction: 优先使用上次远征阵营
+  ✓ validate 拒绝残缺 spec、接受合法 spec
+  ✓ validate 对损坏的 PlanetSpec 深层数组只报错不抛异常
+  ✓ #202 validate: 拒绝会让坏运行数值的 tier、地形、夜间倍率和权重
+  ✓ hasLaw: 按 id 判断
+  ✓ sporeNudge: 近距排开, 中距趋光
+  ✓ 信标间距与禁区(离基地>220 / 离湖>200)
+  ✓ save: 合法 JSON 但不是存档对象 → 当损坏处理, 不抛错
+  ✓ save: 未来版本存档抛错, 且绝不把版本号改回来
+  ✓ save: 正常迁移链仍然推进版本号
+  ✓ ADR-39 save: 殖民地存档往返, 且带上当前版本号
+  ✓ ADR-39 save: 无存档时给出空殖民地而不是 null
+  ✓ ADR-39 save: 势力关系是数组, 往返不被 migrate 判成损坏
+  ✓ ADR-39 colony: persist 落盘前把地上堆序列化进 colony.ground
+  ✓ ADR-39 rivals: 首次 hydrate 从星球 spec 建表并立刻落盘
+  ✓ ADR-39 rivals: 老存档缺字段时 hydrate 补齐, 不丢已有关系
+  ✓ ADR-39 colony: haveStock 算上地上堆(ui 那份 fallback 曾漏掉)
+  ✓ ADR-39 colony: playerDefPower 随炮塔与等离子科技增长
+  ✓ ADR-40 combat: 袭击溃退发 notice, 载荷是 {text,color}
+  ✓ ADR-40 combat: 玩家死亡发 death, 载荷是 {reason,stats}
+  ✓ ADR-40: 无人订阅时模拟层照跑(无头/测试环境)
+[bus] notice Error: 订阅者炸了
+    at Array.eval (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:375:48)
+    at Object.emit (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:41:3), <anonymous>:58:18)
+    at Object.raidRetreat (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:41:3), <anonymous>:1373:7)
+    at Object.eval [as fn] (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:378:16)
+    at Object.<anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:65:7)
+    at Module._compile (node:internal/modules/cjs/loader:1829:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+    at Module.load (node:internal/modules/cjs/loader:1552:32)
+    at Module._load (node:internal/modules/cjs/loader:1354:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+  ✓ ADR-40: 单个订阅者抛错不拖垮模拟层
+  ✓ ADR-42 colonyTick: 跳末发 productionTick, 让订阅者去做杂事
+  ✓ ADR-42 colonyTick: 覆灭判定 —— 立过殖民地再归零才算输
+  ✓ ADR-42 colonyTick: 无人订阅时生产跳照跑
+  ✓ ADR-43 visitors: 招募成功发 rosterChanged, 实体同步交给订阅者
+  ✓ ADR-43 visitors: 粮食不足时请客失败并说明原因
+  ✓ ADR-43 visitors: 对视图零依赖 —— 没有订阅者也不炸
+  ✓ ADR-43 draw: 绘制层是纯输出 —— 画一遍不改 state
+  ✓ ADR-43 ent: selectedPawn 只认活着的居民实体
+  ✓ ADR-45: 开局播种班底 —— 零居民就什么都不会发生
+  ✓ ADR-45: 已有人的存档不再播种(零迁移)
+  ✓ ADR-45: 覆灭仍是唯一失败出口, 且开局即已立殖民地
+  ✓ gear_items: 5 大外星特种装备定义齐全
+  ✓ craft_recipes: 工坊配方表与前置科技契约合法
+  ✓ craft_pipeline: workshopCraftTick 消耗建材推进工序并产出特种装备
+  ✓ gear_equip: 装备穿戴与被动抗性计算
+  ✓ craft_integration: 工坊全链路生产与装备生效闭环
+  ✓ critical home: reload 后新掉落 ID 不得撞上 runtime 已恢复的掉落
+  ✓ critical home: 重复旧 ID 不能让物流把另一种物资转换成预约货物
+  ✓ ecology: 新家园按种子稳定生成约十二只野生动物，重复 seed 不刷重
+  ✓ ecology: 普通动物避开居民并留下可见行为状态
+  ✓ ecology: 岩丘护域者先警告，再按冷却伤害并驱离
+  ✓ ecology: 农田旁觅食会消耗成熟作物进度
+  ✓ ecology: 刺激性植物风险有位置边界，采掉或离开后解除
+  ✓ entities: findNearest 按照几何距离截断并返回最近实体
+  ✓ entities: findNearestBuilding 支持单建筑与多建筑类型合并查询
+  ✓ entities: findNearestFood 实现熟食优先与仓库兜底
+  ✓ entities: destroy 标记死亡与 sweepDead 安全清洗 (保护玩家)
+  ✓ entity index: circle result matches full scan across bucket boundaries
+  ✓ entity index: dynamic movement is never stale and unprepared queries fall back
+  ✓ entity index: reused array detects static move/death, delete, and restored same uid object
+  ✓ entity index: rect candidates preserve boundary inclusivity and full-scan membership
+  ✓ wealthScore: 资源+建筑+人口+科技累加且随发展增长
+  ✓ threatLevel: 随财富阶梯上升且封顶
+  ✓ pickEvent: 喘息窗口内负面事件被排除
+  ✓ pickEvent: restFor 覆盖默认喘息窗口
+  ✓ pickEvent: 冷却中的卡不参与
+  ✓ pickEvent: 资格谓词过滤(无牧场无兽群/无居民无极光疫病)
+  ✓ pickEvent: 心情怜悯 — 低心情时负面权重减半
+  ✓ pickEvent: 威胁级放大负面权重
+  ✓ directorTick: 间隔未到不发事件, 到点才抽
+  ✓ directorTick: 负面事件重置喘息计时
+  ✓ directorTick: 不修改入参状态(纯函数)
+  ✓ directorTick: 冷却随时间衰减并过期移除
+  ✓ textOf: 每张卡都有中文名与文案
+  ✓ deck 配置完整性: DECK 每张卡在 CFG.events.deck 有 w/cd
+  ✓ expedition combat: all downed squad never damages ghost player
+  ✓ expedition combat: enemy projectile cannot fall back to ghost player
+  ✓ expedition combat: living member receives melee instead of player
+  ✓ #201 new planet: 全 seed ID 不碰撞且第一次创建即带确定 Observation
+  ✓ #201 discovery: PlanetSpec 与 Atlas 同批成功后才更新内存与可重载状态
+  ✓ #201 discovery: 任一持久化写失败会回滚且不建立远征或扣补给
+  ✓ #201 discovery: 第三步 colony 写失败会按原始字节回滚 planet/meta/colony 与内存
+  ✓ #201 discovery: 无法读取的未来家园快照会安全拒绝且不写半份发现
+  ✓ #201 discovery: 未来 PlanetSpec 或 Atlas 版本不得被新发现降级覆盖
+  ✓ #201 atlas: loadMeta 与普通 saveMeta 原样保留未来 Atlas 顶层字段
+  ✓ #202 loadMeta: future authoritative meta 在任何迁移或 Atlas 回填前拒绝且磁盘零变化
+  ✓ #202 loadMeta: 任意非对象 authoritative metaSnapshot 回退 standalone 且不迁移 colony
+  ✓ #202 saveMeta: 活动旧实例在 emit 前拒绝覆盖另一标签页的 future metaSnapshot
+  ✓ #202 save planet: future authoritative metaSnapshot 不得被发现或重访覆盖
+  ✓ #201 expedition state: destination 必须已解析并写进唯一 Active Run
+  ✓ #202 atlas: 首访与重访保留发现时间和扩展字段，只递增访问记录
+  ✓ #202 legacy backfill: 旧短 P ID 原样进入 Atlas，且不伪造 Observation
+  ✓ #202 atlas migration: #201 的 visits 0 发现先归一为首访，再重访变 2
+  ✓ #202 legacy backfill: 危险运行字段损坏的 PlanetSpec 不进入 Atlas
+  ✓ #202 visit: 已知星只原子保存 Atlas 访问记录，不改写 PlanetSpec
+  ✓ #202 visit: colony 写失败回滚 meta/colony，PlanetSpec 与调用方内存零变化
+  ✓ #203 所有受支持资源类型都有完整且可验证的共享语义
+  ✓ #203 Observation 是四类远征群系唯一且确定的自然资源事实源
+  ✓ #203 未知资源类型在校验、实体化与采集处显式失败且绝不掉木材
+  ✓ #203 新资源拒绝显式语义篡改，同时兼容旧 v1 最小记录并补齐字段
+  ✓ #203 Observation 资源身份与覆盖物隔离，存档恢复引用不会串实体
+  ✓ #203 四类远征群系的保底植物都能推进植物取样目标
+  ✓ #203 采集耗尽、WorldRuntime 往返与再生保留完整资源身份
+  ✓ #203 遗迹、任务矿点与敌对基地按完整占地确定落在合法空地
+  ✓ #203 覆盖物有限扫描在零水地图成功，密占地图明确失败
+  ✓ expedition state: 击败守护者只记账, 不结束永久家园
+  ✓ expedition state: 三类 objective 只接受 CFG 中真实且类别匹配的物品
+  ✓ expedition state: 倒地/医疗居民被过滤，补给不足或目标错误时绝不扣粮
+  ✓ expedition state: 显式零补给和省略补给均可出发且不扣库存
+  ✓ expedition state: begin 生成稳定 runId 并只改变所选居民 worldId
+  ✓ expedition state: 现代补给合并迫降舱与精确实体库存，并避开已预订食材
+  ✓ expedition state: 现代补给不足失败时数字库存、实体与任务锁均零变化
+  ✓ expedition state: cargo 推进目标，reward 只描述实际回收物且不凭空加货
+  ✓ expedition state: JSON snapshot/restore 保留成员、货物、目标和 runtime
+  ✓ expedition state: restore 明确拒绝缺少已解析目的地的旧 Active Run
+  ✓ expedition state: 返航保留原 itemId 落地，研究物沿 settleGoods，runId 重放只结一次
+  ✓ expedition state: 返航只退还剩余补给且不计入 objective
+  ✓ expedition state: 未吃完的现代精确食物按原类型返航且共享记忆只记一次
+  ✓ expeditionUI 编组只提交健康队员与显式补给目标
+  ✓ #202 expeditionUI 必须重选目的地，并可提交已知 observed/legacy 星球身份
+  ✓ flora_items: 异星特产与种子物品定义齐全
+  ✓ alien_crops: 4 大外星奇幻植物定义
+  ✓ crop_plot: 建筑目录包含轻量外星种植圃 bl_crop_plot
+  ✓ bioluminescence: getGlowSources 派生夜光荧蕈生物发光源
+  ✓ expedition_flora: generateExpeditionFlora 生成远征野生异星植物
+  ✓ seeds: 远征采种与返航结算
+  ✓ cultivation: cropPlotTick 推进异星作物生长并成熟
+  ✓ harvest: harvestAlienCrop 产出对应外星特产与副产物
+  ✓ flora_integration: 种植圃品种切换与全链路状态机流通
+  ✓ fuel jobs: 低燃料发电机创建批量木材运输任务
+  ✓ fuel jobs: 实物木材到场后无需工人直接转入唯一机仓
+  ✓ fuel jobs: 现代发电只烧机内燃料，legacy 仍烧数字库存
+  ✓ fuel jobs: powerSettle 现代规则透传且 fuelWood 随建筑记录存档
+  ✓ fuel jobs: 发电机拆除会把已送达燃料退到原地
+  ✓ power grid: 正式导线使用占格而非旧中心四舍五入坐标
+  ✓ power grid: 现代建筑下方同格导线接网，旧几何不改变接线语义
+  ✓ gathering: CFG.gathering 配置完整
+  ✓ gathering: workOnFlora 砍树推进与掉落
+  ✓ gathering: workOnFlora 采浆果与矿石掉落
+  ✓ gathering: floraRespawnTick 再生系统
+  ✓ designation: applyDesignation 规划打标与取消纯函数
+  ✓ designation: boxSelectEntities 矩形框选几何筛选纯函数
+  ✓ combat: hasCover 沙袋与墙体掩体加成纯函数
+  ✓ haul reachability: modern nearest pile skips a wall cell and keeps the original pile
+  ✓ haul reachability: no reachable pile lets a modern resident gather designated stone
+  ✓ haul reachability: a wall-edge pile already in grab range remains directly pickable
+  ✓ haul reachability: legacy and missing Nav keep nearest-pile compatibility
+  ✓ haul reachability: existing reservation, storage, predicate and strict radius filters still apply
+  ✓ haul reachability: path search stops at nearest reachable pile and empty searches build no grid
+  ✓ hints: 优先级第一档是物资告急 —— 它连「击倒昏迷」都盖得住
+  ✓ hints: 没有可说的就返回目标阶梯, 而不是 null
+  ✓ hints: 目标阶梯永不枯竭 —— 走到终局也还有话说
+  ✓ hints: 围攻期间不唠叨目标(打仗时别念叨盖房子)
+  ✓ hints: 是纯读取 —— 调用前后 state 不变
+  ✓ hints: 过客在场时提示他值不值得招
+  ✓ hints: 有人崩溃时提示「派人去安抚」而不是「你走过去安抚」
+  ✓ hints: 提示层不再读 playerNeeds(主角已不存在)
+  ✓ home snapshot: meta-only resource spending persists with in-flight cargo atomically
+  ✓ construction cost includes mineral and large beacon works from its legal interaction cell
+  ✓ modern bed capacity has no imaginary landing-cabin beds
+  ✓ new-map tree regen clamps to 128-grid scene, not CFG.WORLD
+  ✓ new-map exhausted mineral cannot return from a stale respawn queue
+  ✓ recovery suppresses negative event cards and first-day protection excludes raids
+  ✓ construction integration persists excess delivery for ground placement before completion save
+  ✓ rooting requires three continuous days of valid cold-stored food and harvested alien crops
+  ✓ ADR-47: 小人缝生成人型袭击者，有名字和阵营，不进玩家名册
+  ✓ ADR-47: 人型袭击者在袭击上下文有念头
+  ✓ ADR-47: 体现到场上后仍是同一个人，检查器能读念头
+  ✓ ADR-47: 家园袭击刷出的是人型小人
+  ✓ ADR-47: 俘虏保持同一 id 与伤势，不标死、不进名册
+  ✓ ADR-47: 释放仍是同一对象，招降只改阵营
+  ✓ ADR-47: 家园快照读回后俘虏身体重新绑定权威名册同一人
+  ✓ ADR-47: 招募过客保持同一 id
+  ✓ ADR-47: 工作指派跳过敌对与俘虏
+  ✓ ADR-47: 士兵是玩家阵营小人，不是敌人旗
+  ✓ ADR-47: 基因团敌人不是小人缝产物
+  ✓ dirOf: 下左上右
+  ✓ sheetKey: 玩家 walk/idle 固定键
+  ✓ sheetLayout: 玩家 idle 16 帧横排，walk 32
+  ✓ sheetKey: 居民无包、过客有包、键不撞
+  ✓ pose: 向下走第 3 帧用 walk sheet
+  ✓ pose: 向右走第 0 帧是 16，不是 idle
+  ✓ pose: 站住走 idle 出口，不是 walk 第 0 帧
+  ✓ pose: idle 四向 下0 左4 右8 上12，不吃 walkPh
+  ✓ pose: 过客有包 idle 键
+  ✓ pose: 居民脸 0 无包 walk
+  ✓ pose: 居民脸 0 无包 idle，不吃 walkPh
+  ✓ sheetLayout: 居民 nopack 与玩家同布局
+  ✓ pose: 过客脸 0 有包 walk
+  ✓ pose: 过客脸 0 有包 idle，不吃 walkPh
+  ✓ sheetLayout: 过客 pack 与玩家同布局
+  ✓ appearance: 过客有包、居民无包、脸 0–3
+  ✓ appearance: 已知 id 压到脸 0–3
+  ✓ pose: 脸 1–3 无包/有包键不撞且帧对
+  ✓ poseFor: appearance 选脸，缺 walk sheet 回退脸 0
+  ✓ chibiScale: 程序化小人拉到玩家 drawH
+  ✓ sheetLayout: 脸 1–3 与玩家同布局
+  ✓ #59 sheetLayout: player_prone 16 帧横排, 建筑仍 null
+  ✓ #59/#60/#61/#62/#63 sheetKey: 四脸无包居民用专用俯卧，过客/玩家沿用 player_prone
+  ✓ #61 sheetLayout: 脸 1 无包居民 prone 为 16 帧四向各 4
+  ✓ #62 sheetLayout: 脸 2 无包居民 prone 为 16 帧四向各 4
+  ✓ #63 sheetLayout: 脸 3 无包居民 prone 为 16 帧四向各 4
+  ✓ #60 sheetLayout: 脸 0 无包居民 prone 为 16 帧四向各 4
+  ✓ #59 pose: 俯卧四向 下0 左4 右8 上12, 不吃 walkPh
+  ✓ #59 pose: 俯卧呼吸随 time 推进(同 idle fps), 例 time=1.2 → dir2 帧9
+  ✓ #59 pose: 俯卧优先于 moving(躺着不因走而切换)
+  ✓ #59 poseFor: 俯卧共用 sheet, 缺图也不回退走循环
+  ✓ #60 pose: 脸 0 无包居民俯卧选四向专用 sheet
+  ✓ #60 poseFor: 专用 prone 未就绪只回退通用 prone，绝不回退 walk
+  ✓ #68 poseFor: 脸1/脸2 居民俯卧选对应专用 sheet
+  ✓ #59 poseFor: 未配专用图的身份仍共用 player_prone
+  ✓ #71 geometry: 不同 contentH 的俯卧 sheet 仍映射到同一 [-drawH,0] 身体空间
+  ✓ input: 默认上下文为 game, 栈底保护不被弹出
+  ✓ input: pushContext 与 popContext 维持 LIFO 栈顺序
+  ✓ input: resolveAction 在不同上下文中实现按键隔离
+  ✓ input: onAction 订阅与 dispatchAction / dispatchKey 触发
+  ✓ input: 指针事件派发成 POINTER_* 动作, 带工具与上下文
+  ✓ input: 模态打开时按下被阻断, 但 move/up 仍放行(防拖拽卡死)
+  ✓ input: 右键派发 POINTER_CONTEXT 且带 button=2
+toolProvider error: Error: boom
+    at eval (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:163:39)
+    at currentTool (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:41:3), <anonymous>:145:18)
+    at Object.dispatchPointer (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:41:3), <anonymous>:174:13)
+    at Object.eval [as fn] (eval at <anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:56:3), <anonymous>:164:9)
+    at Object.<anonymous> (/Users/mac/.codex/worktrees/visual-cohesion/aphelion/tests/run.js:65:7)
+    at Module._compile (node:internal/modules/cjs/loader:1829:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+    at Module.load (node:internal/modules/cjs/loader:1552:32)
+    at Module._load (node:internal/modules/cjs/loader:1354:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+  ✓ input: toolProvider 抛错时回退 select, 不炸分发
+  ✓ inventory reservation: haveStock 与 stockOf 排除 stock/drop 预约并识别 exact 实体
+  ✓ inventory reservation: takeStock 不足时原子失败，不扣半份或破坏预约
+  ✓ inventory reservation: takeStock 只消费未预约 stock 与实体，结果和 haveStock 一致
+  ✓ inventory reservation: takeDropped exact 失败原子且不会抢同实体预约
+  ✓ inventory reservation: ensureStock 只补足未预约库存，失败不搬半份
+  ✓ inventory reservation: 现代矿材消费拆合金后把余量留在库存，单位守恒
+  ✓ inventory reservation: legacy 保留原先允许部分扣取与不拆合金行为
+  ✓ inventory reservation: nearestMeal 跳过被完整预约的熟食堆
+  ✓ inventory reservation: nearestMeal 的现代数值粮固定在迫降舱且排除预约
+  ✓ inventory reservation: nibblePile 只吃未预约份数
+  ✓ inventory reservation: takeStock 空实体参数仍从当前 meta 识别预约
+  ✓ inventory reservation: 过客请熟食跳过预约堆且只在实际扣到后结算
+  ✓ inventory reservation: 请居民吃饭不会拿预约粮换好感
+  ✓ meal sourcing: 现代居民跳过家具内不可达口粮并选择可达食物
+  ✓ layering: 反向调用 main 的次数只减不增 (棘轮)
+  ✓ layering: 模拟层已彻底不再反向调用 main (ADR-38/43)
+  ✓ layering: 内联事件处理器里不得出现 APH.Main (ADR-39 命令表)
+  ✓ layering: 模拟层不得直接调用 APH.UI (ADR-40/43)
+  ✓ layering: 模块不得引用加载顺序在自己之后的模块
+  ✓ layering: 加载 main.js 的测试入口不得漏掉 build.py 里的模块
+  ✓ extractJSON: 裸 JSON
+  ✓ extractJSON: markdown 代码块包裹
+  ✓ extractJSON: 前后杂文本
+  ✓ extractJSON: 非法输入返回 null(不抛错)
+  ✓ merge: 合法富化全部生效
+  ✓ merge: 结构不可变承诺(ADR-1 只增不改)
+  ✓ merge: beaconLore 长度不匹配 → 整段忽略
+  ✓ merge: 未知 law/faction id 忽略, 已知才替换
+  ✓ merge: 恶意/超长输入被截断消毒
+  ✓ merge: null/garbage 富化 → 原 spec 原样返回
+  ✓ cacheKey: 同输入同 key, 异输入异 key
+  ✓ logistics: 精确预订锁来源但不提前扣料
+  ✓ logistics: 走到来源才能取料，走到互动点才能送达
+  ✓ logistics: 取消把在途与已送达货物原地落下，不瞬移回库存
+  ✓ logistics: releaseCarrier 只释放该搬运者，工地已送达材料保留
+  ✓ logistics: restore 保留有原搬运者的 canonical cargo，缺人时才落地
+  ✓ logistics: 读档计数器落后时不得复用已有任务或预订 ID
+  ✓ logistics: JSON 读档保留已送达与在途所有权，续送后总量只消耗一次
+  ✓ logistics: completeTask 只消费需求量并把 storeN 超额退成单位物资
+  ✓ logistics: restore 取消已无蓝图的施工孤儿并返还已送达与在途物资
+  ✓ construction: 正式蓝图缺料冻结；旧蓝图保持已付款兼容
+  ✓ construction: 到料且居民到场才完工，保留统一 geometry record
+  ✓ construction: 遗留 s.px 不能幽灵施工，活人占格时不得封死成品
+  ✓ construction: 倒地、睡眠、征召居民与失能强制指令都不能施工
+  ✓ logistics: 同一物品的通用资源与精确配方不能跨 key 重复预订
+  ✓ logistics: 预订按物品重量拆成多人多趟且总量守恒
+  ✓ logistics: 数值库存按对应 itemId 重量限额且 opts 不能放大上限
+  ✓ logistics: pickup 只取预订的 id+itemId 并按实体当前位置验距离
+  ✓ #200 single source: Observation 尺寸、格语义、导航和生态使用同一坐标定义
+  ✓ #200 boundaries: 旧二维 Observation、相机和建筑格都服从观测尺寸
+  ✓ #200 activity: 全陆地越界目标与直移水格都不能绕过 observed 导航
+  ✓ #200 player: observed 水格阻挡且边界来自 Observation，generation 0 保留旧圆湖
+  ✓ #200 resources: observed 家园只实体化 Observation 资源，不叠加程序化 rock/crystal
+  ✓ #200 cache revision: 替换同 seed 同尺寸 Observation 会产生新地形修订号
+  ✓ gridOf: 空建筑=全通矩阵
+  ✓ gridOf: 墙格=1 营地=1 闸门=可通行(0) 其他建筑=0
+  ✓ astar: 围栏留闸门→路径穿门
+  ✓ gridOf: 越界坐标 clamp 不出错
+  ✓ astar: 空地=直线两点
+  ✓ astar: 一堵墙+缺口→绕缺口(不穿墙)
+  ✓ astar: 封闭围栏内→无路返回null
+  ✓ astar: 起终点同格→直达终点
+  ✓ astar: 起点在墙内→仍能找到(退化放行)
+  ✓ followPath: 两点路径逐步到达并清walking
+  ✓ followPath: 多段路径逐段前进
+  ✓ followPath: 最后一步超额吞掉(不越点)
+  ✓ followPath: 精确落点帧保持walking(不闪烁)
+  ✓ followPath: 空路径立即停
+  ✓ #82 roomsOf: 3×3 墙环 → 内部 1×1 房间
+  ✓ #82 roomsOf: 5×5 墙环(留缺口) → 无房间(有缺口即连通外部)
+  ✓ #82 roomsOf: 门算边界(围合含门) → 仍成房间
+  ✓ #82 inRooms: 点在世界坐标判房间内外
+  ✓ #94 astar: costFn 使路径绕开陷阱格
+  ✓ #94 astar: 陷阱代价极高且无绕路 → 仍走直线(绕无可绕不卡死)
+  ✓ #94 astar: 外部行为不变 (无 costFn 全绿兼容)
+  ✓ #205 astar: 长绕行的累计代价=手推最优(二叉堆 open 集不牺牲最优性)
+  ✓ #198 Observation 相同输入产生相同的复合格网
+  ✓ #198 家园核心地面与首夜资源是同一次观测的两个层
+  ✓ #198 正常观测不降级且 seed 会改变实际地形
+  ✓ #198 零水体观测不会留下水或干湖岸
+  ✓ #198 资源 pin 按格去重、限制边界并服从群系地面兼容表
+  ✓ #198 ground pin 与 fallback 不能写入群系表外的地面
+  ✓ #198 未知群系不会被静默改写或污染 CFG
+  ✓ #198 地面邻接矛盾会有限降级且仍可复现
+  ✓ #198 四种远征 biome 产生地图并执行不同邻接规则
+  ✓ #198 求解失败可注入现有生成器作为确定性 fallback
+  ✓ clock: t=0 → shot 0; 过 shotEnds[0] → shot 1; t=30 停在最后
+  ✓ skipToLast → shot 4, skipped, t 在最后窗口起点
+  ✓ shouldPlay: 每次打开都播; 仅 autostart 不播
+  ✓ markPlayed 把 played 置 true
+  ✓ captions 锁定系统字; 第 3 镜无字; 第 5 镜旁白 活下去。
+  ✓ audioOf: 1-3 镜 alarm, 4-5 镜与 skip 后 silence
+  ✓ Save.loadMeta 空存储 → opening.played===false
+  ✓ 旧档无 opening 键 → played===true
+  ✓ 显式 opening.played:false 保持 false
+  ✓ 旧 seen:true 迁成 played
+  ✓ 缝2 无居住舱 → 目标盖房且过客不允许
+  ✓ 缝2 有舱未睡 → 目标去睡且过客不进场
+  ✓ 缝2 舱内睡过 → 目标无且过客允许
+  ✓ 缝2 未睡但完工超过一天 → 过客允许, 目标仍是去睡
+  ✓ 缝2 老档 nightDone → 无目标且过客允许
+  ✓ Save.loadMeta 新档 nightDone===false; 旧档 true
+  ✓ assetOf 无 OpeningData 回退 CFG 路径
+  ✓ skipToLast 后 isLast, 无 OpeningVideo 时 t=30 也是最后一镜
+  ✓ #178 filth: 加脏与清扫
+  ✓ #179 building hp: 掉耐久可修理
+  ✓ #180 parts: 六部位与腿伤减速
+  ✓ #181 corpse: 埋葬标记死亡
+  ✓ #213: 人型敌人死亡留下同一人的尸体；非人不留；尸体会腐烂
+  ✓ #178 clean: 小人会去最脏格
+  ✓ #182 fire: 火烧到同格建筑
+  ✓ #182 fire: 火会蔓延或熄灭
+  ✓ #184 hunt: workOnAnimal 猎杀掉肉
+  ✓ #182 fire: 灭火格熄灭
+  ✓ #185 prisoner: 俘虏与释放
+  ✓ #184 animals: 牧场同步出羊
+  ✓ #183 restrict: 活动区外不允许
+  ✓ placementGhost: 导出并吸到格网
+  ✓ placementGhost: 同一鼠标微移仍停在同一格
+  ✓ placementGhost: 离核心太近不可放
+  ✓ placementGhost: 空地可放
+  ✓ placementGhost: 重叠不可放
+  ✓ placementGhost: 无建筑模式返回 null
+  ✓ 收容规划：一格一人，优先已建收容点，其余进家园临时区
+  ✓ 收容规划：已到达者占位；不可达点不分派；中断后可换押送员
+  ✓ 收容规划：释放其他人后仍保留高序号临时收容位
+  ✓ production jobs: prepare 创建实际配方需求与默认工坊药品任务
+  ✓ production jobs: 共享库存由 Logistics 精确预订，送达前完全不推进
+  ✓ production jobs: 只消费工位已送材料，完成一次后产出与工单各推进一次
+  ✓ production jobs: 在途读档保留任务，原搬运者可继续送达后生产
+  ✓ production jobs: 切配方和拆工位取消任务，已送达与在途材料全部落地守恒
+  ✓ production jobs: 科研台送达前不推进，送达后只消费一份标本并返回原化验结果
+  ✓ production jobs: 现代默认工坊消耗已送矿材产药，legacy 完全不接管
+  ✓ production jobs: 换配方把退款放在可达互动格而非阻挡的工位中心
+  ✓ #214 崩溃按生产跳推进，规模满足时复用整队撤离并取消后续波次
+  ✓ #214 非人型、士兵、俘虏与倒地者不触发崩溃；单个崩溃不足以取消整波
+  ✓ #214 出走优先于围攻，怠工停止攻击，结束后恢复战斗
+  ✓ #214 斗殴走向同伴，接触后沿用 hurtResident，一次崩溃只打一架
+  ✓ #214 暴食必须走到粮堆，只扣实物一份；俘虏和库存不受影响
+  ✓ #214 饥饿、疼痛、同伴倒下沿同一念头系统降低心情
+RAID_MORALE_SOAK [{"seed":1,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1},{"seed":2,"reason":"morale","routAt":510,"ended":true,"casualties":0,"kills":0,"departed":4},{"seed":3,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1},{"seed":4,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":2},{"seed":5,"reason":"morale","routAt":150,"ended":true,"casualties":0,"kills":0,"departed":4},{"seed":6,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":3},{"seed":7,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":2},{"seed":8,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":0},{"seed":9,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":2},{"seed":10,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1},{"seed":11,"reason":"morale","routAt":120,"ended":true,"casualties":0,"kills":0,"departed":4},{"seed":12,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1},{"seed":13,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":0},{"seed":14,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1},{"seed":15,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":2},{"seed":16,"reason":"none","routAt":null,"ended":false,"casualties":0,"kills":0,"departed":1}]
+  ✓ #214 seeded 长测：疲惫饥饿的袭击者无击杀也会整队溃退
+  ✓ combat: low-health home raider enters retreat cleanup on legacy and modern map bounds
+  ✓ Recovery.plan 缺料蓝图沿正式建造需求走半价，不预扣库存
+  ✓ Recovery.plan 遵守真实科技与空间校验
+  ✓ Recovery.cancel 只解除源残骸锁，不改队列与物流状态
+  ✓ 修复锁定期间 workOnFlora 不伤残骸也不产生拆解收益
+  ✓ 正式施工完成会消耗修复源，并只生成目标建筑
+  ✓ Recovery.complete 永久采空源残骸，重复完成不生成任何收益
+  ✓ Recovery.reconcile 解开孤儿锁，缺源蓝图只报错且绝不补实体
+  ✓ Colony 重建会恢复 pendingRepair，reconcile 保留合法修复队列
+  ✓ generate: takenNames 查重
+  ✓ fallbackBio: 确定性小传含名字与出身
+  ✓ globalBonuses: 空居民无加成
+  ✓ globalBonuses: 建造折扣与下限40%
+  ✓ globalBonuses: 学识产出与社交心情上限
+  ✓ farmTick: 阶段推进与技能加速
+  ✓ farmTick: 效率打折减慢生长
+  ✓ farmTick: 酸雨法则减半生长
+  ✓ harvestYield: 只有成熟产出
+  ✓ jobOutput: 技能越高产出越多, 效率打折生效
+  ✓ generate: 结构完整, 主技能6~9副3~5其余0~2
+  ✓ generate: 同seed同居民(ADR-5), 主≠副
+  ✓ homeFoodTick: 家园掉饱食, 远征不掉, 不饿死
+  ✓ ensurePlayerNeeds: 缺省饱食并兼容旧档
+  ✓ #166 day: 一天 60 分钟，饱食/精力按白天校准
+  ✓ homeRestTick: 家园掉精力, 远征不掉, 钳到 0
+  ✓ ensurePlayerNeeds: 缺省精力并兼容旧档
+  ✓ homeIllnessTick: 家园不改值, 远征不结算, 钳到 0..100
+  ✓ ensurePlayerNeeds: 缺省病情 0 并兼容旧档
+  ✓ needsTick: 饿了有粮就吃, 没粮掉饱食
+  ✓ eatOnce: 饿了才吃一口, 饱了不再吃
+  ✓ needsTick: 饥饿确定性涨病, 不饿死
+  ✓ efficiency: 病情超阈值打折
+  ✓ clinicTick: 有舱基疗, 有医更快, 无舱吃饱微愈
+  ✓ hurtResident: 涨病掉心情, 不致死
+  ✓ applyMed: 降病不致死
+  ✓ efficiency: 心情好+吃饱 >1, 饥饿打折
+  ✓ socialTick: 同岗增更多, 暴脾气+低心情引发矛盾(负增量)
+  ✓ applyBond: 无序key归一, 范围clamp 0~100
+  ✓ canRecruit: 住宅满拒绝, 有空位通过
+  ✓ recruitInto: 写入名册且不自动上岗
+  ✓ joinIntent: 难民/游商/过路客
+  ✓ recruitGate: 游商不招, 难民空家必成, 有人断粮拒
+  ✓ joinChance: 过路客粮多/性格/袭击调制
+  ✓ attemptRecruit: 掷骰失败可复现, 成功入籍
+  ✓ hospitalityRate: 好招待为正, 袭击断粮为负
+  ✓ tickImpression: 好招待随时间上涨且封顶
+  ✓ offerMeal: 扣粮涨印象, 不可连请
+  ✓ joinChance: 印象高过路客更好招
+  ✓ wanderStep: 院子内移动且不越界
+  ✓ walkToward: 走向目标, 到达后停下
+  ✓ walkToward: 不越过目标
+  ✓ walkToward: 走动推进 walkPh，停下冻结
+  ✓ #68 walkToward: 睡着不移动、清走位残留、不推进 walkPh
+  ✓ wanderStep: 游荡时 walking、朝向、walkPh
+  ✓ wanderStep: 站住时 idle，不走不推进 walkPh
+  ✓ wanderStep: 站够后重新开走
+  ✓ wanderStep: 过客走完低骰站住
+  ✓ wanderStep: 居民游荡不进过客站住
+  ✓ breakTypeOf: 性格分流四种崩溃
+  ✓ breakTick: 心情高不崩溃
+  ✓ breakTick: 低心情命中掷骰 → 按性格进入崩溃
+  ✓ breakTick: 大崩溃阈值下概率×3
+  ✓ breakTick: 结束宣泄回弹 + 进冷却, 冷却期不复发
+  ✓ lowestBondMate: 挑好感最低的同事
+  ✓ makeTraderStock: 同seed确定, 结构合法, 价格≥1
+  ✓ tradeOnce: 买入扣矿得货, 矿不够拒绝且不扣账
+  ✓ tradeOnce: 卖出得矿, 社交议价加成
+  ✓ tradeOnce: 卖晶体矿扣地上堆
+  ✓ tradeOnce: 没存货不能卖, 收购额度用完不再收
+  ✓ tradeOnce: 仓不够时用地上堆付款(先仓后堆)
+  ✓ defaultPrio: 主技能=1 其余=2
+  ✓ defaultPrio: 有现职时按岗位对应技能=1
+  ✓ assignByPriority: 1级先满足且按技能高者
+  ✓ assignByPriority: 0=禁止永不指派
+  ✓ assignByPriority: 手动锁岗不动, 崩溃者缺勤
+  ✓ assignByPriority: 有施工队列时建造者留空
+  ✓ assignByPriority: 同级粘性——现职同级不换岗
+  ✓ assignByPriority: 更高优先级空位会抢走现职
+  ✓ assignByPriority: 岗位数受建筑数约束
+  ✓ assignByPriority: 重病居民跳过指派
+  ✓ globalBonuses: tradeMul 随社交封顶
+  ✓ ensureAilments: 旧档 illness>0 迁移为一条外伤
+  ✓ addAilment: 同型合并, 满2条加到最重
+  ✓ hurtResident: type 参数分型(疫病)
+  ✓ ailmentAge: 外伤拖2跳未进舱 → 升级感染+掉心情
+  ✓ treatAilment: 优先级 感染>疫病>外伤
+  ✓ plague: 无药只能压到地板, 用药×2 可除根
+  ✓ clinicTick: 吃饱自愈只治外伤, 感染不自愈
+  ✓ efficiency: 感染者效率地板更低
+  ✓ needsTick: 饥饿病计为外伤
+  ✓ #69 needsMedBed: 病情严格超阈值或击倒才需床, 边界 50 不躺
+  ✓ #69 clinicBedSpot: 与 residentSpot 同款偏移
+  ✓ #69 walkToward: 医疗舱俯卧者不移动, 清走位残留, 不推进 walkPh
+  ✓ #69 needsTick: 病情回落自动起身, 击倒者不起, 重病继续躺
+  ✓ #81 diningSeatAlloc: 每椅1人, 就近分配, 不抢座
+  ✓ #81 diningSeatAlloc: 独椅无桌不算可用餐位
+  ✓ #81 diningSeatAlloc: 距离远超 diningChairR 不派座
+  ✓ #81 faceTable: 椅子看向桌子角度
+  ✓ #81 eatMeal: opts.atTable 心情增益 (diningMoodGain)
+  ✓ #81 eatMeal: 无 opts 不加桌心情
+  ✓ #82 shelteredFor: 房间内=true (免疫暴露)
+  ✓ #82 shelteredFor: 房间外回退 isSheltered(建筑半径)
+  ✓ #82 roomMoodGain: 房间含居住舱=卧室级 → +2
+  ✓ #82 roomMoodGain: 房间无居住舱 → 0
+  ✓ #82 roomMoodGain: 室外 → 0
+  ✓ #93 playerExposureTick: 极端天气室外累积+8/跳
+  ✓ #93 playerExposureTick: 室内/房间消退 -12/跳
+  ✓ #93 playerExposureTick: 酸雨+防酸服减免
+  ✓ #93 playerExposureTick: 不转化伤病/不加心情 (显式裁剪)
+  ✓ #93 playerExposureTick: 值域钳 0~100, 老档缺失兜底0
+  ✓ #97 roomMoodGain: 房间含家具 → 逐件加成聚合 (电视+书架=+2)
+  ✓ #97 roomMoodGain: 卧室级+家具叠加 (居住舱+电视+书架=+4)
+  ✓ #97 roomMoodGain: 家具在房间外(墙外)不加成
+  ✓ P2 beauty: 露天不谈美观 → null
+  ✓ P2 beauty: 家具加分, 工业设施减分 (别把发电机塞进卧室)
+  ✓ P2 beauty: 污秽与尸体拉低美观
+  ✓ P2 beauty: 分档 —— 漂亮 / 难看 / 中性
+  ✓ P2 beauty: 心情幅度 1:1 且受上下限约束
+  ✓ P2 beauty: 漂亮房间挂 th_pretty_room, 且不与通用房间念头重复
+  ✓ P2 beauty: 装修越好心情越好 —— 跨档不得反而变差
+  ✓ resources: 基础自然原材料定义齐全
+  ✓ nature: generateFlora 程序化生成自然树木、矿脉与灌木
+  ✓ nature: 采集作业推进与物理掉落产出
+  ✓ growthTick: aggressive 军事增长快于经济
+  ✓ growthTick: trader 经济增长快于军事
+  ✓ shouldRaid: 军力不足1.3倍防御 → 不袭
+  ✓ shouldRaid: 优势+愤怒满 → 袭
+  ✓ shouldRaid: trader 几乎不打(愤怒需求×4)
+  ✓ warScore: 边界 0~100 且军力占主导
+  ✓ raidWave: 规模随军力阶梯上升(总兵力)
+  ✓ raidWave: trait → 战术分流(强攻/盗掠/围攻)
+  ✓ raidWave: 战术兵力系数——强攻×1.2 盗掠×0.7
+  ✓ raidWave: 军力≥90 拆两波且总量不缩水
+  ✓ raidWave: label 带战术前缀
+  ✓ defaultRelationOf: 按 trait 分流初始好感
+  ✓ relationTierOf: 三级状态机划分
+  ✓ sendTribute: 资源充足纳贡成功并平息怒气与撤销袭击
+  ✓ sendTribute: 资源不足纳贡失败
+  ✓ signTradePact: 关系达标签署通商协定
+  ✓ signTradePact: 负关系拒绝签署通商
+  ✓ deterRival: 压倒性防御威慑成功
+  ✓ deterRival: 防御不足威慑失败
+  ✓ applyBaseRaid: 远征基地击破战略重创
+  ✓ growthTick: 畏缩期间军力不增长
+  ✓ shouldRaid: 盟友绝不袭击 / 畏缩期不袭击 / 中立门槛提高
+  ✓ #176 roomRole: 有居住舱是卧室
+  ✓ #175 grow: addGrowZone 与成熟收割
+  ✓ ruins: generateAncientRuins 确定性生成遗迹复合体
+  ✓ ruins: 能量闸门可被伤害击破或按 E 解除
+  ✓ ruins: applyDamageWithShield 能量护盾吸收与穿透
+  ✓ ruins: shieldRechargeTick 脱战4s后护盾回充
+  ✓ ruins: hackTerminal 学识技能加成与成功/警报分支
+  ✓ ruins: openArtifactVault 开箱产出古代蓝图与史前核心
+  ✓ ruins: 终极科技与史前永恒发电机零燃料200W发电
+  ✓ colony v1 migration preserves coordinates, stock, paid blueprints and legacy beds
+  ✓ colony migration stable IDs do not collide and explicit scene is preserved
+  ✓ colony future envelope rejected without overwriting and PlanetSpec remains v1
+  ✓ #199 future additive Observation is preserved instead of being downgraded
+  ✓ #199 malformed future Observation is rejected without overwriting
+  ✓ #199 new home is observed and atomically saved before the first running state
+  ✓ #199 generation 1 migration is anchored to the pre-repair deterministic map
+  ✓ #199 generation 1 is snapshotted once without changing terrain, resources or buildings
+  ✓ #199 failed persistent write keeps one complete in-memory migration and can recover
+  ✓ #170 schedule: hourOfDay 把一天切成 24 小时
+  ✓ #170 schedule: 默认夜里睡白天工作
+  ✓ #170 schedule: 缺字段补默认，点击循环
+  ✓ #170 thinkPawn: 睡眠格且精力未满去睡觉
+  ✓ #170 thinkPawn: 睡眠格精力已满不困在床循环
+  ✓ #170 thinkPawn: 工作格轻微无聊不去篝火
+  ✓ #170 thinkPawn: 娱乐格优先休闲
+  ✓ specimen_items: 7 大异星实物标本定义齐全
+  ✓ specimen_analysis: 标本化验表与回报契约合法
+  ✓ lab_pipeline: labAnalysisTick 推进标本化验与样本消耗
+  ✓ expedition_specimens: 远征野生植株掉落实物标本而非现成种子
+  ✓ specimen_drops: 酸吐者/硅壳/Boss 掉落实物标本
+  ✓ settleGoods: 返航保留实物标本，不折算研究点
+  ✓ collectHome: 标本入库而不是立刻变成研究点
+  ✓ eureka: applySpecimenAnalysis 解锁作物、吐出种子并注入研究点
+  ✓ crop_lock: 未化验作物不可选，化验后可循环切换
+  ✓ lab_cycle: cycleAnalysisTarget 轮换化验队列
+  ✓ lab_starved: 标本库存为 0 时化验不推进
+  ✓ chitin_unlock: 无水培时硅壳化验不授予科技，仍记已化验并注入尤里卡
+  ✓ chitin_unlock: 已有水培时硅壳化验授予 te_bio_adaptation
+  ✓ collectHome_seeds: 纯净种荚入库不折算研究点
+  ✓ reagent: 强酸腺囊化验产出精纯试剂
+  ✓ codex_entries: specimenCodexEntries 区分已化验与未化验
+  ✓ shared memory: 共同经历写入实际队员、关系与限时念头，读档重结算不叠加
+  ✓ shared memory: 历史有界，多个经历的心情不无限堆叠
+  ✓ social: CFG.social.tiers 定义完整五级关系状态机
+  ✓ social: relationshipTierOf 纯函数边界判定准确
+  ✓ social: applyBond 支持 player 参与者与键位归一化
+  ✓ social: keyBondsOf 提取最亲密与最敌对关系
+  ✓ social: workSynergyOf 好友协同增产与宿怨减产
+  ✓ social: roomFrictionOf 同室死敌心情惩罚
+  ✓ social: canSocialEncounter 验证 90s 冷却与紧急豁免
+  ✓ social: triggerSocialEncounter 结算气泡、动作描述与羁绊增减
+  ✓ social: attemptIntervention 成功安抚平息精神崩溃
+  ✓ social: attemptIntervention 失败分支与暴力转火反噬
+  ✓ #84: 11 项建筑 v3 sheet 均为 2048×256 RGBA PNG
+  ✓ #84: sprite_data 每个新键唯一且 base64 与 PNG 字节一致
+  ✓ sprite_meta bl: bl_barracks 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_battery 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_carpet 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_clinic 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_conduit 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_dining_chair 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_dining_table 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_farm 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_gate 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_house 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_lab 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_lamp 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_landing_pad 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_mine 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_pasture 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_sandbag 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_shelf 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_solar_panel 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_spike_trap 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_turret 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_tv 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_wall 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_warehouse 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_wood_generator 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta bl: bl_workshop 的 main.js baseline/h 与 build_sprites.py 权威输出一致
+  ✓ sprite_meta: player_prone 的 main.js baseline/h 与实测 PNG 一致
+  ✓ sprite_meta: hum_0_nopack_prone 的 main.js baseline/h 与实测 PNG 一致
+  ✓ sprite_meta: hum_1_nopack_prone 的 main.js baseline/h 与实测 PNG 一致
+  ✓ sprite_meta: hum_2_nopack_prone 的 main.js baseline/h 与实测 PNG 一致
+  ✓ sprite_meta: hum_3_nopack_prone 的 main.js baseline/h 与实测 PNG 一致
+  ✓ framePos: 4列sheet的索引映射
+  ✓ framePos: 负数与超界索引回绕
+  ✓ advance: fps推进与loop回绕
+  ✓ advance: loop=false 停在末帧
+  ✓ frameAt: 无状态便捷式计算
+  ✓ physical storage: geometry1 容器目的地是合法互动格并保留温度坐标
+  ✓ physical storage: 精确物品实体是唯一库存且不修改 meta.res
+  ✓ physical storage: 不同 owner 的同物品不得误合并
+  ✓ physical storage: 容器拆除、过滤变化和仓储区删格只释放所有权不改数量
+  ✓ physical storage: 重复 prepare 不抹除合法已入库实体
+  ✓ physical storage: Logistics 锁定同一库存实体，追加合并后取料仍守恒
+  ✓ physical storage: 无容器回落迫降舱实体，legacy 才写数字库存
+  ✓ physical storage: 现代几何容器没有合法互动格时 destination 返回 null
+  ✓ storage: BUILDINGS 注册 1x1 置物货架 bl_storage_shelf
+  ✓ storage: CFG.storage 配置完整品类与轮转预设
+  ✓ storage: storageFilterMatches 纯函数品类匹配准确
+  ✓ storage: cycleStorageFilter 容器分类单键轮转
+  ✓ storage: deteriorationTick 露天天气劣化与避难豁免
+  ✓ storage: bulkHaulCandidates 48px 范围内相邻多堆聚类抓取
+  ✓ storage: findBestStorageSpot 寻找最近兼容品类的仓储点
+  ✓ storage: findNearbySourcedItem 120px 范围内就近货架优先取料
+  ✓ rest: 居民生成带默认精力与睡眠字段
+  ✓ rest: needsTick 自然衰减精力 (7/跳)
+  ✓ rest: needsTick 精力 < 20 标记困倦，不原地瞬睡
+  ✓ rest: 夜间精力未满也想睡 (作息)
+  ✓ rest: 睡眠中在床铺恢复 (+25/跳) 且满 100 醒来
+  ✓ rest: 睡眠中在地面 (无床) 恢复慢 30% (+18/跳)
+  ✓ beds: assignBeds 纯函数按容量分配床位
+  ✓ disturbSleep: 惊醒中断睡眠并附加心情减益
+  ✓ assignByPriority: 睡眠中的居民不被派岗
+  ✓ capacities: 健康居民三维机能均为 1.0 (100%)
+  ✓ capacities: 外伤削弱移动与操作机能
+  ✓ capacities: 严重疫病削弱认知并作为全局上限
+  ✓ efficiency: 整合 manipulation 机能损耗
+  ✓ recreation: 居民生成带默认娱乐值 80
+  ✓ recreation: needsTick 自然衰减 5/跳
+  ✓ recreation: 高娱乐拉高心情、低娱乐拉低, 且念头清单能解释差距 (ADR-31)
+  ✓ recreation: enjoyRecreation 增加娱乐值
+  ✓ downed: 认知 < 30% 触发击倒与 90s 濒死倒计时
+  ✓ downed: 击倒者不参与工作分配
+  ✓ rescue: rescueTick 推进濒死倒计时与送医止血康复
+  ✓ rescue: 倒计时归零判定死亡并产生悼念心情减益
+  ✓ exposure: 居民生成带默认暴露值 0
+  ✓ exposure: 极端天气室外累积，避难所内快速消退
+  ✓ exposure: isSheltered 判定建筑与核心范围
+  ✓ exposure: 严重暴露 (>80) 转化为急性感染病症
+  ✓ survival_integration: 居民生存全属性在名册与实体模型中完整流通
+  ✓ playerRestTick: 清醒在家园每跳掉 7 精力
+  ✓ playerRestTick: 睡眠中床上 +25/跳, 地铺 +18/跳
+  ✓ playerRestTick: 睡眠回满 100 自动醒
+  ✓ playerRestTick: 清醒在远征精力冻结
+  ✓ playerRestTick: 家园精力见底(<=0)原地累塌(地铺睡, bedId=null)
+  ✓ playerRestTick: 累塌后地铺恢复 +18/跳
+  ✓ playerRestTick: 累塌恢复回满自动醒且清 bedId (对齐 playerWake)
+  ✓ playerRestTick: 远征精力冻结且 0 值不触发累塌
+  ✓ playerRestTick: 睡眠回满自动醒同时清 bedId (#67 修复)
+  ✓ setPlayerSleeping: 可传入自定义床ID (默认保留 bed_player, #70 预留)
+  ✓ playerRestTick: 医疗舱躺卧(bedId=bed_med, hasBed=true) 按床速 +25/跳
+  ✓ playerRestTick: 舱内回满自动醒并清 bedId=bed_med
+  ✓ playerWake: 清 bedId=bed_med
+  ✓ setPlayerSleeping: 靠床 E 入睡绑床, 无床打地铺, 离床清床
+  ✓ playerWake: 清睡眠返回 true, 非睡眠/null 返回 false
+  ✓ ensurePlayerNeeds: 缺省 isSleeping=false 且不覆盖已有值
+  ✓ playerDownedTick: 家园倒计时递减
+  ✓ playerDownedTick: 有居民+舱内送医复活
+  ✓ playerDownedTick: 有舱无居民不解救(继续倒计时)
+  ✓ playerDownedTick: 倒计时归零判定死亡
+  ✓ playerDownedTick: 远征 no-op(老档保护)
+  ✓ playerDownedTick: 未击倒 no-op
+  ✓ ensurePlayerNeeds: 缺省 downed=false / downT=null 且不覆盖已有值 (#72)
+  ✓ playerEatOnce: 生食加 25 饱食
+  ✓ playerEatOnce: 熟食用 itemDef.foodGain (炙烤异星肉排 +40)
+  ✓ playerEatOnce: 满饱食不触发 (food>=阈值 ate=false)
+  ✓ playerEatOnce: clamp 到 100 (55+50 alien_feast=105→100)
+  ✓ playerEatOnce: food=null 不触发且不污染 mood/recreation
+  ✓ playerEatOnce: 进食后只改 food, 不写 mood/recreation/exposure
+  ✓ T3 walkAround: 无墙=walkToward 逐帧一致(直线+清缓存)
+  ✓ T3 walkAround: 无 grid(null)也退化直线
+  ✓ T3 walkAround: 无墙斜向逐帧与 walkToward 完全一致
+  ✓ T3 walkAround: 一堵墙+缺口→绕缺口(不穿墙/终点精确/能到达)
+  ✓ T3 walkAround: 封闭围栏无路→停下并报告不可达
+  ✓ T3 walkAround: 目标未变沿用缓存路径, 目标变更重算
+  ✓ T3 walkAround: 围栏唯一开口=闸门→路径经门格并到达
+  ✓ T3 walkAround: 睡着/俯卧者不移动并清路径缓存
+  ✓ T3 walkAround: 有墙但直线无挡→单点路径直达(轨迹同直线)
+  ✓ planChase: 无墙 → direct(原直线冲脸行为)
+  ✓ planChase: 有墙但不挡视线 → direct
+  ✓ planChase: 墙列挡路 → path(绕墙路径, 终点=目标)
+  ✓ planChase: 闸门格不是障碍 → 直接穿门(direct)
+  ✓ planChase: 目标被墙环完全封死 → breach(拆最近墙)
+  ✓ planChase: 目标格本身是墙(玩家卡墙内) → breach
+  ✓ wallHp: 旧存档无 hp 字段 → 兜底 CFG.wall.hp
+  ✓ strikeWall: 默认耐久递减(每击=敌人伤害); 未拆不掉石
+  ✓ strikeWall: 归零→移除记录+掉石料1~2+wallDown事件+震屏
+  ✓ strikeWall: 已拆除(0血)墙不再命中
+  ✓ strikeWall: 拆掉环上墙 → 原目标恢复可达(direct)
+  ✓ followPath: 逐段推进→到达终点清 walking
+  ✓ pickShellTarget: 优先墙(即使距离更远)
+  ✓ pickShellTarget: 炮塔与墙同组取最近
+  ✓ pickShellTarget: 无优先建筑 → 最近一般建筑
+  ✓ pickShellTarget: 发射台排除/0血墙排除/空表null
+  ✓ segHitBox: 线段穿越墙盒=命中(水平/垂直/斜线)
+  ✓ segHitBox: 线段未达墙盒=不命中(不足/上方掠过/盒外)
+  ✓ segHitBox: 贴边与零长盒内点=命中(隧穿安全, 判据含端点)
+  ✓ updateCombat: 玩家弹丸穿自家墙=墙扣血+弹丸消散+wallHit一次
+  ✓ updateCombat: 第二发连击自家墙继续扣血 47→34(不豁免)
+  ✓ updateCombat: 敌人酸弹被墙挡(玩家躲墙后 hp 不掉)
+  ✓ updateCombat: 墙碎后弹道恢复穿透(第二发穿旧墙格命中后方敌人)
+  ✓ updateCombat: 闸门不挡弹(穿门语义延续, 弹丸直穿)
+  ✓ updateCombat: 0血墙残留记录不拦截(弹丸直穿)
+  ✓ updateCombat: 围攻炮弹对墙用 shellDmg(两发击穿一墙)
+  ✓ BUILDINGS: 电网四建筑注册, 导线1x1格, 发电/电池有科技
+  ✓ powerNets: 发电机-导线-炮塔 成一组且节点齐全
+  ✓ powerNets: 断线失联→2网分离
+  ✓ powerNets: 孤立导线不成网(无节点)
+  ✓ powerNets: 蓄电池并网(经导线)
+  ✓ powerSettle: 满供→active, 无shed
+  ✓ powerSettle: 供不应求→优先级停机(炮塔保供, 低prio停)
+  ✓ powerSettle: 零发电机=未激活(默认通电)
+  ✓ powerSettle: 电池兜底(耗尽前供电, 用尽后停)
+  ✓ solarMulOf: 读天气 solarMul(雨0.5)
+  ✓ solarMulOf: 老档无天气→晴1
+  ✓ applyPowerState: status 写入各建筑 powered/grid 标志
+  ✓ farmPowerMul: 无电农场减产50%
+  ✓ farmPowerMul: 通电/未激活=满产
+  ✓ turretFireAllowed: 无电+未超时→禁射
+  ✓ turretFireAllowed: 通电且无offline→可射
+  ✓ turretFireAllowed: offlineT(耀斑)仍然禁射
+  ✓ clinicPowered: 无电→停诊
+  ✓ clinicPowered: 未激活默认(无grid字段)→照常
+  ✓ tech: 基础科技无前置条件，可直接研发
+  ✓ tech: 高级科技受前置条件约束，未满足前置时拒绝研发
+  ✓ tech: 研发前置科技后成功解锁下游科技
+  ✓ buildings: 建造完全不扣除研究点，仅扣除物理建材
+  ✓ buildings: 未研发科技时禁止放置高级建筑蓝图
+  ✓ tech: 缺前置时优先提示需先研发，不报研究点不足
+  ✓ tech: 化验钥匙节点不能花研究点买
+  ✓ tech: 先化验硅壳后研发水培则补发化验钥匙
+  ✓ tech: 全屏图列表完整、不重复、不含旧档别名 te_weaponry
+  ✓ tech: 每个科技都必须出现在某一列(否则 UI 根本不渲染它)
+  ✓ tech: 等离子等级取 ballistics 与旧档 weaponry 的较大值
+  ✓ buildings: 物理建材不足时拒绝放置
+  ✓ temperature: CFG.temperature 包含完整天气温标与舒适区间
+  ✓ temperature: ambientTemperatureOf 纯函数推导室外环境气温
+  ✓ temperature: roomTemperatureTick 封闭房间热阻隔热与缓慢传导
+  ✓ temperature: BUILDINGS 注册电暖器与制冷空调
+  ✓ temperature: roomTemperatureTick 电暖器升温与空调降温控温
+  ✓ temperature: deteriorationTick 冷冻库(<0°C)永久保鲜与冷藏减缓
+  ✓ temperature: cropThermalGrowthMul 作物适温生长与极寒冻害
+  ✓ temperature: thermalStressTick 极寒失温、防寒服抵抗与击倒
+  ✓ TerrainModel 新家园是固定的 128×128 格描述
+  ✓ TerrainModel 旧场景保持 2200 与 generation 0
+  ✓ #198 TerrainModel 同时归一化 observed、未观测 generation 1 与 generation 0
+  ✓ #198 observed TerrainModel 只导出 Observation 的自然资源层
+  ✓ #198 零水 Observation 不再暴露固定湖泊地标
+  ✓ TerrainModel 湖岸沃土与贫瘠矿丘导出可用于作物的倍率
+  ✓ TerrainModel 两块 20×20 建地连续并可建造
+  ✓ TerrainModel seed 会改变区域分界，出生锚点仍留在旧 HAB
+  ✓ TerrainModel 资源清单确定、约两千对象、补给充足、矿物耗尽只留残骸
+  ✓ TerrainModel 重要资源从 HAB 经真实水格 A* 可达
+  ✓ TerrainModel 新资源版本给出真实标本与有限可修复残骸，旧地图身份保持稳定
+  ✓ TerrainModel 六个固定 seed 的两块 20×20 建地、首夜物资与分区资源契约
+  ✓ TerrainModel 矿物与可修复残骸的采空状态跨 Save/WorldRuntime/重建保持
+  ✓ terrain movement: 现代地图把湖岸与岩丘代价写入导航缓存，旧档保持普通速度
+  ✓ terrain movement: A* 为低总代价绕开高代价地带，普通旧网格仍直线
+  ✓ #168 thinkPawn: 导出
+  ✓ #168 thinkPawn: 征召中不自治
+  ✓ #168 thinkPawn: 睡着/倒地不自治
+  ✓ #168 thinkPawn: 饿了去吃饭，优先于睡觉和干活
+  ✓ #168 thinkPawn: 贴着粮就地吃
+  ✓ #168 thinkPawn: 饿了没粮去采浆果
+  ✓ #168 thinkPawn: 困了去睡觉，优先于建造
+  ✓ #168 thinkPawn: 贴床就睡
+  ✓ #169 thinkPawn: 强制建造走指定蓝图坐标
+  ✓ #168 thinkPawn: 不饿不困去建造
+  ✓ #168 thinkPawn: 无蓝图去搬运
+  ✓ #168 thinkPawn: 工作优先于娱乐
+  ✓ #168 thinkPawn: 无活才娱乐
+  ✓ #168 thinkPawn: 没事闲逛
+  ✓ #168 thinkPawn: 有岗位则上岗，不乱跑采集
+  ✓ #168 thinkPawn: 有岗位不丢下工去满图搬运
+  ✓ #171 thoughts: 目录至少 20 条
+  ✓ #171 thoughts: collectThoughts 导出
+  ✓ #171 thoughts: 饥饿点亮肚子饿
+  ✓ #171 thoughts: 地铺与床互斥
+  ✓ #171 thoughts: 无聊与袭击
+  ✓ #171 thoughts: 心情合计是各条之和
+  ✓ #ADR31 mood: needsTick 把念头清单挂到 pawn 上(检查器与模拟同源)
+  ✓ #ADR31 mood: 心情向念头目标缓动收敛, 不会一跳到位
+  ✓ #ADR31 mood: 上下文里的房间/同室念头带可变幅度
+  ✓ #ADR31 mood: 饥饿把心情目标压到基线以下
+  ✓ #ADR37 ctx: 上下文构造器收口在 APH.Res, 不再各处自留一份
+  ✓ #ADR37 ctx: 上下文字段齐全 —— 少一项就等于检查器对玩家撒谎
+  ✓ #ADR37 env: 环境构造器给出念头需要的全部世界量
+  ✓ tierOf: 只返回1/2/3且同seed确定
+  ✓ tierOf: 分布大致 50/30/20 (mulberry32均匀性)
+  ✓ fallbackPlanet: spec.tier 存在且高tier敌人hp更高
+  ✓ visual catalog: every buildable item occurs once, structure first
+  ✓ environment atlas: measured crop is contained, aspect and foot anchor preserved
+  ✓ environment atlas: unavailable image falls back without mutating entities
+  ✓ visual floor: grid floor never draws again as a generic furniture box
+  ✓ visual keyboard: native button activation does not pause, canvas Space still does
+  ✓ visual lab: 72 legal components preserve 5x6 / 6x6 rooms and bed rotations 0/1/2
+  ✓ visual lab: all six completed furniture work cells are reachable from outside their gates
+  ✓ BUILDINGS: bl_wall/bl_gate 注册, cells=[1,1], 有 costRes
+  ✓ canPlace: 墙豁免离核心130px(贴家围起来)
+  ✓ canPlace: 墙与墙相邻允许(围一圈)
+  ✓ canPlace: 墙与其他建筑重叠仍拒绝
+  ✓ canPlace: 闸门可放墙线上(与墙同类相邻)
+  ✓ canPlace: 同格墙叠放拒绝
+  ✓ refundOf: 墙拆退石料半价(5石→2石)
+  ✓ refundOf: 闸门拆退石+木半价
+  ✓ refundOf: 普通建筑(矿井)仍走研/矿退款不变
+  ✓ wallCells: 屏幕坐标→格中心(48px)
+  ✓ wallGrid: 用于拖拽连续放置的行列
+  ✓ wallNeighbors: 四邻墙判定
+  ✓ wallNeighbors: 闸门不算墙邻(独立物)
+  ✓ drawWalls: 横线 连续填充且只描外边
+  ✓ drawWalls: 竖线 连续填充且只描外边
+  ✓ drawWalls: L形 连续填充且只描外边
+  ✓ drawWalls: T形 连续填充且只描外边
+  ✓ drawWalls: 十字 连续填充且只描外边
+  ✓ drawWalls: 墙门 连续填充且只描外边
+  ✓ drawWalls: 墙门接缝不描边，生产门维持关闭表现
+  ✓ drawWalls: 偏移格网中心仍按真实48px邻接
+  ✓ drawWalls: 单墙非整数倍中心不被渲染层吸格
+  ✓ drawWalls: fallback 相邻格没有逐格内框或 inset 色带
+  ✓ drawWalls: 半血墙保留裂纹与24px耐久条
+  ✓ drawWalls: BuildArt 墙材质可选，失败时不影响代码材质
+  ✓ weatherDefs: 11 种且全部 wx_ 前缀
+  ✓ defaultWeather: 无老档→晴天
+  ✓ tickWeather: 晴天持续(权重自身最大)→到时长后掷骰仍可继续晴
+  ✓ tickWeather: 晴朗到时长后 rng=0.99 命中末位权重(雨/雪/雾之外的冷门)
+  ✓ tickWeather: 冷却中的天气被排除(雷暴cd期内雨→雨不选雷暴)
+  ✓ tickWeather: 冷却只在非极端天气期间衰减
+  ✓ weatherEffects: 晴天基准无负面
+  ✓ weatherEffects: 雨 speedMul=0.7 farmMul=1.3
+  ✓ weatherEffects: 雷暴 exposureGain>0 solarMul=0.15
+  ✓ weatherEffects: 酸雨 farmMul=0.5(家园版减半)
+  ✓ weatherEffects: 雾 enemySightMul=0.7
+  ✓ weatherEffects: 寒潮 speedMul<1 且暴露>0
+  ✓ weatherEffects: 未知天气→回退晴天
+  ✓ weatherEffects: 全表 11×5 字段与 CFG 一致
+  ✓ tickWeather: 进入极端天气写入冷却
+  ✓ tickWeather: 空cd对象归一为null
+  ✓ tickWeather: dur 边界(1天=210s 内不切, 210s 后切)
+  ✓ tickWeather: 热浪/寒潮属极端(写cd) — 冷却清单与 exposureGain>0 唯一真源一致
+  ✓ tickWeather: wx_storm 不算极端冷却真源(exposureGain=0, 极端期间衰减)
+  ✓ #92 forecast: 当前晴 → 权重最高目标是晴(自身权重4)/预报应给 rain 或雪? —— 取转移表最高=wx_clear
+  ✓ #92 forecast: 当前雨 → 预报最高=wx_clear(权重4)
+  ✓ #92 forecast: 冷却中的目标被排除 (晴的 cd 含 rain → 预报转向 snow)
+  ✓ #92 forecast: 无转转移/全冷却兑底 wx_clear, 老档无 weather 兜底晴
+  ✓ #92 forecast: 确定性 — 同输入重复调用结果一致(不消费rng)
+  ✓ T3 season: 按世界时钟推导季节, 一年循环
+  ✓ T3 season: daysUntilWinter 正确倒数, 入冬即 0
+  ✓ T3 season: 气温叠加季节偏移, 省略季节时行为不变
+  ✓ T3 season: 冬天的作物生长乘子会让田停长
+  ✓ T3 season: tickGrowZones 冬天不长, 省略参数时按 1
+  ✓ ev_weather: 进卡组且 w/cd/文案齐备
+  ✓ ev_weather: can 谓词 = 非冷却期 且 需天气上下文
+  ✓ pickEvent: 冷却期 ev_weather 不可选(全卡冷却→抽空)
+  ✓ pickEvent: 仅剩 ev_weather 未冷却时必抽中
+  ✓ pickEvent: 无天气上下文时 ev_weather 不参与(兼容资格过滤)
+  ✓ directorTick: ev_weather 推进天气时钟(晴 → 保底1天, 不切)
+  ✓ directorTick: 未到期不发事件, 天气时钟仍累计
+  ✓ directorTick: 非天气事件不动天气时钟
+  ✓ directorTick: 极端结束 → 强制晴天窗口+喘息(sinceNeg=0, restFor∈[2,4])
+  ✓ directorTick: 极端→极端连击不强制不清零(马尔可夫原样)
+  ✓ directorTick: 喘息窗口内负面事件被抑制, 天气卡照常
+  ✓ w3_currentId: 无 meta.weather → wx_clear (老档零迁移兜底)
+  ✓ w3_expectDur: dur 区间中值 × dayLen (晴 3.5天=735s, 雷暴 1天=210s)
+  ✓ w3_expectRemain: 中值-已过 t, 超时不取负
+  ✓ w3_extremeGate: 极端=exposureGain>0 (雷暴/暴雪/热浪/寒潮/酸雨); 大雨=0 非极端
+  ✓ w3_speedMul表: 雨0.7/雪0.8/暴雪0.6/寒潮0.85/酸雨0.85, 晴=1
+  ✓ w3_moveMul: 室外×speedMul; 室内免; 寒潮+防寒服免; 服不串味
+  ✓ w3_suitResist: 防酸服 acidResist=0.8 / 防寒服 cryoResist=0.8 / 无装=0
+  ✓ w3_exposureTick: 酸雨+防酸服 暴露增 ×(1-0.8)=+2
+  ✓ w3_exposureTick: wx_acid 转化=感染(同 lw_night_acid 链), 热浪=外伤
+  ✓ w3_fogSight: enemySightMul=0.7; fsmStep(sightMul) 0.85×aggroR 雾天不察觉/无雾察觉
+  ✓ w3_farmMul: 雨+30%/雪0.6/暴雪0.3/酸雨0.5 乘入 cropPlotTick 生长
+  ✓ world runtime: capture is shallow and excludes manager fields
+  ✓ world runtime: install keeps facade identity and global controls
+  ✓ world runtime: run binds synchronously and always restores APH.state
+  ✓ world runtime: manager swaps isolated home and expedition behind one facade
+  ✓ world runtime: serializable restore keeps entities groups carry and recoverable orders
+  ✓ #203 world runtime: corrupt expedition regen clocks are bounded at persistence seams
+  ✓ fxParams: 全天气表与 CFG 一致 (null=无粒子无tint的天气)
+  ✓ fxParams: 未知天气 → null (渲染层静默跳过)
+  ✓ fxParams: 雨天气合并 fxRain, 不含 snow
+  ✓ fxParams: 雪天气合并 fxSnow, 不含 rain
+  ✓ fxParams: 暴雪也走 snow(密度不同, tint 偏青)
+  ✓ rgbaOf: #rrggbb + alpha → rgba 字符串
+  ✓ rgbaOf: 非 # 前缀/空 → null
+  ✓ tintRGBA: 雨灰蓝
+  ✓ tintRGBA: 雪亮白 / 暴雪偏青
+  ✓ tintRGBA: 酸雨黄绿 / 磁暴紫
+  ✓ tintRGBA: 大雨/雷暴更暗, 热浪暖橙, 寒潮灰蓝
+  ✓ tintRGBA: 晴天/未知 → null (无色罩)
+  ✓ fxCount: 800x600 视口面积缩放 (130*0.520833=67.7→68)
+  ✓ fxCount: 参考视口 1280x720 → 原值
+  ✓ fxCount: 超大视口被 caps.wxParticles 封顶 (雨 130*4=520→240)
+  ✓ fxCount: 无粒子天气/极小视口 → 0 或 1
+  ✓ fxCount: caps.wxParticles 存在且为雨雪上限 (ADR-10 预算)
+  ✓ #174 zones: cellsFromBox 吸附格网
+  ✓ #174 zones: addStockpileZone 写入 type=stockpile
+  ✓ #174 zones: 禁止口粮则不允许食物
+  ✓ #174 zones: findBestStorageSpot 优先仓储格
+
+1095 通过 / 0 失败 / 共 1095

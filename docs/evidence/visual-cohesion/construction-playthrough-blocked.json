@@ -1,0 +1,2278 @@
+{
+  "scope": "Node DOM stubs; formal planning, original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+  "status": "interrupted",
+  "complete": false,
+  "interrupted": true,
+  "signal": "SIGTERM",
+  "seed": 58098,
+  "requested": 72,
+  "maxSeconds": 1800,
+  "sites": [
+    [
+      18,
+      18
+    ],
+    [
+      23,
+      18
+    ]
+  ],
+  "phase": 2,
+  "seconds": 1765.2999999989422,
+  "simulatedSeconds": 1765.3000000000002,
+  "samples": [
+    {
+      "seconds": 300,
+      "built": 36,
+      "queued": 30,
+      "phase": 1
+    },
+    {
+      "seconds": 600,
+      "built": 52,
+      "queued": 14,
+      "phase": 1
+    },
+    {
+      "seconds": 900,
+      "built": 62,
+      "queued": 4,
+      "phase": 1
+    },
+    {
+      "seconds": 1200,
+      "built": 70,
+      "queued": 2,
+      "phase": 2
+    },
+    {
+      "seconds": 1500,
+      "built": 70,
+      "queued": 2,
+      "phase": 2
+    }
+  ],
+  "rooms": [
+    {
+      "area": 12
+    },
+    {
+      "area": 16
+    }
+  ],
+  "built": 71,
+  "available": [
+    [
+      "wood",
+      1
+    ],
+    [
+      "stone",
+      0
+    ],
+    [
+      "iron",
+      85
+    ],
+    [
+      "mineral",
+      105
+    ],
+    [
+      "food",
+      12
+    ]
+  ],
+  "workers": [
+    {
+      "id": "rs_start1",
+      "x": 1220.1505767902172,
+      "y": 1017.4466476104051,
+      "tx": 344.16191996634007,
+      "ty": 546.268852070719,
+      "reason": "运送加工材料",
+      "person": {
+        "id": "rs_start1",
+        "name": "米娅·一号",
+        "origin": "第一代殖民者",
+        "skills": {
+          "sk_build": 1,
+          "sk_farm": 2,
+          "sk_ranch": 1,
+          "sk_craft": 2,
+          "sk_lore": 9,
+          "sk_social": 4
+        },
+        "mainSkill": "sk_lore",
+        "subSkill": "sk_social",
+        "mood": 73.7685125105244,
+        "food": 72.70000000000033,
+        "illness": 15,
+        "ailments": [
+          {
+            "type": "plague",
+            "sev": 15,
+            "age": 14
+          }
+        ],
+        "rest": 75.6399999999999,
+        "isSleeping": false,
+        "bedId": "b_67_loywtgqq:0",
+        "sleepDisturbed": 0,
+        "recreation": 56.799999999999805,
+        "exposure": 0,
+        "downed": false,
+        "bleedOutTimer": null,
+        "rescuedBy": null,
+        "job": null,
+        "parts": {
+          "head": 1,
+          "torso": 1,
+          "armL": 1,
+          "armR": 1,
+          "legL": 1,
+          "legR": 1
+        },
+        "schedule": [
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "joy",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep"
+        ],
+        "trait": "乐观",
+        "arrivedAt": 0,
+        "faction": "home",
+        "humanlike": true,
+        "wantSleep": false,
+        "thoughts": [
+          {
+            "id": "th_safe",
+            "text": "家里暂时安全",
+            "mood": 1
+          },
+          {
+            "id": "th_room_bad",
+            "text": "房间让人不适",
+            "mood": -2
+          }
+        ],
+        "moodTarget": 69,
+        "hypothermia": 0,
+        "heatstroke": 0,
+        "_alienExposure": false
+      }
+    },
+    {
+      "id": "rs_start2",
+      "x": 1224,
+      "y": 984,
+      "tx": 1132.6472603169314,
+      "ty": 1036.8090510581123,
+      "reason": "加工中",
+      "person": {
+        "id": "rs_start2",
+        "name": "阿枝·六号",
+        "origin": "游商后代",
+        "skills": {
+          "sk_build": 2,
+          "sk_farm": 5,
+          "sk_ranch": 0,
+          "sk_craft": 9,
+          "sk_lore": 1,
+          "sk_social": 2
+        },
+        "mainSkill": "sk_craft",
+        "subSkill": "sk_farm",
+        "mood": 73.39143032035989,
+        "food": 68.70000000000033,
+        "illness": 30,
+        "ailments": [
+          {
+            "type": "plague",
+            "sev": 30,
+            "age": 34
+          }
+        ],
+        "rest": 75.6399999999999,
+        "isSleeping": false,
+        "bedId": "b_69_loywtgqq:0",
+        "sleepDisturbed": 0,
+        "recreation": 56.799999999999805,
+        "exposure": 0,
+        "downed": false,
+        "bleedOutTimer": null,
+        "rescuedBy": null,
+        "job": "bl_workshop",
+        "parts": {
+          "head": 1,
+          "torso": 1,
+          "armL": 1,
+          "armR": 1,
+          "legL": 1,
+          "legR": 1
+        },
+        "schedule": [
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "joy",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep"
+        ],
+        "trait": "乐观",
+        "arrivedAt": 0,
+        "faction": "home",
+        "humanlike": true,
+        "wantSleep": false,
+        "thoughts": [
+          {
+            "id": "th_safe",
+            "text": "家里暂时安全",
+            "mood": 1
+          },
+          {
+            "id": "th_room_bad",
+            "text": "房间让人不适",
+            "mood": -2
+          }
+        ],
+        "moodTarget": 69,
+        "hypothermia": 0,
+        "heatstroke": 0,
+        "_alienExposure": false,
+        "workBuildingUid": "b_70_loywtgqq"
+      }
+    },
+    {
+      "id": "rs_start3",
+      "x": 1099.2029779088691,
+      "y": 1204.7970220911309,
+      "tx": 1100,
+      "ty": 1240,
+      "reason": "运送施工材料",
+      "person": {
+        "id": "rs_start3",
+        "name": "阿岚·七号",
+        "origin": "第一代殖民者",
+        "skills": {
+          "sk_build": 2,
+          "sk_farm": 2,
+          "sk_ranch": 0,
+          "sk_craft": 7,
+          "sk_lore": 5,
+          "sk_social": 2
+        },
+        "mainSkill": "sk_craft",
+        "subSkill": "sk_lore",
+        "mood": 73.32827860490634,
+        "food": 61.70000000000028,
+        "illness": 0,
+        "ailments": [],
+        "rest": 75.6399999999999,
+        "isSleeping": false,
+        "bedId": "b_68_loywtgqq:0",
+        "sleepDisturbed": 0,
+        "recreation": 56.799999999999805,
+        "exposure": 0,
+        "downed": false,
+        "bleedOutTimer": null,
+        "rescuedBy": null,
+        "job": null,
+        "parts": {
+          "head": 1,
+          "torso": 1,
+          "armL": 1,
+          "armR": 1,
+          "legL": 1,
+          "legR": 1
+        },
+        "schedule": [
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "work",
+          "joy",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep",
+          "sleep"
+        ],
+        "trait": "乐观",
+        "arrivedAt": 0,
+        "faction": "home",
+        "humanlike": true,
+        "wantSleep": false,
+        "thoughts": [
+          {
+            "id": "th_safe",
+            "text": "家里暂时安全",
+            "mood": 1
+          },
+          {
+            "id": "th_room_bad",
+            "text": "房间让人不适",
+            "mood": -2
+          }
+        ],
+        "moodTarget": 69,
+        "hypothermia": 0,
+        "heatstroke": 0,
+        "_alienExposure": false
+      }
+    }
+  ],
+  "buildings": [
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1176,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_25_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1224,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_26_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1272,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_27_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1320,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_28_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1320,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_24_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1272,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_23_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1224,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_22_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1176,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_21_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1176,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_17_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1224,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_18_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1272,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_19_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1320,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_20_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1320,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_16_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1272,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_15_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1224,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_14_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1176,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_13_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1032,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_6_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1032,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_9_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1032,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_12_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 984,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_11_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 936,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_10_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 936,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_7_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 984,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_8_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 984,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_5_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 936,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_4_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 936,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_1_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 984,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_2_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_floor",
+      "bid": "bl_floor",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "floor",
+      "solid": false,
+      "interaction": "front",
+      "x": 1032,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_3_loyw53w2",
+      "materialsSpent": {
+        "wood": 1
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_34_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_35_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_29_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 936,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_30_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 984,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_31_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_33_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1032,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_32_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_36_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_37_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_38_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_39_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_40_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 18,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 888,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_42_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_41_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_gate",
+      "bid": "bl_gate",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": false,
+      "interaction": "perimeter",
+      "x": 984,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_44_loyw7rye",
+      "materialsSpent": {
+        "stone": 2,
+        "wood": 4
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 936,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_43_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1032,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_45_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 22,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1080,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_46_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_47_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1176,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_48_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1224,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_49_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1272,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_50_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1320,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_51_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 18,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 888,
+      "lv": 1,
+      "uid": "b_52_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_53_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_54_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_55_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_57_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_56_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 21,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 1032,
+      "lv": 1,
+      "uid": "b_58_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_59_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 22,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 1080,
+      "lv": 1,
+      "uid": "b_60_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 23,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1128,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_61_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1176,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_62_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_gate",
+      "bid": "bl_gate",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": false,
+      "interaction": "perimeter",
+      "x": 1224,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_63_loyw7rye",
+      "materialsSpent": {
+        "stone": 2,
+        "wood": 4
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 26,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1272,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_64_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1320,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_65_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_wall",
+      "bid": "bl_wall",
+      "geometryVersion": 1,
+      "gx": 28,
+      "gy": 23,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "structure",
+      "solid": true,
+      "interaction": "perimeter",
+      "x": 1368,
+      "y": 1128,
+      "lv": 1,
+      "uid": "b_66_loyw7rye",
+      "materialsSpent": {
+        "stone": 4
+      },
+      "hp": 60,
+      "maxHp": 60
+    },
+    {
+      "id": "bl_dining_chair",
+      "bid": "bl_dining_chair",
+      "geometryVersion": 1,
+      "gx": 27,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        1
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 1320,
+      "y": 984,
+      "lv": 1,
+      "uid": "b_72_loywtgqq",
+      "materialsSpent": {
+        "wood": 5
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_bed",
+      "bid": "bl_bed",
+      "geometryVersion": 1,
+      "gx": 21,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        1,
+        2
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 1032,
+      "y": 1008,
+      "lv": 1,
+      "uid": "b_67_loywtgqq",
+      "materialsSpent": {
+        "wood": 6
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_bed",
+      "bid": "bl_bed",
+      "geometryVersion": 1,
+      "gx": 19,
+      "gy": 21,
+      "rotation": 2,
+      "cells": [
+        1,
+        2
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 936,
+      "y": 1056,
+      "lv": 1,
+      "uid": "b_69_loywtgqq",
+      "materialsSpent": {
+        "wood": 6
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_bed",
+      "bid": "bl_bed",
+      "geometryVersion": 1,
+      "gx": 20,
+      "gy": 19,
+      "rotation": 1,
+      "cells": [
+        1,
+        2
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 1008,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_68_loywtgqq",
+      "materialsSpent": {
+        "wood": 6
+      },
+      "maxHp": 80,
+      "hp": 80
+    },
+    {
+      "id": "bl_workshop",
+      "bid": "bl_workshop",
+      "geometryVersion": 1,
+      "gx": 24,
+      "gy": 19,
+      "rotation": 0,
+      "cells": [
+        2,
+        1
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 1200,
+      "y": 936,
+      "lv": 1,
+      "uid": "b_70_loywtgqq",
+      "materialsSpent": {
+        "wood": 11,
+        "iron": 15,
+        "stone": 8,
+        "mineral": 19
+      },
+      "bills": [],
+      "productionTaskId": "lt_74",
+      "productionRecipe": "__medicine__",
+      "maxHp": 80,
+      "hp": 80,
+      "workReason": "加工中"
+    }
+  ],
+  "queue": [
+    {
+      "id": "bl_dining_table",
+      "bid": "bl_dining_table",
+      "geometryVersion": 1,
+      "gx": 25,
+      "gy": 20,
+      "rotation": 0,
+      "cells": [
+        2,
+        2
+      ],
+      "layer": "furniture",
+      "solid": true,
+      "interaction": "front",
+      "x": 1248,
+      "y": 1008,
+      "lv": 1,
+      "uid": "b_71_loywtgqq",
+      "total": 10,
+      "progress": 0,
+      "materialsPaid": false,
+      "need": {
+        "wood": 11,
+        "stone": 4
+      },
+      "taskId": "lt_71",
+      "materialState": "missing",
+      "building": false
+    }
+  ],
+  "logistics": {
+    "v": 1,
+    "nextTask": 75,
+    "nextReservation": 96,
+    "tasks": [
+      {
+        "id": "lt_71",
+        "kind": "construction",
+        "targetId": "b_71_loywtgqq",
+        "x": 1248,
+        "y": 1008,
+        "deliverySpot": {
+          "x": 1224,
+          "y": 1080
+        },
+        "need": {
+          "wood": 11,
+          "stone": 4
+        },
+        "deliveredLots": [
+          {
+            "key": "wood",
+            "amount": 11,
+            "itemId": "it_wood",
+            "itemCount": 11,
+            "sourceKind": "drop"
+          },
+          {
+            "key": "stone",
+            "amount": 2,
+            "itemId": "it_stone",
+            "itemCount": 2,
+            "sourceKind": "drop"
+          }
+        ]
+      },
+      {
+        "id": "lt_74",
+        "kind": "production",
+        "targetId": "b_70_loywtgqq",
+        "x": 1200,
+        "y": 936,
+        "deliverySpot": {
+          "x": 1224,
+          "y": 984
+        },
+        "need": {
+          "mineral": 2
+        },
+        "deliveredLots": [
+          {
+            "key": "mineral",
+            "amount": 2,
+            "itemId": "it_mineral",
+            "itemCount": 2,
+            "sourceKind": "stock"
+          }
+        ],
+        "productionJob": true,
+        "productionMode": "medicine",
+        "currentRecipe": "__medicine__",
+        "productionToken": "medicine|__medicine__|repeat"
+      }
+    ],
+    "reservations": []
+  },
+  "drops": [
+    {
+      "id": "dp_store_1",
+      "type": "dropped",
+      "x": 1100,
+      "y": 1240,
+      "itemId": "it_wood",
+      "n": 1,
+      "bobA": 0,
+      "stock": true,
+      "containerId": "landing_cargo",
+      "storageX": 1100,
+      "storageY": 1240
+    },
+    {
+      "id": "dp_18",
+      "type": "dropped",
+      "x": 1071.638384368778,
+      "y": 932.0341620608024,
+      "itemId": "it_food",
+      "n": 3,
+      "bobA": 1.2768041795026512,
+      "stock": true,
+      "decayHp": 25
+    },
+    {
+      "id": "dp_store_2",
+      "type": "dropped",
+      "x": 1100,
+      "y": 1240,
+      "itemId": "it_mineral",
+      "n": 4,
+      "bobA": 0,
+      "stock": true,
+      "containerId": "landing_cargo",
+      "storageX": 1100,
+      "storageY": 1240
+    },
+    {
+      "id": "dp_store_3",
+      "type": "dropped",
+      "x": 1100,
+      "y": 1240,
+      "itemId": "it_berry",
+      "n": 9,
+      "bobA": 0,
+      "stock": true,
+      "containerId": "landing_cargo",
+      "storageX": 1100,
+      "storageY": 1240,
+      "decayHp": 50.5
+    },
+    {
+      "id": "dp_store_4",
+      "type": "dropped",
+      "x": 1100,
+      "y": 1240,
+      "itemId": "it_alloy",
+      "n": 8,
+      "bobA": 0,
+      "stock": true,
+      "containerId": "landing_cargo",
+      "storageX": 1100,
+      "storageY": 1240
+    },
+    {
+      "id": "dp_store_6",
+      "type": "dropped",
+      "x": 1100,
+      "y": 1240,
+      "itemId": "it_med",
+      "n": 2,
+      "bobA": 0,
+      "stock": true,
+      "containerId": "landing_cargo",
+      "storageX": 1100,
+      "storageY": 1240
+    }
+  ],
+  "designations": {
+    "obs_58098_rock_stone_5_44": {
+      "type": "mine",
+      "entityId": "obs_58098_rock_stone_5_44"
+    },
+    "obs_58098_rock_stone_54_18": {
+      "type": "mine",
+      "entityId": "obs_58098_rock_stone_54_18"
+    }
+  }
+}

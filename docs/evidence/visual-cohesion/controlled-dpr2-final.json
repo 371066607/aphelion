@@ -1,0 +1,4543 @@
+{
+  "scope": "Final source including bed sleep correction; single CUA tab sequential 1440x900 game frame, observed DPR2, seed58098,20 fixed-seed residents,2059 nonresident objects,10 warmup+120 samples; no Node simulation during measurement; CPU submission only, not GPU/sustained performance",
+  "baselineCommit": "4658e35",
+  "headBeforeDirtyFixes": "d6c33d2",
+  "cases": [
+    {
+      "version": "current",
+      "time": "day",
+      "run": 1,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.216600000002,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4620,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 387,
+        "clock": 902.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 302.70000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1098.2786882880257,
+          "y": 1018.6839328941958
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1113.422558350063,
+          "y": 1131.6603317630309
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1090.6384063738517,
+          "y": 1105.399961149111
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1128,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.9,
+        "p95": 4.1,
+        "max": 9.1
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.6,
+        "max": 633.3
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.217,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4620,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "current",
+      "time": "day",
+      "run": 2,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.2166000000022,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4788,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 401,
+        "clock": 902.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 266.29999999701977,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1089.4454446541242,
+          "y": 1133.3643975510975
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1152.596501626078,
+          "y": 1170.5229767185047
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1082.9215107350783,
+          "y": 1102.352150084453
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1128,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.5,
+        "p95": 4.1,
+        "max": 7.7
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.4,
+        "max": 616.7
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.217,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4788,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "current",
+      "time": "day",
+      "run": 3,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.2166000000026,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4836,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 405,
+        "clock": 902.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 261,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1060.3217081519747,
+          "y": 1178.3927375381386
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1110.6665946323888,
+          "y": 1130.8385257888242
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.6,
+        "p95": 4.2,
+        "max": 5.6
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.4,
+        "max": 616.6
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.217,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4836,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "current",
+      "time": "night",
+      "run": 1,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.217700000004,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4860,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 407,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 256.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1084.5696260684772,
+          "y": 1177.189219358554
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1059.5338467741742,
+          "y": 1177.2240320189835
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1137.657073602231,
+          "y": 1100.9862397751622
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.7,
+        "p95": 4.6,
+        "max": 5.1
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.5,
+        "max": 615.6
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.218,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4860,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "current",
+      "time": "night",
+      "run": 2,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.2147000000027,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4836,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 405,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 257.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1092.772655245895,
+          "y": 1162.7330566663413
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1125.171510013324,
+          "y": 1171.4964509530082
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1038.4823880040449,
+          "y": 1160.3167585369463
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1144.7295852459056,
+          "y": 1176.3590087287869
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.6,
+        "p95": 4.2,
+        "max": 4.7
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.2,
+        "max": 618.6
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.215,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4836,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "current",
+      "time": "night",
+      "run": 3,
+      "build": "isolated",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.233300000006,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4788,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 401,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 270.69999998807907,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 20,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1089.7042974625551,
+          "y": 1129.6066209769235
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1128.640254313594,
+          "y": 1180.1300928662508
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1068.8441587385757,
+          "y": 1180.0053179226543
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1128,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.5,
+        "p95": 4.4,
+        "max": 13.6
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.5,
+        "max": 616.7
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.233,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4788,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "day",
+      "run": 1,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.2167000000013,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4884,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 408,
+        "clock": 902.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 246.20000000298023,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1052.2503312525737,
+          "y": 1173.8613435109548
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1143.7729053783885,
+          "y": 1104.1071800037328
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1166.2889661851011,
+          "y": 1131.5718246437168
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.4,
+        "p95": 4.5,
+        "max": 5.4
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.6,
+        "max": 633.3
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.217,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4884,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "day",
+      "run": 2,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.2188000000023,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4800,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 401,
+        "clock": 902.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 260.59999999403954,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1024.344368667838,
+          "y": 1149.7997831696975
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1122.3463916927376,
+          "y": 1100.2649903466968
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1030.1614705678755,
+          "y": 1164.8320841412315
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1102.0886534211618,
+          "y": 1170.650226712235
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.4,
+        "p95": 3.7,
+        "max": 4.5
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.6,
+        "max": 631.2
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.219,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4800,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "day",
+      "run": 3,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 902.2500000000022,
+      "dayFraction": 0.251,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4800,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 401,
+        "clock": 902.3,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 281.1000000089407,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1055.9437557879985,
+          "y": 1177.7956984436669
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1109.5709347895067,
+          "y": 1127.4650688287747
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1117.1608586797445,
+          "y": 1180.4613094133085
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.3,
+        "p95": 4.3,
+        "max": 4.8
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.5,
+        "max": 583.3
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.25,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4800,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "night",
+      "run": 1,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.2186000000065,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4752,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 397,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 241.20000000298023,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1061.979512503141,
+          "y": 1178.9740452209594
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1101.9431929655696,
+          "y": 1169.286222138925
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1034.981464303292,
+          "y": 1155.7801896513167
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1128,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.6,
+        "p95": 4.6,
+        "max": 6.1
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.7,
+        "max": 614.7
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.219,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4752,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "night",
+      "run": 2,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.232700000004,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4740,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 396,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 243.3999999910593,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1100.7328586306842,
+          "y": 1170.6604366404936
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1056.5640386818939,
+          "y": 1101.9830239021312
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1128,
+          "y": 1140
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 2.5,
+        "p95": 4.6,
+        "max": 6
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.1,
+        "max": 616.6
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.233,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4740,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    },
+    {
+      "version": "baseline",
+      "time": "night",
+      "run": 3,
+      "build": "baseline",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 2
+      },
+      "nativeStorageUnchanged": true,
+      "storage": "memory-only; native localStorage untouched",
+      "rooms": [],
+      "residentsState": [
+        {
+          "id": "rs_visual_lab_0",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "job": null,
+          "bedId": null,
+          "sleeping": false,
+          "food": 100,
+          "rest": 100
+        }
+      ],
+      "queue": 0,
+      "available": [
+        [
+          "wood",
+          50
+        ],
+        [
+          "stone",
+          30
+        ],
+        [
+          "iron",
+          100
+        ],
+        [
+          "mineral",
+          100
+        ],
+        [
+          "food",
+          0
+        ]
+      ],
+      "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+      "fixture": "20-resident performance; natural world preserved",
+      "seed": 58098,
+      "mode": "running",
+      "scene": "home",
+      "clock": 2702.215000000005,
+      "dayFraction": 0.751,
+      "paused": false,
+      "camera": {
+        "x": 1100,
+        "y": 1210,
+        "zoom": 1
+      },
+      "residents": 20,
+      "buildings": 0,
+      "nonResidentObjects": 2059,
+      "entities": 2079,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4752,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "main": {
+        "mode": "running",
+        "frameN": 397,
+        "clock": 2702.2,
+        "o2": 100,
+        "hp": 100,
+        "found": 0,
+        "total": 0,
+        "enemies": 0,
+        "carryW": 0,
+        "research": 0
+      },
+      "constructionRecord": null,
+      "startup": {
+        "freshNavigationToReadyMs": 252.09999999403954,
+        "environmentReady": null,
+        "buildingReady": true,
+        "portraitImages": 0,
+        "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+      },
+      "weather": "wx_clear",
+      "constructionPhase": 0,
+      "constructionTargets": [
+        {
+          "id": "rs_visual_lab_0",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_1",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_2",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_3",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_4",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_5",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_6",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_7",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_8",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_9",
+          "x": 1128,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_10",
+          "x": 1068.3880146306944,
+          "y": 1156.40711923806
+        },
+        {
+          "id": "rs_visual_lab_11",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_12",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_13",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_14",
+          "x": 1121.8682064273967,
+          "y": 1016.1116522525917
+        },
+        {
+          "id": "rs_visual_lab_15",
+          "x": 1072,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_16",
+          "x": 1086,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_17",
+          "x": 1100,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_18",
+          "x": 1114,
+          "y": 1140
+        },
+        {
+          "id": "rs_visual_lab_19",
+          "x": 1126.6596748624581,
+          "y": 1015.9672417120149
+        }
+      ],
+      "blueprints": [],
+      "frameCostMs": {
+        "samples": 120,
+        "median": 3.5,
+        "p95": 4.4,
+        "max": 5.3
+      },
+      "frameIntervalMs": {
+        "samples": 120,
+        "median": 16.7,
+        "p95": 18.6,
+        "max": 616.7
+      },
+      "gameFramesAdvanced": 131,
+      "simulationSecondsAdvanced": 2.215,
+      "terrainCache": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 4752,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "worldObjects": 2059
+    }
+  ]
+}

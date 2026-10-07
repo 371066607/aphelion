@@ -36,6 +36,10 @@ APH.UI = (function(){
     if(vPop) vPop.textContent = pop+' 人 / '+cap+' 床位';
     var atHome=s.scene==='home';
     ['rowCrystal','rowCarry','rowDiscovery'].forEach(function(id){var row=$(id);if(row)row.style.display=atHome?'none':'';});
+    var powerEl=$('rowPower');if(powerEl)powerEl.style.display=atHome?'':'none';
+    if(!atHome){
+      var exposureEl=$('rowExposure');if(exposureEl)exposureEl.style.display='none';
+    }
     $('bCR').style.width = U.clamp(s.cry*4,0,100)+'%';
     $('vCR').textContent = s.cry;
     var cw = APH.Combat.carryWeight(s.carry);

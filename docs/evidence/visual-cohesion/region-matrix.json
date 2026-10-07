@@ -1,0 +1,149 @@
+{
+  "scope": "CUA visual inspection of actual TerrainModel and existing flora; no terrain/resource edits",
+  "cases": [
+    {
+      "region": "shore",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 720,
+        "y": 450,
+        "zoom": 1
+      },
+      "terrainCell": {
+        "tile": "lakeshore",
+        "region": "lakeshore",
+        "water": false,
+        "shore": true,
+        "color": "#315a61",
+        "walkable": true,
+        "buildable": true,
+        "fertility": 0.72,
+        "moveCost": 1.12
+      },
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 68712,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "storageUnchanged": true
+    },
+    {
+      "region": "forest",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1512,
+        "y": 1128,
+        "zoom": 1
+      },
+      "terrainCell": {
+        "tile": "landing",
+        "region": "landing",
+        "water": false,
+        "shore": false,
+        "color": "#334a3b",
+        "walkable": true,
+        "buildable": true,
+        "fertility": 0.45,
+        "moveCost": 1
+      },
+      "terrain": {
+        "cacheSize": 15,
+        "cacheLimit": 36,
+        "hits": 69183,
+        "misses": 15,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "storageUnchanged": true
+    },
+    {
+      "region": "ore",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 720,
+        "y": 450,
+        "zoom": 1
+      },
+      "terrainCell": {
+        "tile": "ridge",
+        "region": "ridge",
+        "water": false,
+        "shore": false,
+        "color": "#60574a",
+        "walkable": true,
+        "buildable": true,
+        "fertility": 0.16,
+        "moveCost": 1.36
+      },
+      "terrain": {
+        "cacheSize": 17,
+        "cacheLimit": 36,
+        "hits": 69821,
+        "misses": 17,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "storageUnchanged": true
+    },
+    {
+      "region": "edge",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 5424,
+        "y": 5694,
+        "zoom": 1
+      },
+      "terrainCell": {
+        "tile": "lakeshore",
+        "region": "lakeshore",
+        "water": false,
+        "shore": true,
+        "color": "#315a61",
+        "walkable": true,
+        "buildable": true,
+        "fertility": 0.72,
+        "moveCost": 1.12
+      },
+      "terrain": {
+        "cacheSize": 17,
+        "cacheLimit": 36,
+        "hits": 70301,
+        "misses": 17,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "storageUnchanged": true
+    }
+  ]
+}

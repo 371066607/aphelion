@@ -1,0 +1,154 @@
+{
+  "scope": "Original ordinary construction save; night clock fixture followed by real browser simulation; rendering correction only; no resident/needs/stock injection",
+  "build": "isolated",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "dpr": 1
+  },
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [
+    {
+      "area": 12
+    },
+    {
+      "area": 16
+    }
+  ],
+  "residentsState": [
+    {
+      "id": "rs_start1",
+      "job": null,
+      "bedId": "b_67_loywswes:0",
+      "sleeping": true,
+      "food": 77.25000000000026,
+      "rest": 82.16999999999993
+    },
+    {
+      "id": "rs_start2",
+      "job": null,
+      "bedId": "b_69_loywswes:0",
+      "sleeping": true,
+      "food": 73.25000000000026,
+      "rest": 82.16999999999993
+    },
+    {
+      "id": "rs_start3",
+      "job": null,
+      "bedId": "b_68_loywswes:0",
+      "sleeping": true,
+      "food": 66.25000000000026,
+      "rest": 82.16999999999993
+    }
+  ],
+  "queue": 0,
+  "available": [
+    [
+      "wood",
+      1
+    ],
+    [
+      "stone",
+      2
+    ],
+    [
+      "iron",
+      85
+    ],
+    [
+      "mineral",
+      111
+    ],
+    [
+      "food",
+      15
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "Node 脚本普通采集施工存档；不是人工鼠标生存验收",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 2723.432600000045,
+  "dayFraction": 0.757,
+  "paused": true,
+  "camera": {
+    "x": 1248,
+    "y": 1248,
+    "zoom": 1
+  },
+  "residents": 3,
+  "buildings": 72,
+  "nonResidentObjects": 2067,
+  "entities": 2070,
+  "terrain": {
+    "cacheSize": 12,
+    "cacheLimit": 36,
+    "hits": 23328,
+    "misses": 12,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 1946,
+    "clock": 2723.4,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 225
+  },
+  "constructionRecord": {
+    "scope": "Node DOM stubs; scripted formal planning, designations and explicit remote gather commands (not mouse QA), original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+    "complete": true,
+    "built": 72,
+    "queue": 0,
+    "seconds": 1329.3999999993387,
+    "remoteGatherCommandsCount": 5,
+    "label": "Node 脚本普通采集施工存档；不是人工鼠标生存验收"
+  },
+  "startup": {
+    "freshNavigationToReadyMs": 309.20000000298023,
+    "environmentReady": true,
+    "buildingReady": true,
+    "portraitImages": 3,
+    "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+  },
+  "weather": "wx_clear",
+  "constructionPhase": 3,
+  "constructionTargets": [
+    {
+      "id": "rs_start1",
+      "x": 1032,
+      "y": 1080,
+      "target": null,
+      "order": null,
+      "reason": "目的地不可达"
+    },
+    {
+      "id": "rs_start2",
+      "x": 936,
+      "y": 984,
+      "target": null,
+      "order": null,
+      "reason": "前往工坊"
+    },
+    {
+      "id": "rs_start3",
+      "x": 936,
+      "y": 936,
+      "target": null,
+      "order": null,
+      "reason": "运送施工材料"
+    }
+  ],
+  "blueprints": [],
+  "exportedAt": "2026-10-07T12:12:17.391Z"
+}

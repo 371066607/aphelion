@@ -40,7 +40,7 @@ APH.Draw = (function(){
     return {
       /* ADR-45: 远征地表上跑的是殖民者, 不是化身 —— 这张表原先根本没有
          resident 项, 所以队员一个都画不出来。 */
-      resident:function(e,t){ APH.Ent.drawResident(e,t); },
+      resident:function(e,t,bedPose){ APH.Ent.drawResident(e,t,bedPose); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
@@ -319,7 +319,7 @@ APH.Draw = (function(){
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
       blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
-      resident:function(e,t){ APH.Ent.drawResident(e,t); },
+      resident:function(e,t,bedPose){ APH.Ent.drawResident(e,t,bedPose); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       flora:function(e,t){ APH.Ent.drawFlora(e,t); },
       animal:function(e,t){

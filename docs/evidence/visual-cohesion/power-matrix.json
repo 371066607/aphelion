@@ -1,0 +1,542 @@
+[
+  {
+    "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+    "build": "isolated",
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "dpr": 1
+    },
+    "nativeStorageUnchanged": true,
+    "storage": "memory-only; native localStorage untouched",
+    "rooms": [
+      {
+        "area": 12
+      },
+      {
+        "area": 16
+      }
+    ],
+    "residentsState": [
+      {
+        "id": "rs_start1",
+        "job": null,
+        "bedId": "b_67_loywswes:0",
+        "sleeping": true,
+        "food": 77.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start2",
+        "job": "bl_workshop",
+        "bedId": "b_69_loywswes:0",
+        "sleeping": true,
+        "food": 73.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start3",
+        "job": null,
+        "bedId": "b_68_loywswes:0",
+        "sleeping": true,
+        "food": 66.60000000000025,
+        "rest": 81.51999999999992
+      }
+    ],
+    "queue": 0,
+    "available": [
+      [
+        "wood",
+        1
+      ],
+      [
+        "stone",
+        2
+      ],
+      [
+        "iron",
+        85
+      ],
+      [
+        "mineral",
+        107
+      ],
+      [
+        "food",
+        12
+      ]
+    ],
+    "fixture": "free-build solar/conduit/lamp visual fixture; not survival",
+    "seed": 58098,
+    "mode": "running",
+    "scene": "home",
+    "clock": 900,
+    "dayFraction": 0.25,
+    "paused": true,
+    "camera": {
+      "x": 888,
+      "y": 792,
+      "zoom": 1
+    },
+    "residents": 3,
+    "buildings": 75,
+    "nonResidentObjects": 2068,
+    "entities": 2071,
+    "terrain": {
+      "cacheSize": 15,
+      "cacheLimit": 36,
+      "hits": 79839,
+      "misses": 15,
+      "width": 6144,
+      "height": 6144,
+      "grid": 48,
+      "seed": 58098,
+      "generation": 1
+    },
+    "main": {
+      "mode": "running",
+      "frameN": 6670,
+      "clock": 900,
+      "o2": 100,
+      "hp": 100,
+      "found": 0,
+      "total": 0,
+      "enemies": 0,
+      "carryW": 0,
+      "research": 220
+    },
+    "constructionRecord": {
+      "scope": "Node DOM stubs; scripted formal planning, designations and explicit remote gather commands (not mouse QA), original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+      "complete": true,
+      "built": 72,
+      "queue": 0,
+      "seconds": 1329.3999999993387,
+      "remoteGatherCommandsCount": 5,
+      "label": "Node 脚本普通采集施工存档；不是人工鼠标生存验收"
+    },
+    "startup": {
+      "freshNavigationToReadyMs": 312.69999998807907,
+      "environmentReady": true,
+      "buildingReady": true,
+      "portraitImages": 3,
+      "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+    },
+    "weather": "wx_clear",
+    "constructionPhase": 3,
+    "constructionTargets": [
+      {
+        "id": "rs_start1",
+        "x": 1032,
+        "y": 1080,
+        "target": null,
+        "order": null,
+        "reason": "目的地不可达"
+      },
+      {
+        "id": "rs_start2",
+        "x": 936,
+        "y": 984,
+        "target": null,
+        "order": null,
+        "reason": "前往工坊"
+      },
+      {
+        "id": "rs_start3",
+        "x": 936,
+        "y": 936,
+        "target": null,
+        "order": null,
+        "reason": "运送施工材料"
+      }
+    ],
+    "blueprints": [],
+    "power": {
+      "day": true,
+      "prodW": 8,
+      "loadW": 3,
+      "lampPowered": true,
+      "settledSeconds": 30,
+      "iterations": 1,
+      "ticks": [
+        {
+          "iteration": 1,
+          "settledSeconds": 30,
+          "grace": 60,
+          "lampPowered": true
+        }
+      ],
+      "grace": {
+        "before": 0,
+        "after": 60,
+        "blackoutSec": 60,
+        "note": "A tick starting with positive grace remains powered; outage requires the following tick after grace expires"
+      },
+      "scope": "Solar/conduit/lamp visual fixture; formal power ticks only, not full world simulation or survival acceptance"
+    },
+    "caseName": "day"
+  },
+  {
+    "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+    "build": "isolated",
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "dpr": 1
+    },
+    "nativeStorageUnchanged": true,
+    "storage": "memory-only; native localStorage untouched",
+    "rooms": [
+      {
+        "area": 12
+      },
+      {
+        "area": 16
+      }
+    ],
+    "residentsState": [
+      {
+        "id": "rs_start1",
+        "job": null,
+        "bedId": "b_67_loywswes:0",
+        "sleeping": true,
+        "food": 77.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start2",
+        "job": "bl_workshop",
+        "bedId": "b_69_loywswes:0",
+        "sleeping": true,
+        "food": 73.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start3",
+        "job": null,
+        "bedId": "b_68_loywswes:0",
+        "sleeping": true,
+        "food": 66.60000000000025,
+        "rest": 81.51999999999992
+      }
+    ],
+    "queue": 0,
+    "available": [
+      [
+        "wood",
+        1
+      ],
+      [
+        "stone",
+        2
+      ],
+      [
+        "iron",
+        85
+      ],
+      [
+        "mineral",
+        107
+      ],
+      [
+        "food",
+        12
+      ]
+    ],
+    "fixture": "free-build solar/conduit/lamp visual fixture; not survival",
+    "seed": 58098,
+    "mode": "running",
+    "scene": "home",
+    "clock": 2700,
+    "dayFraction": 0.75,
+    "paused": true,
+    "camera": {
+      "x": 888,
+      "y": 792,
+      "zoom": 1
+    },
+    "residents": 3,
+    "buildings": 75,
+    "nonResidentObjects": 2068,
+    "entities": 2071,
+    "terrain": {
+      "cacheSize": 15,
+      "cacheLimit": 36,
+      "hits": 80505,
+      "misses": 15,
+      "width": 6144,
+      "height": 6144,
+      "grid": 48,
+      "seed": 58098,
+      "generation": 1
+    },
+    "main": {
+      "mode": "running",
+      "frameN": 6744,
+      "clock": 2700,
+      "o2": 100,
+      "hp": 100,
+      "found": 0,
+      "total": 0,
+      "enemies": 0,
+      "carryW": 0,
+      "research": 220
+    },
+    "constructionRecord": {
+      "scope": "Node DOM stubs; scripted formal planning, designations and explicit remote gather commands (not mouse QA), original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+      "complete": true,
+      "built": 72,
+      "queue": 0,
+      "seconds": 1329.3999999993387,
+      "remoteGatherCommandsCount": 5,
+      "label": "Node 脚本普通采集施工存档；不是人工鼠标生存验收"
+    },
+    "startup": {
+      "freshNavigationToReadyMs": 312.69999998807907,
+      "environmentReady": true,
+      "buildingReady": true,
+      "portraitImages": 3,
+      "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+    },
+    "weather": "wx_clear",
+    "constructionPhase": 3,
+    "constructionTargets": [
+      {
+        "id": "rs_start1",
+        "x": 1032,
+        "y": 1080,
+        "target": null,
+        "order": null,
+        "reason": "目的地不可达"
+      },
+      {
+        "id": "rs_start2",
+        "x": 936,
+        "y": 984,
+        "target": null,
+        "order": null,
+        "reason": "前往工坊"
+      },
+      {
+        "id": "rs_start3",
+        "x": 936,
+        "y": 936,
+        "target": null,
+        "order": null,
+        "reason": "运送施工材料"
+      }
+    ],
+    "blueprints": [],
+    "power": {
+      "day": false,
+      "prodW": 0,
+      "loadW": 3,
+      "lampPowered": true,
+      "settledSeconds": 30,
+      "iterations": 1,
+      "ticks": [
+        {
+          "iteration": 1,
+          "settledSeconds": 30,
+          "grace": 30,
+          "lampPowered": true
+        }
+      ],
+      "grace": {
+        "before": 60,
+        "after": 30,
+        "blackoutSec": 60,
+        "note": "A tick starting with positive grace remains powered; outage requires the following tick after grace expires"
+      },
+      "scope": "Solar/conduit/lamp visual fixture; formal power ticks only, not full world simulation or survival acceptance"
+    },
+    "caseName": "night-grace"
+  },
+  {
+    "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+    "build": "isolated",
+    "viewport": {
+      "width": 1440,
+      "height": 900,
+      "dpr": 1
+    },
+    "nativeStorageUnchanged": true,
+    "storage": "memory-only; native localStorage untouched",
+    "rooms": [
+      {
+        "area": 12
+      },
+      {
+        "area": 16
+      }
+    ],
+    "residentsState": [
+      {
+        "id": "rs_start1",
+        "job": null,
+        "bedId": "b_67_loywswes:0",
+        "sleeping": true,
+        "food": 77.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start2",
+        "job": "bl_workshop",
+        "bedId": "b_69_loywswes:0",
+        "sleeping": true,
+        "food": 73.60000000000025,
+        "rest": 81.51999999999992
+      },
+      {
+        "id": "rs_start3",
+        "job": null,
+        "bedId": "b_68_loywswes:0",
+        "sleeping": true,
+        "food": 66.60000000000025,
+        "rest": 81.51999999999992
+      }
+    ],
+    "queue": 0,
+    "available": [
+      [
+        "wood",
+        1
+      ],
+      [
+        "stone",
+        2
+      ],
+      [
+        "iron",
+        85
+      ],
+      [
+        "mineral",
+        107
+      ],
+      [
+        "food",
+        12
+      ]
+    ],
+    "fixture": "free-build solar/conduit/lamp visual fixture; not survival",
+    "seed": 58098,
+    "mode": "running",
+    "scene": "home",
+    "clock": 2700,
+    "dayFraction": 0.75,
+    "paused": true,
+    "camera": {
+      "x": 888,
+      "y": 792,
+      "zoom": 1
+    },
+    "residents": 3,
+    "buildings": 75,
+    "nonResidentObjects": 2068,
+    "entities": 2071,
+    "terrain": {
+      "cacheSize": 15,
+      "cacheLimit": 36,
+      "hits": 81171,
+      "misses": 15,
+      "width": 6144,
+      "height": 6144,
+      "grid": 48,
+      "seed": 58098,
+      "generation": 1
+    },
+    "main": {
+      "mode": "running",
+      "frameN": 6818,
+      "clock": 2700,
+      "o2": 100,
+      "hp": 100,
+      "found": 0,
+      "total": 0,
+      "enemies": 0,
+      "carryW": 0,
+      "research": 220
+    },
+    "constructionRecord": {
+      "scope": "Node DOM stubs; scripted formal planning, designations and explicit remote gather commands (not mouse QA), original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+      "complete": true,
+      "built": 72,
+      "queue": 0,
+      "seconds": 1329.3999999993387,
+      "remoteGatherCommandsCount": 5,
+      "label": "Node 脚本普通采集施工存档；不是人工鼠标生存验收"
+    },
+    "startup": {
+      "freshNavigationToReadyMs": 312.69999998807907,
+      "environmentReady": true,
+      "buildingReady": true,
+      "portraitImages": 3,
+      "scope": "navigation + network + parse + initialization + available asset readiness; not isolated decoder timing or cold browser cache"
+    },
+    "weather": "wx_clear",
+    "constructionPhase": 3,
+    "constructionTargets": [
+      {
+        "id": "rs_start1",
+        "x": 1032,
+        "y": 1080,
+        "target": null,
+        "order": null,
+        "reason": "目的地不可达"
+      },
+      {
+        "id": "rs_start2",
+        "x": 936,
+        "y": 984,
+        "target": null,
+        "order": null,
+        "reason": "前往工坊"
+      },
+      {
+        "id": "rs_start3",
+        "x": 936,
+        "y": 936,
+        "target": null,
+        "order": null,
+        "reason": "运送施工材料"
+      }
+    ],
+    "blueprints": [],
+    "power": {
+      "day": false,
+      "prodW": 0,
+      "loadW": 3,
+      "lampPowered": false,
+      "settledSeconds": 90,
+      "iterations": 3,
+      "ticks": [
+        {
+          "iteration": 1,
+          "settledSeconds": 30,
+          "grace": 0,
+          "lampPowered": true
+        },
+        {
+          "iteration": 2,
+          "settledSeconds": 60,
+          "grace": 0,
+          "lampPowered": false
+        },
+        {
+          "iteration": 3,
+          "settledSeconds": 90,
+          "grace": 0,
+          "lampPowered": false
+        }
+      ],
+      "grace": {
+        "before": 30,
+        "after": 0,
+        "blackoutSec": 60,
+        "note": "A tick starting with positive grace remains powered; outage requires the following tick after grace expires"
+      },
+      "scope": "Solar/conduit/lamp visual fixture; formal power ticks only, not full world simulation or survival acceptance"
+    },
+    "caseName": "night-off"
+  }
+]
