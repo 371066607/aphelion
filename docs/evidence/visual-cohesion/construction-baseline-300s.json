@@ -1,0 +1,96 @@
+{
+  "build": "baseline",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "dpr": 2
+  },
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [],
+  "residentsState": [
+    {
+      "id": "rs_start1",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 82.15000000000006,
+      "rest": 95.37999999999998
+    },
+    {
+      "id": "rs_start2",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 77.15000000000006,
+      "rest": 95.37999999999998
+    },
+    {
+      "id": "rs_start3",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 81.15000000000006,
+      "rest": 95.37999999999998
+    }
+  ],
+  "queue": 55,
+  "available": [
+    [
+      "wood",
+      27
+    ],
+    [
+      "stone",
+      0
+    ],
+    [
+      "iron",
+      92
+    ],
+    [
+      "food",
+      0
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "scripted ordinary planning and designations; original resources, skills, needs, simulation",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 331.21510000004037,
+  "dayFraction": 0.092,
+  "paused": true,
+  "camera": {
+    "x": 1128,
+    "y": 1008
+  },
+  "residents": 3,
+  "buildings": 17,
+  "nonResidentObjects": 2131,
+  "entities": 2134,
+  "terrain": {
+    "cacheSize": 12,
+    "cacheLimit": 36,
+    "hits": 27972,
+    "misses": 12,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 2566,
+    "clock": 331.2,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 22
+  },
+  "simulatedSeconds": 300.00000000004076
+}

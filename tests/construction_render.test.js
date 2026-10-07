@@ -35,5 +35,5 @@ test('formal renderer: 新地板导线与相邻墙走共享格层', function(){
   APH.state={colony:{scene:{width:480,height:480,grid:48},buildings:[f,w,g,wire]}};
   APH.Ent.drawWalls(0);
   if(!c.calls.some(function(x){return x[0]==='rect'&&x[1]===48&&x[2]===96;})) throw new Error('新墙必须按gx/gy共享格绘制');
-  if(!c.calls.some(function(x){return x[0]==='fillRect'&&x[1]===49&&x[2]===49;})) throw new Error('新地板必须在独立格层可见');
+  if(!c.calls.some(function(x){return x[0]==='fillRect'&&x[1]===48&&x[2]===48&&x[3]===48&&x[4]===48;})) throw new Error('新地板必须在独立格层可见');
 });

@@ -8,6 +8,23 @@ APH.CFG = {
   /* 场景 (设计支柱: 殖民地优先) */
   scene: { COLONY:'colony', PLANET:'planet' },
 
+  /* Visual-only dimensions never participate in footprint, harvest or navigation. */
+  visual: {
+    environmentSizes:{tree_a:[132,142],tree_b:[130,140],berry:[48,42],herb:[45,40],stone:[48,40],iron:[48,42],wreck:[72,58],cargo:[86,65],glow:[48,44],crystal:[50,47],dew:[46,44],star:[48,46]},
+    environmentKinds:{tree:'tree_a',bush_berry:'berry',bush_herb:'herb',rock_stone:'stone',rock_iron:'iron',rock_wreckage:'wreck',bush_alien:'dew',flora_glow:'glow',flora_crystal:'crystal',flora_dew:'dew',flora_star:'star'},
+    homeDarkness:.52, homeVignette:.45, groundTextureAlpha:.18, terrainEdge:8,
+    bedSleepInset:{side:6,end:8}, // Mattress inset in world pixels; rendering only.
+    homeTerrain:{landing:'#707254',woodland:'#596e4c',lakeshore:'#7b8771',ridge:'#918771',alien:'#7b756e',wreckage:'#8a7a63',water:'#426c73'},
+    buildCategories:[
+      {name:'结构',ids:['bl_wall','bl_gate','bl_floor']},
+      {name:'生活',ids:['bl_bed','bl_dining_table','bl_dining_chair','bl_campfire','bl_clinic','bl_house','bl_tv','bl_shelf','bl_carpet','bl_prison_spot']},
+      {name:'生产',ids:['bl_workshop','bl_lab','bl_crop_plot','bl_farm','bl_kitchen','bl_mine','bl_pasture','bl_transmitter']},
+      {name:'仓储',ids:['bl_storage_shelf','bl_warehouse']},
+      {name:'电力',ids:['bl_conduit','bl_wood_generator','bl_solar_panel','bl_battery','bl_lamp','bl_heater','bl_cooler','bl_ancient_generator']},
+      {name:'防御',ids:['bl_barracks','bl_turret','bl_heavy_turret','bl_spike_trap','bl_sandbag']}
+    ]
+  },
+
   /* 世界 */
   WORLD: 2200,
   CHUNK: 550,

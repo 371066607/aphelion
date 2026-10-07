@@ -1,0 +1,5 @@
+{"seconds":300,"built":36,"queued":30,"phase":1}
+{"seconds":600,"built":52,"queued":14,"phase":1}
+{"seconds":900,"built":62,"queued":4,"phase":1}
+{"seconds":1200,"built":70,"queued":2,"phase":2}
+{"seconds":1500,"built":70,"queued":2,"phase":2}

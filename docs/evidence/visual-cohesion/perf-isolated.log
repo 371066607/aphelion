@@ -1,0 +1,10 @@
+  ✓ guardTrim: 未超限返回空
+  ✓ guardTrim: 超限回收离玩家最远的可牺牲实体
+  ✓ guardTrim: 大超限时只删可牺牲类型
+  ✓ perf: 完整殖民地 updateResidents 240帧 < 3000ms (P1-P3 叠加后每帧成本)
+LARGE_MAP_METRICS {"worldCells":128,"residents":20,"worldObjects":2000,"simulationP50Ms":2,"simulationP95Ms":4,"navigation20Ms":59,"saveBytes":1610843,"renderer":"DOM stub; browser measurement required separately"}
+  ✓ perf: 128格、20居民、2000自然对象的模拟与寻路记录
+HOSTILE_NEEDS_METRICS {"hostiles":80,"residents":20,"productionTicks":5,"totalMs":483,"avgMs":96.6}
+  ✓ #212/#214 perf: 80 名人型敌对按生产跳结算需求与袭击士气
+
+6 通过 / 0 失败

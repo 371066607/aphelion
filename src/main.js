@@ -1653,6 +1653,7 @@ window.APH = window.APH || {};
   }
   function toggleFreeBuild(){
     var s=APH.state;
+    if(!s.debugTools&&!s.debugKeys)return false;
     s.devFreeBuild = !s.devFreeBuild;
     if(APH.UI && APH.UI.floatText) APH.UI.floatText(s.devFreeBuild ? '∞ 无限建造 ON · 点地即成' : '无限建造 OFF', s.devFreeBuild ? '#ffc857' : '#8fa3cc');
     if(APH.UI && APH.UI.updHUD) APH.UI.updHUD();
@@ -2215,14 +2216,14 @@ window.APH = window.APH || {};
       var squadNow = (s0.selectedPawns && s0.selectedPawns.length>0) ? s0.selectedPawns : (s0.selectedRid ? [selectedPawnEnt()].filter(Boolean) : []);
       var draftedNow = !!s0.playerDrafted || squadNow.some(function(p){ return p && p.drafted; });
       if(hitBp && s0.scene==='home' && !draftedNow){
-        var bpx=hitBp.x, bpy=hitBp.y;
+        var bpx=hitBp.x, bpy=hitBp.y, bpUid=hitBp.uid;
         if(squadNow.length){
           squadNow.forEach(function(p){
-            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type:'build', x:bpx, y:bpy };
-            else if(p) p.userOrder = { type:'build', x:bpx, y:bpy };
+            if(p && (p.type==='player' || p.id==='player')) s0.playerOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
+            else if(p) p.userOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
           });
         } else {
-          s0.playerOrder = { type:'build', x:bpx, y:bpy };
+          s0.playerOrder = { type:'build', x:bpx, y:bpy, uid:bpUid };
         }
         APH.UI.floatText('→ 优先建造', '#ffc857');
         APH.state.parts.push({ t:'ping', x:bpx, y:bpy, life:0.8, max:0.8 });
@@ -2716,7 +2717,8 @@ window.APH = window.APH || {};
       APH.state.clock=APH.state.colony.clock||0;APH.state.power=APH.state.colony.power||{};
       if(APH.state.colony.war)APH.state.war=APH.state.colony.war;          // 殖民地布局持久化
       APH.World.initCanvas();
-      if(APH.BuildArt) APH.BuildArt.load();
+      if(APH.BuildArt) APH.BuildArt.load(function(ok){if(ok&&APH.World&&APH.World.buildTerrain)APH.World.buildTerrain();});
+      if(APH.EnvironmentArt) APH.EnvironmentArt.load();
       APH.Ent.bindCtx(document.getElementById('cv').getContext('2d'));
       var seed=(Date.now()%100000)|0;
       APH.SFX.bindBus();
@@ -2828,6 +2830,7 @@ window.APH = window.APH || {};
          玩家默认不可触发 */
       s.debugKeys = _q.indexOf('debugkeys=1')>=0;
       s.devFreeBuild = _q.indexOf('freebuild=1')>=0;
+      s.debugTools=s.debugKeys||s.devFreeBuild;
       if(_q.indexOf('autostart=1')>=0){
         document.title='AUTO: q命中';
         startGame();

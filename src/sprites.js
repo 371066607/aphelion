@@ -18,8 +18,10 @@ APH.Sprites = (function(){
   var IMAGES = {};          // name -> HTMLImageElement | null
   var readyCount = 0;
   var TINTED = {};                    // name -> 环境融合版canvas
+  var CONTENT_BOUNDS = {};            // Only numeric bounds survive a lazy frame scan.
 
   function define(name, def){
+    delete CONTENT_BOUNDS[name];
     SHEETS[name] = {
       src: def.src,
       fw: def.fw || 0,                    /* 0=加载时按图高自动探测格宽(横排表) */
@@ -45,6 +47,7 @@ APH.Sprites = (function(){
     var pending = names.length;
     names.forEach(function(name){
       var d = SHEETS[name];
+      delete CONTENT_BOUNDS[name];
       var img = new Image();
       img.onload = function(){
         /* 强制完整解码后再标记ready, 避免首帧drawImage画出半解码白条 */
@@ -73,16 +76,18 @@ APH.Sprites = (function(){
             TINTED[name]=c;
           }catch(e){ /* 跨域等异常忽略 */ }
           IMAGES[name] = img;
+          delete CONTENT_BOUNDS[name];
           done();
         };
         if (img.decode) {
           img.decode().then(finish).catch(function(){
-            IMAGES[name] = null; done();
+            IMAGES[name] = null; delete CONTENT_BOUNDS[name]; done();
           });
         } else { finish(); }
       };
       img.onerror = function(){
         IMAGES[name] = null;               // 标记失败, isReady 返回 false
+        delete CONTENT_BOUNDS[name];
         if (--pending <= 0 && onReady) onReady();
       };
       img.src = d.src;
@@ -95,6 +100,47 @@ APH.Sprites = (function(){
     return !!IMAGES[name];
   }
   function allRegistered(){ return Object.keys(SHEETS); }
+
+  /* Union of source-frame alpha bounds, relative to one frame. Scanning is
+     lazy (bed sleepers only), cached per image/definition/range, and never
+     retains an extra atlas or canvas. Failed/empty scans are cached too. */
+  function contentBounds(name, first, count){
+    var d=SHEETS[name], img=IMAGES[name];
+    if(!d || !img || !d.fw || !d.fh) return null;
+    first=((Math.floor(first||0)%d.count)+d.count)%d.count;
+    count=Math.min(d.count,Math.max(1,Math.floor(count||1)));
+    var cache=CONTENT_BOUNDS[name];
+    if(!cache || cache.image!==img || cache.definition!==d){
+      cache=CONTENT_BOUNDS[name]={image:img,definition:d,ranges:{}};
+    }
+    var key=first+':'+count;
+    if(Object.prototype.hasOwnProperty.call(cache.ranges,key)) return cache.ranges[key];
+    var canvas=null, bounds=null;
+    try{
+      if(typeof document==='undefined' || !document.createElement) return null;
+      canvas=document.createElement('canvas');canvas.width=d.fw;canvas.height=d.fh;
+      var g=canvas.getContext('2d',{willReadFrequently:true});
+      if(!g) return null;
+      var left=d.fw, top=d.fh, right=0, bottom=0;
+      for(var i=0;i<count;i++){
+        var pos=framePos(d,first+i);
+        g.clearRect(0,0,d.fw,d.fh);
+        g.drawImage(img,pos.sx,pos.sy,d.fw,d.fh,0,0,d.fw,d.fh);
+        var px=g.getImageData(0,0,d.fw,d.fh).data;
+        for(var y=0;y<d.fh;y++) for(var x=0;x<d.fw;x++){
+          if(px[(y*d.fw+x)*4+3]<=8) continue;
+          left=Math.min(left,x);top=Math.min(top,y);
+          right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);
+        }
+      }
+      if(right>left && bottom>top) bounds=Object.freeze({x:left,y:top,w:right-left,h:bottom-top});
+    }catch(e){ /* Missing pixels / tainted image: keep the existing draw path. */ }
+    finally{
+      if(canvas){canvas.width=0;canvas.height=0;}
+      cache.ranges[key]=bounds;
+    }
+    return bounds;
+  }
 
   /* ---------- 纯函数: 帧矩形 ---------- */
   /* index(0..count-1) → {sx,sy} 源切点 */
@@ -157,7 +203,7 @@ APH.Sprites = (function(){
   return {
     define:define, loadAll:loadAll, isReady:isReady, allRegistered:allRegistered,
     framePos:framePos, advance:advance, frameAt:frameAt,
-    draw:draw, drawPlayerFrame:drawPlayerFrame, sheetDef:sheetDef,
+    draw:draw, drawPlayerFrame:drawPlayerFrame, sheetDef:sheetDef, contentBounds:contentBounds,
     getTinted:function(n){ return TINTED[n]; },
     _images:IMAGES,
   };

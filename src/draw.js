@@ -40,7 +40,7 @@ APH.Draw = (function(){
     return {
       /* ADR-45: 远征地表上跑的是殖民者, 不是化身 —— 这张表原先根本没有
          resident 项, 所以队员一个都画不出来。 */
-      resident:function(e,t){ APH.Ent.drawResident(e,t); },
+      resident:function(e,t,bedPose){ APH.Ent.drawResident(e,t,bedPose); },
       rock:function(e,t){ APH.Ent.drawRock(e); },
       crystal:function(e,t){ APH.Ent.drawCrystal(e,t); },
       beacon:function(e,t){ APH.Ent.drawBeacon(e,t); },
@@ -85,6 +85,13 @@ APH.Draw = (function(){
     ctx2.beginPath();
     ctx2.ellipse(p.x,p.y,ringR*z,ringR*.42*z,0,0,U.TAU);
     ctx2.stroke();
+    /* Opaque canopies keep their depth; the selected colonist gets a foreground locator. */
+    var canopy=(s.entities||[]).some(function(e){return !e.dead&&e.type==='flora'&&(e.visualKind||e.kind)==='tree'&&Math.abs(e.x-ent.x)<CFG.visual.environmentSizes.tree_a[0]/2&&e.y>ent.y&&e.y-ent.y<CFG.visual.environmentSizes.tree_a[1];});
+    if(canopy){
+      var head=screenOf(ent.x,ent.y-(CFG.humanoid.drawH||78));
+      ctx2.strokeStyle='#ffe2a2';ctx2.lineWidth=2;ctx2.beginPath();
+      ctx2.moveTo(head.x-10*z,head.y-4*z);ctx2.lineTo(head.x,head.y+3*z);ctx2.lineTo(head.x+10*z,head.y-4*z);ctx2.stroke();
+    }
     /* 命令旗标: 虚线到目标点 */
     var uo=ent.userOrder;
     if(uo && uo.type==='move'){
@@ -312,7 +319,7 @@ APH.Draw = (function(){
       dropped:function(e,t){ APH.Ent.drawDropped(e,t); },
       building:function(e,t){ APH.Ent.drawBuilding(e,t); },
       blueprint:function(e,t){ APH.Ent.drawBuilding(e,t); },
-      resident:function(e,t){ APH.Ent.drawResident(e,t); },
+      resident:function(e,t,bedPose){ APH.Ent.drawResident(e,t,bedPose); },
       visitor:function(e,t){ APH.Ent.drawVisitor(e,t); },
       flora:function(e,t){ APH.Ent.drawFlora(e,t); },
       animal:function(e,t){

@@ -1,0 +1,508 @@
+{
+  "build": "isolated",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "dpr": 2
+  },
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [
+    {
+      "area": 12
+    }
+  ],
+  "residentsState": [
+    {
+      "id": "rs_start1",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 86.7000000000001,
+      "rest": 92.43999999999997
+    },
+    {
+      "id": "rs_start2",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 82.7000000000001,
+      "rest": 92.43999999999997
+    },
+    {
+      "id": "rs_start3",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 75.7000000000001,
+      "rest": 92.43999999999997
+    }
+  ],
+  "queue": 17,
+  "available": [
+    [
+      "wood",
+      50
+    ],
+    [
+      "stone",
+      0
+    ],
+    [
+      "iron",
+      100
+    ],
+    [
+      "mineral",
+      104
+    ],
+    [
+      "food",
+      3
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "Node 脚本普通采集施工存档；不是人工鼠标生存验收",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 543.2038960000567,
+  "dayFraction": 0.151,
+  "paused": true,
+  "camera": {
+    "x": 1100,
+    "y": 1210,
+    "zoom": 1
+  },
+  "residents": 3,
+  "buildings": 49,
+  "nonResidentObjects": 2094,
+  "entities": 2097,
+  "terrain": {
+    "cacheSize": 0,
+    "cacheLimit": 36,
+    "hits": 0,
+    "misses": 0,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 1,
+    "clock": 543.2,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 90
+  },
+  "constructionRecord": {
+    "scope": "Node DOM stubs; scripted formal planning, designations and explicit remote gather commands (not mouse QA), original 3 residents/stock/needs, real gathering/material delivery/construction; no free build or injected supplies",
+    "complete": false,
+    "built": 49,
+    "queue": 17,
+    "seconds": 543.2000000000537,
+    "remoteGatherCommandsCount": 0,
+    "label": "Node 脚本普通采集施工存档；不是人工鼠标生存验收"
+  },
+  "startup": {
+    "freshNavigationToReadyMs": 291.5,
+    "environmentReady": true,
+    "buildingReady": true,
+    "portraitImages": 0,
+    "scope": "network + parse + initialization + decode readiness; not isolated decoder timing or cold browser cache"
+  },
+  "weather": "wx_clear",
+  "constructionPhase": 2,
+  "constructionTargets": [
+    {
+      "id": "rs_start1",
+      "x": 1466.9394383273602,
+      "y": 926.987887665472,
+      "target": null,
+      "reason": "运送施工材料"
+    },
+    {
+      "id": "rs_start2",
+      "x": 1466.9394383273602,
+      "y": 926.987887665472,
+      "target": null,
+      "reason": "运送施工材料"
+    },
+    {
+      "id": "rs_start3",
+      "x": 1466.3541588515425,
+      "y": 930.9492692352189,
+      "target": null,
+      "reason": "运送施工材料"
+    }
+  ],
+  "blueprints": [
+    {
+      "uid": "b_50_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1272,
+      "y": 888,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_51_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1320,
+      "y": 888,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_52_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 888,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_53_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1128,
+      "y": 936,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_54_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 936,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_55_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1128,
+      "y": 984,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_56_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 984,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_57_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1128,
+      "y": 1032,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_58_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 1032,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_59_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1128,
+      "y": 1080,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_60_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 1080,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_61_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1128,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_62_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1176,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_63_loyw7rye",
+      "bid": "bl_gate",
+      "x": 1224,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 2,
+          "wood": 4
+        },
+        "reserved": {
+          "stone": 0,
+          "wood": 0
+        },
+        "delivered": {
+          "stone": 0,
+          "wood": 0
+        }
+      }
+    },
+    {
+      "uid": "b_64_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1272,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_65_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1320,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    },
+    {
+      "uid": "b_66_loyw7rye",
+      "bid": "bl_wall",
+      "x": 1368,
+      "y": 1128,
+      "rotation": 0,
+      "progress": 0,
+      "task": {
+        "status": "missing",
+        "ready": false,
+        "missing": {
+          "stone": 4
+        },
+        "reserved": {
+          "stone": 0
+        },
+        "delivered": {
+          "stone": 0
+        }
+      }
+    }
+  ],
+  "freeBuild": false
+}

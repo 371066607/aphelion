@@ -44,7 +44,7 @@ APH.ResidentWork = (function(){
     return best;
   }
 
-  function pawnWorldAt(x, y, haulCarry, resident){
+  function pawnWorldAt(x, y, haulCarry, resident, worker){
     var s = APH.state;
     var house=null, hd=Infinity;
     (s.colony && s.colony.buildings || []).forEach(function(b){
@@ -79,7 +79,7 @@ APH.ResidentWork = (function(){
       hour: (APH.Res && APH.Res.hourOfDay) ? APH.Res.hourOfDay(s.clock||0, CFG.DAY_LEN) : 0,
       meal: APH.Colony.nearestMeal({x:x,y:y}, 1e9),
       house: house,
-      blueprint: nearestBlueprint(x,y),
+      blueprint: nearestBlueprint(x,y,worker),
       drop: nearestDrop({x:x,y:y}, (CFG.haul&&CFG.haul.seekR)||1200),
       flora: pickDesignatedFloraAt(x,y),
       hunt: pickHuntedAnimal(x,y),
@@ -158,16 +158,30 @@ APH.ResidentWork = (function(){
     return best;
   }
 
-  function nearestBlueprint(x, y){
-    var q=(APH.state.colony && APH.state.colony.buildQueue) || [];
-    var best=null, bd=1e9;
-    for(var i=0;i<q.length;i++){
-      if(!q[i]) continue;
-      if(q[i].materialsPaid===false&&(!q[i].taskId||!APH.Logistics.taskState(APH.state.colony,q[i].taskId).ready))continue;
-      var d=U.dst(x,y,q[i].x,q[i].y);
-      if(d<bd){ bd=d; best=q[i]; }
+  function nearestBlueprint(x, y, worker){
+    var s=APH.state, q=(s.colony && s.colony.buildQueue) || [];
+    function ready(bp){return bp && (bp.materialsPaid!==false ||
+      (bp.taskId && APH.Logistics.taskState(s.colony,bp.taskId).ready));}
+    /* Blueprint centres and work cells differ. Keep one modern target while it
+       is ready and reachable, otherwise overlapping layers can reverse a pawn
+       on every frame before either interaction cell is reached. */
+    if(worker && worker.constructionTargetUid){
+      var current=q.find(function(bp){return bp.uid===worker.constructionTargetUid;});
+      if(ready(current) && APH.Construction.spot(s,current,{x:x,y:y}))return current;
+      worker.constructionTargetUid=null;
     }
-    return best;
+    var candidates=[];
+    for(var i=0;i<q.length;i++){
+      if(ready(q[i]))candidates.push(q[i]);
+    }
+    candidates.sort(function(a,b){return U.dst(x,y,a.x,a.y)-U.dst(x,y,b.x,b.y);});
+    for(var j=0;j<candidates.length;j++){
+      var best=candidates[j];
+      if(best.geometryVersion===1 && !APH.Construction.spot(s,best,{x:x,y:y}))continue;
+      if(worker && best.geometryVersion===1 && best.uid)worker.constructionTargetUid=best.uid;
+      return best;
+    }
+    return null;
   }
 
   function tryResidentJoy(e, r, dt, spdMul, navGrid){
@@ -344,7 +358,26 @@ APH.ResidentWork = (function(){
   }
 
   function nearestDrop(from, r, pred){
-    var s=APH.state;return APH.Ent.findNearest(s.entities,T.DROPPED,from.x,from.y,r,function(e){return freeDropCount(s,e)>0&&(!s.colony.rulesVersion||!APH.Storage.isStored(e,s))&&(!pred||pred(e));});
+    var s=APH.state,nav=window.APH.Nav;
+    function eligible(e){return freeDropCount(s,e)>0&&(!s.colony.rulesVersion||!APH.Storage.isStored(e,s))&&(!pred||pred(e));}
+    if(s.colony.rulesVersion!==1||!nav||!nav.gridOf||!nav.astar)
+      return APH.Ent.findNearest(s.entities,T.DROPPED,from.x,from.y,r,eligible);
+    var radius=r!=null&&r>0?r:Infinity,candidates=[];
+    (s.entities||[]).forEach(function(e){
+      if(!e||e.dead||e.type!==T.DROPPED)return;
+      var d=U.dst(from.x,from.y,e.x,e.y);
+      if(d<radius&&eligible(e))candidates.push({entity:e,distance:d});
+    });
+    candidates.sort(function(a,b){return a.distance-b.distance;});
+    var grid=null,grabR=CFG.haul.grabR;
+    for(var i=0;i<candidates.length;i++){
+      var candidate=candidates[i];
+      // Already within pickup range: no need to walk into a blocked edge cell.
+      if(candidate.distance<=grabR)return candidate.entity;
+      if(!grid)grid=nav.gridOf(s.colony.buildings||[],s.colony.scene);
+      if(nav.astar(grid,from,candidate.entity))return candidate.entity;
+    }
+    return null;
   }
 
   function applyNoTablePenalty(r){
@@ -878,11 +911,13 @@ APH.ResidentWork = (function(){
         }
         else if(uo.type==='build'){
           var bx=uo.x, by=uo.y;
-          if(bx==null){
-            var nbp=nearestBlueprint(e.x,e.y);
-            if(nbp){ bx=nbp.x; by=nbp.y; }
+          var forcedPlan=uo.uid?(s.colony.buildQueue||[]).find(function(q){return q.uid===uo.uid;}):null;
+          if(!uo.uid && bx==null){
+            var nbp=nearestBlueprint(e.x,e.y,e);
+            if(nbp){ bx=nbp.x; by=nbp.y; forcedPlan=nbp; }
           }
-          var forcedPlan=(s.colony.buildQueue||[]).find(function(q){return q.x===bx&&q.y===by;});
+          if(!uo.uid && !forcedPlan)forcedPlan=(s.colony.buildQueue||[]).find(function(q){return q.x===bx&&q.y===by;});
+          if(uo.uid && !forcedPlan){e.userOrder=null;e.walking=false;return;}
           if(forcedPlan&&forcedPlan.geometryVersion===1){
             if(moveConstructionMaterials(s,e,r,dt,spdO,navGrid))return;
             var forcedSpot=APH.Construction.spot(s,forcedPlan,e);
@@ -985,7 +1020,7 @@ APH.ResidentWork = (function(){
           job: e.job || r.job,
           gathering: !!e.gathering
         };
-        var intent=APH.Res.thinkPawn(rpawn, pawnWorldAt(e.x, e.y, e.haulCarry, r));
+        var intent=APH.Res.thinkPawn(rpawn, pawnWorldAt(e.x, e.y, e.haulCarry, r, e));
         e.workAnim = (intent.type==='build') ? 'build' : ((intent.type==='haul'||intent.type==='haul_dump') ? 'haul' : ((intent.type==='job' && (e.job==='bl_kitchen'||r.job==='bl_kitchen')) ? 'cook' : null));
         var handled=true;
         if(intent.type==='none'){ e.walking=false; }
@@ -1035,7 +1070,9 @@ APH.ResidentWork = (function(){
           e.tx=intent.x; e.ty=intent.y;
           APH.Res.walkAround(e, {x:e.tx,y:e.ty}, dt, spdMul, navGrid);
         }else if(intent.type==='build'){
-          var plannedBuild=(s.colony.buildQueue||[]).find(function(q){return q.x===intent.x&&q.y===intent.y;});
+          var plannedBuild=(s.colony.buildQueue||[]).find(function(q){
+            return intent.uid ? q.uid===intent.uid : q.x===intent.x&&q.y===intent.y;
+          });
           if(plannedBuild&&plannedBuild.geometryVersion===1){
             var buildSpot=APH.Construction.spot(s,plannedBuild,e);
             if(buildSpot)APH.Res.walkAround(e,buildSpot,dt,spdMul,navGrid);else {e.walking=false;e.workReason='工地入口被堵住';}

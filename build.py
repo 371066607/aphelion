@@ -25,6 +25,8 @@ MODULE_ORDER = [
     "camera.js",
     "building_art_data.js",
     "building_art.js",
+    "environment_art_data.js",
+    "environment_art.js",
     "input.js",
     "humanoid.js",
     "planet.js",
@@ -75,6 +77,7 @@ def node_check(path):
 
 def main():
     subprocess.run([sys.executable, os.path.join(ROOT, "assets", "build_building_art.py")], check=True)
+    subprocess.run([sys.executable, os.path.join(ROOT, "assets", "build_environment.py")], check=True)
     tpl_path = os.path.join(ROOT, "template.html")
     tpl = open(tpl_path, encoding="utf-8").read()
     if "<!--SCRIPTS-->" not in tpl:

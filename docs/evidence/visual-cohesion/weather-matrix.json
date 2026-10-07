@@ -1,0 +1,308 @@
+{
+  "scope": "CUA inspection; explicit weather visual fixtures on restored ordinary in-progress construction; not survival or weather duration proof",
+  "cases": [
+    {
+      "weather": "wx_clear",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 26856,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "startup": {
+        "freshNavigationToReadyMs": 287.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 3,
+        "scope": "network + parse + initialization + decode readiness; not isolated decoder timing or cold browser cache"
+      }
+    },
+    {
+      "weather": "wx_rain",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 27804,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "startup": {
+        "freshNavigationToReadyMs": 287.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 3,
+        "scope": "network + parse + initialization + decode readiness; not isolated decoder timing or cold browser cache"
+      }
+    },
+    {
+      "weather": "wx_rain_heavy",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 28680,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "startup": {
+        "freshNavigationToReadyMs": 287.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 3,
+        "scope": "network + parse + initialization + decode readiness; not isolated decoder timing or cold browser cache"
+      }
+    },
+    {
+      "weather": "wx_thunder",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 29640,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      },
+      "startup": {
+        "freshNavigationToReadyMs": 287.20000000298023,
+        "environmentReady": true,
+        "buildingReady": true,
+        "portraitImages": 3,
+        "scope": "network + parse + initialization + decode readiness; not isolated decoder timing or cold browser cache"
+      }
+    },
+    {
+      "weather": "wx_snow",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 42240,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_blizzard",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 43200,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_heat",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 44160,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_cold",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 45120,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_acid",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 53820,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_storm",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 54708,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    },
+    {
+      "weather": "wx_fog",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "dpr": 1
+      },
+      "camera": {
+        "x": 1248,
+        "y": 1248,
+        "zoom": 1
+      },
+      "storageUnchanged": true,
+      "terrain": {
+        "cacheSize": 12,
+        "cacheLimit": 36,
+        "hits": 55656,
+        "misses": 12,
+        "width": 6144,
+        "height": 6144,
+        "grid": 48,
+        "seed": 58098,
+        "generation": 1
+      }
+    }
+  ]
+}

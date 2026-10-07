@@ -102,9 +102,37 @@ APH.World = (function(){
       var TM=APH.TerrainModel, g0=Math.floor(ox/desc.grid), g1=Math.ceil((ox+CFG.CHUNK)/desc.grid);
       var h0=Math.floor(oy/desc.grid), h1=Math.ceil((oy+CFG.CHUNK)/desc.grid);
       for(var gy=h0;gy<h1;gy++) for(var gx=g0;gx<g1;gx++){
-        var col=terrainColor(desc,(gx+.5)*desc.grid,(gy+.5)*desc.grid,pal.ground1);
+        var wx=(gx+.5)*desc.grid,wy=(gy+.5)*desc.grid;
+        var cell=TM.cellAt(desc,wx,wy);
+        var col=(desc.kind==='home'&&CFG.visual.homeTerrain[cell.tile])||cell.color||pal.ground1, tx=gx*desc.grid-ox,ty=gy*desc.grid-oy;
         g.fillStyle=col;
-        g.fillRect(gx*desc.grid-ox,gy*desc.grid-oy,desc.grid,desc.grid);
+        g.fillRect(tx,ty,desc.grid,desc.grid);
+        /* Static, world-coordinate texture is baked into the existing LRU chunk.
+           Observation decides water and buildability; marks never invent a tile. */
+        if(!cell.water){
+          [[-1,0],[1,0],[0,-1],[0,1]].forEach(function(dir){
+            var neighbor=TM.cellAt(desc,wx+dir[0]*desc.grid,wy+dir[1]*desc.grid);
+            if(neighbor.water||!neighbor.tile||neighbor.tile===cell.tile)return;
+            var ncol=(desc.kind==='home'&&CFG.visual.homeTerrain[neighbor.tile])||neighbor.color;
+            if(!ncol)return;
+            var edge=CFG.visual.terrainEdge,ex=tx+(dir[0]>0?desc.grid:0),ey=ty+(dir[1]>0?desc.grid:0);
+            var grad=g.createLinearGradient(ex,ey,ex-dir[0]*edge,ey-dir[1]*edge);
+            grad.addColorStop(0,ncol);grad.addColorStop(1,col);
+            g.save();g.globalAlpha=.28;g.fillStyle=grad;
+            g.fillRect(dir[0]>0?tx+desc.grid-edge:tx,dir[1]>0?ty+desc.grid-edge:ty,dir[0]?edge:desc.grid,dir[1]?edge:desc.grid);g.restore();
+          });
+          if(window.APH.BuildArt&&APH.BuildArt.isReady&&APH.BuildArt.isReady()){
+            g.save();g.globalAlpha=CFG.visual.groundTextureAlpha;g.translate(-ox,-oy);
+            APH.BuildArt.fillMaterial(g,'ground',gx*desc.grid,gy*desc.grid,desc.grid,desc.grid);
+            g.restore();
+          }
+          var salt=U.hash2(gx+desc.seed,gy),px=tx+7+salt*(desc.grid-14),py=ty+8+U.hash2(gy+3,gx+desc.seed)*(desc.grid-16);
+          g.fillStyle=cell.shore?'rgba(240,212,158,.28)':'rgba(226,204,153,.16)';
+          g.beginPath();g.ellipse(px,py,2.5+salt*3,1.2+salt,0,0,U.TAU);g.fill();
+        }else{
+          g.strokeStyle='rgba(176,220,215,.15)';g.lineWidth=1;
+          g.beginPath();g.moveTo(tx+8,ty+16);g.lineTo(tx+22,ty+16);g.stroke();
+        }
       }
       return c;
     }
@@ -172,13 +200,14 @@ APH.World = (function(){
   }
 
   /* ---------- 夜景暗幕 + 光源挖洞 ---------- */
+  function sIsHome(){return APH.state&&APH.state.scene==='home';}
   function drawDarkness(dL){
     var na = 1 - dL;
     if(na < .02) return;
     darkCv.width = VW; darkCv.height = VH;
     var g = darkCtx;
     g.clearRect(0,0,VW,VH);
-    g.fillStyle = 'rgba(5,8,26,' + (na*.82) + ')';
+    g.fillStyle = sIsHome() ? 'rgba(23,27,31,' + (na*CFG.visual.homeDarkness) + ')' : 'rgba(5,8,26,' + (na*.82) + ')';
     g.fillRect(0,0,VW,VH);
     g.globalCompositeOperation = 'destination-out';
     var s=APH.state,vp={w:VW,h:VH},z=Camera.zoom(s);
@@ -190,32 +219,55 @@ APH.World = (function(){
       g.fillStyle = gr; g.beginPath(); g.arc(sx,sy,sr,0,U.TAU); g.fill();
     }
     var marks=terrainLandmarks();
-    hole(marks.hab.x, marks.hab.y, 250, 1);
-    hole(APH.state.px, APH.state.py, 95, .95);
-    hole(APH.state.px + Math.cos(APH.state.face)*70,
-         APH.state.py + Math.sin(APH.state.face)*70 - 10, 75, .8);
+    if(s.scene==='home'){
+      hole(marks.hab.x, marks.hab.y+140, 185, .85);
+    }else{
+      hole(marks.hab.x, marks.hab.y, 250, 1);
+      hole(s.px, s.py, 95, .95);
+      hole(s.px + Math.cos(s.face)*70, s.py + Math.sin(s.face)*70 - 10, 75, .8);
+    }
     APH.state.entities.forEach(function(e){
       if(e.type === 'beacon') hole(e.x, e.y-40, e.done?90:135, e.done?.6:1);
       else if(e.type === 'crystal' && !e.taken) hole(e.x, e.y-8, 42, .5);
     });
-    g.globalCompositeOperation = 'source-over';
-
+    /* Keep expedition compositing as before; this pass changes home lighting only. */
+    if(s.scene!=='home')g.globalCompositeOperation='source-over';
     /* Task5+: 建筑自带微光(夜间可见) */
     (s.colony? s.colony.buildings : []).forEach(function(b){
       if(b.id==='bl_landing_pad') return;
       if(b.id==='bl_lamp'){
         /* T9 路灯: 夜间通电才亮(挖大洞); 断电/未接线(b.powered===false)熄灭 */
         if(b.powered !== false && dL < 0.5) hole(b.x, b.y-6, 120, .92);
-        hole(b.x, b.y, 70, .45);   // 本体微光(断电也可见轮廓)
+        if(s.scene!=='home')hole(b.x,b.y,70,.45);
+        else if(b.powered!==false)hole(b.x, b.y, 60, .28);   // 通电设备本体微光
         return;
       }
-      hole(b.x, b.y, 70, .45);
+      if(s.scene==='home'&&b.id==='bl_campfire'&&!b.dead)hole(b.x,b.y-8,110,.75);
+      if(s.scene==='expedition')hole(b.x, b.y, 70, .45);
     });
+    g.globalCompositeOperation = 'source-over';
     /* 暗幕是屏幕层。若沿用世界 transform，缩放/平移会把整张遮罩拖离画布。 */
     ctx.save();
     ctx.setTransform(DPR,0,0,DPR,0,0);
     ctx.drawImage(darkCv,0,0,VW,VH);
     ctx.restore();
+  }
+
+  /* Keep one unified list. Resolve bed rendering once before sorting, then
+     reuse the pose in drawResident. Logical positions and EntityIndex stay
+     untouched. With no valid sleeper the original Y comparator is retained. */
+  function sortRenderEntities(entities){
+    var sleepPoses=null;
+    if(window.APH.Ent && APH.Ent.bedSleepPose) entities.forEach(function(e){
+      if(!e.isSleeping || e.type!==CFG.entType.RESIDENT) return;
+      var pose=APH.Ent.bedSleepPose(e);
+      if(pose){if(!sleepPoses) sleepPoses=new Map();sleepPoses.set(e,pose);}
+    });
+    entities.sort(sleepPoses?function(a,b){
+      var pa=sleepPoses.get(a), pb=sleepPoses.get(b);
+      return (pa?pa.depth:a.y)-(pb?pb.depth:b.y) || (pa?1:0)-(pb?1:0);
+    }:function(a,b){return a.y-b.y;});
+    return {entities:entities,sleepPoses:sleepPoses};
   }
 
   /* ---------- 主渲染入口（main.js 每帧调用） ----------
@@ -268,6 +320,19 @@ APH.World = (function(){
       ctx.restore();
     }
 
+    /* Landing cargo remains the existing stock anchor. These skid marks and hull art
+       are display only: no entity, collision or inventory is added. */
+    if(s.scene==='home'&&s.colony){
+      var stock=s.colony.stockLocation||{x:CFG.HAB.x,y:CFG.HAB.y+140};
+      ctx.save();ctx.translate(stock.x,stock.y);
+      ctx.fillStyle='rgba(74,55,35,.24)';
+      ctx.beginPath();ctx.ellipse(0,15,75,18,-.08,0,U.TAU);ctx.fill();
+      ctx.strokeStyle='rgba(210,170,110,.36)';ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(-62,6);ctx.lineTo(-104,36);ctx.moveTo(61,5);ctx.lineTo(99,31);ctx.stroke();
+      if(window.APH.EnvironmentArt)APH.EnvironmentArt.draw(ctx,'cargo',0,9,79,59);
+      ctx.restore();
+    }
+
     /* 粒子层(地面) */
     drawEntityFns.particles(dt, time);
 
@@ -275,7 +340,7 @@ APH.World = (function(){
     if(drawEntityFns.walls) drawEntityFns.walls(time);
 
     /* 统一实体 Y 排序 (ADR-3) */
-    var entityPad=256/z;
+    var entityPad=Math.max(256/z,CFG.visual.environmentSizes.tree_a[1]);
     function entityVisible(e){return e&&e.x>=view.left-entityPad&&e.x<=view.right+entityPad&&e.y>=view.top-entityPad&&e.y<=view.bottom+entityPad;}
     /* EntityIndex is deliberately optional: a cold index falls back to the
        canonical list, while a prepared one only narrows render candidates. */
@@ -284,9 +349,11 @@ APH.World = (function(){
       APH.EntityIndex.queryRect(s.entities,view.left-entityPad,view.top-entityPad,view.right+entityPad,view.bottom+entityPad))||s.entities;
     var sorted = entityCandidates.filter(function(e){ return !e.dead && e.type!=='player'&&entityVisible(e); })
                   .concat([entityCandidates.find(function(e){return e.type==='player'&&entityVisible(e);})])
-                  .filter(Boolean)
-                  .sort(function(a,b){ return a.y-b.y; });
-    sorted.forEach(function(e){ drawEntityFns[e.type] && drawEntityFns[e.type](e, time); });
+                  .filter(Boolean);
+    var ordered=sortRenderEntities(sorted);
+    ordered.entities.forEach(function(e){
+      drawEntityFns[e.type] && drawEntityFns[e.type](e,time,ordered.sleepPoses&&ordered.sleepPoses.get(e)||null);
+    });
 
     /* 孢子 */
     drawSpores(time, dL);
@@ -308,7 +375,8 @@ APH.World = (function(){
 
     /* 屏幕空间(绝对重置, 无 restore 依赖) */
     applyScreen();
-    ctx.drawImage(vigCv,0,0,VW,VH);
+    ctx.save();if(s.scene==='home')ctx.globalAlpha=CFG.visual.homeVignette;
+    ctx.drawImage(vigCv,0,0,VW,VH);ctx.restore();
     drawCompass();
   }
 
@@ -565,7 +633,7 @@ APH.World = (function(){
 
   return {
     initCanvas:initCanvas, buildTerrain:buildTerrain,
-    daylight:daylight, drawDarkness:drawDarkness, render:render,
+    daylight:daylight, drawDarkness:drawDarkness, render:render, sortRenderEntities:sortRenderEntities,
     drawWeather:drawWeather, drawFog:drawFog,
     terrainColor:terrainColor, legacyLake:legacyLake,
     wxCount:function(){ return wxParts.length; },

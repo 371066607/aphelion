@@ -1,0 +1,126 @@
+{
+  "build": "isolated",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "dpr": 2
+  },
+  "nativeStorageUnchanged": true,
+  "storage": "memory-only; native localStorage untouched",
+  "rooms": [],
+  "residentsState": [
+    {
+      "id": "rs_start1",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 84.50000000000006,
+      "rest": 95.79999999999998
+    },
+    {
+      "id": "rs_start2",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 79.50000000000006,
+      "rest": 95.79999999999998
+    },
+    {
+      "id": "rs_start3",
+      "job": null,
+      "bedId": null,
+      "sleeping": false,
+      "food": 83.50000000000006,
+      "rest": 95.79999999999998
+    }
+  ],
+  "queue": 0,
+  "available": [
+    [
+      "wood",
+      54
+    ],
+    [
+      "stone",
+      62
+    ],
+    [
+      "iron",
+      100
+    ],
+    [
+      "mineral",
+      100
+    ],
+    [
+      "food",
+      0
+    ]
+  ],
+  "label": "tests/visual_lab.html; no survival acceptance from fixtures",
+  "fixture": "scripted ordinary planning and designations; original resources, skills, needs, simulation",
+  "seed": 58098,
+  "mode": "running",
+  "scene": "home",
+  "clock": 300.00000000003394,
+  "dayFraction": 0.083,
+  "paused": true,
+  "camera": {
+    "x": 1128,
+    "y": 1008,
+    "zoom": 1
+  },
+  "residents": 3,
+  "buildings": 28,
+  "nonResidentObjects": 2072,
+  "entities": 2075,
+  "terrain": {
+    "cacheSize": 12,
+    "cacheLimit": 36,
+    "hits": 6700,
+    "misses": 12,
+    "width": 6144,
+    "height": 6144,
+    "grid": 48,
+    "seed": 58098,
+    "generation": 1
+  },
+  "main": {
+    "mode": "running",
+    "frameN": 730,
+    "clock": 300,
+    "o2": 100,
+    "hp": 100,
+    "found": 0,
+    "total": 0,
+    "enemies": 0,
+    "carryW": 0,
+    "research": 10
+  },
+  "constructionPhase": 1,
+  "constructionTargets": [
+    {
+      "id": "rs_start1",
+      "x": 760.8877752475784,
+      "y": 932.0542651893584,
+      "target": null,
+      "reason": "运送施工材料"
+    },
+    {
+      "id": "rs_start2",
+      "x": 1211.0147518795284,
+      "y": 1278.9953848543196,
+      "target": null,
+      "reason": "运送施工材料"
+    },
+    {
+      "id": "rs_start3",
+      "x": 1282.1731173146834,
+      "y": 1373.6514736376982,
+      "target": null,
+      "reason": "运送施工材料"
+    }
+  ],
+  "blueprints": [],
+  "simulatedSeconds": 300.00000000003394
+}

@@ -1,0 +1,54 @@
+{
+  "baseCommit": "4658e35c87680805eccb6a82ff6d2fb3806b943c",
+  "date": "2026-10-04",
+  "browser": "Codex in-app browser",
+  "seed": 58098,
+  "viewport": [
+    1440,
+    900
+  ],
+  "dpr": 1,
+  "population": 20,
+  "naturalObjects": 2059,
+  "samplesPerRun": 120,
+  "warmupFrames": 10,
+  "htmlBytes": {
+    "before": 42003833,
+    "after": 43694514,
+    "increase": 1690681
+  },
+  "results": {
+    "before-day": {
+      "frameCpuP95Ms": [
+        5.9,
+        5.4,
+        5.6
+      ],
+      "medianOfP95Ms": 5.6
+    },
+    "before-night": {
+      "frameCpuP95Ms": [
+        6,
+        6.2,
+        5.7
+      ],
+      "medianOfP95Ms": 6
+    },
+    "after-day": {
+      "frameCpuP95Ms": [
+        4.5,
+        5.3,
+        5.4
+      ],
+      "medianOfP95Ms": 5.3
+    },
+    "after-night": {
+      "frameCpuP95Ms": [
+        6.2,
+        5.9,
+        6
+      ],
+      "medianOfP95Ms": 6
+    }
+  }
+}

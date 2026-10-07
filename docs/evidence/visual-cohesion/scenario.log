@@ -1,0 +1,164 @@
+  ✓ #199: boot 在 running 前已持久化完整家园 Observation
+  ✓ #200: 世界渲染、总览图和零水体覆盖层读取同一 Observation
+  ✓ #200: 矩形 Observation 的世界区块分别按宽高覆盖
+  ✓ #200: 居民娱乐移动沿 Observation 导航绕过水格
+  ✓ #200: 生态更新后野生动物不再经过第二套直移游荡
+  ✓ #200: 升级恢复旧 homeRuntime 时清除第二套 rock/crystal
+  ✓ #84: boot 注册 11 项 256 格 sheet 并生成夜间 tint
+  ✓ #84: sprite 成功走贴图，Image onerror 后程序化回退不抛错
+  ✓ opening: 新档 boot 有 intro 时钟
+  ✓ opening: start 后 running、played、时钟清空
+  ✓ opening: showDeath 不重播短片且不把 played 打回未播
+  ✓ T2 新档进家无过客, hint 是盖房目标
+  ✓ boot 后: 出生在殖民地(home), spec=新曙光殖民地
+  ✓ 殖民地世界: 有发射台, 无敌人, 无信标
+  ✓ 发射台在玩家附近(可交互)
+  ✓ launch: 进入远征, 到达陌生星球
+  ✓ 远征场景: 着陆点有返回舱
+  ✓ 远征战斗: 击杀掉落可拾取进背包
+  ✓ returnHome: 结算研究点并回家
+  ✓ 死亡循环: 死亡后重新着陆仍在殖民地
+  ✓ home raid: 空 spec factions 不崩且刷出真阵营
+  ✓ showDeath: 携带物品不抛错(含未知 id)
+  ✓ returnHome: 着陆点不自动卸货, 返航才结算
+  ✓ returnHome: 真正空手仍显示空手而归
+  ✓ home: 袭击结束后战利品由合法居民搬入仓储
+  ✓ O2 死亡: showDeath 传入 runLoot 与 survived
+  ✓ 夜间渲染与暗幕: drawDarkness 正常处理建筑光源挖洞(零未定义错误)
+[aphelion] 远征归来: 异常 0/0 · 矿1 研0
+  ✓ home: 居民实体数与名册一致
+  ✓ home: 过客可招募进名册, 生产跳不自动入籍
+  ✓ home: 请客扣粮涨印象且不可连请
+  ✓ home: 上岗从居住舱走过去, 不瞬移; 袭击改走回家
+  ✓ #64 home: 上岗居民病情超过移动阈值后减速，边界不减速
+  ✓ #64 home: wanderStep 游荡居民同样只乘一次病情倍率
+  ✓ #68 home: 睡着居民原地俯卧不动 (不走位/不清走位)
+  ✓ #64 render: 病号标记在显示阈值起为红色 14px 十字
+  ✓ home: 殖民地有气候法则, 酸雨夜间减农 / 磁暴停实验室
+  ✓ home: 工坊扣矿产药, 不是远征消耗
+  ✓ home: 居民把脚边的堆搬去仓库入库
+  ✓ home: 仓空时能吃地上粮, 工坊能用地上矿
+  ✓ home: 饿了走去地上粮, 远处不隔空吃
+  ✓ combat: 袭击会抢药, 工坊可被锁定
+  ✓ planet: 孢子近距排开 / hasLaw
+  ✓ home: 深度生存系统全链路 (精力睡眠、机能损毁、倒地救援、气候暴露与名册UI)
+  ✓ science: 标本化验解锁作物、吐出种荚并点亮图鉴
+  ✓ tech map: T 全屏四列、隐藏旧档别名、化验钥匙不可买
+  ✓ tech map: 研发反馈写在图上，失败原因可见
+  ✓ tech map: 居民跳后刷新研究点栏
+  ✓ tech map: 出航收起遮罩，远征上 T 可关
+  ✓ #59 smoke: 睡/倒居民 drawResident/drawVisitor 不崩(程序化回退)
+  ✓ #59 smoke: 玩家俯卧触发(惰性 flag)不崩、不走循环
+  ✓ #70: 击倒玩家靠舱按 E 被阻断 (#72 互斥)
+  ✓ #65: 满饱食靠粮按 E 不耗粮不寻路
+  ✓ #72: hurtPlayer 家园击倒 != 死亡, 远征生命归零仍死亡
+  ✓ #71 render: 居民击倒叠伤痕(专用俯卧sheet), 睡着同sheet不叠
+  ✓ #71 render: 过客击倒叠伤痕(通用player_prone), 睡着同sheet不叠
+  ✓ #71 render: 玩家击倒叠伤痕(player_prone), 睡着同sheet不叠, 且downed/isSleeping互斥
+  ✓ #68 render: 睡着居民按脸用对应俯卧 sheet, 不叠Zzz/不叠伤痕/不走循环
+  ✓ #69 home: 病重居民自动前往医疗舱床并俯卧 (逾50重病, 轻病不躺另测)
+  ✓ #69 home: 轻病居民不躺, 仍慢走并画 ✚
+  ✓ #69 home: 击倒居民匍匐前往医疗舱床, 保持 downed
+  ✓ #69 home: residentsTick 击倒判定与送医接线 (checkDowned/rescueTick)
+  ✓ W2 天气接线: 极端暴雪结束→强制晴天窗口+喘息
+  ✓ W2 天气接线: 非天气事件不写 meta.weather
+  ✓ W3 冒烟: 雷暴室外居民暴露+10, HUD 天气行显示雷暴, 寒潮防寒服免减速
+  ✓ #89 smoke: 全 11 种天气 drawWeather/drawFog 不崩, 粒子数≤caps 预算
+  ✓ T2 smoke: 墙入 colony.buildings 不占实体, drawWalls 不崩
+  ✓ T2 smoke: wallLine 拖拽连续铺墙 5 格
+  ✓ #81 home: 饥饿居民走到最近空椅坐下, 面向桌, 在餐桌用餐 (+心情)
+  ✓ #81 home: 多居民多椅不抢座 (两居民两椅同时吃饭)
+  ✓ #81 home: 无桌吃心情惩罚 (无桌椅时吃地上食物扣心情)
+  ✓ #82 home: 圈房免疫极端天气暴露 (房间内 residentsTick 不累积)
+  ✓ #82 home: 有缺口的圈不算房间 (室外照常累积暴露)
+  ✓ #82 home: 路灯可建造, 通电夜间亮/断电灭 (drawDarkness 不崩)
+  ✓ #83 home: 敌人踩陷阱受伤出血+陷阱触发一次性
+  ✓ #83 home: 沙袋减速乘子生效 (敌人移动减速通过 sandbagMul)
+  ✓ #83 home: 居民路过自动重置陷阱 (耗建材)
+  ✓ #92 home: HUD 天气行显示明日预报 (雨→明日晴)
+  ✓ #92 home: 雷暴→明日依旧雷雨链 (转移表 wx_rain 最高), HUD 不崩
+  ✓ #94 home: 敌人寻路绕开待触发陷阱 (不踩)
+  ✓ #94 home: 绕无可绕 → 敌仍踩陷阱 (不卡死)
+  ✓ #95 home: 窄道陷阱+近墙 → 工兵拆陷阱(不拆墙), 拆后通途恢复
+  ✓ #95 home: 无陷阱堵点 → 保持原破墙行为 (回归零破坏)
+  ✓ #97 home: 家具房间心情 > 普通房间 (生产跳 roomMoodGain 聚合)
+  ✓ #97 home: 家具可建造 (te_machining 解锁, 成本校验)
+  ✓ #105 diplomacy: O 键打开关闭外交浮层与卡片渲染
+  ✓ #106 diplomacy: 纳贡平息即刻袭击危机并扣减物资
+  ✓ #106 diplomacy: 压倒性防御成功实施军事威慑
+  ✓ #106 diplomacy: 远征基地击破联动削弱敌对势力军力与怒气
+  ✓ #106 diplomacy: 通商协定签署并生效
+  ✓ #149 cmd: 点选居民征召 → 待命(不游荡不上岗), Esc解除恢复
+  ✓ #149 cmd: 移动令 → 走到目标后自动清令
+  ✓ #149 cmd: 采集令 → 走到树下砍完掉落, 自动清令
+  ✓ #149 cmd: 搬运令 → 抓取地上堆并入库, 自动清令
+  ✓ #149 cmd: 休息令 → 走到住宅入睡(isSleeping), 吃饭令 → 就近进食
+  ✓ #149 cmd: 袭击中移动令保留(撤离), 非移动令被清除
+  ✓ #157 orders: 规划工具箱选择、框选打标与自动清标
+  ✓ #158 orders: 严格无标不采、规划驱动全链路开采入库与右键强制微操
+  ✓ #160 camera: 键盘 WASD 平移视口、Shift 加速与居中对焦
+  ✓ #161 colonist_bar: 顶部小人条选择、R 键战备征召切换与聚焦居中
+  ✓ #162 squad: 鼠标拉框多选编队、批量征召、散兵线战术集结与掩体交火
+  ✓ #163 right_click: 全局右键交互（出航、开箱、破译、送医、返航）与远征 RTS
+  ✓ #209 倒地敌人的右键处置优先于发射台
+  ✓ #201 unknown destination: 先保存 PlanetSpec/Atlas，再扣补给并安装同一 observed runtime
+  ✓ #201 unknown destination: 星球持久化失败时留在家园且补给零变化
+  ✓ #201 debug expedition: 明确固定目的地也经过同一保存与 Active Run 流程
+  ✓ #201 restore: 伪装成 generation 0 的 runtime 不得绕过 observed 绑定
+  ✓ #201 restore: runtime 的 PlanetSpec 镜像残缺时以完整持久档恢复
+  ✓ #201 restore: 持久 PlanetSpec 自身残缺时安全返航
+  ✓ #201 restore: 持久 PlanetSpec 深层数组损坏时启动不崩并安全返航
+  ✓ #204 LLM enrichment: 当前远征标题与刷新后的持久星球身份一致
+  ✓ #202 revisit: 已观测星球按持久 PlanetSpec 重访，刷新恢复后返航仍幂等
+  ✓ #203 expedition resources: 着陆采集、刷新恢复、返航结算与新 Run 重置闭环
+  ✓ #203 restore: 旧 observed runtime 的第二套自然资源安全返航而不重新装入
+  ✓ #203 restore: Observation 资源冒充覆盖物实体时拒绝恢复并安全返航
+  ✓ #202 revisit: 访问记录保存失败时不扣补给、不切世界且 PlanetSpec 不变
+  ✓ #202 launch transaction: begin 后首个 runtime 保存失败会撤回补给、run、Atlas 与磁盘
+  ✓ #202 launch transaction: 新星首个 runtime 保存失败也撤回 PlanetSpec 与发现记录
+  ✓ #202 known revisit: 运行危险字段损坏时拒绝启动且家园零变化
+  ✓ #202 legacy revisit: 旧短 ID 星球保持 generation 0，刷新不会静默补 Observation
+  ✓ 双世界: 单人出征，两个世界各结算一次并可切换、暂停和幂等返航
+  ✓ 双世界恢复: 无效远征 runtime 返航一次，pendingGround 不重放且 meta 快照同步
+  ✓ #164 idle: 闲置居民在无规划任务时自主漫步休闲与工位作业动效
+  ✓ #168 rest: 困了的居民走去居住舱再睡，不原地瞬睡
+  ✓ #172 right_click: 右键居住舱下达优先休息
+  ✓ #169 right_click: 右键蓝图下达优先建造
+  ✓ #169 build: 镜头不是施工者，真实居民到场才推进
+  ✓ 征召后点地面走路（笔记本无右键）
+  ✓ #170 schedule: 检查器循环作息格
+  ✓ #169 right_click: 发射台右键打开编组，不抢建造命令
+  ✓ #173 pause: 暂停时钟停、倍速加速、暂停时镜头可平移 (#165)
+  ✓ #167 alerts: 饥饿警报可点跳镜头，没事则空
+  ✓ #ADR32 hint: 没东西可交互时不出交互键提示
+  ✓ #ADR32 hint: 物资告急压过交互提示
+  ✓ #T1 fall: 没立过殖民地(开局0人)不算覆灭
+  ✓ #T1 fall: 立过殖民地后归零 = 本局结束
+  ✓ #T1 commander: 指挥官有心情, 且由念头驱动
+  ✓ #T5 rooting: 灯塔查看进度不会提前结束经营
+  ✓ #T5 win: 发射器是唯一胜利出口, 且需通电
+  ✓ formal home: 两棵指定树→取料→运料→施工→独立床，普通主流程
+  ✓ modern production: 厨师实际取送地面食材后才在篝火完成肉排工单
+  ✓ modern production: 在途材料取消工单后读档恢复守恒，不凭空吞食材
+  ✓ modern production: 学者实际运送露果标本后化验，解锁作物并吐出种荚
+  ✓ season boundary and rooting-condition recovery fixture
+  ✓ modern equip: 两名居民争抢一件装备只会消费一次
+  ✓ modern haul: 普通搬运不会抢走已被生产工单预订的地面份额
+  ✓ modern dining: 餐位离食物货架超过 200px 时先取一份再走回用餐
+  ✓ #212 人型敌对与俘虏随生产跳走同一需求/健康结算，面板读实时值
+  ✓ #213 居民看到具名人型尸体会起既有念头，埋葬后消失
+  ✓ #213 标记搬运后居民实际移动同一遗体，仍可安葬
+  ✓ #213 家园与远征绘制表都能显示具名尸体
+  ✓ ADR-47 收容：居民押送同一俘虏到建成点，释放仍由同一身体撤离
+  ✓ ADR-47 收容：未建专用点时押送到家园临时收容区
+  ✓ ADR-47 收容：一名空闲居民连续押送多名俘虏，不会只处理首人
+  ✓ #189 释放俘虏：同一个人自己走出地图，不是删一行
+  ✓ #189 招降俘虏：同 id 只留一份世界实体（玩家居民）
+  ✓ #189 囚犯有玩家出口：检查器面板 + 名册俘虏区 + 键盘等价路径
+  ✓ #189 非人俘虏（基因体）只能放走，不能入籍
+  ✓ #190 框选只收玩家居民，敌对小人进不了编队
+  ✓ #190 征召只认玩家阵营：敌对小人即使被选中也不立正
+  ✓ #190 头像条只列殖民者，不含敌对小人
+  ✓ #214 敌对检查器直接显示共享崩溃类型与剩余跳数
+
+161 通过 / 0 失败 / 共 161

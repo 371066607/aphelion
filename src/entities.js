@@ -525,6 +525,8 @@ APH.Ent = (function(){
       ctx.restore();
       return;
     }
+    /* Floors/conduits already render in the grid layer; never fall through to a generic building. */
+    if(isGeometry(e)&&(e.bid==='bl_floor'||e.bid==='bl_conduit'))return;
     if(isGeometry(e) && e.bid!=='bl_wall' && e.bid!=='bl_gate' && e.layer!=='floor' && e.layer!=='conduit'){
       drawGeometryFurniture(e,time,false); return;
     }
@@ -1296,8 +1298,63 @@ APH.Ent = (function(){
     return true;
   }
 
-  function drawResident(e,time){
+  /* Resolve only a modern ordinary bed. Sleeping on the ground, old housing,
+     downed and medical poses retain their existing rendering contract. */
+  function bedSleepPose(e){
+    if(!e || e.type!==T.RESIDENT || !e.isSleeping || e.downed || e.medLying || !e.sleepAnchor ||
+      e.sleepAnchor.x==null || e.sleepAnchor.y==null) return null;
+    var s=APH.state;
+    if(!s || s.scene!=='home' || !s.meta || !s.colony || !window.APH.BuildGrid) return null;
+    var r=(s.meta.residents||[]).find(function(r){return r.id===(e.rid||e.id);});
+    if(!r || !r.bedId) return null;
+    var bed=(s.colony.buildings||[]).find(function(b){
+      return b && !b.dead && b.id==='bl_bed' && b.geometryVersion===1 &&
+        r.bedId.indexOf((b.uid||(b.id+'@'+b.x+','+b.y))+':')===0;
+    });
+    if(!bed) return null;
+    var rect=geometryRect(bed), center=geometryCenter(rect), base=geometryBaseSize(bed);
+    return {x:center.x,y:center.y,w:base.w,h:base.h,rotation:APH.BuildGrid.normalizeRotation(bed),
+      depth:typeof bed.y==='number'?bed.y:center.y,rect:rect};
+  }
+
+  /* Canonical prone artwork has its head to the left. Turn that into the
+     bed's north-facing pillow, then apply the same quarter-turn as the bed.
+     Union bounds keep all breathing frames fitted without per-frame jitter. */
+  function bedSleepLayout(bed,bounds,def){
+    if(!bed || !bounds || !def || !bounds.w || !bounds.h) return null;
+    var inset=CFG.visual.bedSleepInset, width=bed.w-inset.side*2, length=bed.h-inset.end*2;
+    if(width<=0 || length<=0) return null;
+    var scale=Math.min(length/bounds.w,width/bounds.h);
+    var baseline=def.baseline || def.fh*def.anchorY;
+    return {scale:scale,angle:(bed.rotation+1)*Math.PI/2,
+      drawX:(def.fw/2-bounds.x-bounds.w/2)*scale,
+      drawY:(baseline-bounds.y-bounds.h/2)*scale};
+  }
+
+  function drawBedSleeper(e,time,bed){
+    if(!(window.APH.Sprites && APH.Sprites.contentBounds && window.APH.Humanoid)) return false;
+    var pose=APH.Humanoid.poseFor({role:'resident',id:e.rid||e.id,pack:false,lying:true,
+      face:Math.PI/2,time:time},function(name){return APH.Sprites.isReady(name);});
+    if(!APH.Sprites.isReady(pose.sheet)) return false;
+    var def=APH.Sprites.sheetDef(pose.sheet);
+    var bounds=APH.Sprites.contentBounds(pose.sheet,0,CFG.humanoid.idlePerDir);
+    var layout=bedSleepLayout(bed,bounds,def);
+    if(!layout) return false;
+    ctx.save();ctx.translate(bed.x,bed.y);ctx.rotate(layout.angle);
+    if(e.hitFlash>0 && Math.floor(time*18)%2===0) ctx.globalAlpha=.35;
+    APH.Sprites.draw(ctx,pose.sheet,layout.drawX,layout.drawY,pose.frame,layout.scale);
+    ctx.restore();
+    // Existing marks stay upright; no illness/needs rules change.
+    ctx.save();ctx.translate(bed.x,bed.y);
+    drawResidentMarks(e,0,-bed.rect.h/2+8,-bed.rect.h/2+40);
+    ctx.restore();
+    return true;
+  }
+
+  function drawResident(e,time,bedPose){
     if(!ctx) return;
+    if(bedPose===undefined) bedPose=bedSleepPose(e);
+    if(bedPose && drawBedSleeper(e,time,bedPose)) return;
     ctx.save();
     /* New beds keep the pawn's logical position on the reachable interaction
        cell.  While asleep only, render the prone body over the bed centre;
@@ -1386,7 +1443,12 @@ APH.Ent = (function(){
     ctx.translate(e.x + shake, e.y);
     ctx.fillStyle='rgba(0,0,0,.22)';
     ctx.beginPath(); ctx.ellipse(0,4,12,6,0,0,U.TAU); ctx.fill();
-    if(kind === 'tree'){
+    var artName=CFG.visual.environmentKinds[kind];
+    if(kind==='tree'&&U.hash2(Math.floor(e.x),Math.floor(e.y))>.5)artName='tree_b';
+    var drewArt=!!(artName && window.APH.EnvironmentArt && APH.EnvironmentArt.draw(ctx,artName,0,4));
+    if(drewArt){
+      if(kind==='rock_wreckage'&&e.repairable){ctx.fillStyle='#ffe099';ctx.fillRect(11,-16,5,5);}
+    }else if(kind === 'tree'){
       ctx.fillStyle='#6d4c41';
       ctx.fillRect(-3, -12, 6, 14);
       ctx.fillStyle='#388e3c';
@@ -1493,7 +1555,9 @@ APH.Ent = (function(){
     /* New floor/conduit live in their own layers below the shared wall outline. */
     floors.forEach(function(f){
       APH.BuildGrid.cellsOf(f,APH.Colony&&APH.Colony.list&&APH.Colony.list(),geometryScene()).forEach(function(c){
-        var x=c.gx*grid,y=c.gy*grid;ctx.fillStyle='#9a805e';ctx.fillRect(x+1,y+1,grid-2,grid-2);ctx.strokeStyle='rgba(255,234,190,.34)';ctx.lineWidth=1;ctx.strokeRect(x+2.5,y+2.5,grid-5,grid-5);
+        var x=c.gx*grid,y=c.gy*grid;ctx.fillStyle='#9a805e';ctx.fillRect(x,y,grid,grid);
+        if(APH.BuildArt&&APH.BuildArt.fillMaterial)APH.BuildArt.fillMaterial(ctx,'floor',x,y,grid,grid);
+        ctx.strokeStyle='rgba(91,76,51,.22)';ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,grid-1,grid-1);
       });
     });
     conduits.forEach(function(co){
@@ -1525,6 +1589,10 @@ APH.Ent = (function(){
           ctx.beginPath(); ctx.moveTo(t.x-5,t.y+4); ctx.lineTo(t.x+2,t.y+1); ctx.stroke();
         }
       });
+
+      /* South-facing sides stay within the same solid cells. No false gap at joins. */
+      ctx.fillStyle='#ac9775';ctx.beginPath();
+      wallTiles.forEach(function(t){if(!hasWall(t.x,t.y+grid))ctx.rect(t.x-half,t.y+half-10,grid,10);});ctx.fill();
 
       /* 暗金属只包外轮廓。墙与门互为邻格，接缝处绝不重复描边。 */
       ctx.strokeStyle='#4a4138';
@@ -1786,6 +1854,7 @@ APH.Ent = (function(){
     makeRock:makeRock, makeCrystal:makeCrystal, makeBeacon:makeBeacon, makeEnemy:makeEnemy,
     drawRock:drawRock, drawCrystal:drawCrystal, drawCrystalGlow:drawCrystalGlow,
     drawBeacon:drawBeacon, drawPlayer:drawPlayer, drawResident:drawResident, drawVisitor:drawVisitor,
+    bedSleepPose:bedSleepPose, bedSleepLayout:bedSleepLayout,
     drawEnemy:drawEnemy, drawProj:drawProj, drawDropped:drawDropped, drawCorpse:drawCorpse,
     drawBuilding:drawBuilding, drawFlora:drawFlora, hitBuilding:hitBuilding,
     drawWalls:drawWalls,
